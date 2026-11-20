@@ -1497,17 +1497,19 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
 
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
 
-    // Check that a callable or property extension member's own [require(...)] attributes are
+    // Check that a callable or data extension member's own [require(...)] attributes are
     // compatible with the extension's target type capabilities. Shared by
-    // visitFunctionDeclBase (functions and constructors), visitSubscriptDecl, and
-    // visitPropertyDecl.
+    // visitFunctionDeclBase (functions and constructors), visitSubscriptDecl,
+    // visitPropertyDecl, and the variable merge in checkVarDeclCommon.
     void _checkExtensionMemberCapConflict(Decl* memberDecl);
 
-    // Return the capability set a declaration's own [require(...)] attributes declare,
-    // ignoring the parent chain that getDeclaredCapabilitySet walks. Used where the
-    // parent's requirements are already enforced or propagated elsewhere and only the
-    // declaration itself is in scope: the extension-member compatibility check below,
-    // and the variable merge in checkVarDeclCommon.
+    // Return the capability set a declaration's own [require(...)] attributes
+    // declare — deliberately only those, unlike getDeclaredCapabilitySet, which also
+    // folds in Shader64BitIndexingAttribute, entry-point stages and the parent chain.
+    // Used where the parent's requirements are already enforced or propagated
+    // elsewhere and only the declaration itself is in scope: the extension-member
+    // compatibility check (_checkExtensionMemberCapConflict), and the variable merge
+    // in checkVarDeclCommon.
     CapabilitySet getOwnDeclaredCapabilitySet(Decl* decl);
 
     enum class UndeclaredCapabilityDiagnosticKind
@@ -23100,26 +23102,36 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     //     [require(spirv)] static const float w = 1.0;
     //     export float a() { return w; }
     // Compiling `a` for `hlsl` must fail, which requires `w`'s inferred set to carry
-    // `spirv`. A variable's initializer is not walked, so chained constants
-    // (`static const float x = w;`) are not transitively gated by this merge; a
-    // variable's initializer may legitimately reference gated declarations
-    // (resource-typed initializers do), so walking initializers needs its own design.
+    // `spirv`. A global or member variable's initializer is not walked, so chained
+    // global constants (`static const float x = w;`) are not transitively gated by
+    // this merge — a function local's initializer is reached through the enclosing
+    // body walk, so chained locals are gated; a global initializer may legitimately
+    // reference gated declarations (resource-typed initializers do), so walking
+    // those needs its own design.
     //
-    // This serves every kind of `VarDeclBase` a module can declare: global constants
-    // and static members, whose requirements reach consumers directly, and parameters
-    // and function locals, whose requirements reach the enclosing function through its
-    // parameter and body walks.
+    // This serves every kind of `VarDeclBase` that can carry a `[require]`
+    // attribute: global constants and static members, whose requirements reach
+    // consumers directly, and parameters and function locals, whose requirements
+    // reach the enclosing function through its parameter and body walks.
     //
-    // Only the variable's own attributes are merged, on both the inferred and the
-    // declared side, not the parent chain that `getDeclaredCapabilitySet` would walk.
-    // A parent struct's requirements already reach a consumer through its reference to
-    // the parent type, and a parent function's requirements are already carried by the
-    // function doing the consuming. Re-merging the parent chain here would also feed it
-    // back into the enclosing capability-usage computation through parameter and local
-    // references (the `target_switch` case validation walks those references), which
-    // would pollute the per-case capability sets — and because the declared set lands
-    // in the inferred set in both branches below, that pollution happens whichever
-    // side the parent requirements enter from.
+    // Only the variable's own attributes are merged — never the parent chain that
+    // `getDeclaredCapabilitySet` would walk — and both branches below consume that
+    // single own set. A parent struct's requirements already reach a consumer
+    // through its reference to the parent type, and a parent function's requirements
+    // are already carried by the function doing the consuming. Re-merging the parent
+    // chain here would also feed it back into the enclosing capability-usage
+    // computation through parameter and local references: a gated parameter
+    // referenced from an hlsl `target_switch` case would pick up the enclosing
+    // function's requirements and the per-case conflict would compile silently — the
+    // CHECKDESIGN case in require-on-var-decl-site.slang pins exactly that shape.
+    // One accepted consequence: a static member whose own `[require]` narrows below
+    // its parent's (a `[require(hlsl)]` member inside a `[require(metal)]` struct)
+    // conflicts at every use, on every target, because the base-expression walk
+    // joins the parent's set with the member's own — where the member-function path
+    // joins the parent's set into the declared set and yields a usable union. That
+    // asymmetry is deliberate (the parent join is what breaks the `target_switch`
+    // validation above) and is pinned by the CHECKNARROW case in the same test
+    // file.
     //
     // Public decls must declare a superset of what their type references; internal
     // decls join the two sets, as with functions. Unlike the function path we do not
@@ -23131,9 +23143,9 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         return;
 
     auto vis = getDeclVisibility(varDecl);
-    const auto frozenDeclaredCaps = ownDeclaredCaps.freeze(getASTBuilder());
     if (vis == DeclVisibility::Public)
     {
+        const auto frozenDeclaredCaps = ownDeclaredCaps.freeze(getASTBuilder());
         CapabilityAtomSet failedAvailableCapabilityConjunction;
         CheckCapabilityRequirementResult checkCapabilityResult;
         CapabilitySet::checkCapabilityRequirement(
@@ -23156,6 +23168,8 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 .join(ownDeclaredCaps)
                 .freeze(getASTBuilder());
     }
+
+    _checkExtensionMemberCapConflict(varDecl);
 }
 
 CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* decl)
@@ -23407,19 +23421,6 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         _checkExtensionMemberCapConflict(funcDecl);
 }
 
-// Verify that a callable extension member's own [require(...)] attributes are
-// compatible with the extension's target type capabilities.
-//
-// We check only the member's own [require(...)] attributes rather than the
-// full declaredCaps (which includes caps inherited from the parent extension)
-// for two reasons:
-//  1. Avoids cascading errors: when the extension itself has an incompatible
-//     [require(X)] (already caught by visitExtensionDecl), members that inherit
-//     X should not also generate errors — fixing the extension fixes them too.
-//  2. Catches a case that full declaredCaps misses: if an extension has a
-//     compatible [require(glsl)] and a member adds its own [require(hlsl)],
-//     declaredCaps would be {hlsl|glsl} and joining that with {glsl} gives the
-//     valid {glsl}, hiding the conflict. Using just {hlsl} detects it.
 CapabilitySet SemanticsDeclCapabilityVisitor::getOwnDeclaredCapabilitySet(Decl* decl)
 {
     CapabilitySet ownDeclaredCaps;
@@ -23431,6 +23432,19 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getOwnDeclaredCapabilitySet(Decl* 
     return ownDeclaredCaps;
 }
 
+// Verify that a callable or data extension member's own [require(...)] attributes
+// are compatible with the extension's target type capabilities.
+//
+// We check only the member's own [require(...)] attributes rather than the
+// full declaredCaps (which includes caps inherited from the parent extension)
+// for two reasons:
+//  1. Avoids cascading errors: when the extension itself has an incompatible
+//     [require(X)] (already caught by visitExtensionDecl), members that inherit
+//     X should not also generate errors — fixing the extension fixes them too.
+//  2. Catches a case that full declaredCaps misses: if an extension has a
+//     compatible [require(glsl)] and a member adds its own [require(hlsl)],
+//     declaredCaps would be {hlsl|glsl} and joining that with {glsl} gives the
+//     valid {glsl}, hiding the conflict. Using just {hlsl} detects it.
 void SemanticsDeclCapabilityVisitor::_checkExtensionMemberCapConflict(Decl* memberDecl)
 {
     CapabilitySet ownDeclaredCaps = getOwnDeclaredCapabilitySet(memberDecl);
