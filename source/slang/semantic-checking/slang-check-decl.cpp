@@ -1049,6 +1049,7 @@ private:
     Expr* createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex);
 };
 
+/// Walk declaration references in syntax and checked values.
 template<typename VisitorType>
 struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
                                        public StmtVisitor<VisitorType>,

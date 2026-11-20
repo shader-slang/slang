@@ -4622,6 +4622,7 @@ private:
     bool isGLSLOperatorScope();
 };
 
+/// Check statements and their condition clauses in the current semantic context.
 struct SemanticsStmtVisitor : public SemanticsVisitor,
                               StmtVisitor<SemanticsStmtVisitor>,
                               ConditionClauseVisitor<SemanticsStmtVisitor>

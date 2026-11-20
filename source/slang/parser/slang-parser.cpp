@@ -338,6 +338,21 @@ public:
     }
 };
 
+/// Set a parser's pending modifiers and restore the previous list when leaving the scope.
+struct ScopedPendingModifiers
+{
+    ScopedPendingModifiers(Parser* parser, Modifiers& modifiers)
+        : parser(parser), previousModifiers(parser->pendingModifiers)
+    {
+        parser->pendingModifiers = &modifiers;
+    }
+
+    ~ScopedPendingModifiers() { parser->pendingModifiers = previousModifiers; }
+
+    Parser* parser;
+    Modifiers* previousModifiers;
+};
+
 // Forward Declarations
 
 enum class MatchedTokenType
@@ -6228,14 +6243,7 @@ static DeclBase* ParseDeclWithModifiers(
 {
     DeclBase* decl = nullptr;
 
-    struct RestorePendingModifiersRAII
-    {
-        Modifiers* oldValue;
-        Parser* parser;
-        ~RestorePendingModifiersRAII() { parser->pendingModifiers = oldValue; }
-    };
-    RestorePendingModifiersRAII restorePendingModifiersRAII{parser->pendingModifiers, parser};
-    parser->pendingModifiers = &modifiers;
+    ScopedPendingModifiers modifierContext(parser, modifiers);
 
     auto loc = parser->tokenReader.peekLoc();
     switch (peekTokenType(parser))
@@ -7891,7 +7899,9 @@ DeclConditionClause* Parser::parseDeclConditionClause()
 
     // A declaration condition declares one variable. We parse its type and declarator as
     // for a local declaration, including the distinction between type and declaration modifiers.
-    auto modifiers = ParseModifiers(this);
+    Modifiers modifiers;
+    ScopedPendingModifiers modifierContext(this, modifiers);
+    modifiers = ParseModifiers(this);
     auto typeSpec = parseConditionTypeSpec(this, modifiers);
     if (typeSpec.decl)
     {
@@ -7901,6 +7911,11 @@ DeclConditionClause* Parser::parseDeclConditionClause()
         sink->diagnose(Diagnostics::DeclNotAllowed{
             .declType = declType.produceString(),
             .location = typeSpec.decl->loc});
+
+        // The rejected definition never enters the scope. We keep the variable's
+        // declarator for recovery and give it an incomplete type expression.
+        typeSpec.expr = astBuilder->create<IncompleteExpr>();
+        typeSpec.expr->loc = typeSpec.decl->loc;
     }
     auto initDeclarator = parseInitDeclarator(this, kDeclaratorParseOptions_None);
     if (!initDeclarator.initializer)
@@ -7966,7 +7981,9 @@ bool Parser::doesConditionStartWithDeclaration()
     // prefix is missing, the real parser starts over with the expression grammar.
     DiagnosticSink declSink(sink->getSourceManager(), nullptr);
     auto declProbe = makeConditionLookaheadParser(tokens, &declSink);
-    auto modifiers = ParseModifiers(&declProbe);
+    Modifiers modifiers;
+    ScopedPendingModifiers declModifierContext(&declProbe, modifiers);
+    modifiers = ParseModifiers(&declProbe);
     parseConditionTypeSpec(&declProbe, modifiers);
     if (declSink.getErrorCount() != 0)
         return false;
@@ -7985,6 +8002,10 @@ bool Parser::doesConditionStartWithDeclaration()
     // fails that rule, but an assignment within a comma expression does not.
     DiagnosticSink exprSink(sink->getSourceManager(), nullptr);
     auto exprProbe = makeConditionLookaheadParser(tokens, &exprSink);
+    // `parseOptionalInheritanceClause` can run for inline types in expressions.
+    // The expression probe has no declaration modifiers to pass to it.
+    Modifiers emptyModifiers;
+    ScopedPendingModifiers exprModifierContext(&exprProbe, emptyModifiers);
     auto expr = exprProbe.ParseExpression();
     if (exprSink.getErrorCount() != 0)
         return true;
@@ -9114,9 +9135,9 @@ static Expr* parseLambdaExpr(Parser* parser)
     parser->ReadToken(TokenType::DoubleRightArrow);
     if (parser->LookAheadToken(TokenType::LBrace))
     {
-        // Conditions inside a lambda body cannot determine the form of a condition
-        // containing the lambda. We defer the body during lookahead so the nested
-        // conditions are parsed only when the real parser reaches them.
+        // The semantic checker visits the parsed body to infer the return type and
+        // discover captures. The condition probes inspect the syntax around the
+        // lambda and discard their ASTs, so they can skip over its statements.
         lambdaExpr->bodyStmt =
             parser->shouldDeferLambdaBodies ? parseOptBody(parser) : parser->parseBlockStatement();
     }

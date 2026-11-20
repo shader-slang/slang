@@ -366,6 +366,9 @@ struct ASTIterator
         void visitDetachExpr(DetachExpr* expr) { iterator->maybeDispatchCallback(expr); }
     };
 
+    /// Walk the statement subtree for `ASTIterator`.
+    ///
+    /// A declaration condition contributes its written declaration to the walk.
     struct ASTIteratorStmtVisitor : public StmtVisitor<ASTIteratorStmtVisitor>,
                                     public ConditionClauseVisitor<ASTIteratorStmtVisitor>
     {

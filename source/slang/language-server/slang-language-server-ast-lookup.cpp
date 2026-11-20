@@ -614,6 +614,9 @@ public:
     }
 };
 
+/// Search statements and their children for a match in the lookup context.
+///
+/// A visit returns true when it finds a match and the search can stop.
 struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>,
                               public ConditionClauseVisitor<ASTLookupStmtVisitor, bool>
 {

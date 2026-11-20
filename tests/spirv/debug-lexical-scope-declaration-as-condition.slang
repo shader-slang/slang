@@ -1,8 +1,8 @@
 //TEST:SIMPLE_EX(filecheck=CHECK): -lang hlsl tests/spirv/debug-lexical-scope-declaration-as-condition.slang -entry computeMain -stage compute -target spirv -g2 -O0 -validate-ir
 
 // Each statement's scope contains the variable declared in its condition and encloses its
-// body scopes. The local declared after the loop belongs to the function. The `#line`
-// directives fix the line numbers for the scope checks and the initializer call.
+// body scopes. The local declared after the loop belongs to the function. The checks use
+// physical line numbers so the debug locations refer to the embedded file text.
 // CHECK-DAG: OpName [[CHOOSE_THEN:%[A-Za-z_0-9]+]] "chooseThen"
 // CHECK-DAG: [[MAIN_NAME:%[0-9]+]] = OpString "computeMain"
 // CHECK-DAG: [[SELECTED_NAME:%[0-9]+]] = OpString "selected"
@@ -12,10 +12,10 @@
 // CHECK-DAG: [[LOOP_NAME:%[0-9]+]] = OpString "loopValue"
 // CHECK-DAG: [[AFTER_NAME:%[0-9]+]] = OpString "afterLoop"
 // CHECK-DAG: [[MAIN_FUNC:%[A-Za-z_0-9]+]] = {{.*}} DebugFunction [[MAIN_NAME]]
-// CHECK-DAG: [[IF_SCOPE:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE:%[A-Za-z_0-9]+]] %uint_101 {{%uint_[0-9]+}} [[MAIN_FUNC]]
-// CHECK-DAG: [[THEN_SCOPE:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] %uint_103 {{%uint_[0-9]+}} [[IF_SCOPE]]
-// CHECK-DAG: [[ELSE_SCOPE:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] %uint_108 {{%uint_[0-9]+}} [[IF_SCOPE]]
-// CHECK-DAG: [[WHILE_SCOPE:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] %uint_200 {{%uint_[0-9]+}} [[MAIN_FUNC]]
+// CHECK-DAG: [[IF_SCOPE:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE:%[A-Za-z_0-9]+]] %uint_[[#@LINE+29]] {{%uint_[0-9]+}} [[MAIN_FUNC]]
+// CHECK-DAG: [[THEN_SCOPE:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] %uint_[[#@LINE+30]] {{%uint_[0-9]+}} [[IF_SCOPE]]
+// CHECK-DAG: [[ELSE_SCOPE:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] %uint_[[#@LINE+34]] {{%uint_[0-9]+}} [[IF_SCOPE]]
+// CHECK-DAG: [[WHILE_SCOPE:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] %uint_[[#@LINE+38]] {{%uint_[0-9]+}} [[MAIN_FUNC]]
 // CHECK-DAG: [[LOOP_BODY:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[WHILE_SCOPE]]
 // CHECK-DAG: DebugLocalVariable [[SELECTED_NAME]] {{.*}} [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[IF_SCOPE]]
 // CHECK-DAG: DebugLocalVariable [[THEN_NAME]] {{.*}} [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[THEN_SCOPE]]
@@ -25,8 +25,8 @@
 // CHECK-DAG: DebugLocalVariable [[AFTER_NAME]] {{.*}} [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[MAIN_FUNC]]
 
 // The initializer call is on the declaration line. The `if` keyword is on the previous line.
-// CHECK: DebugLine [[SOURCE]] %uint_101 %uint_101
-// CHECK-NOT: DebugLine [[SOURCE]] %uint_100
+// CHECK: DebugLine [[SOURCE]] %uint_[[#@LINE+16]] %uint_[[#@LINE+16]]
+// CHECK-NOT: DebugLine [[SOURCE]] %uint_[[#@LINE+14]]
 // CHECK: OpFunctionCall %bool [[CHOOSE_THEN]]
 
 RWStructuredBuffer<int> result;
@@ -40,7 +40,6 @@ bool chooseThen(uint value)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
-#line 100
     if (
         bool selected = chooseThen(tid.x))
     {
@@ -54,7 +53,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     }
 
     uint remaining = tid.x & 1;
-#line 200
     while (bool repeat = remaining != 0)
     {
         int loopValue = int(repeat) + int(remaining);

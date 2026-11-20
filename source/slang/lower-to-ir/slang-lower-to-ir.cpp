@@ -7910,10 +7910,16 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>,
 
     IRInst* visitDeclConditionClause(DeclConditionClause* conditionClause)
     {
+        auto predicateExpr = conditionClause->predicateExpr;
+        // The statement visitor has already established the insertion point for the test.
+        // We emit the debug line before lowering the initializer because the declaration
+        // can start on a different line from the statement keyword.
+        maybeEmitDebugLine(context, nullptr, nullptr, predicateExpr->loc, /*allowNullStmt=*/true);
+
         // The checked predicate reads the declared variable. We lower its declaration first
         // so the same initialized variable supplies the test and any references in the body.
         lowerDecl(context, conditionClause->decl);
-        return getSimpleVal(context, lowerRValueExpr(context, conditionClause->predicateExpr));
+        return getSimpleVal(context, lowerRValueExpr(context, predicateExpr));
     }
 
     /// Enter a debug lexical block for the statement's declarations when emitting debug info.
@@ -7947,14 +7953,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>,
         auto thenStmt = stmt->positiveStatement;
         auto elseStmt = stmt->negativeStatement;
 
-        // The declaration can start on a different line from the `if` keyword.
-        // We emit the declaration's debug line before lowering its initializer so the
-        // debugger can attribute the initializer instructions to the declaration.
-        bool hasConditionDeclaration = as<DeclConditionClause>(conditionClause) != nullptr;
-        if (hasConditionDeclaration)
-            maybeEmitDebugLine(context, this, stmt, condExpr->loc);
         auto irCond = lowerConditionClause(conditionClause);
-        if (!hasConditionDeclaration)
+        if (as<ExprConditionClause>(conditionClause))
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
         IRInst* ifInst = nullptr;
@@ -8251,7 +8251,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>,
         auto conditionClause = stmt->condition;
         auto enclosingDebugScope = maybeEnterConditionDebugScope(stmt, conditionClause->loc);
         auto predicateLoc = getPredicateExpr(conditionClause)->loc;
-        maybeEmitDebugLine(context, this, stmt, predicateLoc);
+        if (as<ExprConditionClause>(conditionClause))
+            maybeEmitDebugLine(context, this, stmt, predicateLoc);
         auto irCondition = lowerConditionClause(conditionClause);
 
         uint32_t coverageBranchSiteID =

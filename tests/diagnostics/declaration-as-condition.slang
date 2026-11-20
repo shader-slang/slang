@@ -56,6 +56,21 @@ void extraDeclarator()
 */
     {}
 }
+
+struct Base
+{
+    int baseMember;
+};
+
+void embeddedTypeDefinition()
+{
+    if (struct Derived : Base { int derivedMember; } value = {})
+/*DECLARATOR:
+               ^^^^^^^ declaration not allowed here
+               ^^^^^^^ struct is not allowed here
+*/
+    {}
+}
 #elif defined(GLSL_TEST)
 void declarationInIfCondition()
 {
