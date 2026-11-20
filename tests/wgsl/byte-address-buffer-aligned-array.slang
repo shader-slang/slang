@@ -10,11 +10,7 @@
 //TEST:SIMPLE(filecheck=WGSL_BAD):-target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL_BAD):-target metal -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -output-using-type
-//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-llvm -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+metal+cuda+cpu+wgpu+llvm, filecheck-buffer=BUF):-output-using-type
 //TEST:SIMPLE(filecheck=LLVM):-target llvm-shader-ir -entry computeMain -stage compute -O1
 
 //TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 11.0 12.0 13.0 14.0 15.0 16.0 17.0 18.0 19.0 20.0 21.0 22.0 23.0 24.0 25.0 26.0 27.0 28.0 29.0 30.0 31.0 32.0 33.0 34.0], stride=4):name=src

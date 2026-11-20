@@ -9,8 +9,7 @@
 //TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain -stage compute -line-directive-mode none -g3
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -line-directive-mode none -g
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -line-directive-mode none -g3
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type -Xslang -g
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -output-using-type -Xslang -g
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=BUF): -output-using-type -Xslang -g
 
 //TEST_INPUT: set divisor = 4
 uniform int divisor;

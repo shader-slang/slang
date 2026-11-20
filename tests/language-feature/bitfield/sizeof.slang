@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -output-using-type
+//TEST:COMPARE_COMPUTE(targets=metal+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 
 // CHECK:      1

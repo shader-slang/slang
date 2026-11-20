@@ -24,12 +24,8 @@
 //TEST:SIMPLE(filecheck=NATIVE): -entry computeMain -stage compute -target glsl -DTEST_FLOAT=double
 //TEST:SIMPLE(filecheck=NATIVE): -entry computeMain -stage compute -target cuda -DTEST_FLOAT=double
 //TEST:SIMPLE(filecheck=NATIVE): -entry computeMain -stage compute -target cpp -DTEST_FLOAT=double
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cpu -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cpu -output-using-type -Xslang -DTEST_FLOAT=double
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -dx12 -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -shaderobj -mtl -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda+cpu, filecheck-buffer=BUF): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=BUF): -output-using-type -Xslang -DTEST_FLOAT=double
 
 // NATIVE: {{[Mm]odf}}
 

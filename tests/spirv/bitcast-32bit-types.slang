@@ -24,7 +24,7 @@
 // CHECK-DAG: OpBitcast %v4int %
 // CHECK-DAG: OpBitcast %v4uint %
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=OUT):-vk -compute -emit-spirv-directly -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=OUT):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[1078523331 1073741824 1077936128 1082130432 286331153 572662306 1065353216 1073741824 1077936128 1084227584], stride=4):name=inputBuffer
 RWStructuredBuffer<uint> inputBuffer;

@@ -7,8 +7,7 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none -g
 //TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain -stage compute -line-directive-mode none -g
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -emit-spirv-via-glsl -entry computeMain -stage compute -g
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=BUF):-output-using-type
 
 struct S
 {

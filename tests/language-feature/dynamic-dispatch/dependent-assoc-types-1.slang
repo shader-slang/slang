@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
@@ -28,7 +28,7 @@ struct StandardSerializer<T : __BuiltinFloatingPointType> : ISerializer<T>
 
     static T deserialize(RWStructuredBuffer<float> buffer)
     {
-        return __realCast<T>(buffer[0]); 
+        return __realCast<T>(buffer[0]);
     }
 };
 
@@ -40,7 +40,7 @@ struct A : ICalculation
     Data make(float q) { return q; }
 };
 
-struct BData 
+struct BData
 {
     float x;
     float y;
@@ -108,7 +108,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     f(0, 3.f);
     outputBuffer[3] = g(2.f);
     f(1, 2.f);
-    outputBuffer[4] = g(2.f); 
+    outputBuffer[4] = g(2.f);
 
     // Clear the first 3 elements
     outputBuffer[0] = 0.f;

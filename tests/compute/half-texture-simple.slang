@@ -1,10 +1,5 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute  -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12  -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj
 // TODO(JS): Doesn't work on vk currently
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj
+//TEST:COMPARE_COMPUTE(targets=cuda):
 
 // Doesn't work on CUDA, not clear why yet
 //DISABLE_TEST_INPUT: Texture1D(format=R16Float, size=4, content = one, mipMaps=1):name tLoad1D
@@ -37,17 +32,17 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint idx = dispatchThreadID.x;
     float u = idx * (1.0f / 4);
-    
+
     float val = 0.0f;
-   
-    val += t1D.SampleLevel(samplerState, u, 0); 
+
+    val += t1D.SampleLevel(samplerState, u, 0);
     val += t2D.SampleLevel(samplerState, float2(u, u), 0);
     val += t3D.SampleLevel(samplerState, float3(u, u, u), 0);
     val += tCube.SampleLevel(samplerState, normalize(float3(u, 1 - u, u)), 0);
- 
+
     val += t1DArray.SampleLevel(samplerState, float2(u, 0), 0);
     val += t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0);
     val += tCubeArray.SampleLevel(samplerState, float4(u, u, u, 0), 0);
- 
+
     outputBuffer[idx] = val;
 }

@@ -1,10 +1,10 @@
 //TEST_CATEGORY(wave, compute)
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-directly -render-feature subgroup-partitioned-ext
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-via-glsl
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -dx12 -profile sm_6_5 -shaderobj
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -xslang -DCUDA
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-render-feature subgroup-partitioned-ext
+//TEST:COMPARE_COMPUTE(targets=glsl, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=CHECK):-profile sm_6_5
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-xslang -DCUDA
 
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-directly -xslang -DUSE_GLSL_SYNTAX -render-feature subgroup-partitioned-ext
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-xslang -DUSE_GLSL_SYNTAX -render-feature subgroup-partitioned-ext
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

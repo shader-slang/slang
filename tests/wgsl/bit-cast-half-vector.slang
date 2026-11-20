@@ -1,7 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -render-feature half
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -render-feature half
+//TEST:COMPARE_COMPUTE(targets=vk+wgpu, filecheck-buffer=BUF):-render-feature half
 
 // WGSL's `bitcast` converts directly between `vec2<f16>` and a 32-bit scalar (`u32`, `i32`,
 // `f32`), and between `vec4<f16>` and a `vec2` of 32-bit values. `bit_cast` of those shapes is

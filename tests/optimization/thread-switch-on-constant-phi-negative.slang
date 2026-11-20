@@ -54,7 +54,7 @@
 
 // End-to-end correctness on the CPU target for the loop-break and defaultless
 // shapes below.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cpu
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[7 9 3 5], stride=4):name=selectors
 StructuredBuffer<int> selectors;

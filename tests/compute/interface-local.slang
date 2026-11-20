@@ -10,10 +10,7 @@
 
 // on a generic type parameter.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 
 interface IHelper

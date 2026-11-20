@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type -compute
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 // Test IEEE 754 NaN comparison behavior
 // According to IEEE 754 standard:

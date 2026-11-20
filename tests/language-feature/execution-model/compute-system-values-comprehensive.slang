@@ -5,9 +5,7 @@
 //   SV_DispatchThreadID == SV_GroupID * numthreads + SV_GroupThreadID
 //   SV_GroupIndex == x + y*Nx + z*Nx*Ny == x + y*2 + z*4
 
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type -compute-dispatch 2,2,2
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -compute-dispatch 2,2,2
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -compute-dispatch 2,2,2
+//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type -compute-dispatch 2,2,2
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 
 RWStructuredBuffer<int> outputBuffer;

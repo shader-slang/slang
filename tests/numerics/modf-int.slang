@@ -7,10 +7,8 @@
 //TEST:SIMPLE(filecheck=NATIVE): -target cpp -entry computeMain -stage compute -experimental-feature
 //TEST:SIMPLE(filecheck=NATIVE): -target spirv -entry computeMain -stage compute -experimental-feature -DTEST_FLOAT=half
 //TEST:SIMPLE(filecheck=NATIVE): -target spirv -entry computeMain -stage compute -experimental-feature -DTEST_FLOAT=double -DTEST_DOUBLE_PRECISION
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -output-using-type -Xslang -experimental-feature
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -output-using-type -Xslang -experimental-feature -Xslang -DTEST_FLOAT=double -Xslang -DTEST_DOUBLE_PRECISION
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type -Xslang -experimental-feature
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda+cpu, filecheck-buffer=CHECK): -output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -output-using-type -Xslang -experimental-feature -Xslang -DTEST_FLOAT=double -Xslang -DTEST_DOUBLE_PRECISION
 
 // We check integer outputs through both representation-independent interfaces and the public
 // builtin aliases. Non-square matrices distinguish their dimensions, explicit layouts check both

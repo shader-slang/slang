@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):
 
 // CHECK: 1
 // CHECK-NEXT: 2

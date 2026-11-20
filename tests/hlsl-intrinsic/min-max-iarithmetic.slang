@@ -1,10 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-mtl -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test that min/max can be used with IArithmetic constraint (issue #9395)
 // This verifies that generic code can use min/max for both integer and float types.
@@ -70,39 +64,39 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Test IArithmetic constraint with integers
     int intA = 5;
     int intB = 3;
-    
+
     int intMin = genericMinArithmetic<int>(intA, intB);  // Expected: 3
     int intMax = genericMaxArithmetic<int>(intA, intB);  // Expected: 5
     int intClamped = genericClamp<int>(7, 2, 6);  // Expected: 6
-    
+
     outputBuffer[0] = intMin;      // 3
     outputBuffer[1] = intMax;      // 5
     outputBuffer[2] = intClamped;  // 6
-    
+
     // Test IArithmetic constraint with floats
     float floatA = 2.5f;
     float floatB = 4.0f;
-    
+
     float floatMin = genericMinArithmetic<float>(floatA, floatB);  // Expected: 2.5
     float floatMax = genericMaxArithmetic<float>(floatA, floatB);  // Expected: 4.0
     float floatClamped = genericClamp<float>(5.0f, 1.0f, 3.0f);  // Expected: 3.0
-    
+
     outputBuffer[3] = int(floatMin * 10);      // 25
     outputBuffer[4] = int(floatMax * 10);      // 40
     outputBuffer[5] = int(floatClamped * 10);  // 30
-    
+
     // Test IInteger constraint
     int intMinI = genericMinInteger<int>(intA, intB);  // Expected: 3
     outputBuffer[6] = intMinI;  // 3
-    
+
     // Test IFloat constraint
     float floatMaxF = genericMaxFloat<float>(floatA, floatB);  // Expected: 4.0
     outputBuffer[7] = int(floatMaxF * 10);  // 40
-    
+
     // Test that direct calls still work (backward compatibility)
     outputBuffer[8] = min(10, 20);  // 10 (int)
     outputBuffer[9] = int(max(1.5f, 2.5f) * 10);  // 25 (float)
-    
+
     // Test with uint (unsigned integer)
     uint uintA = 8u;
     uint uintB = 12u;

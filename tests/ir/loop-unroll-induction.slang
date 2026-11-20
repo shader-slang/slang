@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type -xslang -g0
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type -xslang -g0
 
 //TEST_INPUT:set output = out ubuffer(data=[0], stride=4)
 

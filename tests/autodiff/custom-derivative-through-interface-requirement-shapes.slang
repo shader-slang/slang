@@ -5,8 +5,8 @@
 // custom derivative deliberately differs from the true derivative of the primal body (`3 * s`)
 // and counts its invocations in `outputBuffer[0]`.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=GENERIC_METHOD):-cpu -shaderobj -output-using-type -Xslang... -DGENERIC_METHOD -X.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=FORWARD_ONLY):-cpu -shaderobj -output-using-type -Xslang... -DFORWARD_ONLY -X.
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=GENERIC_METHOD):-output-using-type -Xslang... -DGENERIC_METHOD -X.
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=FORWARD_ONLY):-output-using-type -Xslang... -DFORWARD_ONLY -X.
 
 //TEST_INPUT:ubuffer(data=[0.0 0.0 0.0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;

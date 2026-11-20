@@ -4,7 +4,7 @@
 // any CPU test that used a gradient texture. A one-texel gradient must have 0 in its color
 // channels. The `float` format and the `uint` format take different paths in render-test, and
 // both are covered here.
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: Texture2D(size=1, content=gradient, format=RGBA32Float):name tf
 Texture2D<float4> tf;

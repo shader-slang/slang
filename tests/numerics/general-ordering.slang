@@ -2,7 +2,7 @@
 // require numeric arithmetic or a Scalar and Mask. Application types can use these operations
 // without claiming unrelated numeric capabilities.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 //TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o numeric-interfaces-general-ordering.hlsl -experimental-feature
 //TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o numeric-interfaces-general-ordering.spv -experimental-feature
 

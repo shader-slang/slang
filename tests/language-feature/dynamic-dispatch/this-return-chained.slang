@@ -3,10 +3,7 @@
 // exercises multi-step chaining (obj.f().f().g()), storing intermediate
 // interface-typed results, and passing them to functions that chain further.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-mtl -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda, filecheck-buffer=CHECK):-output-using-type
 //DIAGNOSTIC_TEST:SIMPLE(diag=REPORT,exit-code=0,non-exhaustive):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
 interface ITransformable

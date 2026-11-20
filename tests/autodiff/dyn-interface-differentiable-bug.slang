@@ -1,20 +1,18 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -compute -shaderobj -output-using-type -dx12
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda, filecheck-buffer=CHECK): -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-public dyn interface IFoo 
+public dyn interface IFoo
 {
     [Differentiable]
-    public float bar<let N : int>(vector<float, N> v); 
+    public float bar<let N : int>(vector<float, N> v);
 };
 
-public struct Foo1 : IFoo 
+public struct Foo1 : IFoo
 {
     [Differentiable]
-    public float bar<let N : int>(vector<float, N> v) 
+    public float bar<let N : int>(vector<float, N> v)
     {
         float sum = 0;
         [ForceUnroll]
@@ -25,10 +23,10 @@ public struct Foo1 : IFoo
 };
 
 
-public struct Foo2 : IFoo 
+public struct Foo2 : IFoo
 {
     [Differentiable]
-    public float bar<let N : int>(vector<float, N> v) 
+    public float bar<let N : int>(vector<float, N> v)
     {
         float sum = 0;
         [ForceUnroll]
@@ -54,9 +52,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     else
         foo = Foo2();
 
-    DifferentialPair<vector<float, 4>> dpa = 
+    DifferentialPair<vector<float, 4>> dpa =
         diffPair(
-            vector<float, 4>(1, 2, 3, 4), 
+            vector<float, 4>(1, 2, 3, 4),
             vector<float, 4>(0, 0, 0, 0));
 
     bwd_diff(doThing)(foo, dpa, 1.0f);

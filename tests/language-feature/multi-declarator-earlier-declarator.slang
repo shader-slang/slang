@@ -3,7 +3,7 @@
 // parser looks up a name to decide whether `<` starts generic arguments or a
 // parenthesized name is a cast (gh-13428).
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[1 5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=buf
 RWStructuredBuffer<int> buf;

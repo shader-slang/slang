@@ -1,7 +1,7 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=SPIRV): -vk -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=SPIRV): -output-using-type
 //TEST:SIMPLE(filecheck=SPIRV_BRANCH): -target spirv-asm -stage compute -entry computeMain -DBRANCH
 //TEST:SIMPLE(filecheck=SPIRV_BRANCH): -target spirv-asm -stage compute -entry computeMain -DBRANCH -O3
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BRANCH): -vk -shaderobj -output-using-type -Xslang -DBRANCH
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BRANCH): -output-using-type -Xslang -DBRANCH
 
 // This tests if the function parameter is properly legalized from ByteAddressBuffer to StructurredBuffer.
 

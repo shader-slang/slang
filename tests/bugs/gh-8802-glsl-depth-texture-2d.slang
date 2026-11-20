@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -target glsl
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -vk -emit-spirv-via-glsl
+//TEST:COMPARE_COMPUTE(targets=glsl, filecheck-buffer=POSITIVE_RESULT):
 
 // This is a minimal repro for issue 8802
 

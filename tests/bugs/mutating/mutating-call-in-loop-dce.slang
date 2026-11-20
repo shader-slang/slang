@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 // Confirm that a SideEffectFree mutable method does not get DCE'd when
 // it is called from within a loop.

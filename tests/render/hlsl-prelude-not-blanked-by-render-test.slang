@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=BUF):-output-using-type
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 
 // Regression test for shader-slang/slang#12462.

@@ -1,9 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -cpu
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -cuda -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -mtl -compute
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -dx12 -profile cs_6_0 -shaderobj -render-feature hardware-device
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -llvm -compute
+//TEST:COMPARE_COMPUTE(targets=vk+metal+cuda+cpu+llvm, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=CHECK):-profile cs_6_0 -render-feature hardware-device
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

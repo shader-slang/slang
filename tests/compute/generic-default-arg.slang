@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Check that user code can declare and use a generic
 // `struct` type.

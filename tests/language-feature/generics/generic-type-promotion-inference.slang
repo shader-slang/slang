@@ -8,7 +8,7 @@
 //
 // This file retains a minimal smoke test for the basic case.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -output-using-type
 
 T add<T : IArithmetic>(T a, T b)
 {

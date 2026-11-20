@@ -1,6 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -10,12 +8,12 @@ RWStructuredBuffer<float> outputBuffer;
 // Derivatives are technically zero since `ladd`, `lmul` and `lscale` are all defined in
 // ILinearArithmeticType, where the type are all non-differentiable (in that context).
 // Adding a IDifferentiable conformance on to `T` should not change the fact that `ladd`
-// should still be treated as non-differentiable. 
+// should still be treated as non-differentiable.
 //
-// This test stress-tests that differentiability doesn't 'leak' into non-differentiable 
+// This test stress-tests that differentiability doesn't 'leak' into non-differentiable
 // contexts. At the time of writing this test, modified types are used to ensure that non-differentiable
 // types remain that way even under substitution.
-// 
+//
 
 typedef float Real;
 
@@ -184,7 +182,7 @@ extension float : MyLinearArithmeticDifferentiableType
     {
         return a * b;
     }
-    
+
     [Differentiable]
     static float ldot(float a, float b)
     {
@@ -211,7 +209,7 @@ G f<G>(G x) where G : MyLinearArithmeticType, IDifferentiable
     G a = x + x;
     G b = x * x;
 
-    return a * a + G.lscale((Real)3.0, x); 
+    return a * a + G.lscale((Real)3.0, x);
 }
 
 

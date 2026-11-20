@@ -7,7 +7,7 @@
 //    extension.
 // 3. Otherwise, if there is a generic extension that makes the type conform to the interface, use that.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 interface IFoo
 {
     int getVal();

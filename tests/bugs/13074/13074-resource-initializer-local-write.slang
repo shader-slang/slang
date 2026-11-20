@@ -8,7 +8,7 @@
 // `selectThroughLocal`. This test concerns the initializer analysis rather than a target's rules
 // for local resource storage.
 //TEST:SIMPLE: -target cpp -entry computeMain -stage compute -O0 -validate-ir -o 13074-resource-initializer-local-write.cpp
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -output-using-type
 
 // CHECK: type: float
 // CHECK-NEXT: {{^}}1.000000{{$}}

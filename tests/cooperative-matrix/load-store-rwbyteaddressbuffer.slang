@@ -1,7 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DRWBAB
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -Xslang -DRWBAB
+//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type -Xslang -DRWBAB
 
 //DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include
 //DXIL: result code = 0

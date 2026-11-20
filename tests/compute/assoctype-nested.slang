@@ -2,10 +2,7 @@
 
 // Confirm that an associated type can be declared nested in its parent.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 interface IRandomGenerator
 {

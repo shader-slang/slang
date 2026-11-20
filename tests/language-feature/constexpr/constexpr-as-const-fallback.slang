@@ -2,7 +2,7 @@
 // variable can be used as a compile-time generic argument. Regression test
 // for issue #10940 (static constexpr uint N used as vector size).
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -Wno-31227
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -xslang -Wno-31227
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;

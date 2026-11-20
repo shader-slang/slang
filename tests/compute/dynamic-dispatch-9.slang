@@ -1,7 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-dx11 -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk+dx11+cuda+cpu):
 
 // Test dynamic dispatch code gen for initializing an extential value
 // from a generic value.
@@ -20,7 +17,7 @@ int GenericCompute0(IInterface obj, int inVal)
 int GenericCompute1<T:IInterface>(T obj, int inVal)
 {
     IInterface iobj = obj;
-	return iobj.Compute(inVal) + 
+	return iobj.Compute(inVal) +
         GenericCompute0(obj, inVal) -
         GenericCompute0(iobj, inVal);
 }

@@ -1,11 +1,11 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 interface IFoo
 {
-  static This myAdd(This v, float val);   
+  static This myAdd(This v, float val);
 }
 
 __generic<let N : int>

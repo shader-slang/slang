@@ -1,8 +1,8 @@
 // Check that a shader that samples a never-written texture only on a path that is not taken runs on
 // Vulkan and returns the value that it computes without the texture.
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -Wno-41016
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -g -xslang -Wno-41016
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -xslang -Wno-41016
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -xslang -g -xslang -Wno-41016
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):name=flags
 RWStructuredBuffer<uint> flags;

@@ -7,7 +7,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -mtl -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUFFER):-output-using-type
 
 //TEST_INPUT: set dataBuffer = ubuffer(stride=4, count=4096)
 uniform RWStructuredBuffer<float>.Handle dataBuffer;

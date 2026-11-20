@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Confirm that generics syntax can be used in user
 // code and generates valid output.
@@ -58,7 +57,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         GenFoo<BottomImpl> outVal = { {inVal} };
         BottomImpl bi = testRight(outVal);
         outputBuffer[tid] = bi.x;
-        
+
         // CHECK: 0.0
         // CHECK-NEXT: 1.0
         // CHECK-NEXT: 2.0
@@ -70,7 +69,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         GenFoo<BottomImpl> outVal = { {inVal} };
         BottomImpl bi = testLeft(outVal);
         outputBuffer[tid + 4] = bi.x;
-        
+
         // CHECK-NEXT: 0.0
         // CHECK-NEXT: 1.0
         // CHECK-NEXT: 2.0

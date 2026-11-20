@@ -4,10 +4,7 @@
 // generic functions forwarding through existential parameters, and
 // nested generic interfaces with multi-level dynamic dispatch.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-mtl -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
 interface IProcessor<T : IArithmetic>

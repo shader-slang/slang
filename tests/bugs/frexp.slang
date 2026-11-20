@@ -1,10 +1,4 @@
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -emit-spirv-directly -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -mtl -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-output-using-type
 
 // BUF:      type: int32_t
 // BUF-NEXT: 1

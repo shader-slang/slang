@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 // CHECK: 9223372036854775808
 // CHECK: 1

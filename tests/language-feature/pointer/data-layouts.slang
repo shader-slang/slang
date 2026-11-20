@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -llvm -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -emit-spirv-directly -compute
+//TEST:COMPARE_COMPUTE(targets=vk+llvm, filecheck-buffer=CHECK):
 
 struct A
 {

@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -43,5 +41,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[2] = dOut.d[0][0].m;
     outputBuffer[3] = darrCopy[0][1].n;
     outputBuffer[4] = darrCopy[0][1].m;
-    
+
 }

@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE: 
+//TEST:COMPARE_COMPUTE(targets=all):
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -profile cs_5_0
 
 int check<let b : bool>(int x)

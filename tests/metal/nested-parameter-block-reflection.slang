@@ -1,6 +1,5 @@
 //TEST:REFLECTION(filecheck=METAL): -target metal
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -slang -compute -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -slang -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUF):-output-using-type
 
 
 // METAL: "name": "gParams",

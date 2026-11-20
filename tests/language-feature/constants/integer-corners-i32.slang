@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -output-using-type -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF): -output-using-type
 //TEST_INPUT:ubuffer(data=[7 7 7 7 7 7 7 7], stride=4, count=8):out,name=outputBuffer
 RWStructuredBuffer<int32_t> outputBuffer;
 

@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -capability cuda_sm_8_0
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type -capability cuda_sm_8_0
 
 // Element-wise arithmetic on CoopMat<int8_t, ...>. Each entry fills two MatrixA
 // fragments with uniform int8 scalars, applies the operator, and uses .equals()

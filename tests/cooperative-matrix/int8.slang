@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -capability cuda_sm_8_0
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type -capability cuda_sm_8_0
 
 // This test exercises using int8 Cooperative Matrix type in matmuladd operation
 // on CUDA, which targets PTX mma.sync.m16n8k16.s32.s8.s8.s32 (k=16).
