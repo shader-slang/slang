@@ -23,7 +23,7 @@ ranges are the `block` entry (around line 829) and the
   opcodes (e.g. `TryCall`, `GenericAsm`). Include them when they live
   in the same group; otherwise leave a brief note.
 - The `AST origin` column should cite the
-  [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+  [slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
   visitors for statements: `lowerStmt`, `visitBlockStmt`,
   `visitIfStmt`, `visitForStmt`, `visitWhileStmt`, `visitDoWhileStmt`,
   `visitSwitchStmt`, `visitReturnStmt`, `visitBreakStmt`,

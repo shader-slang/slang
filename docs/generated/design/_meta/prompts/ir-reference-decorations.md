@@ -7,7 +7,7 @@ See [_common.md](_common.md) for the universal rules and the
 
 Produce `docs/generated/design/ir-reference/decorations.md` — the
 per-opcode reference for every entry in the `Decoration` family of
-[../../../../source/slang/slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
+[../../../../source/slang/ir/slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua)
 (top-level `Decoration` entry around line 1591 through ~line 2476).
 
 This is the largest single family in the Lua file. The page is

@@ -24,12 +24,12 @@ syntax table or the core-module sources, not the lexer.
 Three sources contribute keywords:
 
 1. **Hardcoded statement keywords** in
-   [slang-parser.cpp](../../../../source/slang/slang-parser.cpp). The
+   [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp). The
    statement parser inspects identifiers via `LookAheadToken("if")`,
    `LookAheadToken("for")`, etc., and dispatches to dedicated parse
    functions.
 2. **The parser's `SyntaxParseInfo` table**
-   ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp), the
+   ([slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp), the
    array `g_parseSyntaxEntries[]`), which `getSyntaxParseInfos()`
    exposes as a view and `populateBaseLanguageModule()` registers into
    the default environment. This is the source of decl, modifier, and
@@ -88,7 +88,7 @@ so the new spelling is a drop-in alias in that case; no `.slang` source in the t
 
 Recognized in the statement parser by direct identifier comparison.
 Cited line numbers refer to
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp) at
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) at
 `source_commit`.
 
 | Keyword | Where parsed |
@@ -121,7 +121,7 @@ code. Note that `try` is an *expression* keyword (see
 to the expression-statement parser; the statement-level exception
 handler is `do { ... } catch ( ... ) { ... }`, parsed at
 [slang-parser.cpp lines
-7882-7913](../../../../source/slang/slang-parser.cpp). The error
+7882-7913](../../../../source/slang/parser/slang-parser.cpp). The error
 parameter is optional — a bare `catch` catches every error type — and
 `ParseDoCatchStatement` loops while another `catch` follows, using each
 `CatchStmt` as the `tryBody` of the next so a chain of `catch` clauses
@@ -146,7 +146,7 @@ one in core-module source can recognize it:
 ### Decl keywords
 
 Registered in `g_parseSyntaxEntries[]` at
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line 11106
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) line 11106
 through `_makeParseDecl(...)` (defined at line 11077). Identifiers that begin with double
 underscore (`__`) are intentionally namespaced as compiler-internal /
 non-stable.
@@ -217,11 +217,11 @@ callback name alone does not imply one:
 identifier lookahead in the type-specifier parser
 `_parseSimpleTypeSpec`
 ([slang-parser.cpp lines
-3662-3688](../../../../source/slang/slang-parser.cpp)), reached through
+3662-3688](../../../../source/slang/parser/slang-parser.cpp)), reached through
 `ParseDeclaratorDecl` and `_parseTypeSpec` from the fallback case of
 `ParseDeclWithModifiers`
 ([slang-parser.cpp line
-6268](../../../../source/slang/slang-parser.cpp)). The dedicated
+6268](../../../../source/slang/parser/slang-parser.cpp)). The dedicated
 parse routines (`ParseStruct` at line 6719, `ParseClass`
 at line 6789, `parseEnumDecl` at line 6838) construct the
 corresponding AST nodes directly. A block statement also routes a
@@ -249,7 +249,7 @@ leaves every semantic consequence of the choice to later stages
 The same type-specifier parser also recognizes the variadic-pack type
 forms `expand` and `each` by direct identifier lookahead
 ([slang-parser.cpp lines
-3689-3698](../../../../source/slang/slang-parser.cpp)), in the same
+3689-3698](../../../../source/slang/parser/slang-parser.cpp)), in the same
 branch as the `__first` / `__last` / `__trimFirst` / `__trimLast` /
 `__shapeConcat` / `__shapePermute` / `__shapeSwap` / `__shapeReduce` /
 `__packBranch` shape utilities, which hands off to `parsePrefixExpr`.
@@ -280,7 +280,7 @@ accepted (bare `unsigned` too), while `signed` and the `char` /
 ### Modifier keywords
 
 Registered through `_makeParseModifier` in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp). Some are
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp). Some are
 "simple" (single keyword, single AST node class), others take
 arguments (e.g. `layout`, `__target_intrinsic`).
 
@@ -384,7 +384,7 @@ taking the integer or identifier it otherwise accepts, and
 ### Expression keywords
 
 Registered through `_makeParseExpr` in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp).
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp).
 
 | Keyword | Parses |
 | --- | --- |
@@ -397,7 +397,7 @@ Registered through `_makeParseExpr` in
 | `__fwd_diff`, `fwd_diff` | Forward-mode differentiation (`parseForwardDifferentiate`) |
 | `__bwd_diff`, `bwd_diff` | Reverse-mode differentiation (`parseBackwardDifferentiate`) |
 | `__apply` | Apply-for-backward higher-order expression (`parseApplyForBwd`); used inside `__func_extension` to expose the primal-with-context companion to a custom `bwd_diff`; experimental |
-| `new` | Heap-style allocation expression; parsed specially by the `AdvanceIf(parser, "new")` branch of `parsePrefixExpr` at [slang-parser.cpp line 10093](../../../../source/slang/slang-parser.cpp) (`parsePrefixExpr` defined at line 10085; not via `_makeParseExpr`) |
+| `new` | Heap-style allocation expression; parsed specially by the `AdvanceIf(parser, "new")` branch of `parsePrefixExpr` at [slang-parser.cpp line 10093](../../../../source/slang/parser/slang-parser.cpp) (`parsePrefixExpr` defined at line 10085; not via `_makeParseExpr`) |
 | `__return_val` | Compiler-internal return-value reference |
 | `__func_as_type` | Function-as-type reflection |
 | `__dispatch_kernel` | Kernel-dispatch primitive |
@@ -457,7 +457,7 @@ Process notes:
   `__builtinGroupIndex` near the top of the file (lines 15 and 17); the
   module attaches no capability requirement to them, and which targets
   accept one is decided by entry-point varying-parameter legalization
-  ([slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp)),
+  ([slang-ir-legalize-varying-params.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-varying-params.cpp)),
   not here. In that file only two per-target contexts map `SV_WaveIndex`:
   the Metal one (line 4608, to `simdgroup_index_in_threadgroup`) and the
   WGSL one (line 5380, to `subgroup_id`). It has no arm for it on any
@@ -528,7 +528,7 @@ user-defined name, including declaration keywords such as `func`,
 The one place the parser looks at a `__` prefix on a user-chosen name is
 inline SPIR-V assembly: when parsing the core module, a named `%id`
 register must start with `__` (an assertion at
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) lines
 9828-9831), so that the register reads as compiler-internal.
 
 The `__` prefix is the one that is really load-bearing, and it is

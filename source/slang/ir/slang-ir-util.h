@@ -1,0 +1,863 @@
+// slang-ir-util.h
+#ifndef SLANG_IR_UTIL_H_INCLUDED
+#define SLANG_IR_UTIL_H_INCLUDED
+
+// This file contains utility functions for operating with Slang IR.
+//
+#include "slang-ir-insts.h"
+#include "slang-ir.h"
+namespace Slang
+{
+struct GenericChildrenMigrationContextImpl;
+struct IRCloneEnv;
+
+constexpr IRIntegerValue kInvalidAnyValueSize = 0xFFFFFFFF;
+constexpr IRIntegerValue kDefaultAnyValueSize = 16;
+constexpr SlangInt kRTTIHeaderSize = 16;
+constexpr SlangInt kRTTIHandleSize = 8;
+
+/// Return whether a struct contains only void fields or recursively empty structs. Other types,
+/// including arrays of empty elements, return false. This preserves DCE's existing structural
+/// query: type decorations do not affect its result.
+bool isStructEmpty(IRType* type);
+
+/// Return whether a type contains only empty data: void, structs of empty fields, or arrays of
+/// empty elements. Pointers, resources, opaque records, and target-intrinsic types are not empty.
+/// This structural query does not infer emptiness from byte size or predict all target-dependent
+/// type legalization decisions.
+bool isEmptyType(IRType* type);
+
+// A helper class to clone children insts to a different generic parent that has equivalent set of
+// generic parameters. The clone will take care of substitution of equivalent generic parameters and
+// intermediate values between the two generic parents.
+struct GenericChildrenMigrationContext : public RefObject
+{
+private:
+    GenericChildrenMigrationContextImpl* impl;
+
+public:
+    IRCloneEnv* getCloneEnv();
+
+    GenericChildrenMigrationContext();
+    ~GenericChildrenMigrationContext();
+
+    void init(IRGeneric* genericSrc, IRGeneric* genericDst, IRInst* insertBefore);
+
+    IRInst* deduplicate(IRInst* value);
+
+    IRInst* cloneInst(IRBuilder* builder, IRInst* src);
+};
+
+
+struct DeduplicateContext
+{
+    Dictionary<IRInstKey, IRInst*> deduplicateMap;
+
+    template<typename TFunc>
+    IRInst* deduplicate(IRInst* value, const TFunc& shouldDeduplicate)
+    {
+        if (!value)
+            return nullptr;
+        if (!shouldDeduplicate(value))
+            return value;
+        IRInstKey key = {value};
+        if (auto newValue = deduplicateMap.tryGetValue(key))
+            return *newValue;
+        for (UInt i = 0; i < value->getOperandCount(); i++)
+        {
+            auto deduplicatedOperand = deduplicate(value->getOperand(i), shouldDeduplicate);
+            if (deduplicatedOperand != value->getOperand(i))
+                value->unsafeSetOperand(i, deduplicatedOperand);
+        }
+        if (auto newValue = deduplicateMap.tryGetValue(key))
+            return *newValue;
+        deduplicateMap[key] = value;
+        return value;
+    }
+};
+
+
+//
+// Helper struct to represent a parameter's direction and type component separately.
+// Useful for passes that need to reason about parameter directions (like `in`, `out`, `ref`, etc.)
+//
+struct ParameterDirectionInfo
+{
+    enum Kind
+    {
+        In,
+        BorrowIn,
+        Out,
+        BorrowInOut,
+        Ref
+    } kind;
+
+    // For Ref and BorrowInOut
+    AddressSpace addressSpace;
+
+    // For Ref: the callee's access through the reference.
+    AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+
+    ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)
+        : kind(kind), addressSpace(addressSpace)
+    {
+    }
+
+    ParameterDirectionInfo()
+        : kind(Kind::In), addressSpace((AddressSpace)0)
+    {
+    }
+
+    bool operator==(const ParameterDirectionInfo& other) const
+    {
+        return kind == other.kind && addressSpace == other.addressSpace &&
+               accessQualifier == other.accessQualifier;
+    }
+};
+
+
+// Split into direction and type
+std::tuple<ParameterDirectionInfo, IRType*> splitParameterDirectionAndType(IRType* paramType);
+
+IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IRType* type);
+
+bool isAnnotation(IRInst* inst);
+
+bool isPtrToClassType(IRInst* type);
+
+bool isPtrToArrayType(IRInst* type);
+
+// True if ptrType is a pointer type to elementType
+bool isPointerOfType(IRInst* ptrType, IRInst* elementType);
+
+// True if ptrType is a pointer type to a type of opCode
+bool isPointerOfType(IRInst* ptrType, IROp opCode);
+
+bool isUserPointerType(IRInst* type);
+
+/// Return whether `inst` projects a field, element, or pointer-offset address from operand zero.
+bool isAddressInst(IRInst* inst);
+
+/// Return whether the result of `use->getUser()` may transfer a later storage access to or from the
+/// storage supplied through `use`.
+///
+/// This predicate recognizes only operand zero of address projections, pointer-to-pointer casts,
+/// `GetAddress`, `AssumeAddress`, and l-value implicit casts. Address operations and pointer casts
+/// can make a later access through the result affect storage reached from operand zero. The
+/// predicate therefore treats both reads and writes as transferable; a caller that needs an exact
+/// whole-value, subobject, or unknown relation must classify that relation separately.
+/// `InOutImplicitCast` transfers reads into its temporary and writes back to the source;
+/// `OutImplicitCast` transfers only writes back. A caller that does not track direction must treat
+/// every later access conservatively.
+bool doesUserResultTransferStorageAccessFromUse(IRUse* use);
+
+/// Return the function-type operand for the formal parameter corresponding to `argumentUse`, after
+/// removing outer attributed and rate-qualified wrappers. Parameter-direction wrappers such as
+/// `BorrowIn` and `Out` are preserved. A generic type parameter need not derive from `IRType`, so
+/// callers must test the returned instruction for the specific wrapper they need.
+///
+/// Returns null when `argumentUse` does not belong to `call`, when the callee's data type is not a
+/// function type, or when that function type has no corresponding parameter.
+IRInst* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse);
+
+// Builds a dictionary that maps from requirement key to requirement value for `interfaceType`.
+Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType);
+
+bool isComInterfaceType(IRType* type);
+
+// If `type` is a vector, returns its element type. Otherwise, return `type`.
+IRType* getVectorElementType(IRType* type);
+
+struct IRInstOperandSource
+{
+    IRInst* inst;
+
+    Index getOperandCount() const { return Index(inst->getOperandCount()); }
+    IRInst* getOperand(Index index) const { return inst->getOperand(UInt(index)); }
+};
+
+struct IRArrayOperandSource
+{
+    ArrayView<IRInst*> operands;
+
+    Index getOperandCount() const { return operands.getCount(); }
+    IRInst* getOperand(Index index) const { return operands[index]; }
+};
+
+/// Collects variadic operands from an indexed operand source, unwrapping a single `MakeStruct`
+/// when present.
+template<typename TOperandSource, typename TList>
+void collectFlattenedVariadicOperandsImpl(
+    const TOperandSource& operandSource,
+    Index firstOperandIndex,
+    TList& outOperands)
+{
+    auto operandCount = operandSource.getOperandCount();
+    SLANG_RELEASE_ASSERT(firstOperandIndex >= 0 && firstOperandIndex <= operandCount);
+    if (operandCount == firstOperandIndex + 1)
+    {
+        auto operand = operandSource.getOperand(firstOperandIndex);
+        if (auto makeStruct = as<IRMakeStruct>(operand))
+        {
+            for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
+                outOperands.add(makeStruct->getOperand(i));
+        }
+        else
+        {
+            outOperands.add(operand);
+        }
+        return;
+    }
+
+    for (Index i = firstOperandIndex; i < operandCount; i++)
+        outOperands.add(operandSource.getOperand(i));
+}
+
+/// Collects variadic operands, unwrapping the single `MakeStruct` form when present.
+template<typename TList>
+void collectFlattenedVariadicOperands(IRInst* inst, Index firstOperandIndex, TList& outOperands)
+{
+    collectFlattenedVariadicOperandsImpl(IRInstOperandSource{inst}, firstOperandIndex, outOperands);
+}
+
+/// Collects variadic operands from an operand view, unwrapping a single `MakeStruct` when present.
+template<typename TList>
+void collectFlattenedVariadicOperands(
+    ArrayView<IRInst*> operands,
+    Index firstOperandIndex,
+    TList& outOperands)
+{
+    collectFlattenedVariadicOperandsImpl(
+        IRArrayOperandSource{operands},
+        firstOperandIndex,
+        outOperands);
+}
+
+// If `type` is a vector or a coop matrix, returns its element type. Otherwise, return `type`.
+IRType* getVectorOrCoopMatrixElementType(IRType* type);
+
+// If `type` is a matrix, returns its element type. Otherwise, return `type`.
+IRType* getMatrixElementType(IRType* type);
+
+/// Return whether `inst` may inspect operand types but cannot observe operand runtime values.
+///
+/// A value-use analysis may ignore these instructions without treating their operands as read.
+bool doesInstOnlyDependOnOperandTypes(IRInst* inst);
+
+/// Return whether `type`, after removing attributed and rate wrappers, structurally represents one
+/// resource value rather than an aggregate containing resource values.
+///
+/// This predicate recognizes texture, sampler, structured-buffer, and byte-address-buffer IR
+/// types. It does not recursively inspect arrays, structs, or other aggregate types, and it does
+/// not decide whether a particular resource type is legal in a language construct. An unresolved
+/// type instruction, including `IRSymbolAlias`, does not match.
+bool isSingleResourceValueType(IRInst* type);
+
+/// Return whether `type` is one resource value, or a fixed-size homogeneous array of resource
+/// values, that the per-invocation replacement pass can represent with one local per affected
+/// function and one generated parameter per non-entry-point function with runtime access.
+///
+/// This predicate inspects only the IR type structure. An unresolved type instruction, including
+/// `IRSymbolAlias`, does not match.
+bool isResourceValueOrArrayTypeSupportedForPerInvocationReplacement(IRInst* type);
+
+/// Return the value type stored by `globalVar`.
+///
+/// The module must have been linked, so removing attributed and rate wrappers from the variable's
+/// data type must expose a concrete pointer type with a type instruction as its pointee. Attributes
+/// on the pointee remain part of the returned type.
+IRType* getGlobalVarValueType(IRGlobalVar* globalVar);
+
+/// Return whether `globalVar` is a candidate for replacing mutable resource state with
+/// function-local storage.
+///
+/// This predicate checks the marker, rate, and value-type conditions that make a global eligible
+/// for further analysis. It does not inspect the global's uses, linkage, or other requirements that
+/// can prevent replacement. The module must have been linked, so the global's pointer and value
+/// types are concrete type instructions rather than unresolved `IRSymbolAlias` instructions.
+bool isResourceGlobalCandidateForPerInvocationReplacement(IRGlobalVar* globalVar);
+
+/// Return whether `func` is a shader entry point or a CUDA kernel.
+bool isShaderOrCudaKernelEntryPoint(IRFunc* func);
+
+/// Return whether generic target assembly supplies any part of `func`'s emitted implementation.
+bool hasGenericAssemblyImplementation(IRFunc* func);
+
+// True if type is a resource backing memory
+bool isResourceType(IRType* type);
+
+/// Return whether `type` is itself a texture or storage image, a sampler, a combined
+/// texture-sampler, a subpass input (including a GLSL input attachment), or an acceleration
+/// structure. Unlike a buffer, which a target can represent as a pointer to memory, a value of one
+/// of these types is an opaque handle that only dedicated operations can use.
+bool isImageSamplerOrAccelerationStructureType(IRType* type);
+
+/// Test for opaque values or invalid recursion in the by-value storage of `type`.
+///
+/// Examines struct fields, array elements, and tuple elements. On a match, assigns the
+/// matching type to `outLeafOpaqueHandleType` if supplied. Native pointers remain leaves;
+/// parameter-group types are themselves opaque.
+/// Conservatively returns true for invalid by-value recursion, assigning the recursive
+/// aggregate type to `outLeafOpaqueHandleType` even if that aggregate contains no resource.
+/// Leaves `outLeafOpaqueHandleType` unchanged when no match occurs.
+bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);
+
+/// Test whether by-value storage for `type` contains an unsized array.
+///
+/// Examines struct fields, array elements, and tuple elements for `IRUnsizedArrayType`.
+/// Native pointers and parameter-group types remain leaves. Specialization can determine an
+/// `IRArrayType` element count; an `IRUnsizedArrayType` has no count.
+bool isUnsizedType(IRType* type);
+
+// True if `type` (after unwrapping attributed types) is a texture or a sampler-state-family type,
+// i.e. one the `spvBindlessTextureNV` descriptor-handle-to-resource conversion can produce. This is
+// also the set of `DescriptorHandle` element types that are represented as `uint64` under that
+// capability; every other kind (buffers, acceleration structures) stays `uint2`.
+bool isBindlessTextureNVEncodableResourceType(IRType* type);
+
+// True if `descriptorHandleType` (an `IRDescriptorHandleType`) is represented as `uint64` rather
+// than `uint2` for SPIR-V. Under `spvBindlessTextureNV` (passed in as `hasBindlessTextureNV`, since
+// callers detect the capability in different ways) only the resource kinds that extension can
+// convert — see `isBindlessTextureNVEncodableResourceType` — use the wide form; buffers and
+// acceleration structures stay `uint2`. Returns false when the capability is absent or the type is
+// not a descriptor handle.
+bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool hasBindlessTextureNV);
+
+// True if type is a pointer to a resource
+bool isPointerToResourceType(IRType* type);
+
+IROp getTypeStyle(IROp op);
+IROp getTypeStyle(BaseType op);
+
+inline bool isScalarIntegerType(IRType* type)
+{
+    return getTypeStyle(type->getOp()) == kIROp_IntType;
+}
+
+// Returns true for the integer arithmetic and bitwise op-kinds through which a
+// NonUniformResourceIndex mark propagates. Nonuniformity is contagious: an
+// elementwise integer op with a non-uniform operand yields a non-uniform result
+// (Vulkan VUID-RuntimeSpirv-None-10148). This is the single source of truth for
+// that op-set, shared by the SPIR-V float pass that bubbles the wrapper past such
+// an op (slang-ir-float-non-uniform-resource-index.cpp) and by the function-call
+// specializer that detects a non-uniform index passed through arithmetic across a
+// call boundary (slang-ir-specialize-function-call.cpp). Comparison/logical ops
+// are excluded (they yield a bool, not an index); IntCast is handled separately by
+// both consumers.
+//
+// This classifies by op-kind and assumes the operands are the integer index the
+// caller guarantees. That matters because `kIROp_Div` is the type-polymorphic divide
+// (there is no separate integer-divide op, unlike the integer-specific `kIROp_IRem`
+// whose float sibling `kIROp_FRem` is deliberately absent): the set is sound only
+// because the value asked about is always a NonUniformResourceIndex-derived integer
+// index, not because the op-kinds alone are integer-only.
+inline bool isNonUniformIndexArithmeticOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_IRem:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_BitNot:
+    case kIROp_Neg:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// No side effect can take place through a value of a "Value" type.
+bool isValueType(IRInst* type);
+
+bool isScalarOrVectorType(IRInst* type);
+
+bool isSimpleDataType(IRType* type);
+
+bool isSimpleHLSLDataType(IRInst* inst);
+
+bool isWrapperType(IRInst* inst);
+
+SourceLoc findFirstUseLoc(IRInst* inst);
+
+/// Return the best location for diagnosing `inst`: its own source location when valid, else
+/// its first located use (unlike getDiagnosticPos, which walks parents). Returns an invalid
+/// location when neither exists, so a diagnostic still reports without a location.
+SourceLoc getDiagnosticSourceLoc(IRInst* inst);
+
+inline bool isChildInstOf(IRInst* inst, IRInst* parent)
+{
+    while (inst)
+    {
+        if (inst == parent)
+            return true;
+        inst = inst->getParent();
+    }
+    return false;
+}
+
+// Specialize `genericToSpecialize` with the generic parameters defined in `userGeneric`.
+// For example:
+// ```
+// int f<T>(T a);
+// ```
+// will be extended into
+// ```
+// struct IntermediateFor_f<T> { T t0; }
+// int f_primal<T>(T a, IntermediateFor_f<T> imm);
+// ```
+// Given a user generic `f_primal<T>` and a used value parameterized on the same set of generic
+// parameters `IntermediateFor_f`, `genericToSpecialize` constructs `IntermediateFor_f<T>` (using
+// the parameter list from user generic).
+//
+IRInst* specializeWithGeneric(
+    IRBuilder& builder,
+    IRInst* genericToSpecialize,
+    IRGeneric* userGeneric);
+
+IRInst* maybeSpecializeWithGeneric(
+    IRBuilder& builder,
+    IRInst* genericToSpecailize,
+    IRInst* userGeneric);
+
+// For a value inside a generic, create a standalone generic wrapping just the value, and replace
+// the use of the original value with a specialization of the new generic using the current generic
+// arguments if `replaceExistingValue` is true. For example, if we have
+// ```
+//     generic G { param T; v = x(T); f = y(v); return f; }
+// ```
+// hoistValueFromGeneric(G, v) turns the code into:
+// ```
+//     generic G1 { param T1; v1 = x(T); return v1; }
+//     generic G { param T; v = specialize(G1, T); f = y(v); return f; }
+// ```
+// This function returns newly created generic inst.
+// if `value` is not inside any generic, this function makes no change to IR, and returns `value`.
+IRInst* hoistValueFromGeneric(
+    IRBuilder& builder,
+    IRInst* value,
+    IRInst*& outSpecializedVal,
+    bool replaceExistingValue = false);
+
+// Clear dest and move all chidlren from src to dest.
+void moveInstChildren(IRInst* dest, IRInst* src);
+
+inline bool isGenericParam(IRInst* param)
+{
+    auto parent = param->getParent();
+    if (auto block = as<IRBlock>(parent))
+        parent = block->getParent();
+    if (as<IRGeneric>(parent))
+        return true;
+    return false;
+}
+
+inline IRInst* unwrapAttributedType(IRInst* type)
+{
+    for (;;)
+    {
+        if (auto attrType = as<IRAttributedType>(type))
+            type = attrType->getBaseType();
+        else if (auto rateType = as<IRRateQualifiedType>(type))
+            type = rateType->getValueType();
+        else
+            return type;
+    }
+}
+
+// Remove hlsl's 'unorm' and 'snorm' modifiers
+IRType* dropNormAttributes(IRType* const t);
+
+void getTypeNameHint(StringBuilder& sb, IRInst* type);
+void copyNameHintAndDebugDecorations(IRInst* dest, IRInst* src);
+IRInst* getRootAddr(IRInst* addrInst);
+IRInst* getRootAddr(
+    IRInst* addrInst,
+    List<IRInst*>& outAccessChain,
+    List<IRInst*>* outTypes = nullptr);
+
+/// Return the texture element that the atomic operation `atomic` reads or writes, or nullptr when
+/// `atomic` addresses ordinary memory. For example, `InterlockedAdd(tex[uint2(0, 0)], 1)` on a
+/// `RWTexture2D<uint>` returns the `ImageSubscript` for `tex[uint2(0, 0)]`, while the same call on
+/// a `RWStructuredBuffer<uint>` element returns nullptr.
+IRImageSubscript* getAtomicImageSubscript(IRAtomicOperation* atomic);
+
+/// Return the resource type of the image that `subscript` indexes, looking through a pointer to
+/// the image, or nullptr when the image is not a resource.
+IRResourceTypeBase* getImageSubscriptResourceType(IRImageSubscript* subscript);
+
+bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
+
+bool canAddressesPotentiallyAlias(
+    TargetRequest* target,
+    IRGlobalValueWithCode* func,
+    IRInst* addr1,
+    IRInst* addr2);
+
+String dumpIRToString(
+    IRInst* root,
+    IRDumpOptions options = {IRDumpOptions::Mode::Simplified, IRDumpOptions::Flag::DumpDebugIds});
+
+// Returns whether a call insts can be treated as a pure functional inst, and thus can be
+// DCE'd and deduplicated.
+// (no writes to memory, no reads from unknown memory, no side effects).
+bool isPureFunctionalCall(
+    IRCall* callInst,
+    SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None);
+
+// Returns whether a call insts can be treated as a pure functional inst, and thus can be
+// DCE'd (but not necessarily deduplicated).
+// (no side effects).
+bool isSideEffectFreeFunctionalCall(
+    IRCall* call,
+    SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);
+
+// Returns whether calling `callee` can have side effects, either directly or
+// through an associated function attached via an `IRAnnotation`. The
+// association lookup walks the callee's entire use list, so each query is
+// O(#call sites to that callee).
+bool doesCalleeHaveSideEffect(IRInst* callee);
+
+// Memoized variant of the above; `cache` may be null (uncached). See
+// IRDeadCodeEliminationOptions::calleeSideEffectCache for the sharing and
+// staleness contract.
+bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
+
+bool isPtrLikeOrHandleType(IRInst* type);
+
+// `calleeSideEffectCache` is optional; see `IRDeadCodeEliminationOptions::calleeSideEffectCache`
+// in slang-ir-dce.h for the authoritative sharing/staleness contract this function depends on.
+// Turns the `kIROp_Call` case's `doesCalleeHaveSideEffect` query O(1) after the first lookup per
+// callee.
+bool canInstHaveSideEffectAtAddress(
+    IRGlobalValueWithCode* func,
+    IRInst* inst,
+    IRInst* addr,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);
+
+/// Get a unit-type (aka `void`) value using the `poison` instruction,
+/// which indicates an undefined (and potentially unstable) value.
+///
+IRInst* getUnitPoisonVal(IRBuilder* builder);
+
+// The the equivalent op of (a op b) in (b op' a). For example, a > b is equivalent to b < a. So (<)
+// ==> (>).
+IROp getSwapSideComparisonOp(IROp op);
+
+// Set IRBuilder to insert before `inst`. If `inst` is a param, it will insert after the last param.
+void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst);
+
+// Set IRBuilder to insert after `inst`. If `inst` is a param, it will insert after the last param.
+void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst);
+
+// Emit a loop structure with a simple incrementing counter.
+// Returns the loop counter `IRParam`.
+IRInst* emitLoopBlocks(
+    IRBuilder* builder,
+    IRInst* initVal,
+    IRInst* finalVal,
+    IRBlock*& loopBodyBlock,
+    IRBlock*& loopBreakBlock);
+
+void sortBlocksInFunc(IRGlobalValueWithCode* func);
+
+// Remove all linkage decorations from func.
+void removeLinkageDecorations(IRInst* inst);
+
+/// Return whether `inst` carries an `IRInterpolationModeDecoration` with the given `mode`.
+/// Each interpolation modifier lowers to its own decoration, and a declaration can combine one
+/// interpolation mode with one sampling location (`noperspective centroid`). The order of those
+/// decorations carries no meaning, so `findDecoration` followed by `getMode()` cannot answer
+/// this query.
+bool hasInterpolationMode(IRInst* inst, IRInterpolationMode mode);
+
+IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
+
+IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);
+
+IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar);
+
+IRInst* getInstInBlock(IRInst* inst);
+
+void removePhiArgs(IRInst* phiParam);
+
+ShortList<IRInst*> getPhiArgs(IRInst* phiParam);
+
+int getParamIndexInBlock(IRParam* paramInst);
+
+bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* inst);
+
+bool isZero(IRInst* inst);
+
+bool isOne(IRInst* inst);
+
+// Casts inst to IRPtrTypeBase, excluding UserPointer address space.
+IRPtrTypeBase* asRelevantPtrType(IRInst* inst);
+
+// Returns the pointer type if it is pointer type that is not a const ref or a user pointer.
+IRPtrTypeBase* isMutablePointerType(IRInst* inst);
+
+void initializeScratchData(IRInst* inst);
+///
+/// IRBlock related common helper methods
+///
+void moveParams(IRBlock* dest, IRBlock* src);
+
+List<IRBlock*> collectBlocksInRegion(IRDominatorTree* dom, IRLoop* loop);
+
+List<IRBlock*> collectBlocksInRegion(IRDominatorTree* dom, IRSwitch* switchInst);
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRSwitch* switchInst,
+    bool* outHasMultilevelBreaks);
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRLoop* loop,
+    bool* outHasMultilevelBreaks);
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRBlock* breakBlock,
+    IRBlock* firstBlock,
+    bool includeFirstBlock,
+    bool* outHasMultilevelBreaks);
+
+List<IRBlock*> collectBlocksInRegion(
+    IRGlobalValueWithCode* func,
+    IRLoop* loopInst,
+    bool* outHasMultilevelBreaks);
+
+List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func, IRLoop* loopInst);
+
+HashSet<IRBlock*> getParentBreakBlockSet(IRDominatorTree* dom, IRBlock* block);
+
+IRBlock* getBlock(IRInst* inst);
+
+///
+/// End of IRBlock utility methods
+///
+
+IRVarLayout* findVarLayout(IRInst* value);
+
+UnownedStringSlice getBuiltinFuncName(IRInst* callee);
+KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee);
+
+// Run an operation over every block in a module
+template<typename F>
+static void overAllBlocks(IRModule* module, F f)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRGlobalValueWithCode>(globalInst))
+        {
+            for (auto block : func->getBlocks())
+            {
+                f(block);
+            }
+        }
+    }
+}
+
+void hoistInstOutOfASMBlocks(IRBlock* block);
+
+inline bool isCompositeType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_StructType:
+    case kIROp_ArrayType:
+    case kIROp_UnsizedArrayType:
+        return true;
+    default:
+        return false;
+    }
+}
+
+IRType* getSPIRVSampledElementType(IRInst* sampledType);
+
+IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t);
+
+IRParam* getParamAt(IRBlock* block, UIndex ii);
+
+/// Selects the compute derivative grouping, honoring explicit entry-point attributes.
+/// Without an attribute, selects linear only for a literal numthreads Y extent of 1.
+/// Specialization constants and all other cases, including missing thread counts, select quad.
+DerivativeGroupMode inferDerivativeGroupMode(IRFunc* entryPoint);
+
+void verifyComputeDerivativeGroupModifiers(
+    DiagnosticSink* sink,
+    SourceLoc errorLoc,
+    bool quadAttr,
+    bool linearAttr,
+    IRNumThreadsDecoration* numThreadsDecor);
+
+int getIRVectorElementSize(IRType* type);
+IRType* getIRVectorBaseType(IRType* type);
+
+// Retrieves the element type of a pointer, buffer, array, vector or matrix type.
+// This is the result type of a ElementExtract operation on a value of `type`.
+IRType* getElementType(IRBuilder& builder, IRType* type);
+
+// Find the struct field with `key` and return its type. Return nullptr if not found.
+IRType* getFieldType(IRType* type, IRStructKey* key);
+
+Int getSpecializationConstantId(IRGlobalParam* param);
+
+void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target);
+
+UnownedStringSlice getMangledName(IRInst* inst);
+
+bool isFirstBlock(IRInst* inst);
+
+bool isSpecConstRateType(IRType* type);
+void hoistInstAndOperandsToGlobal(IRBuilder* builder, IRInst* inst);
+IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* oldType);
+IRType* ensureSpecConstRate(IRBuilder* builder, IRType* type);
+bool canOperationBeSpecConst(
+    IROp op,
+    IRType* resultType,
+    IRInst* const* fixedArgs,
+    IRUse* operands);
+bool shouldHaveSpecConstRate(
+    IROp op,
+    IRType* resultType,
+    UInt operandCount,
+    IRInst* const* operands);
+bool isInstHoistable(IROp op);
+
+// most of <algorithm> doesn't work on out non-const iterators, so define this
+// version
+template<typename Range, typename Predicate>
+constexpr bool anyOf(Range&& range, Predicate&& pred)
+{
+    // Handle both const and non-const ranges
+    auto first = range.begin();
+    auto last = range.end();
+
+    for (; first != last; ++first)
+    {
+        if (pred(*first))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type);
+
+bool isSignedType(IRType* type);
+
+bool isIROpaqueType(IRType* type);
+
+IRInst* tryGetTranslation(IRModule* module, IRInst* inst);
+
+IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
+
+// Peel `addr` through instructions that forward the address of the same underlying
+// storage without changing which storage it refers to (field/element access, casts,
+// offset computation), stopping at the first instruction that is not one of these.
+// Returns that terminal instruction. This is the shape-independent counterpart to
+// `getRootAddr`: `getRootAddr` only peels `FieldAddress`/`GetElementPtr`/
+// `NodeOutputRecordGetElementPtr`, so a `BitCast`/`Reinterpret`/`PtrCast`/`GetOffsetPtr`
+// inserted by a later legalization pass (e.g. `lowerBufferElementTypeToStorageType`) can
+// make `getRootAddr` stop short of the address's true root. Callers that need to
+// recognize a specific root shape regardless of such legalization (e.g. "is this address
+// into the OptiX SBT" or "is this address into CUDA's `__constant__` global parameter
+// group") should peel with this function first, then test the terminal instruction.
+IRInst* peelAddressForwardingOps(IRInst* addr);
+
+/// Returns whether `inst` has an `[Artificial]` decoration; returns false for null.
+bool isArtificialInst(IRInst* inst);
+
+/// Return whether `inst` records source-level debug information without affecting execution.
+bool isDebugInfoInst(IRInst* inst);
+
+/// Return whether `op` is a dedicated IR operation that reads resource contents.
+bool doesOpReadResourceContents(IROp op);
+
+/// Return whether `op` directly produces an address into a resource's contents.
+bool doesOpProduceResourceContentAddress(IROp op);
+
+// Returns true if the memory location pointed to by `ptrInst` is immutable.
+// An immutable location is the memory region that can't be modified by the user code.
+// Examples are ConstantBuffer and shader resource contents(e.g. StructuredBuffer).
+// Note that this is to be disguished from the access qualifier of the pointer itself,
+// e.g. a `ptrInst` of type `Ptr<T, Access.Read>` may still point to a mutable location,
+// so this function returns false in that case.
+bool isPointerToImmutableLocation(IRInst* ptrInst);
+
+// Check if `use` is the `baseAddr` operand of a GetElement/FieldExtract inst.
+// This is true if `use` is the first operand of the user inst.
+inline bool isUseBaseAddrOperand(IRUse* use, IRInst* user)
+{
+    return user->getOperandUse(0) == use;
+}
+
+// Check if the inst is a generic parameter.
+bool isGenericParameter(IRInst* inst);
+
+// Usually we want to enforce that an instruction is defined before any of its uses, but
+// if the use is a generic parameter, we can relax this rule when the instruction is the data type
+// of the generic parameter.
+bool canRelaxInstOrderRule(IRInst* instToCheck, IRInst* otherInst);
+
+IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc);
+
+// Return true if the inst can be stored into a variable.
+bool canInstBeStored(IRInst* inst);
+
+IRType* getTextureTypeFromCombinedTextureSampler(IRType* type);
+IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type);
+
+bool isReadNoneCallee(IRInst* callee);
+
+/// True iff `callee` is read-none AND every user-supplied derivative variant
+/// of it whose read-none-ness is not already implied by the primary is also
+/// read-none.
+///
+/// In practice this checks the `ForwardDerivative` annotation and the
+/// `BackwardDerivativePropagate` annotation. `BackwardDerivativeApply` is
+/// intentionally not consulted because the apply wrapper inherits
+/// read-none-ness from the primary callee — see the implementation comment
+/// in `slang-ir-util.cpp` for the unwrapping chain.
+///
+/// The carry-set analysis in slang-ir-check-differentiability needs this
+/// stronger property: a primary callee can be `[__readNone]` while its
+/// user-supplied `[ForwardDerivative]` or `[BackwardDerivative]` has side
+/// effects, in which case a call to the primary still produces observable
+/// derivative state through differentiation. Other callers of
+/// `isReadNoneCallee` reason about the local function's own read-none-ness
+/// and should not use this variant.
+bool isReadNoneCalleeAndAllDerivatives(IRInst* callee);
+
+bool isNoSideEffectCallee(IRInst* callee);
+
+bool tryGetConstantIntLit(IRInst* inst, Int64& outValue);
+
+bool areKnownEqualShapeElements(IRInst* left, IRInst* right);
+
+IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> elements);
+
+/// Returns true if `type` is one of the work-graph record types (e.g.
+/// DispatchNodeInputRecord<T>, ThreadNodeInputRecord<T>, NodeOutput<T>, etc.).
+/// These types are opaque ABI objects that must survive type legalization unchanged.
+bool isWorkGraphRecordType(IRType* type);
+
+/// Returns the element type operand for generic work-graph record types, or null
+/// for non-generic record types. Empty record types such as `EmptyNodeOutput`
+/// intentionally return null because they carry no payload element type.
+IRType* getWorkGraphRecordElementType(IRType* type);
+
+} // namespace Slang
+
+#endif

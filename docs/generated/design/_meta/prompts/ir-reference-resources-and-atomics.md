@@ -46,7 +46,7 @@ that live elsewhere in the file.
     `SPIRVLoadDescriptorFromHeap`,
     `SPIRVLoadTexelPointerFromHeap`).
 - The atomics row should cite the `IRMemoryOrder` enum from
-  [slang-ir.h](../../../../source/slang/slang-ir.h) and note that the
+  [slang-ir.h](../../../../source/slang/ir/slang-ir.h) and note that the
   ordering is an extra operand on the atomic opcode.
 - `AST origin` typically points to method-call expressions on
   resource types or to entry-point parameter declarations.

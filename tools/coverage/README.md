@@ -109,7 +109,7 @@ The record-replay smoke tests (`RecordReplaySmokeCreateSession`, `RecordReplaySm
 ```bash
 llvm-cov show ./build/RelWithDebInfo/lib/libslang.so \
     -instr-profile=slang-test.profdata \
-    source/slang/slang-parser.cpp
+    source/slang/parser/slang-parser.cpp
 ```
 
 ### Get function-level coverage:

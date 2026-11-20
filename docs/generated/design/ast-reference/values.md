@@ -19,9 +19,9 @@ witnesses, or generic specialization.
 ## Source
 
 Non-Type `Val` classes are declared in
-[slang-ast-val.h](../../../../source/slang/slang-ast-val.h). The `Val`
+[slang-ast-val.h](../../../../source/slang/ast/slang-ast-val.h). The `Val`
 and `DeclRefBase` abstract bases are in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h). The
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h). The
 `Type` subhierarchy lives in [types.md](types.md); `Type` *is* a
 `Val`, but its concrete classes are documented there to keep this
 page focused on the non-Type Vals.
@@ -29,15 +29,15 @@ page focused on the non-Type Vals.
 The central operation on every class below is substitution.
 `Val::substitute` and the lower-level `Val::substituteImpl` are
 declared on `Val` in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h), and most
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h), and most
 of the classes on this page provide a `_substituteImplOverride` that
 rebuilds the node from substituted operands. The `SubstitutionSet`
 those methods take is declared in
-[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h),
+[slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h),
 but its two traversal members —
 `SubstitutionSet::forEachGenericSubstitution` and
 `SubstitutionSet::forEachSubstitutionArg` — are defined at the bottom
-of [slang-ast-val.h](../../../../source/slang/slang-ast-val.h), and
+of [slang-ast-val.h](../../../../source/slang/ast/slang-ast-val.h), and
 show that a substitution set is a chain of `GenericAppDeclRef` and
 `LookupDeclRef` links walked through `DeclRefBase::getBase()`. See
 [Substitution and the substitution cache](#substitution-and-the-substitution-cache)
@@ -138,10 +138,10 @@ Abstract intermediates: `IntVal`, `SizeOfLikeIntVal`,
 ### DeclRef family
 
 `DeclRefBase` is the abstract base (declared in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h)); its
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h)); its
 concrete subclasses below realise the different shapes a decl-ref
 can take. The user-facing API is the template `DeclRef<T>`, declared
-in [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
+in [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h)
 and described in [base.md](base.md#support-types).
 
 The four shapes record *how* a declaration was reached; they are not
@@ -151,7 +151,7 @@ out: a `DirectDeclRef` holds a bare `Decl` operand and so has nothing
 to substitute, and a `MemberDeclRef` whose path is known to be static
 folds back into one — `MemberDeclRef(DirectDeclRef(A), B)` becomes
 `DirectDeclRef(B)`, per the comment at
-[slang-ast-val.h](../../../../source/slang/slang-ast-val.h) lines
+[slang-ast-val.h](../../../../source/slang/ast/slang-ast-val.h) lines
 32-35. `GenericAppDeclRef` and `LookupDeclRef` are the two shapes that
 add information beyond the path — an argument list and a
 `SubtypeWitness` — and so are the two that can make decl-refs to the
@@ -167,7 +167,7 @@ the same `Box` declaration (assigning one to the other is diagnosed,
 E30019, with both spellings in the message), and a `LookupDeclRef`
 is what makes `T.Elem` inside a generic body mean a different type for
 each conformer of `T`: it carries the `SubtypeWitness` of
-`lookupSource` (see [slang-ast-val.h](../../../../source/slang/slang-ast-val.h)
+`lookupSource` (see [slang-ast-val.h](../../../../source/slang/ast/slang-ast-val.h)
 lines 62-76), so substituting the witness re-resolves the lookup. The
 diagnostic and the per-conformer result were observed by running the
 test bundle; they were not re-run for this revision.
@@ -309,7 +309,7 @@ earlier commit saw E41400 for `Texture2D<unorm float4>` and none for
 whether that still holds: `is` goes through `isSubtype`, and for a
 `ModifiedType` without `no_diff` the inheritance computation returns
 the base type's inheritance info unchanged
-([slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp)
+([slang-check-inheritance.cpp](../../../../source/slang/semantic-checking/slang-check-inheritance.cpp)
 lines 2421-2488), which may let the modified type satisfy the test.
 That outcome was not run here. See also
 [../pipeline/06-emit.md](../pipeline/06-emit.md).
@@ -427,17 +427,17 @@ equality evidence is spelled: a declared equality constraint such as
 `where T == U` yields a `DeclaredSubtypeWitness` whose `isEquality()`
 is true, which is a different class. Code that must accept either form
 calls the `isTypeEqualityWitness` helper at the end of
-[slang-ast-val.h](../../../../source/slang/slang-ast-val.h) (lines
+[slang-ast-val.h](../../../../source/slang/ast/slang-ast-val.h) (lines
 1352-1405), which also looks through the `each`, `expand`, `first`,
 `last`, `trim-first` and `trim-last` pack witnesses and requires every
 element witness of a `TypePackSubtypeWitness` to be one; any other
 witness kind answers `false`. Every
 semantic-checking construction site funnels through
 `SemanticsVisitor::createTypeEqualityWitness` in
-[slang-check-conformance.cpp](../../../../source/slang/slang-check-conformance.cpp)
+[slang-check-conformance.cpp](../../../../source/slang/semantic-checking/slang-check-conformance.cpp)
 (line 654), which just forwards to `ASTBuilder::getTypeEqualityWitness`.
 Its callers are all in
-[slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp),
+[slang-check-inheritance.cpp](../../../../source/slang/semantic-checking/slang-check-inheritance.cpp),
 each building the self facet of a type's inheritance linearization:
 line 737 for a non-decl-ref type that is the `selfType` of a
 declaration, line 2116 for an opened existential
@@ -447,7 +447,7 @@ declaration, line 2116 for an opened existential
 `no_diff`-modified type, and line 2499 for the fallback that covers any
 other type. Substitution is the exception: `TypeEqualityWitness::_substituteImplOverride`
 rebuilds the witness directly with `getOrCreate`
-([slang-ast-val.cpp](../../../../source/slang/slang-ast-val.cpp)
+([slang-ast-val.cpp](../../../../source/slang/ast/slang-ast-val.cpp)
 lines 312-319).
 
 ### SubtypeWitness across packs
@@ -485,7 +485,7 @@ substitutions. `LookupDeclRef` represents a decl found by
 witness-table lookup — it carries a witness operand, so that
 specializing the generic value also specializes the lookup. This
 fan-out is why the user-facing `DeclRef<T>` template (in
-[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h))
+[slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h))
 is just a typed wrapper around a `DeclRefBase*`.
 
 ### Hash-consing and the ASTBuilder
@@ -506,7 +506,7 @@ also means *all* operands must themselves be canonical — the
 pointers are identical or when their `resolve()` results are, and each
 `Val` memoizes its resolved form in the private `m_resolvedVal` /
 `m_resolvedValEpoch` pair declared in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h). The
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h). The
 surface consequence is that two differently-spelled compile-time
 values compare equal exactly when they hash-cons to one node: inside
 a generic over `let N : int`, `int[2*N+3]` and `int[3+2*N]` are the
@@ -524,7 +524,7 @@ arrays type-checks. The parameter `a` has a bound written
 reach the same hash-consed node. The assignment `c = a` (bound `3+2*N` against `2*N+3`) is checked
 before `N` is substituted, so it succeeds only because the two
 bounds are the same `Val*`; had the two spellings produced distinct
-nodes, `Val::equals` ([slang-ast-base.h](../../../../source/slang/slang-ast-base.h)
+nodes, `Val::equals` ([slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h)
 lines 434-437) would compare unequal resolved nodes and the
 declaration would be rejected as a type mismatch between two different
 array types. Any
@@ -539,7 +539,7 @@ and `hash-consing` entries in [../glossary.md](../glossary.md).
 Substitution is the operation that turns an unspecialized `Val` into a
 specialized one: `Val::substitute` / `Val::substituteImpl` (declared on
 `Val` in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h)) walk a
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h)) walk a
 `SubstitutionSet` and rebuild the node from substituted operands, and
 almost every class on this page supplies a `_substituteImplOverride`
 for that purpose. Because `Val`s form a shared DAG, the same subtree is
@@ -547,11 +547,11 @@ reached many times during one substitution, so a `SubstitutionSet`
 carries a `substitutionCache: SubstitutionCache*` that memoizes the
 result of substituting a given `Val` under a given
 `packExpansionIndex`. That field is declared in
-[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
+[slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h)
 and the cache type itself, together with the `substituteValWithCache`
 helper that installs a cache for the outermost substitution and
 propagates it through copies of the `SubstitutionSet`, is defined in
-[slang-ast-substitution.h](../../../../source/slang/slang-ast-substitution.h).
+[slang-ast-substitution.h](../../../../source/slang/ast/slang-ast-substitution.h).
 Neither of those headers is in this page's `watched_paths`, so the
 description here is limited to what the declaration sites state; if
 this page is to describe the caching in more detail, both should be

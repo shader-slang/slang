@@ -11,6 +11,20 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
 
     [ForceInline] [require(cooperative_vector)]
     static This fromScalar(Scalar value) { return This(value); }
+
+    [ForceInline] [require(cooperative_vector)]
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse)
+    {
+        // The mask is an ordinary Boolean vector, so we select each cooperative-vector component
+        // with its corresponding scalar condition rather than requiring a native aggregate select.
+        This result;
+        [ForceUnroll]
+        for (int index = 0; index < N; ++index)
+            result[index] = __numericsBuiltinSelect(
+                condition[index], ifTrue[index], ifFalse[index]);
+        return result;
+    }
+
     [ForceInline] [require(cooperative_vector)]
     __init<TSource : __BuiltinIntegerType>(TSource value)
     {
@@ -167,6 +181,19 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
 
     [ForceInline] [require(cooperative_vector)]
     static This fromScalar(Scalar value) { return This(value); }
+
+    [ForceInline] [require(cooperative_vector)]
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse)
+    {
+        // The mask is an ordinary Boolean vector, so we select each cooperative-vector component
+        // with its corresponding scalar condition rather than requiring a native aggregate select.
+        This result;
+        [ForceUnroll]
+        for (int index = 0; index < N; ++index)
+            result[index] = __numericsBuiltinSelect(
+                condition[index], ifTrue[index], ifFalse[index]);
+        return result;
+    }
 
     [ForceInline] [require(cooperative_vector)]
     Mask isEqualTo(This other)

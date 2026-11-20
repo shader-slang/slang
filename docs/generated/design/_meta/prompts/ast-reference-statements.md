@@ -7,7 +7,7 @@ reference family contract**.
 
 Produce `docs/generated/design/ast-reference/statements.md` — the
 per-node reference for the `Stmt` family declared in
-[slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h).
+[slang-ast-stmt.h](../../../../source/slang/ast/slang-ast-stmt.h).
 
 ## Family-specific guidance
 

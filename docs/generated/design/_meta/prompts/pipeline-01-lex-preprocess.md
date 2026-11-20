@@ -30,7 +30,7 @@ encoding, or preprocessor directives.
      resolved later, not in the lexer).
 4. `## Preprocessor`:
    - File pointer
-     ([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)).
+     ([slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp)).
    - The "stack of input streams" model.
    - Macro expansion ("replay" of stored token sequences) and
      environments for argument lookup.
@@ -48,7 +48,7 @@ encoding, or preprocessor directives.
 ## Quality checklist (in addition to the universal one)
 
 - [ ] Every claim about lexer or preprocessor behavior cites a file
-      under `source/compiler-core/` or `source/slang/slang-preprocessor*`.
+      under `source/compiler-core/` or `source/slang/preprocessor/`.
 - [ ] Token-kind enumeration is **not** duplicated; defer to
       [../syntax-reference/tokens.md](../syntax-reference/tokens.md).
 - [ ] Document length under 24 KB.
