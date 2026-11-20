@@ -1,6 +1,6 @@
 // -Wno-31228 keeps the E31228 warning out of the compute comparison output.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -xslang -Wno-31228
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -xslang -Wno-31228
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 
 RWStructuredBuffer<uint> outputBuffer;

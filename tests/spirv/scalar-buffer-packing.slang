@@ -1,5 +1,5 @@
 // scalar-buffer-packing.slang
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+llvm, filecheck-buffer=CHECK):
 //TEST:SIMPLE(filecheck=SPIRV): -stage compute -entry computeMain -target spirv -emit-spirv-directly -force-glsl-scalar-layout
 // Test ability to directly output SPIR-V
 

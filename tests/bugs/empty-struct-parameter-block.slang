@@ -15,7 +15,7 @@
 // fix stops emitting `IRPublicDecoration` for the `public` modifier, so a public empty
 // struct now legalizes identically to a non-public one.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 // The reported failure is on CUDA (a distinct emitter); assert at the text-emit level that
 // the empty members are gone from the emitted CUDA structs (no GPU needed).
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute -line-directive-mode none

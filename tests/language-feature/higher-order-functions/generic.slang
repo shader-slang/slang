@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm):
+//TEST:COMPARE_COMPUTE(targets=all):
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

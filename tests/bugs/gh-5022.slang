@@ -1,4 +1,4 @@
-//TEST(smoke):COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):
+//TEST(smoke):COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // CHECK:      0
 // CHECK-NEXT: 1

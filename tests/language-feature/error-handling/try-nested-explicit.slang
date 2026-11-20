@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 // Throwing calls inside `try` operands run and propagate their errors (#13489). A throwing call in
 // the operand of another call carries its own `try`. A `try` on an identity conversion, as in

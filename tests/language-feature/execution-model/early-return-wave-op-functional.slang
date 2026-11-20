@@ -2,7 +2,7 @@
 // Thread 0 returns early. Threads {1,2,3} continue and do WaveActiveMin.
 // WaveActiveMin({1,2,3}) should be 1 (thread 0 is inactive).
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 
 RWStructuredBuffer<int> outputBuffer;

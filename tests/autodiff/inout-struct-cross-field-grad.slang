@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Regression test for https://github.com/shader-slang/slang/issues/10081
 // When a [Differentiable] function takes an inout struct and reads one field

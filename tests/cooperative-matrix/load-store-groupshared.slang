@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all-glsl-metal-cpu-llvm, filecheck-buffer=CHECK):
 
 // CHECK: 1
 // CHECK-NEXT: 2

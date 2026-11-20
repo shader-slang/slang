@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 // Coverage test for the existential-aggregate dynamic-dispatch lowering path that the
 // O(N^2) `specializeModule` / `TranslationContext::resolveInst` fix touches.

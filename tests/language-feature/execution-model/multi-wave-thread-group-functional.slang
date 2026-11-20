@@ -14,7 +14,7 @@
 // is portable across Vulkan (subgroup size typically 32 or 64) and
 // CUDA (warp size 32).
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 
 RWStructuredBuffer<int> outputBuffer;

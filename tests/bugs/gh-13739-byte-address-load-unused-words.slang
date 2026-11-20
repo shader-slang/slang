@@ -7,7 +7,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu+wgpu, filecheck-buffer=BUF): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF): -output-using-type
 
 // 17 words.
 struct M

@@ -1,5 +1,5 @@
-//TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=CHECK):-output-using-type -xslang -DTYPE=int
-//TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=CHECK):-output-using-type -xslang -DTYPE=uint
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu, filecheck-buffer=CHECK):-output-using-type -xslang -DTYPE=int
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu, filecheck-buffer=CHECK):-output-using-type -xslang -DTYPE=uint
 
 #ifndef TYPE
 #define TYPE int

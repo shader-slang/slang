@@ -11,7 +11,7 @@
 // applied in some order — the final value is the sum of all
 // contributions. This pins that invariant.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-cpu-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 
 RWStructuredBuffer<uint> outputBuffer;

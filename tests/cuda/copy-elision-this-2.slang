@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUF):
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):
 //TEST:SIMPLE(filecheck=CUDA): -stage compute -entry computeMain -target cuda -O3
 
 struct Data

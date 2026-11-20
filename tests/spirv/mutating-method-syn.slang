@@ -1,5 +1,5 @@
 // mutating-method-syn.slang
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 // Test ability to directly output SPIR-V
 
 interface IFoo

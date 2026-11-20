@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -target glsl
-//TEST:COMPARE_COMPUTE(targets=glsl, filecheck-buffer=POSITIVE_RESULT):
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu-wgpu-llvm, filecheck-buffer=POSITIVE_RESULT):
 
 // This is a minimal repro for issue 8802
 

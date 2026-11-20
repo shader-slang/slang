@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: The Khronos Group, Inc.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type -Xslang -O0
-//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type -Xslang -O3
+//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=CHECK):-output-using-type -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=CHECK):-output-using-type -Xslang -O3
 
 // Each row contains u32, u64 low/high, then expected u32/i32/u64/i64 bit indices.
 // Expected indices count from the least significant bit; only signed negative words are

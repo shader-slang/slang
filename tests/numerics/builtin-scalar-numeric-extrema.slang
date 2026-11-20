@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 //TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o builtin-scalar-numeric-extrema.hlsl -experimental-feature
 //TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o builtin-scalar-numeric-extrema.spv -experimental-feature
 

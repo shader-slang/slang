@@ -1,7 +1,7 @@
 // struct-bit-cast-2.slang
 // Test bit casts for read across boundaries of scalar types.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu+llvm, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all-glsl-dx11-dx12-wgpu, filecheck-buffer=CHECK):
 
 // Test that bit_cast works for bit-reinterpreting one struct type as another.
 

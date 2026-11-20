@@ -3,7 +3,7 @@
 // The `some` qualifier is not yet implemented (SP#024, tracked by #7115).
 // Only `dyn` on var/param declarations is currently supported.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -xslang -lang -xslang slang -xslang -std -xslang 2025
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -xslang -lang -xslang slang -xslang -std -xslang 2025
 //TEST:SIMPLE(filecheck=CHECK_COMPILE): -target spirv -lang slang -std 2025 -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK_COMPILE): -target hlsl -lang slang -std 2025 -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK_COMPILE): -target cuda -lang slang -std 2025 -stage compute -entry computeMain

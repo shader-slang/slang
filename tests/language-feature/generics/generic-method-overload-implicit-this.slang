@@ -6,7 +6,7 @@
 // propagation because the callee function type expected the `this` parameter
 // but the call omitted it.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 struct Foo
 {

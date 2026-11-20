@@ -5,7 +5,7 @@
 // Four implementations with sizes: 4, 8, 16, and 32 bytes. The inferred
 // AnyValue size must be at least 32 to accommodate the largest.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 //TEST:SIMPLE(filecheck=SIZE):-target spirv-asm -stage compute -entry computeMain -dump-ir-after inferAnyValueSizeWhereNecessary
 

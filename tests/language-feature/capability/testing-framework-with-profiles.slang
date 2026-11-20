@@ -1,6 +1,6 @@
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-profile sm_6_1
+//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-llvm, filecheck-buffer=BUF):
+//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-llvm, filecheck-buffer=BUF):-profile sm_6_1
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl  -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl  -entry computeMain -stage compute -capability sm_6_1
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute -profile sm_6_1

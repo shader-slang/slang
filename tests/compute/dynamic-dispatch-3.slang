@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx11+cuda+cpu):
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test dynamic dispatch code gen for static member functions
 // of associated type.

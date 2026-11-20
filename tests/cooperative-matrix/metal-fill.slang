@@ -1,4 +1,4 @@
-//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=CHECK):-output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // CHECK: type: float
 // CHECK-COUNT-64: 10.0

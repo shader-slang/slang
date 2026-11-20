@@ -5,7 +5,7 @@
 //TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-lane-masks.slang -stage compute -entry computeMain -target hlsl
 //TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-lane-masks.slang -stage compute -entry computeMain -target cuda
 
-//TEST:COMPARE_COMPUTE(targets=vk+glsl+wgpu, filecheck-buffer=BUF):-entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-llvm, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 // Metal disabled: lane mask computation may differ on Apple GPUs
 
 #version 430

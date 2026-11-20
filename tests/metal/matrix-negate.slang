@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal
-//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUF):
+//TEST:COMPARE_COMPUTE(targets=all-cpu-wgpu, filecheck-buffer=BUF):
 
 // METAL: (matrix<float,int(4),int(4)>{{.*}}(0) -
 

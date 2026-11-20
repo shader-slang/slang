@@ -5,7 +5,7 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain
 
-//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: set output = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> output;

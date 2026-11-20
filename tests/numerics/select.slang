@@ -4,7 +4,7 @@
 // The HLSL case uses Slang 202c so overload selection cannot rely on the deprecated tie-breaker
 // that compares generic parameter counts.
 
-//TEST:COMPARE_COMPUTE(targets=cpu+vk+cuda, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 //TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -experimental-feature -std 202c -o numerics-select.hlsl
 //TEST:SIMPLE: -target spirv -entry computeMain -stage compute -experimental-feature -o numerics-select.spv
 

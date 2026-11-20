@@ -7,7 +7,7 @@
 
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry computeMain -stage compute
-//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-output-using-type
 
 static const int2 kDiv[2] = { int2(10, 7) / int2(4, 2), int2(1, 1) };
 static const int2 kRem[2] = { int2(10, 7) % int2(4, 2), int2(1, 1) };

@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu+wgpu, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-output-using-type
 
 // Negating a float vector must flip the sign of a zero component, like scalar negation and like
 // the other targets: -(+0.0) is -0.0. WGSL has a native unary '-' for f32, f16 and i32 vectors,

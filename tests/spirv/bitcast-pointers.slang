@@ -27,7 +27,7 @@
 // uint2 -> 64-bit pointer
 // CHECK-DAG: OpBitcast %_ptr_PhysicalStorageBuffer_int %
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=OUT):-output-using-type -capability vk_mem_model
+//TEST:COMPARE_COMPUTE(targets=all-glsl-dx11-dx12-wgpu, filecheck-buffer=OUT):-output-using-type -capability vk_mem_model
 
 //TEST_INPUT: set inputPtr = ubuffer(data=[42 100 200 300 400], stride=4);
 uniform int* inputPtr;

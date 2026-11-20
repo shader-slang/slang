@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=SPIRV):-stage compute -entry computeMain -target spirv
-//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-glsl-metal-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 // Ensure SPIRV does not do coherent operations here
 // SPIRV-NOT: MakePointerAvailable

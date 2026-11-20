@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda+cpu, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // Test that char literals work as expected.
 

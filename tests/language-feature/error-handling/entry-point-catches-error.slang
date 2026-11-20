@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 //
 // Companion to tests/diagnostics/entry-point-cannot-throw.slang (issue #12330).
 //

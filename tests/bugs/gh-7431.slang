@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx11+dx12+cpu+wgpu+llvm, filecheck-buffer=CHECKOUT):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECKOUT):-output-using-type
 
 // CHECKOUT:      10
 // CHECKOUT-NEXT: 20

@@ -7,7 +7,7 @@
 //   Odd threads (1,3) take the 'else' branch: WaveActiveMin over {1,3} = 1
 // After reconvergence, WaveActiveSum over all 4 results: 0+1+0+1 = 2
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 
 RWStructuredBuffer<int> outputBuffer;

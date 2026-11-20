@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+glsl+metal+wgpu, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 // Test matrix type legalization for casts between lowered and non-lowered matrices.
 //

@@ -4,7 +4,7 @@
 
 // CUDA keeps a native byte-address buffer (translateToStructuredBufferOps == false) and exercises
 // the fixed path at runtime; Vulkan translates to structured buffers and was already correct.
-//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-cpu-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 // The C++/CPU target cannot run `InterlockedAdd` at runtime (it is capability-gated off the CPU
 // target), so lock the emitted C++ shape statically instead: the global buffer must stay a

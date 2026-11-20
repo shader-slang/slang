@@ -29,7 +29,7 @@
 //     implementation-dependent and would rot if the dispatch shim
 //     naming changes.
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda+cpu, filecheck-buffer=COMPUTE):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=COMPUTE):-output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -report-dynamic-dispatch-sites
 
 [anyValueSize(16)]

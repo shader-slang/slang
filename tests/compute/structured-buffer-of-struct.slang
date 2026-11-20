@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // CHECK:      2
 // CHECK-NEXT: 1

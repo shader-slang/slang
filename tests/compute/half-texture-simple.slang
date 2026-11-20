@@ -1,5 +1,5 @@
 // TODO(JS): Doesn't work on vk currently
-//TEST:COMPARE_COMPUTE(targets=cuda):
+//TEST:COMPARE_COMPUTE(targets=all-wgpu-llvm):
 
 // Doesn't work on CUDA, not clear why yet
 //DISABLE_TEST_INPUT: Texture1D(format=R16Float, size=4, content = one, mipMaps=1):name tLoad1D

@@ -8,7 +8,7 @@
 // as a payload, merging it with the `SurfaceLight`'s tagged-union info would fail with
 // `Incompatible propagation infos during union`.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute -conformance Light:ILight=0 -conformance SurfaceLight:ILight=1 -conformance A:IGeometry=0 -conformance B:IGeometry=1
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry computeMain -stage compute -conformance Light:ILight=0 -conformance SurfaceLight:ILight=1 -conformance A:IGeometry=0 -conformance B:IGeometry=1
 //TEST:SIMPLE(filecheck=DXIL): -target dxil-assembly -entry computeMain -stage compute -conformance Light:ILight=0 -conformance SurfaceLight:ILight=1 -conformance A:IGeometry=0 -conformance B:IGeometry=1

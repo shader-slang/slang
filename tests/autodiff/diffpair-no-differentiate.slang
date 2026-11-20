@@ -2,7 +2,7 @@
 // contains DifferentialPair IR, so the autodiff finalization passes must run to lower it.
 // Guards that calcRequiredLoweringPassSet marks such modules as needing autodiff lowering
 // (otherwise the pair type would survive un-lowered into emission).
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Direct DifferentialPair use marks the module as needing autodiff lowering, so it
 // takes the finalize path: finalizeAutoDiffPass runs to lower the pair type.

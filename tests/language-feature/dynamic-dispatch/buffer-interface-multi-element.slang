@@ -3,7 +3,7 @@
 // loop, verifying that the buffer correctly tracks the concrete type
 // of each element independently.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu+llvm, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name=typeSelector
 RWStructuredBuffer<uint> typeSelector;

@@ -4,7 +4,7 @@
 // and `vec == vec` yields a scalar `bool` (all-components-equal). The import does not otherwise
 // turn this Slang source into GLSL.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 import glsl;
 

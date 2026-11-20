@@ -8,7 +8,7 @@
 // The PR's other tests use only concrete-typed call chains; this
 // test pins the implicit-specialization path through compute.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-llvm, filecheck-buffer=BUF):-output-using-type
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain
 
 //TEST_INPUT:set inBuffer = ubuffer(data=[1 2 3 4], stride=4)

@@ -5,7 +5,7 @@
 // iteration count; otherwise reverse-mode auto-diff fails with
 // "loop in differentiable function needs attributes" (E30510).
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;

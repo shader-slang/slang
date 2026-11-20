@@ -15,7 +15,7 @@
 // VM bytecode gen for inst" on this exact shape), an unrelated, pre-existing gap in that backend,
 // not something this fix touches.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 bool eqVecT<T : __BuiltinFloatingPointType>(vector<T, 3> a, vector<T, 3> b)
 {

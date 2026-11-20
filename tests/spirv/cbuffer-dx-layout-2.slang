@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-xslang -fvk-use-dx-layout
+//TEST:COMPARE_COMPUTE(targets=all-glsl-wgpu-llvm, filecheck-buffer=CHECK):-xslang -fvk-use-dx-layout
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry computeMain -stage compute -fvk-use-dx-layout
 //TEST_INPUT: set Test.v0 = 1;
 //TEST_INPUT: set Test.v1 = {2.0,3.0,4.0};

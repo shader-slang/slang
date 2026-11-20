@@ -1,7 +1,7 @@
 //TEST_CATEGORY(wave-mask, compute)
 //Disabled on D3D, because in general WaveShuffle requires hardware that doesn't have the 'uniform laneId across Wave' restriction.
 // Disabled because vk doesn't currently support matrix types. See wave-shuffle-vk.slang
-//TEST:COMPARE_COMPUTE(targets=cuda):
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

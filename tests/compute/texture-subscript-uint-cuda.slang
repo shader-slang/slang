@@ -1,6 +1,6 @@
 // Test for verifying subscript operator support with uint types in cuda.
 
-//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=dx11+dx12+cuda, filecheck-buffer=CHECK):
 //TEST_INPUT: Texture1D(size=4, content = one):name cudaT1D_u
 Texture1D<uint> cudaT1D_u;
 //TEST_INPUT: Texture2D(size=8, content = one):name cudaT2D_u

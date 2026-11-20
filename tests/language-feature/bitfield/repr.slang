@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck-buffer=CHECK):
 
 // Default GCC/Clang style packs from LSB to MSB
 // struct S { uint a:4; uint b:8; uint c:4; uint d:16; }
