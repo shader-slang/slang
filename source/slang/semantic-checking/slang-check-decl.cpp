@@ -23083,6 +23083,64 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         [this, varDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, varDecl, category); });
     varDecl->inferredCapabilityRequirements = mutableCapSet.freeze(getASTBuilder());
+
+    // Merge the variable's own `[require(...)]` attributes into its inferred set,
+    // mirroring the merge the function path performs in `checkFunctionCommon`. The
+    // inferred set is what a consumer's reference walk propagates through
+    // `_propagateRequirement`, so without this merge a gated variable compiles cleanly
+    // on every target, and so does every consumer of it. Consider:
+    //     [require(spirv)] static const float w = 1.0;
+    //     export float a() { return w; }
+    // Compiling `a` for `hlsl` must fail, which requires `w`'s inferred set to carry
+    // `spirv`.
+    //
+    // Only the variable's own attributes are merged, not the parent chain that
+    // `getDeclaredCapabilitySet` would walk. A parent struct's or function's
+    // requirements already reach a consumer through its reference to the parent type,
+    // and re-merging them here would also feed them back into the enclosing
+    // capability-usage computation through parameter and local references (the
+    // `target_switch` case validation walks those references), which would pollute the
+    // per-case capability sets with the requirements of the whole parent chain.
+    // Public decls must declare a superset of what their type references; internal
+    // decls join the two sets, as with functions.
+    CapabilitySet ownDeclaredCaps;
+    for (auto mod : varDecl->modifiers)
+    {
+        if (auto req = as<RequireCapabilityAttribute>(mod))
+            ownDeclaredCaps.unionWith(req->capabilitySet);
+    }
+    if (ownDeclaredCaps.isEmpty())
+        return;
+
+    auto vis = getDeclVisibility(varDecl);
+    const auto frozenDeclaredCaps = ownDeclaredCaps.freeze(getASTBuilder());
+    auto declaredCapModifier = m_astBuilder->create<ExplicitlyDeclaredCapabilityModifier>();
+    declaredCapModifier->declaredCapabilityRequirements = frozenDeclaredCaps;
+    addModifier(varDecl, declaredCapModifier);
+    if (vis == DeclVisibility::Public)
+    {
+        CapabilityAtomSet failedAvailableCapabilityConjunction;
+        CheckCapabilityRequirementResult checkCapabilityResult;
+        CapabilitySet::checkCapabilityRequirement(
+            CheckCapabilityRequirementOptions::AvailableCanHaveSubsetOfAbstractAtoms,
+            ownDeclaredCaps,
+            CapabilitySet{varDecl->inferredCapabilityRequirements},
+            failedAvailableCapabilityConjunction,
+            checkCapabilityResult);
+        diagnoseUndeclaredCapability(
+            varDecl,
+            UndeclaredCapabilityDiagnosticKind::UseOfUndeclaredCapability,
+            failedAvailableCapabilityConjunction,
+            true);
+        varDecl->inferredCapabilityRequirements = frozenDeclaredCaps;
+    }
+    else
+    {
+        varDecl->inferredCapabilityRequirements =
+            CapabilitySet{varDecl->inferredCapabilityRequirements}
+                .join(ownDeclaredCaps)
+                .freeze(getASTBuilder());
+    }
 }
 
 CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* decl)
