@@ -18559,9 +18559,11 @@ uint WaveGetNumWaves()
 /// which are restricted to compute-class execution models (compute, mesh,
 /// amplification); using it from any other stage is a capability error.
 /// On HLSL with Shader Model 6.10 or later it lowers to GetGroupWaveIndex. Earlier shader
-/// models have no wave index, so it is computed as SV_GroupIndex / WaveGetLaneCount(), which
-/// is correct only if the lanes of each wave have consecutive group indices; HLSL does not
-/// guarantee that for all hardware and workgroup shapes.
+/// models have no wave index, so it is computed as
+/// WaveReadLaneFirst(SV_GroupIndex / WaveGetLaneCount()): all lanes of a wave return the
+/// quotient of its first active lane. That is the wave index only if the lanes of each wave
+/// have consecutive group indices; HLSL does not guarantee that for all hardware and workgroup
+/// shapes.
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
