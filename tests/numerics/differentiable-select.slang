@@ -1,9 +1,7 @@
 // Selection through the differentiable shape contract routes derivatives to the chosen components.
 // Mixed masks distinguish component-wise selection from choosing an entire aggregate.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -Xslang -experimental-feature
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=cpu+vk+cuda, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 
 import slang.numerics.differentiable;
 
