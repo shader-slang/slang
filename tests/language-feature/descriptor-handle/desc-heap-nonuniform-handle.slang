@@ -1,10 +1,10 @@
 // The `.Handle` construction spelling of a non-uniform descriptor-heap index: a `Texture2D.Handle`
-// built from `uint2(NonUniformResourceIndex(tid.x), 0)` is implicitly converted back to `Texture2D`,
-// and the peephole fold that collapses this handle representation round-trip must keep the
-// non-uniform marker on the emerging scalar heap index — the emitted code must mark the heap
-// access non-uniform the same way the direct subscript spelling does (see
-// `desc-heap-nonuniform.slang`), instead of leaving the marker nested inside the `uint2` / `uvec2`
-// construction. SPIR-V decoration for this spelling is covered by
+// built from `uint2(NonUniformResourceIndex(tid.x), 0)` is implicitly converted back to
+// `Texture2D`, and the peephole fold that collapses this handle representation round-trip must
+// keep the non-uniform marker on the emerging scalar heap index — the emitted code must mark
+// the heap access non-uniform the same way the direct subscript spelling does (see
+// `desc-heap-nonuniform.slang`), instead of leaving the marker nested inside the `uint2` /
+// `uvec2` construction. SPIR-V decoration for this spelling is covered by
 // `desc-heap-nonuniform-spirv.slang`.
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -profile cs_6_6
