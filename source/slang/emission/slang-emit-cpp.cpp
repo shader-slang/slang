@@ -1347,6 +1347,203 @@ const UnownedStringSlice* CPPSourceEmitter::getVectorElementNames(IRVectorType* 
     return getVectorElementNames(elemCount);
 }
 
+// The memory order of an atomic instruction, as the `int` the CPU prelude's
+// `_slang_atomic_*` helpers take (the `kIRMemoryOrder_*` values), clamped to
+// what the operation allows: a load cannot release and a store cannot
+// acquire, which the GCC/Clang `__atomic` builtins reject.
+static int _getCPPAtomicMemoryOrder(IRInst* inst, IROp op)
+{
+    Index orderIndex = 0;
+    switch (op)
+    {
+    case kIROp_AtomicLoad:
+    case kIROp_AtomicInc:
+    case kIROp_AtomicDec:
+        orderIndex = 1;
+        break;
+    case kIROp_AtomicCompareExchange:
+        orderIndex = 3;
+        break;
+    default:
+        orderIndex = 2;
+        break;
+    }
+    int order = kIRMemoryOrder_SeqCst;
+    if (inst->getOperandCount() > UInt(orderIndex))
+    {
+        if (auto lit = as<IRIntLit>(inst->getOperand(orderIndex)))
+            order = int(lit->getValue());
+    }
+    if (op == kIROp_AtomicLoad)
+    {
+        if (order == kIRMemoryOrder_Release)
+            order = kIRMemoryOrder_Relaxed;
+        else if (order == kIRMemoryOrder_AcquireRelease)
+            order = kIRMemoryOrder_Acquire;
+    }
+    else if (op == kIROp_AtomicStore)
+    {
+        if (order == kIRMemoryOrder_Acquire)
+            order = kIRMemoryOrder_Relaxed;
+        else if (order == kIRMemoryOrder_AcquireRelease)
+            order = kIRMemoryOrder_Release;
+    }
+    else if (op == kIROp_AtomicCompareExchange && inst->getOperandCount() > 4)
+    {
+        // The helper takes one order and derives the order of a failed exchange from it (the
+        // same order without its release). Strengthen that order so the derived one is at least
+        // the requested failure order (operand 4). For example, a success order of `Relaxed`
+        // with a failure order of `Acquire` becomes `Acquire`. Using an order stronger than
+        // requested is always allowed.
+        if (auto failLit = as<IRIntLit>(inst->getOperand(4)))
+        {
+            auto failOrder = int(failLit->getValue());
+            if (failOrder == kIRMemoryOrder_SeqCst)
+                order = kIRMemoryOrder_SeqCst;
+            else if (
+                failOrder == kIRMemoryOrder_Acquire || failOrder == kIRMemoryOrder_AcquireRelease)
+            {
+                if (order == kIRMemoryOrder_Relaxed)
+                    order = kIRMemoryOrder_Acquire;
+                else if (order == kIRMemoryOrder_Release)
+                    order = kIRMemoryOrder_AcquireRelease;
+            }
+        }
+    }
+    return order;
+}
+
+void CPPSourceEmitter::_emitAtomicInst(IRInst* inst)
+{
+    // Every atomic instruction lowers to a call of a `_slang_atomic_<op>_<type>`
+    // helper of the CPU prelude (`slang-cpp-prelude.h`), which returns the
+    // prior value, as HLSL `Interlocked*` and GLSL `atomic*` do. The helpers
+    // use the toolchain's atomic builtins, so a dispatch whose groups run on
+    // several threads is race-free.
+    const IROp op = inst->getOp();
+    IRType* valueType =
+        op == kIROp_AtomicStore ? inst->getOperand(1)->getDataType() : inst->getDataType();
+
+    const char* typeSuffix = nullptr;
+    bool isFloat = false;
+    switch (valueType->getOp())
+    {
+    case kIROp_UIntType:
+        typeSuffix = "u32";
+        break;
+    case kIROp_IntType:
+        typeSuffix = "i32";
+        break;
+    case kIROp_UInt64Type:
+        typeSuffix = "u64";
+        break;
+    case kIROp_Int64Type:
+        typeSuffix = "i64";
+        break;
+    case kIROp_FloatType:
+        typeSuffix = "f32";
+        isFloat = true;
+        break;
+    case kIROp_DoubleType:
+        typeSuffix = "f64";
+        isFloat = true;
+        break;
+    default:
+        break;
+    }
+
+    const char* opName = nullptr;
+    switch (op)
+    {
+    case kIROp_AtomicLoad:
+        opName = "load";
+        break;
+    case kIROp_AtomicStore:
+        opName = "store";
+        break;
+    case kIROp_AtomicExchange:
+        opName = "exchange";
+        break;
+    case kIROp_AtomicCompareExchange:
+        opName = "compare_exchange";
+        break;
+    case kIROp_AtomicAdd:
+    case kIROp_AtomicInc:
+        opName = "add";
+        break;
+    case kIROp_AtomicSub:
+    case kIROp_AtomicDec:
+        opName = "sub";
+        break;
+    case kIROp_AtomicAnd:
+        opName = isFloat ? nullptr : "and";
+        break;
+    case kIROp_AtomicOr:
+        opName = isFloat ? nullptr : "or";
+        break;
+    case kIROp_AtomicXor:
+        opName = isFloat ? nullptr : "xor";
+        break;
+    case kIROp_AtomicMin:
+        opName = "min";
+        break;
+    case kIROp_AtomicMax:
+        opName = "max";
+        break;
+    default:
+        break;
+    }
+
+    if (!typeSuffix || !opName)
+    {
+        // `half` (and any other type that reaches here) has no helper.
+        StringBuilder operation;
+        operation << "atomic ";
+        operation << (opName ? opName : "operation");
+        operation << " on ";
+        getTypeNameHint(operation, valueType);
+        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = operation.produceString(),
+            .location = inst->sourceLoc});
+        if (op != kIROp_AtomicStore)
+            _emitInstAsDefaultInitializedVar(inst, inst->getDataType());
+        return;
+    }
+
+    if (op != kIROp_AtomicStore)
+        emitInstResultDecl(inst);
+    m_writer->emit("_slang_atomic_");
+    m_writer->emit(opName);
+    m_writer->emit("_");
+    m_writer->emit(typeSuffix);
+    m_writer->emit("(");
+    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+    switch (op)
+    {
+    case kIROp_AtomicLoad:
+        break;
+    case kIROp_AtomicInc:
+    case kIROp_AtomicDec:
+        m_writer->emit(", 1");
+        break;
+    case kIROp_AtomicCompareExchange:
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+        break;
+    default:
+        // The value operand's C++ literal suffix (`U`, `ULL`, `f`) follows
+        // its IR type, which is the helper's value type.
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        break;
+    }
+    m_writer->emit(", ");
+    m_writer->emit(_getCPPAtomicMemoryOrder(inst, op));
+    m_writer->emit(");\n");
+}
+
 bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
     switch (inst->getOp())
@@ -1378,65 +1575,21 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(");\n");
             return true;
         }
+    case kIROp_AtomicLoad:
+    case kIROp_AtomicStore:
+    case kIROp_AtomicExchange:
+    case kIROp_AtomicCompareExchange:
     case kIROp_AtomicAdd:
-        {
-            // Lower AtomicAdd on a pointer-to-uint/int slot to a call
-            // through the CPU prelude helpers. Matches HLSL/GLSL
-            // semantics: returns the prior value as the inst result.
-            //
-            // Shader coverage is the client this lowering exists for,
-            // and it only emits the unsigned variants (its
-            // synthesized buffer element type is uint/uint64). User
-            // code does not reach it through the atomic APIs meant
-            // for it: `InterlockedAdd` and `Atomic<T>` declare
-            // capabilities that exclude the CPU target, so they are
-            // rejected before emission. `Atomic<T>.add` is the
-            // exception, because the extension that declares it does
-            // not repeat `Atomic<T>`'s `[require]`; that is also the
-            // only way the signed variants are reached.
-            //
-            // 32-bit and 64-bit integer widths are supported via the
-            // matching prelude helper pair
-            // (`_slang_atomic_add_{u,i}{32,64}`). Other widths /
-            // float types fall through to the default unhandled-
-            // opcode diagnostic so the build fails loudly instead
-            // of producing bogus code.
-            auto dataType = inst->getDataType();
-            char const* helper;
-            switch (dataType->getOp())
-            {
-            case kIROp_UIntType:
-                helper = "_slang_atomic_add_u32";
-                break;
-            case kIROp_IntType:
-                helper = "_slang_atomic_add_i32";
-                break;
-            case kIROp_UInt64Type:
-                helper = "_slang_atomic_add_u64";
-                break;
-            case kIROp_Int64Type:
-                helper = "_slang_atomic_add_i64";
-                break;
-            default:
-                return false;
-            }
-            emitInstResultDecl(inst);
-            m_writer->emit(helper);
-            m_writer->emit("(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(", ");
-            // The value-operand literal's C++ suffix (`U`/`ULL`) is
-            // chosen by `emitOperand` from the IR operand's type, so
-            // the literal width here matches the chosen `helper`
-            // signature automatically.
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-            // Operand 2 (memory order) is consumed by the prelude
-            // helpers in `slang-cpp-prelude.h`, not threaded through
-            // here; see those helpers for the per-toolchain ordering
-            // choice.
-            m_writer->emit(");\n");
-            return true;
-        }
+    case kIROp_AtomicSub:
+    case kIROp_AtomicAnd:
+    case kIROp_AtomicOr:
+    case kIROp_AtomicXor:
+    case kIROp_AtomicMin:
+    case kIROp_AtomicMax:
+    case kIROp_AtomicInc:
+    case kIROp_AtomicDec:
+        _emitAtomicInst(inst);
+        return true;
     default:
         return false;
     }
