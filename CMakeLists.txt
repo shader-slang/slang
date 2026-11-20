@@ -257,6 +257,7 @@ endif()
 advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LUA "Build slang-fiddle using system Lua" OFF)
+advanced_option(SLANG_USE_SYSTEM_CMARK "Build using system cmark-gfm" OFF)
 advanced_option(
     SLANG_USE_SYSTEM_VULKAN_HEADERS
     "Build using system Vulkan headers"
@@ -629,6 +630,12 @@ endif()
 #
 
 find_package(Threads REQUIRED)
+
+if(SLANG_USE_SYSTEM_CMARK)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(CMARK REQUIRED IMPORTED_TARGET GLOBAL libcmark-gfm)
+    add_library(libcmark-gfm ALIAS PkgConfig::CMARK)
+endif()
 
 if(${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     find_package(unordered_dense CONFIG QUIET)
