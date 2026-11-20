@@ -1425,6 +1425,11 @@ struct ResourceSelectionContext
     /// operation or the block parameter merging its result; a conditional operation without a
     /// result returns null. Leaves the builder in the final merge block when dispatch is emitted,
     /// or at the insertion point after the cloned operation otherwise.
+    ///
+    /// On entry the builder must be inserting into the block whose tail becomes the dispatch's
+    /// continuation: the split block at the top level, the current arm block during recursion.
+    /// Every emitted arm and merge block is placed immediately after that block, so the
+    /// function's block list keeps definitions ahead of their uses for later passes.
     IRInst* emitConsumer(
         IRBuilder& builder,
         ResourceSelectionConsumer& consumer,
@@ -1485,21 +1490,23 @@ struct ResourceSelectionContext
         auto after = builder.createBlock();
         List<IRBlock*> arms;
         for (Index i = 0; i < alternatives.getCount(); i++)
+        {
             arms.add(builder.createBlock());
+        }
         // The arms and their merge block are inserted right after the block being split
-        // instead of being appended to the end of the function. The merge block receives
-        // the instructions that follow the split point, and IR consumers (most notably
-        // the function cloner that call specialization uses) require the block list
-        // order to match dominance order; appending would place those instructions'
-        // definitions after the existing blocks that use them. The inliner keeps the
-        // same adjacency when it splits a block around an inlined call.
-        IRInst* listTail = builder.getBlock();
+        // instead of being appended to the end of the function. The final merge block
+        // receives the instructions that follow the split point, and IR consumers (most
+        // notably the function cloner that call specialization uses) require every
+        // definition to precede its uses in the block list; appending would place those
+        // instructions' definitions after the existing blocks that use them. The inliner
+        // keeps the same adjacency when it splits a block around an inlined call.
+        IRBlock* insertAfterBlock = builder.getBlock();
         for (auto arm : arms)
         {
-            arm->insertAfter(listTail);
-            listTail = arm;
+            arm->insertAfter(insertAfterBlock);
+            insertAfterBlock = arm;
         }
-        after->insertAfter(listTail);
+        after->insertAfter(insertAfterBlock);
         if (condition)
             builder.emitIfElse(condition, arms[0], arms[1], after);
         else
@@ -1632,6 +1639,10 @@ struct ResourceSelectionContext
         {
             // We split at the operation, after all ordinary argument calculations. The original
             // continuation remains shared by all arms, so no unrelated work is duplicated.
+            // The continuation is appended at the end of the block list rather than adjacent to
+            // the split block, which is safe only because it is transient: its instructions are
+            // moved into the final merge block and the block itself is deallocated before this
+            // function returns, so no later pass observes the out-of-order placement.
             auto continuation = builder.createBlock();
             func->addBlock(continuation);
             temporaryContinuation = continuation;
