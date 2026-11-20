@@ -23,10 +23,9 @@ public extension uint : IGridIndex
 
 public extension uint2 : IGridIndex
 {
-    // TODO(WORKAROUND): HGBC does not yet flatten the mixed constructor uint3(this, 1).
     public uint3 gridExtent()
     {
-        return uint3(this.x, this.y, 1);
+        return uint3(this, 1);
     }
     public static uint2 fromGridIndex(uint3 index)
     {

@@ -62,36 +62,62 @@ public static const int d32FloatS8Uint = 46;
 /// allocation.
 public uint getTextureFormatBytesPerTexel(int format)
 {
-    // HGBC does not yet lower host switch statements.
-    if (format == TextureFormat::rgba32Float || format == TextureFormat::rgba32Sint ||
-        format == TextureFormat::rgba32Uint)
+    switch (format)
+    {
+    case TextureFormat::rgba32Float:
+    case TextureFormat::rgba32Sint:
+    case TextureFormat::rgba32Uint:
         return 16;
-    if (format == TextureFormat::rgba16Float || format == TextureFormat::rg32Float ||
-        format == TextureFormat::rgba16Unorm || format == TextureFormat::rgba16Snorm ||
-        format == TextureFormat::rgba16Sint || format == TextureFormat::rg32Sint ||
-        format == TextureFormat::rgba16Uint || format == TextureFormat::rg32Uint ||
-        format == TextureFormat::r64Uint || format == TextureFormat::r64Sint ||
-        format == TextureFormat::d32FloatS8Uint)
+    case TextureFormat::rgba16Float:
+    case TextureFormat::rg32Float:
+    case TextureFormat::rgba16Unorm:
+    case TextureFormat::rgba16Snorm:
+    case TextureFormat::rgba16Sint:
+    case TextureFormat::rg32Sint:
+    case TextureFormat::rgba16Uint:
+    case TextureFormat::rg32Uint:
+    case TextureFormat::r64Uint:
+    case TextureFormat::r64Sint:
+    case TextureFormat::d32FloatS8Uint:
         return 8;
-    if (format == TextureFormat::rg16Float || format == TextureFormat::r11G11B10Float ||
-        format == TextureFormat::r32Float || format == TextureFormat::rgb10A2Unorm ||
-        format == TextureFormat::rgba8Unorm || format == TextureFormat::rg16Unorm ||
-        format == TextureFormat::rgba8Snorm || format == TextureFormat::rg16Snorm ||
-        format == TextureFormat::rgba8Sint || format == TextureFormat::rg16Sint ||
-        format == TextureFormat::r32Sint || format == TextureFormat::rgb10A2Uint ||
-        format == TextureFormat::rgba8Uint || format == TextureFormat::rg16Uint ||
-        format == TextureFormat::r32Uint || format == TextureFormat::bgra8Unorm ||
-        format == TextureFormat::rgba8UnormSrgb || format == TextureFormat::d32Float)
+    case TextureFormat::rg16Float:
+    case TextureFormat::r11G11B10Float:
+    case TextureFormat::r32Float:
+    case TextureFormat::rgb10A2Unorm:
+    case TextureFormat::rgba8Unorm:
+    case TextureFormat::rg16Unorm:
+    case TextureFormat::rgba8Snorm:
+    case TextureFormat::rg16Snorm:
+    case TextureFormat::rgba8Sint:
+    case TextureFormat::rg16Sint:
+    case TextureFormat::r32Sint:
+    case TextureFormat::rgb10A2Uint:
+    case TextureFormat::rgba8Uint:
+    case TextureFormat::rg16Uint:
+    case TextureFormat::r32Uint:
+    case TextureFormat::bgra8Unorm:
+    case TextureFormat::rgba8UnormSrgb:
+    case TextureFormat::d32Float:
         return 4;
-    if (format == TextureFormat::r16Float || format == TextureFormat::rg8Unorm ||
-        format == TextureFormat::r16Unorm || format == TextureFormat::rg8Snorm ||
-        format == TextureFormat::r16Snorm || format == TextureFormat::rg8Sint ||
-        format == TextureFormat::r16Sint || format == TextureFormat::rg8Uint ||
-        format == TextureFormat::r16Uint || format == TextureFormat::d16Unorm)
+    case TextureFormat::r16Float:
+    case TextureFormat::rg8Unorm:
+    case TextureFormat::r16Unorm:
+    case TextureFormat::rg8Snorm:
+    case TextureFormat::r16Snorm:
+    case TextureFormat::rg8Sint:
+    case TextureFormat::r16Sint:
+    case TextureFormat::rg8Uint:
+    case TextureFormat::r16Uint:
+    case TextureFormat::d16Unorm:
         return 2;
-    if (format == TextureFormat::r8Unorm || format == TextureFormat::r8Snorm ||
-        format == TextureFormat::r8Sint || format == TextureFormat::r8Uint)
+    case TextureFormat::r8Unorm:
+    case TextureFormat::r8Snorm:
+    case TextureFormat::r8Sint:
+    case TextureFormat::r8Uint:
         return 1;
+    default:
+        break;
+    }
     fail();
     return 0;
 }

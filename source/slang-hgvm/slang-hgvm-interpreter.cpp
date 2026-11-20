@@ -569,6 +569,21 @@ static constexpr bool kIsInterpreterFloatingPoint =
 template<typename T>
 using NativeFloat = std::conditional_t<std::is_same_v<T, Float16Value>, float, T>;
 
+/// Clears only the IEEE sign bit, so `abs(-0.0)` is +0 and a NaN keeps its payload.
+template<typename T>
+static T clearSignBit(T value)
+{
+    if constexpr (std::is_same_v<T, Float16Value>)
+    {
+        value.bits = uint16_t(value.bits & 0x7fffu);
+        return value;
+    }
+    else
+    {
+        return std::fabs(value);
+    }
+}
+
 
 /// Describes whether a staged embedded object still needs its expensive realization work.
 ///
@@ -2953,6 +2968,10 @@ private:
         case HGBCOpcode::IDiv:
         case HGBCOpcode::IRem:
         case HGBCOpcode::Lsh:
+        case HGBCOpcode::Rsh:
+        case HGBCOpcode::BitAnd:
+        case HGBCOpcode::BitOr:
+        case HGBCOpcode::BitXor:
         case HGBCOpcode::FDiv:
         case HGBCOpcode::Pow:
         case HGBCOpcode::Min:
@@ -2965,6 +2984,8 @@ private:
         case HGBCOpcode::Leq:
         case HGBCOpcode::Geq:
         case HGBCOpcode::Neg:
+        case HGBCOpcode::Abs:
+        case HGBCOpcode::BitNot:
         case HGBCOpcode::Not:
         case HGBCOpcode::Sin:
         case HGBCOpcode::Cos:
@@ -2979,6 +3000,7 @@ private:
         case HGBCOpcode::Log2:
         case HGBCOpcode::Any:
         case HGBCOpcode::ScalarTypeCast:
+        case HGBCOpcode::BitCast:
         case HGBCOpcode::Param:
         case HGBCOpcode::Var:
         case HGBCOpcode::Load:
@@ -3454,22 +3476,25 @@ private:
             getValue(record.operands[3]).address);
     }
 
-    /// Replaces one scalar cast's type and value IDs with compact codes and direct addresses.
+    /// Replaces one cast's type and value IDs with compact codes and direct addresses.
     ///
     /// Consider `%f = OpScalarTypeCast Int32 Float32 %i`: the staged instruction stores `Int32`,
-    /// `Float32`, and `%i`'s resolved address. The destination address was allocated from `Float32`
-    /// through the ordinary result-type path, so this operation needs no size fields of its own.
+    /// `Float32`, lane count one, and `%i`'s resolved address. A `uint3` source stores lane count
+    /// three. The destination address was allocated from the result type through the ordinary
+    /// result-type path, so this operation needs no size fields of its own. `OpBitCast` has the
+    /// same operand layout and is staged here too.
     void stageScalarTypeCast(const HGBC::Record& record)
     {
-        const TypeLayout& sourceLayout = getTypeLayout(record.operands[1]);
-        const TypeLayout& destinationLayout = getTypeLayout(record.operands[2]);
-        SLANG_ASSERT(
-            sourceLayout.kind == TypeKind::Scalar && destinationLayout.kind == TypeKind::Scalar);
+        const NumericLayout& sourceLayout = getNumericLayout(record.operands[1]);
+        const NumericLayout& destinationLayout = getNumericLayout(record.operands[2]);
+        SLANG_ASSERT(sourceLayout.laneCount == destinationLayout.laneCount);
 
         m_builder->emitScalarTypeCast(
+            record.opcode,
             getValue(HGBC::getResultId(record)).address,
-            sourceLayout.numericLayout.scalarType,
-            destinationLayout.numericLayout.scalarType,
+            sourceLayout.scalarType,
+            destinationLayout.scalarType,
+            sourceLayout.laneCount,
             getValue(record.operands[3]).address);
     }
 
@@ -4455,16 +4480,23 @@ private:
     }
 
     /// Emits close or size-query records using the same direct stream value address.
+    ///
+    /// A size query records its result representation: `uint` for `getByteStreamSize`, or
+    /// `double` for `getByteStreamSizeAsDouble`, which can describe files larger than 4 GiB.
     void stageByteStreamOperation(const HGBC::Record& record)
     {
         Address resultAddress;
         auto result = m_values.find(HGBC::getResultId(record));
         if (result != m_values.end())
             resultAddress = result->second.address;
+        ScalarType resultType = ScalarType::UInt32;
+        if (record.opcode == HGBCOpcode::ByteStreamGetSize)
+            resultType = getNumericLayout(record.operands[0]).scalarType;
         m_builder->emitCloseByteStream(
             record.opcode,
             resultAddress,
-            getValue(record.operands.back()).address);
+            getValue(record.operands.back()).address,
+            resultType);
     }
 
     /// Emits one raw stream transfer with the selected endpoint representation and host extent.
@@ -4802,6 +4834,10 @@ private:
                 case HGBCOpcode::IDiv:
                 case HGBCOpcode::IRem:
                 case HGBCOpcode::Lsh:
+                case HGBCOpcode::Rsh:
+                case HGBCOpcode::BitAnd:
+                case HGBCOpcode::BitOr:
+                case HGBCOpcode::BitXor:
                 case HGBCOpcode::FDiv:
                 case HGBCOpcode::Pow:
                 case HGBCOpcode::Atan2:
@@ -4816,6 +4852,8 @@ private:
                     stageTypedBinaryOp(record);
                     break;
                 case HGBCOpcode::Neg:
+                case HGBCOpcode::Abs:
+                case HGBCOpcode::BitNot:
                 case HGBCOpcode::Not:
                 case HGBCOpcode::Sin:
                 case HGBCOpcode::Cos:
@@ -4834,6 +4872,7 @@ private:
                     stageAny(record);
                     break;
                 case HGBCOpcode::ScalarTypeCast:
+                case HGBCOpcode::BitCast:
                     stageScalarTypeCast(record);
                     break;
                 case HGBCOpcode::Param:
@@ -8456,11 +8495,258 @@ struct InterpreterState
         advance(header);
     }
 
+    /// Describes one parsed fmt-style replacement-field specification.
+    ///
+    /// The grammar is `[[fill]align][sign][#][0][width][.precision][type]`, the locale-independent
+    /// subset of `std::format` that applies to HGVM's printable values. For example, `:>8.3f` right
+    /// aligns a float with three decimals in eight columns, and `:#010x` writes `0x0000002a`.
+    struct FormatSpec
+    {
+        char fill = ' ';
+        char align = 0;
+        char sign = '-';
+        bool alternate = false;
+        bool zeroPad = false;
+        uint32_t width = 0;
+        int32_t precision = -1;
+        char type = 0;
+    };
+
+    /// Parses a replacement-field specification such as `:+.2e`, failing on anything malformed.
+    static FormatSpec parseFormatSpec(std::string_view text)
+    {
+        FormatSpec spec;
+        if (text.empty())
+            return spec;
+        if (text[0] != ':')
+            fail("Invalid format specification");
+        size_t i = 1;
+        auto isAlign = [](char c) { return c == '<' || c == '>' || c == '^'; };
+        if (i + 1 < text.size() && isAlign(text[i + 1]) && text[i] != '{' && text[i] != '}')
+        {
+            spec.fill = text[i];
+            spec.align = text[i + 1];
+            i += 2;
+        }
+        else if (i < text.size() && isAlign(text[i]))
+        {
+            spec.align = text[i++];
+        }
+        if (i < text.size() && (text[i] == '+' || text[i] == '-' || text[i] == ' '))
+            spec.sign = text[i++];
+        if (i < text.size() && text[i] == '#')
+        {
+            spec.alternate = true;
+            ++i;
+        }
+        if (i < text.size() && text[i] == '0')
+        {
+            spec.zeroPad = true;
+            ++i;
+        }
+        auto readNumber = [&](uint32_t limit) -> uint32_t
+        {
+            uint32_t value = 0;
+            while (i < text.size() && text[i] >= '0' && text[i] <= '9')
+            {
+                value = value * 10 + uint32_t(text[i++] - '0');
+                if (value > limit)
+                    fail("Format width or precision is too large");
+            }
+            return value;
+        };
+        spec.width = readNumber(1024);
+        if (i < text.size() && text[i] == '.')
+        {
+            ++i;
+            if (i >= text.size() || text[i] < '0' || text[i] > '9')
+                fail("Invalid format precision");
+            spec.precision = int32_t(readNumber(64));
+        }
+        if (i < text.size())
+            spec.type = text[i++];
+        if (i != text.size())
+            fail("Invalid format specification");
+        return spec;
+    }
+
+    /// Pads a formatted field to the requested width.
+    ///
+    /// Numbers align right and text aligns left unless the spec names an alignment. A `0` flag on
+    /// a number without an explicit alignment inserts zeros after the sign and base prefix, so
+    /// `{:06d}` formats -42 as `-00042`.
+    static void appendPadded(
+        std::string& output,
+        const FormatSpec& spec,
+        std::string_view prefix,
+        std::string_view body,
+        bool isNumeric)
+    {
+        size_t length = prefix.size() + body.size();
+        size_t padding = spec.width > length ? spec.width - length : 0;
+        if (isNumeric && spec.zeroPad && !spec.align)
+        {
+            output.append(prefix);
+            output.append(padding, '0');
+            output.append(body);
+            return;
+        }
+        char align = spec.align ? spec.align : (isNumeric ? '>' : '<');
+        size_t before = align == '>' ? padding : align == '^' ? padding / 2 : 0;
+        output.append(before, spec.fill);
+        output.append(prefix);
+        output.append(body);
+        output.append(padding - before, spec.fill);
+    }
+
+    /// Returns the sign prefix for a number, honoring `+` and space sign options.
+    static std::string_view getSignPrefix(const FormatSpec& spec, bool isNegative)
+    {
+        if (isNegative)
+            return "-";
+        return spec.sign == '+' ? "+" : spec.sign == ' ' ? " " : "";
+    }
+
+    /// Formats an integer as decimal, hexadecimal, binary, or octal.
+    ///
+    /// For example, `{:x}` formats 255 as `ff`, `{:#b}` formats 5 as `0b101`, and `{:+d}` formats
+    /// 7 as `+7`. Precision does not apply to integers.
+    static void appendFormattedInteger(
+        std::string& output,
+        const FormatSpec& spec,
+        bool isNegative,
+        uint64_t magnitude)
+    {
+        if (spec.precision >= 0)
+            fail("A precision was applied to an integer value");
+        uint32_t base = 10;
+        const char* digits = "0123456789abcdef";
+        std::string basePrefix;
+        switch (spec.type)
+        {
+        case 0:
+        case 'd':
+            break;
+        case 'x':
+            base = 16;
+            basePrefix = "0x";
+            break;
+        case 'X':
+            base = 16;
+            basePrefix = "0X";
+            digits = "0123456789ABCDEF";
+            break;
+        case 'b':
+            base = 2;
+            basePrefix = "0b";
+            break;
+        case 'o':
+            base = 8;
+            basePrefix = "0";
+            break;
+        default:
+            fail("Unsupported integer format type");
+        }
+        std::string body;
+        do
+        {
+            body.insert(body.begin(), digits[magnitude % base]);
+            magnitude /= base;
+        } while (magnitude);
+        std::string prefix(getSignPrefix(spec, isNegative));
+        if (spec.alternate && !(base == 8 && body == "0"))
+            prefix += basePrefix;
+        appendPadded(output, spec, prefix, body, true);
+    }
+
+    /// Formats a floating-point value with `f`, `e`, `g`, or `%` notation.
+    ///
+    /// For example, `{:.2f}` formats 3.14159 as `3.14`, `{:.3e}` as `3.142e+00`, and `{:.1%}`
+    /// formats 0.256 as `25.6%`. Without a type, a precision selects general notation, as in
+    /// `std::format`.
+    static void appendFormattedFloat(std::string& output, const FormatSpec& spec, double value)
+    {
+        int precision = spec.precision < 0 ? 6 : spec.precision;
+        char conversion = 0;
+        bool percent = false;
+        switch (spec.type)
+        {
+        case 'f':
+        case 'F':
+        case 'e':
+        case 'E':
+        case 'g':
+        case 'G':
+            conversion = spec.type;
+            break;
+        case '%':
+            conversion = 'f';
+            percent = true;
+            value *= 100.0;
+            break;
+        case 0:
+            conversion = spec.precision < 0 ? 'f' : 'g';
+            break;
+        default:
+            fail("Unsupported float format type");
+        }
+
+        bool isNegative = std::signbit(value) && !std::isnan(value);
+        double magnitude = std::fabs(value);
+        char buffer[512];
+        // Each conversion uses a literal format string so compilers can check its arguments.
+        switch (conversion)
+        {
+        case 'f':
+            if (spec.alternate)
+                std::snprintf(buffer, sizeof(buffer), "%#.*f", precision, magnitude);
+            else
+                std::snprintf(buffer, sizeof(buffer), "%.*f", precision, magnitude);
+            break;
+        case 'F':
+            if (spec.alternate)
+                std::snprintf(buffer, sizeof(buffer), "%#.*F", precision, magnitude);
+            else
+                std::snprintf(buffer, sizeof(buffer), "%.*F", precision, magnitude);
+            break;
+        case 'e':
+            if (spec.alternate)
+                std::snprintf(buffer, sizeof(buffer), "%#.*e", precision, magnitude);
+            else
+                std::snprintf(buffer, sizeof(buffer), "%.*e", precision, magnitude);
+            break;
+        case 'E':
+            if (spec.alternate)
+                std::snprintf(buffer, sizeof(buffer), "%#.*E", precision, magnitude);
+            else
+                std::snprintf(buffer, sizeof(buffer), "%.*E", precision, magnitude);
+            break;
+        case 'g':
+            if (spec.alternate)
+                std::snprintf(buffer, sizeof(buffer), "%#.*g", precision, magnitude);
+            else
+                std::snprintf(buffer, sizeof(buffer), "%.*g", precision, magnitude);
+            break;
+        default:
+            if (spec.alternate)
+                std::snprintf(buffer, sizeof(buffer), "%#.*G", precision, magnitude);
+            else
+                std::snprintf(buffer, sizeof(buffer), "%.*G", precision, magnitude);
+            break;
+        }
+        std::string body = buffer;
+        if (percent)
+            body += '%';
+        appendPadded(output, spec, getSignPrefix(spec, isNegative), body, true);
+    }
+
     /// Appends one staged printable value using only its compact execution classification.
     ///
     /// Consider both `print(value)` and `format("{}", value)`: they reach this same routine with a
-    /// direct address and either `String` or a scalar code. A float format such as `:.2f` is parsed
-    /// here because it depends on runtime pattern bytes; all type classification happened earlier.
+    /// direct address and either `String` or a scalar code. A field specification such as `:.2f`
+    /// or `:>8x` is parsed here because it depends on runtime pattern bytes; all type
+    /// classification happened earlier. An empty specification keeps the established output, such
+    /// as `std::to_string` for floats.
     void appendFormattedValue(
         std::string& output,
         ValueKind kind,
@@ -8468,30 +8754,48 @@ struct InterpreterState
         Address valueAddress,
         std::string_view formatSpec)
     {
+        FormatSpec spec = parseFormatSpec(formatSpec);
         if (kind == ValueKind::String)
         {
-            if (!formatSpec.empty())
-                fail("A format was applied to a non-float value");
+            if (spec.type && spec.type != 's')
+                fail("Unsupported string format type");
+            if (spec.sign != '-' || spec.alternate || spec.zeroPad)
+                fail("Sign, '#', and '0' options do not apply to strings");
             std::string_view text = readStringView(valueAddress);
-            if (!text.empty())
-                output.append(text.data(), text.size());
+            if (spec.precision >= 0 && size_t(spec.precision) < text.size())
+                text = text.substr(0, size_t(spec.precision));
+            appendPadded(output, spec, "", text, false);
             return;
         }
 
         SLANG_ASSERT(kind == ValueKind::Scalar);
-        if (!formatSpec.empty() && scalarType != ScalarType::Float16 &&
-            scalarType != ScalarType::Float32 && scalarType != ScalarType::Float64)
-            fail("A format was applied to a non-float value");
         switch (scalarType)
         {
         case ScalarType::Bool:
-            output += readValue<uint8_t>(valueAddress) ? "true" : "false";
+            if ((spec.type && spec.type != 's') || spec.precision >= 0 || spec.sign != '-' ||
+                spec.alternate || spec.zeroPad)
+            {
+                fail("Only width and alignment apply to a bool value");
+            }
+            appendPadded(
+                output,
+                spec,
+                "",
+                readValue<uint8_t>(valueAddress) ? "true" : "false",
+                false);
             return;
         case ScalarType::Int32:
-            output += std::to_string(readValue<int32_t>(valueAddress));
-            return;
+            {
+                int64_t value = readValue<int32_t>(valueAddress);
+                appendFormattedInteger(
+                    output,
+                    spec,
+                    value < 0,
+                    uint64_t(value < 0 ? -value : value));
+                return;
+            }
         case ScalarType::UInt32:
-            output += std::to_string(readValue<uint32_t>(valueAddress));
+            appendFormattedInteger(output, spec, false, readValue<uint32_t>(valueAddress));
             return;
         case ScalarType::Float16:
         case ScalarType::Float32:
@@ -8507,24 +8811,7 @@ struct InterpreterState
                     output += std::to_string(value);
                     return;
                 }
-                if (formatSpec.size() < 4 || formatSpec[0] != ':' || formatSpec[1] != '.' ||
-                    formatSpec.back() != 'f')
-                {
-                    fail("Unsupported float format");
-                }
-                uint32_t precision = 0;
-                for (size_t digitIndex = 2; digitIndex + 1 < formatSpec.size(); ++digitIndex)
-                {
-                    char digit = formatSpec[digitIndex];
-                    if (digit < '0' || digit > '9' || precision > 9)
-                        fail("Invalid float precision");
-                    precision = precision * 10 + uint32_t(digit - '0');
-                }
-                if (precision > 9)
-                    fail("Float precision is too large");
-                char buffer[96];
-                std::snprintf(buffer, sizeof(buffer), "%.*f", int(precision), double(value));
-                output += buffer;
+                appendFormattedFloat(output, spec, value);
                 return;
             }
         default:
@@ -8984,9 +9271,20 @@ struct InterpreterState
             if (endPosition < 0 || SLANG_FAILED(stream->stream->seek(SeekOrigin::Start, position)))
                 fail("HGVM byte stream has an invalid size");
             uint64_t byteCount = uint64_t(endPosition);
-            if (byteCount > std::numeric_limits<uint32_t>::max())
-                fail("HGVM byte-stream size exceeds uint32");
-            writeValue(record.header.resultAddress, uint32_t(byteCount));
+            if (record.resultType == ScalarType::Float64)
+            {
+                // Every size below 2^53 bytes is exact in double.
+                writeValue(record.header.resultAddress, double(byteCount));
+            }
+            else
+            {
+                if (byteCount > std::numeric_limits<uint32_t>::max())
+                {
+                    fail("HGVM byte-stream size exceeds uint32; use getByteStreamSizeAsDouble for "
+                         "streams larger than 4 GiB");
+                }
+                writeValue(record.header.resultAddress, uint32_t(byteCount));
+            }
         }
         advance(header);
     }
@@ -9227,7 +9525,7 @@ struct InterpreterState
             {
                 if (destinationType == ScalarType::Bool)
                     return DestinationT(float(value) != 0.0f);
-                return static_cast<DestinationT>(float(value));
+                return castScalarValue<DestinationT>(destinationType, float(value));
             }
         }
         else
@@ -9236,9 +9534,34 @@ struct InterpreterState
                 return DestinationT(value != SourceT(0));
             if constexpr (std::is_same_v<DestinationT, Float16Value>)
                 return Float16Value(value);
+            else if constexpr (
+                std::is_floating_point_v<SourceT> && std::is_integral_v<DestinationT>)
+                return saturateFloatToInteger<DestinationT>(value);
             else
                 return static_cast<DestinationT>(value);
         }
+    }
+
+    /// Converts a float to an integer the way D3D and CUDA do, instead of with C++'s undefined
+    /// out-of-range conversion.
+    ///
+    /// The value truncates toward zero, saturates to the destination range, and NaN becomes zero:
+    /// `int(3e9f)` is `INT32_MAX`, `uint(-1.5f)` is 0, and `int(NaN)` is 0.
+    template<typename DestinationT, typename SourceT>
+    static DestinationT saturateFloatToInteger(SourceT value)
+    {
+        static_assert(std::is_floating_point_v<SourceT> && std::is_integral_v<DestinationT>);
+        double source = double(value);
+        if (source != source)
+            return DestinationT(0);
+        // Both bounds of every 32-bit HGBC integer type are exact in double.
+        constexpr double lowest = double(std::numeric_limits<DestinationT>::lowest());
+        constexpr double highest = double(std::numeric_limits<DestinationT>::max());
+        if (source <= lowest)
+            return std::numeric_limits<DestinationT>::lowest();
+        if (source >= highest)
+            return std::numeric_limits<DestinationT>::max();
+        return static_cast<DestinationT>(source);
     }
 
     /// Executes one scalar cast after the source scalar code has selected its C++ representation.
@@ -9248,14 +9571,22 @@ struct InterpreterState
     template<typename SourceT>
     void executeScalarTypeCastFromSource(const StagedRecord::ScalarTypeCast& record)
     {
-        SourceT source = readValue<SourceT>(record.sourceAddress);
+        AddressRef<const SourceT> source = resolveAddress<const SourceT>(
+            record.sourceAddress,
+            record.laneCount * uint32_t(sizeof(SourceT)));
         dispatchScalarType(
             record.destinationType,
             [&]<typename DestinationT>()
             {
-                writeValue(
+                AddressRef<DestinationT> result = resolveAddress<DestinationT>(
                     record.header.resultAddress,
-                    castScalarValue<DestinationT>(record.destinationType, source));
+                    record.laneCount * uint32_t(sizeof(DestinationT)));
+                for (uint32_t laneIndex = 0; laneIndex < record.laneCount; ++laneIndex)
+                {
+                    result.get()[laneIndex] = castScalarValue<DestinationT>(
+                        record.destinationType,
+                        source.get()[laneIndex]);
+                }
             });
     }
 
@@ -9321,18 +9652,28 @@ struct InterpreterState
             [](auto lhs, auto rhs) { return lhs * rhs; });
     }
 
+    /// Reduces a shift amount to the value's bit width, matching HLSL's `<<` and `>>`.
+    ///
+    /// For example, a 32-bit shift by 33 shifts by one, and a shift by -1 shifts by 31. D3D masks
+    /// shift amounts this way, and so do the Vulkan drivers HGVM targets, so host and device code
+    /// agree instead of HGVM inventing a separate out-of-range result.
+    template<typename T>
+    static std::make_unsigned_t<T> maskShiftAmount(T amount)
+    {
+        using UnsignedT = std::make_unsigned_t<T>;
+        return UnsignedT(UnsignedT(amount) & UnsignedT(std::numeric_limits<UnsignedT>::digits - 1));
+    }
+
     /// Shifts an integer's bit representation without invoking undefined C++ behavior.
     ///
-    /// HGBC validation restricts this operation to integer types. A shift at least as wide as the
-    /// value has an undefined Slang result, so HGVM chooses zero while keeping execution defined.
+    /// HGBC validation restricts this operation to integer types. The amount is masked to the
+    /// value width, so `1u << 32` is `1u`, as on D3D and Vulkan.
     template<typename T>
     static T shiftLeftValue(T value, T amount)
     {
         static_assert(std::is_integral_v<T>);
         using UnsignedT = std::make_unsigned_t<T>;
-        UnsignedT shift = UnsignedT(amount);
-        if (shift >= std::numeric_limits<UnsignedT>::digits)
-            return T(0);
+        UnsignedT shift = maskShiftAmount(amount);
 
         UnsignedT valueBits;
         if constexpr (std::is_signed_v<T>)
@@ -9344,6 +9685,18 @@ struct InterpreterState
             return bitCast<T>(resultBits);
         else
             return resultBits;
+    }
+
+    /// Shifts right with the masked amount used by `shiftLeftValue`.
+    ///
+    /// Signed values shift arithmetically and unsigned values logically, as HLSL, SPIR-V, and
+    /// CUDA do for `>>`: `int(-8) >> 1` is -4, while `0xfffffff8u >> 1` is `0x7ffffffcu`.
+    template<typename T>
+    static T shiftRightValue(T value, T amount)
+    {
+        static_assert(std::is_integral_v<T>);
+        // C++20 defines `>>` on a negative signed value as an arithmetic shift.
+        return T(value >> maskShiftAmount(amount));
     }
 
     /// Applies one already-selected binary operation to every packed numeric lane.
@@ -9488,6 +9841,36 @@ struct InterpreterState
                 return;
             }
             SLANG_UNREACHABLE("validated OpLsh has a non-integer staged type");
+        case HGBCOpcode::Rsh:
+            if constexpr (std::is_integral_v<T>)
+            {
+                executeBinaryLanes<T>(
+                    record,
+                    [](T value, T amount) { return shiftRightValue(value, amount); });
+                return;
+            }
+            SLANG_UNREACHABLE("validated OpRsh has a non-integer staged type");
+        case HGBCOpcode::BitAnd:
+            if constexpr (std::is_integral_v<T>)
+            {
+                executeBinaryLanes<T>(record, [](T left, T right) { return T(left & right); });
+                return;
+            }
+            SLANG_UNREACHABLE("validated OpBitAnd has a non-integer staged type");
+        case HGBCOpcode::BitOr:
+            if constexpr (std::is_integral_v<T>)
+            {
+                executeBinaryLanes<T>(record, [](T left, T right) { return T(left | right); });
+                return;
+            }
+            SLANG_UNREACHABLE("validated OpBitOr has a non-integer staged type");
+        case HGBCOpcode::BitXor:
+            if constexpr (std::is_integral_v<T>)
+            {
+                executeBinaryLanes<T>(record, [](T left, T right) { return T(left ^ right); });
+                return;
+            }
+            SLANG_UNREACHABLE("validated OpBitXor has a non-integer staged type");
         case HGBCOpcode::FDiv:
             if constexpr (kIsInterpreterFloatingPoint<T>)
             {
@@ -9571,6 +9954,29 @@ struct InterpreterState
                 return;
             }
             SLANG_UNREACHABLE("validated OpNeg has an unsigned staged type");
+        case HGBCOpcode::Abs:
+            if constexpr (kIsInterpreterFloatingPoint<T>)
+            {
+                // Clear only the sign bit, as GPUs do: abs(-0.0) is +0 and NaN stays NaN.
+                executeUnaryLanes<T>(record, [](T value) { return clearSignBit(value); });
+                return;
+            }
+            else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>)
+            {
+                // abs(INT_MIN) wraps to INT_MIN, matching two's-complement GPU integers.
+                executeUnaryLanes<T>(
+                    record,
+                    [](T value) { return value < T(0) ? subtractValues(T(0), value) : value; });
+                return;
+            }
+            SLANG_UNREACHABLE("validated OpAbs has an unsigned staged type");
+        case HGBCOpcode::BitNot:
+            if constexpr (std::is_integral_v<T>)
+            {
+                executeUnaryLanes<T>(record, [](T value) { return T(~value); });
+                return;
+            }
+            SLANG_UNREACHABLE("validated OpBitNot has a non-integer staged type");
         case HGBCOpcode::Sin:
             if constexpr (kIsInterpreterFloatingPoint<T>)
             {
@@ -9751,6 +10157,32 @@ struct InterpreterState
         dispatchScalarType(
             record.sourceType,
             [&]<typename SourceT>() { executeScalarTypeCastFromSource<SourceT>(record); });
+        advance(header);
+    }
+
+    /// Copies every lane's bits from the source to the destination representation.
+    ///
+    /// Consider `asuint(float3(-0.0, 1.0, NaN))`: validation guarantees equal lane widths, so the
+    /// twelve source bytes are copied unchanged and the result is `(0x80000000, 0x3f800000, ...)`
+    /// with the NaN payload preserved, exactly as a GPU bitcast would produce.
+    void executeBitCast(const StagedRecord::Header& header)
+    {
+        SLANG_ASSERT(
+            header.recordWordCount ==
+            StagedRecord::getRecordWordCount<StagedRecord::ScalarTypeCast>());
+        StagedRecord::ScalarTypeCast record =
+            readRecord<StagedRecord::ScalarTypeCast>(programCounter);
+        dispatchScalarType(
+            record.sourceType,
+            [&]<typename SourceT>()
+            {
+                uint32_t byteSize = record.laneCount * uint32_t(sizeof(SourceT));
+                AddressRef<const uint8_t> source =
+                    resolveAddress<const uint8_t>(record.sourceAddress, byteSize);
+                AddressRef<uint8_t> result =
+                    resolveAddress<uint8_t>(record.header.resultAddress, byteSize);
+                std::memmove(result.get(), source.get(), byteSize);
+            });
         advance(header);
     }
 
@@ -10998,6 +11430,10 @@ struct InterpreterState
                 case HGBCOpcode::IDiv:
                 case HGBCOpcode::IRem:
                 case HGBCOpcode::Lsh:
+                case HGBCOpcode::Rsh:
+                case HGBCOpcode::BitAnd:
+                case HGBCOpcode::BitOr:
+                case HGBCOpcode::BitXor:
                 case HGBCOpcode::FDiv:
                 case HGBCOpcode::Pow:
                 case HGBCOpcode::Min:
@@ -11014,6 +11450,8 @@ struct InterpreterState
                     executeComparison(header);
                     break;
                 case HGBCOpcode::Neg:
+                case HGBCOpcode::Abs:
+                case HGBCOpcode::BitNot:
                 case HGBCOpcode::Not:
                 case HGBCOpcode::Sin:
                 case HGBCOpcode::Cos:
@@ -11033,6 +11471,9 @@ struct InterpreterState
                     break;
                 case HGBCOpcode::ScalarTypeCast:
                     executeScalarTypeCast(header);
+                    break;
+                case HGBCOpcode::BitCast:
+                    executeBitCast(header);
                     break;
                 case HGBCOpcode::Var:
                     executeVar(header);

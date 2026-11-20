@@ -7957,6 +7957,7 @@ void abort();
 __generic<T : __BuiltinIntegerType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 T abs(T x)
 {
     __target_switch
@@ -7974,12 +7975,19 @@ T abs(T x)
     //default:
     // Note: this simple definition may not be appropriate for floating-point inputs
     // return x < 0 ? -x : x;
+    case hgbc:
+        if (!__isSignedInt<T>())
+            return x;
+        return hgbc_asm {
+            result : $$T = OpAbs $x;
+        };
     }
 }
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<T, N> abs(vector<T, N> x)
 {
     __target_switch
@@ -7992,6 +8000,12 @@ vector<T, N> abs(vector<T, N> x)
     };
     case wgsl: __intrinsic_asm "abs";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
+    case hgbc:
+        if (!__isSignedInt<T>())
+            return x;
+        return hgbc_asm {
+            result : $$vector<T, N> = OpAbs $x;
+        };
     default:
         VECTOR_MAP_UNARY(T, N, abs, x);
     }
@@ -8000,11 +8014,18 @@ vector<T, N> abs(vector<T, N> x)
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 matrix<T,N,M> abs(matrix<T,N,M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
+    case hgbc:
+        if (!__isSignedInt<T>())
+            return x;
+        return hgbc_asm {
+            result : $$matrix<T, N, M> = OpAbs $x;
+        };
     default:
         MATRIX_MAP_UNARY(T, N, M, abs, x);
     }
@@ -8013,6 +8034,7 @@ matrix<T,N,M> abs(matrix<T,N,M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 T abs(T x)
 {
     __target_switch
@@ -8027,12 +8049,17 @@ T abs(T x)
     };
     case wgsl: __intrinsic_asm "abs";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.fabs($0)";
+    case hgbc:
+        return hgbc_asm {
+            result : $$T = OpAbs $x;
+        };
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<T, N> abs(vector<T, N> x)
 {
     __target_switch
@@ -8045,6 +8072,10 @@ vector<T, N> abs(vector<T, N> x)
     };
     case wgsl: __intrinsic_asm "abs";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.fabs($0)";
+    case hgbc:
+        return hgbc_asm {
+            result : $$vector<T, N> = OpAbs $x;
+        };
     default:
         VECTOR_MAP_UNARY(T, N, abs, x);
     }
@@ -8053,11 +8084,16 @@ vector<T, N> abs(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 matrix<T,N,M> abs(matrix<T,N,M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
+    case hgbc:
+        return hgbc_asm {
+            result : $$matrix<T, N, M> = OpAbs $x;
+        };
     default:
         MATRIX_MAP_UNARY(T, N, M, abs, x);
     }
@@ -8216,6 +8252,7 @@ matrix<T, N, M> acosh(matrix<T, N, M> x)
 __generic<T : __BuiltinType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+[require(hgbc)]
 bool all(T x)
 {
     __target_switch
@@ -8249,6 +8286,8 @@ bool all(T x)
             __intrinsic_asm "ret $0";
         else
             return false;
+    case hgbc:
+        return any(x);
     default:
         __intrinsic_asm "bool($0)";
     }
@@ -8257,6 +8296,7 @@ bool all(T x)
 __generic<T : __BuiltinType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+[require(hgbc)]
 bool all(vector<T,N> x)
 {
     if(N == 1)
@@ -8307,6 +8347,8 @@ bool all(vector<T,N> x)
                 result = result && all(x[i]);
             return result;
         }
+    case hgbc:
+        return !any(__vectorEql(x, __default<vector<T, N>>()));
     default:
         bool result = true;
         for(int i = 0; i < N; ++i)
@@ -8577,6 +8619,7 @@ double2 asdouble(uint2 lowbits, uint2 highbits)
 /// @category conversion
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
+[require(hgbc)]
 float asfloat(int x)
 {
     __target_switch
@@ -8591,11 +8634,14 @@ float asfloat(int x)
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
+    case hgbc:
+        return bit_cast<float>(x);
     }
 }
 
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
+[require(hgbc)]
 float asfloat(uint x)
 {
     __target_switch
@@ -8610,12 +8656,15 @@ float asfloat(uint x)
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
+    case hgbc:
+        return bit_cast<float>(x);
     }
 }
 
 __generic<let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
+[require(hgbc)]
 vector<float, N> asfloat(vector< int, N> x)
 {
     __target_switch
@@ -8628,6 +8677,8 @@ vector<float, N> asfloat(vector< int, N> x)
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
+    case hgbc:
+        return bit_cast<vector<float, N>>(x);
     default:
         VECTOR_MAP_UNARY(float, N, asfloat, x);
     }
@@ -8636,6 +8687,7 @@ vector<float, N> asfloat(vector< int, N> x)
 __generic<let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
+[require(hgbc)]
 vector<float,N> asfloat(vector<uint,N> x)
 {
     __target_switch
@@ -8648,6 +8700,8 @@ vector<float,N> asfloat(vector<uint,N> x)
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
+    case hgbc:
+        return bit_cast<vector<float, N>>(x);
     default:
         VECTOR_MAP_UNARY(float, N, asfloat, x);
     }
@@ -8823,6 +8877,7 @@ matrix<T, N, M> asinh(matrix<T, N, M> x)
 /// @category conversion
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
+[require(hgbc)]
 int asint(float x)
 {
     __target_switch
@@ -8837,11 +8892,14 @@ int asint(float x)
         OpBitcast $$int result $x
     };
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
+    case hgbc:
+        return bit_cast<int>(x);
     }
 }
 
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
+[require(hgbc)]
 int asint(uint x)
 {
     __target_switch
@@ -8856,12 +8914,15 @@ int asint(uint x)
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
+    case hgbc:
+        return bit_cast<int>(x);
     }
 }
 
 __generic<let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
+[require(hgbc)]
 vector<int, N> asint(vector<float, N> x)
 {
     __target_switch
@@ -8874,6 +8935,8 @@ vector<int, N> asint(vector<float, N> x)
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
+    case hgbc:
+        return bit_cast<vector<int, N>>(x);
     default:
         VECTOR_MAP_UNARY(int, N, asint, x);
     }
@@ -8882,6 +8945,7 @@ vector<int, N> asint(vector<float, N> x)
 __generic<let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
+[require(hgbc)]
 vector<int, N> asint(vector<uint, N> x)
 {
     if(N == 1)
@@ -8896,6 +8960,8 @@ vector<int, N> asint(vector<uint, N> x)
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
+    case hgbc:
+        return bit_cast<vector<int, N>>(x);
     default:
         VECTOR_MAP_UNARY(int, N, asint, x);
     }
@@ -8979,6 +9045,7 @@ void asuint(double value, out uint lowbits, out uint highbits)
 
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
+[require(hgbc)]
 uint asuint(float x)
 {
     __target_switch
@@ -8993,11 +9060,14 @@ uint asuint(float x)
         OpBitcast $$uint result $x
     };
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
+    case hgbc:
+        return bit_cast<uint>(x);
     }
 }
 
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
+[require(hgbc)]
 uint asuint(int x)
 {
     __target_switch
@@ -9012,12 +9082,15 @@ uint asuint(int x)
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
+    case hgbc:
+        return bit_cast<uint>(x);
     }
 }
 
 __generic<let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
+[require(hgbc)]
 vector<uint,N> asuint(vector<float,N> x)
 {
     __target_switch
@@ -9028,6 +9101,8 @@ vector<uint,N> asuint(vector<float,N> x)
     case spirv: return spirv_asm {
         OpBitcast $$vector<uint,N> result $x
     };
+    case hgbc:
+        return bit_cast<vector<uint, N>>(x);
     default:
         VECTOR_MAP_UNARY(uint, N, asuint, x);
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
@@ -9038,6 +9113,7 @@ vector<uint,N> asuint(vector<float,N> x)
 __generic<let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
+[require(hgbc)]
 vector<uint, N> asuint(vector<int, N> x)
 {
     if(N == 1)
@@ -9052,6 +9128,8 @@ vector<uint, N> asuint(vector<int, N> x)
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
+    case hgbc:
+        return bit_cast<vector<uint, N>>(x);
     default:
         VECTOR_MAP_UNARY(uint, N, asuint, x);
     }
@@ -9676,6 +9754,7 @@ bool CheckAccessFullyMapped(uint status)
 __generic<T : __BuiltinIntegerType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 T clamp(T x, T minBound, T maxBound)
 {
     __target_switch
@@ -9701,6 +9780,7 @@ T clamp(T x, T minBound, T maxBound)
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
     __target_switch
@@ -9726,6 +9806,7 @@ vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
 {
     __target_switch
@@ -9739,6 +9820,7 @@ matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBo
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 T clamp(T x, T minBound, T maxBound)
 {
     __target_switch
@@ -9758,6 +9840,7 @@ T clamp(T x, T minBound, T maxBound)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
     __target_switch
@@ -9777,6 +9860,7 @@ vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
 {
     __target_switch
@@ -10139,6 +10223,7 @@ vector<uint, N> countbits(vector<T, N> value)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 {
     // TODO: SPIRV does not support integer vectors.
@@ -10162,6 +10247,7 @@ vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 __generic<T : __BuiltinIntegerType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<T, 3> cross(vector<T, 3> left, vector<T, 3> right)
 {
     __target_switch
@@ -10574,6 +10660,7 @@ void DeviceMemoryBarrierWithGroupSync()
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 T distance(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -10593,6 +10680,7 @@ T distance(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 T distance(T x, T y)
 {
     __target_switch
@@ -12074,6 +12162,7 @@ matrix<T, N, M> fmod(matrix<T, N, M> x, matrix<T, N, M> y)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 T frac(T x)
 {
     __target_switch
@@ -12095,6 +12184,7 @@ T frac(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<T, N> frac(vector<T, N> x)
 {
     __target_switch
@@ -12107,6 +12197,8 @@ vector<T, N> frac(vector<T, N> x)
     };
     case wgsl: __intrinsic_asm "fract";
     case llvm:
+        return x - floor(x);
+    case hgbc:
         return x - floor(x);
     default:
         VECTOR_MAP_UNARY(T, N, frac, x);
@@ -12807,6 +12899,7 @@ void InterlockedCompareStoreFloatBitwise<T:IAtomicable>(__ref  T dest,  T compar
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 bool isfinite(T x)
 {
     __target_switch
@@ -12827,6 +12920,7 @@ bool isfinite(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<bool, N> isfinite(vector<T, N> x)
 {
     __target_switch
@@ -12837,6 +12931,10 @@ vector<bool, N> isfinite(vector<T, N> x)
         return !(isinf(x) || isnan(x));
     case metal:
         __intrinsic_asm "isfinite";
+    case hgbc:
+        if (let f = x as vector<float, N>)
+            return (asuint(f) & 0x7f800000u) != 0x7f800000u;
+        VECTOR_MAP_UNARY(bool, N, isfinite, x);
     default:
         VECTOR_MAP_UNARY(bool, N, isfinite, x);
     }
@@ -12862,6 +12960,7 @@ matrix<bool, N, M> isfinite(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 bool isinf(T x)
 {
     __target_switch
@@ -12886,12 +12985,22 @@ bool isinf(T x)
         }
         return false;
     case llvm: __intrinsic_asm "%result = call i1 @llvm.is.fpclass($0, i32 u0x204)";
+    case hgbc:
+        // Test the exponent and mantissa bits exactly, as the WGSL path does.
+        if (let f = x as float)
+            return (asuint(f) & 0x7fffffffu) == 0x7f800000u;
+        if (let h = x as half)
+            return isinf(float(h));
+        if (let d = x as double)
+            return d == d && !(abs(d) <= 1.7976931348623157e308);
+        return false;
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<bool, N> isinf(vector<T, N> x)
 {
     __target_switch
@@ -12902,6 +13011,10 @@ vector<bool, N> isinf(vector<T, N> x)
         __intrinsic_asm "isinf";
     case spirv:
         return spirv_asm { result:$$vector<bool,N> = OpIsInf $x};
+    case hgbc:
+        if (let f = x as vector<float, N>)
+            return (asuint(f) & 0x7fffffffu) == 0x7f800000u;
+        VECTOR_MAP_UNARY(bool, N, isinf, x);
     default:
         VECTOR_MAP_UNARY(bool, N, isinf, x);
     }
@@ -12927,6 +13040,7 @@ matrix<bool, N, M> isinf(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 bool isnan(T x)
 {
     __target_switch
@@ -12951,12 +13065,21 @@ bool isnan(T x)
         }
         return false;
     case llvm: __intrinsic_asm "%result = call i1 @llvm.is.fpclass($0, i32 3)";
+    case hgbc:
+        if (let f = x as float)
+            return (asuint(f) & 0x7fffffffu) > 0x7f800000u;
+        if (let h = x as half)
+            return isnan(float(h));
+        if (let d = x as double)
+            return d != d;
+        return false;
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<bool, N> isnan(vector<T, N> x)
 {
     __target_switch
@@ -12967,6 +13090,10 @@ vector<bool, N> isnan(vector<T, N> x)
         __intrinsic_asm "isnan";
     case spirv:
         return spirv_asm { result:$$vector<bool, N> = OpIsNan $x};
+    case hgbc:
+        if (let f = x as vector<float, N>)
+            return (asuint(f) & 0x7fffffffu) > 0x7f800000u;
+        VECTOR_MAP_UNARY(bool, N, isnan, x);
     default:
         VECTOR_MAP_UNARY(bool, N, isnan, x);
     }
@@ -13085,6 +13212,7 @@ vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 T length(vector<T, N> x)
 {
     __target_switch
@@ -13103,6 +13231,7 @@ T length(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 T length(T x)
 {
     __target_switch
@@ -14984,6 +15113,7 @@ T NonUniformResourceIndex<T>(T value) { return value; }
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<T,N> normalize(vector<T,N> x)
 {
     __target_switch
@@ -15003,6 +15133,7 @@ vector<T,N> normalize(vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 T normalize(T x)
 {
     __target_switch
@@ -15341,6 +15472,7 @@ matrix<T, N, M> radians(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 T rcp(T x)
 {
     __target_switch
@@ -15354,6 +15486,7 @@ T rcp(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<T, N> rcp(vector<T, N> x)
 {
     __target_switch
@@ -15364,6 +15497,8 @@ vector<T, N> rcp(vector<T, N> x)
     case wgsl:
     case llvm:
         return T(1.0) / x;
+    case hgbc:
+        return vector<T, N>(T(1.0)) / x;
     default:
         VECTOR_MAP_UNARY(T, N, rcp, x);
     }
@@ -15658,6 +15793,7 @@ matrix<T,N,M> round(matrix<T,N,M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 T rsqrt(T x)
 {
     __target_switch
@@ -15678,6 +15814,7 @@ T rsqrt(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<T, N> rsqrt(vector<T, N> x)
 {
     __target_switch
@@ -15690,6 +15827,8 @@ vector<T, N> rsqrt(vector<T, N> x)
     };
     case llvm:
         return vector<T, N>(1.0) / sqrt(x);
+    case hgbc:
+        return vector<T, N>(T(1.0)) / sqrt(x);
     default:
         VECTOR_MAP_UNARY(T, N, rsqrt, x);
     }
@@ -15715,6 +15854,7 @@ matrix<T, N, M> rsqrt(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 T saturate(T x)
 {
     __target_switch
@@ -15730,6 +15870,7 @@ T saturate(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc)]
 vector<T,N> saturate(vector<T,N> x)
 {
     __target_switch

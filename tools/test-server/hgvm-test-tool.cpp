@@ -145,8 +145,8 @@ SlangResult HGVMTestTool::execute(
             options.entryPointName.getBuffer(),
             searchPaths.getBuffer(),
             searchPaths.getCount(),
-            options.events.isEnabled() ? SLANG_DEBUG_INFO_LEVEL_MINIMAL
-                                       : SLANG_DEBUG_INFO_LEVEL_NONE,
+            // Line tables let validation failures name the source line, as in slangi.
+            SLANG_DEBUG_INFO_LEVEL_MINIMAL,
             options.diagnosticColor,
             code,
             diagnostics,

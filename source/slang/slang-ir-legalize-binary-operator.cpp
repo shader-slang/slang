@@ -188,6 +188,9 @@ static bool isHGBCTypedBinaryOp(IROp op)
     case kIROp_Mul:
     case kIROp_Div:
     case kIROp_IRem:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
     case kIROp_Eql:
     case kIROp_Neq:
     case kIROp_Greater:
@@ -200,6 +203,71 @@ static bool isHGBCTypedBinaryOp(IROp op)
     }
 }
 
+/// Gives an HGBC shift amount exactly the type of the value being shifted.
+///
+/// HGBC shift records declare one operand type, so `uint3Value << 1u` becomes
+/// `uint3Value << uint3(1u)` and `intValue >> uintAmount` becomes `intValue >> int(uintAmount)`.
+/// Converting the amount between signed and unsigned keeps its low bits, which are the only bits
+/// a masked shift uses.
+static void legalizeShiftForHGBC(IRInst* inst)
+{
+    IRInst* value = inst->getOperand(0);
+    IRInst* amount = inst->getOperand(1);
+    IRType* valueType = value->getDataType();
+    if (amount->getDataType() == valueType)
+        return;
+
+    IRBuilder builder(inst);
+    builder.setInsertBefore(inst);
+    IRType* valueScalarType = valueType;
+    if (auto vectorType = as<IRVectorType>(valueType))
+        valueScalarType = vectorType->getElementType();
+
+    IRInst* newAmount = amount;
+    if (auto amountVectorType = as<IRVectorType>(amount->getDataType()))
+    {
+        if (amountVectorType->getElementType() != valueScalarType)
+        {
+            newAmount = builder.emitCast(
+                builder.getVectorType(valueScalarType, amountVectorType->getElementCount()),
+                newAmount);
+        }
+    }
+    else
+    {
+        if (amount->getDataType() != valueScalarType)
+            newAmount = builder.emitCast(valueScalarType, newAmount);
+        if (as<IRVectorType>(valueType))
+            newAmount = builder.emitMakeCompositeFromScalar(valueType, newAmount);
+    }
+    builder.replaceOperand(inst->getOperands() + 1, newAmount);
+}
+
+/// Rewrites unsigned negation as subtraction from zero, which HGBC already represents.
+///
+/// For example, `-uintValue` becomes `0u - uintValue` and `-uint2Value` becomes
+/// `uint2(0u) - uint2Value`. Both wrap modulo 2^32 exactly as GPU integer negation does, so HGBC
+/// needs no unsigned variant of `OpNeg`.
+static void legalizeUnsignedNegationForHGBC(IRInst* inst)
+{
+    IRType* type = inst->getDataType();
+    IRType* scalarType = type;
+    if (auto vectorType = as<IRVectorType>(type))
+        scalarType = vectorType->getElementType();
+    if (scalarType->getOp() != kIROp_UIntType)
+        return;
+
+    IRBuilder builder(inst);
+    builder.setInsertBefore(inst);
+    IRInst* zero = builder.getIntValue(scalarType, 0);
+    if (as<IRVectorType>(type))
+        zero = builder.emitMakeCompositeFromScalar(type, zero);
+    IRInst* difference = builder.emitSub(type, zero, inst->getOperand(0));
+    inst->replaceUsesWith(difference);
+    inst->transferDecorationsTo(difference);
+    inst->removeAndDeallocate();
+}
+
 /// Walks the linked HGBC program and normalizes each typed binary operation exactly once.
 static void legalizeBinaryOpsForHGBCRec(
     IRInst* inst,
@@ -208,6 +276,13 @@ static void legalizeBinaryOpsForHGBCRec(
 {
     if (isHGBCTypedBinaryOp(inst->getOp()))
         legalizeBinaryOp(inst, sink, targetProgram);
+    else if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
+        legalizeShiftForHGBC(inst);
+    else if (inst->getOp() == kIROp_Neg)
+    {
+        legalizeUnsignedNegationForHGBC(inst);
+        return;
+    }
 
     for (auto child : inst->getModifiableChildren())
         legalizeBinaryOpsForHGBCRec(child, sink, targetProgram);

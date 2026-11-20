@@ -128,7 +128,52 @@ private:
         m_error += std::to_string(record.debugInfo.offset);
         m_error += " ";
         m_error += detail;
+        m_error += describeSourceLocation(record);
         return false;
+    }
+
+    /// Returns ` (at path:line:column)` for the source line that produced `record`, or an empty
+    /// string when the program carries no line information for it.
+    ///
+    /// Consider `float3 c = scale * color;` compiled with line tables: the `OpMul` record follows
+    /// an `OpDebugLine` for that statement in the same function, so a failure reads `OpMul at byte
+    /// offset 1234 values do not match ... (at loader.slang:42:20)`. As when the debug map is
+    /// built, the nearest preceding `OpDebugLine` describes the record, while an `OpDebugNoScope`
+    /// or the start of the function means the record has no source location.
+    std::string describeSourceLocation(const Record& record) const
+    {
+        const auto& records = m_decodedProgram.records;
+        if (records.empty() || &record < records.data() ||
+            &record >= records.data() + records.size())
+            return std::string();
+        if (record.debugInfo.section != HGBCSectionTag::FUNC)
+            return std::string();
+
+        for (size_t index = size_t(&record - records.data()); index-- > 0;)
+        {
+            const Record& candidate = records[index];
+            if (candidate.debugInfo.section != HGBCSectionTag::FUNC ||
+                candidate.opcode == HGBCOpcode::Func ||
+                candidate.opcode == HGBCOpcode::DebugNoScope)
+            {
+                return std::string();
+            }
+            if (candidate.opcode != HGBCOpcode::DebugLine || candidate.operands.size() < 5)
+                continue;
+
+            std::string location = " (at ";
+            const Record* source = findResultRecord(candidate.operands[0]);
+            const std::string* path =
+                source && source->opcode == HGBCOpcode::DebugSource && source->operands.size() >= 2
+                    ? m_program.findString(source->operands[1])
+                    : nullptr;
+            location += path ? *path : std::string("<unknown source>");
+            location += ":" + std::to_string(candidate.operands[1]);
+            location += ":" + std::to_string(candidate.operands[3]);
+            location += ")";
+            return location;
+        }
+        return std::string();
     }
 
     const Record* findResultRecord(HGBCId id) const
@@ -2297,8 +2342,8 @@ private:
     // Ensures an arithmetic record's result and operation types agree and describe both inputs.
     // Consider `%sum : %uint = OpAdd %uint %left %right`: operand two identifies the operation
     // type just as it does for comparisons, while operand zero remains the generic result type.
-    // `OpFDiv`, `OpPow`, and `OpAtan2` require a floating type, while `OpIDiv`, `OpIRem`, and
-    // `OpLsh` require an integer type.
+    // `OpFDiv`, `OpPow`, and `OpAtan2` require a floating type, while `OpIDiv`, `OpIRem`, the
+    // shifts, and the bitwise operations require an integer type.
     bool validateArithmetic(const Record& record)
     {
         HGBCId resultTypeId = record.operands[0];
@@ -2323,6 +2368,10 @@ private:
         case HGBCOpcode::IDiv:
         case HGBCOpcode::IRem:
         case HGBCOpcode::Lsh:
+        case HGBCOpcode::Rsh:
+        case HGBCOpcode::BitAnd:
+        case HGBCOpcode::BitOr:
+        case HGBCOpcode::BitXor:
             supportsType = isInteger;
             break;
         case HGBCOpcode::FDiv:
@@ -2359,8 +2408,12 @@ private:
             supportsType = isBoolScalarType(type.scalarTypeId);
             break;
         case HGBCOpcode::Neg:
+        case HGBCOpcode::Abs:
             supportsType = m_program.getIndex().intTypeIds.contains(type.scalarTypeId) ||
                            isFloatScalarType(type.scalarTypeId);
+            break;
+        case HGBCOpcode::BitNot:
+            supportsType = isIntegerScalarType(type.scalarTypeId);
             break;
         case HGBCOpcode::Sin:
         case HGBCOpcode::Cos:
@@ -2406,18 +2459,66 @@ private:
         return true;
     }
 
-    // Validates the common representation used by all casts between basic scalar types.
+    // Validates the common representation used by all numeric conversions.
     //
-    // Consider `float(i)` and `bool(u)`: both records explicitly identify their source and
-    // destination scalar types, while the value must agree with the source. Adding another scalar
-    // width only extends the type classification; it does not require another cast opcode.
+    // Consider `float(i)`, `bool(u)`, and `float3(uint3Value)`: each record identifies its source
+    // and destination types, which must have the same scalar, vector, or matrix shape, and the
+    // value must agree with the source. Each lane converts as the corresponding scalar would.
     bool validateScalarTypeCast(const Record& record)
     {
         SLANG_RELEASE_ASSERT(record.operands.size() == 4);
         HGBCId sourceTypeId = record.operands[1];
         HGBCId destinationTypeId = record.operands[2];
-        if (!isBasicScalarType(sourceTypeId) || !isBasicScalarType(destinationTypeId))
-            return fail(record, "source and destination must be basic scalar types");
+        NumericType sourceType;
+        NumericType destinationType;
+        if (!tryGetNumericType(sourceTypeId, sourceType) ||
+            !tryGetNumericType(destinationTypeId, destinationType))
+        {
+            return fail(record, "source and destination must be scalar, vector, or matrix types");
+        }
+        if (!haveSameNumericShape(sourceType, destinationType))
+            return fail(record, "source and destination shapes do not match");
+        if (!isValueCompatible(sourceTypeId, record.operands[3]))
+            return fail(record, "value does not match the declared source type");
+        return true;
+    }
+
+    // Returns the storage width of one numeric lane in bits, or zero for Boolean lanes.
+    //
+    // HGBC integers are 32-bit, so `asfloat(uint)` reinterprets 32 bits, while `half` has 16.
+    uint32_t getScalarBitWidth(HGBCId scalarTypeId) const
+    {
+        if (isIntegerScalarType(scalarTypeId) ||
+            isTypeOpcode(scalarTypeId, HGBCOpcode::Float32Type))
+            return 32;
+        if (isTypeOpcode(scalarTypeId, HGBCOpcode::Float16Type))
+            return 16;
+        if (isTypeOpcode(scalarTypeId, HGBCOpcode::Float64Type))
+            return 64;
+        return 0;
+    }
+
+    // Validates a lane-wise reinterpretation of bits, such as `asuint(float3Value)`.
+    //
+    // Source and destination must have the same shape and the same non-Boolean lane width, so
+    // every lane keeps its exact bit pattern, including NaN payloads and negative zero.
+    bool validateBitCast(const Record& record)
+    {
+        SLANG_RELEASE_ASSERT(record.operands.size() == 4);
+        HGBCId sourceTypeId = record.operands[1];
+        HGBCId destinationTypeId = record.operands[2];
+        NumericType sourceType;
+        NumericType destinationType;
+        if (!tryGetNumericType(sourceTypeId, sourceType) ||
+            !tryGetNumericType(destinationTypeId, destinationType))
+        {
+            return fail(record, "source and destination must be scalar, vector, or matrix types");
+        }
+        if (!haveSameNumericShape(sourceType, destinationType))
+            return fail(record, "source and destination shapes do not match");
+        uint32_t sourceWidth = getScalarBitWidth(sourceType.scalarTypeId);
+        if (sourceWidth == 0 || sourceWidth != getScalarBitWidth(destinationType.scalarTypeId))
+            return fail(record, "source and destination lanes must have the same numeric width");
         if (!isValueCompatible(sourceTypeId, record.operands[3]))
             return fail(record, "value does not match the declared source type");
         return true;
@@ -2681,12 +2782,13 @@ private:
             }
             return true;
         case HGBCOpcode::ByteStreamGetSize:
-            if (!m_program.getIndex().uintTypeIds.contains(record.operands[0]) ||
+            if ((!m_program.getIndex().uintTypeIds.contains(record.operands[0]) &&
+                 !isTypeOpcode(record.operands[0], HGBCOpcode::Float64Type)) ||
                 !isTypeOpcode(
                     getEffectiveValueTypeId(record.operands[2]),
                     HGBCOpcode::ByteStreamType))
             {
-                return fail(record, "requires a uint result and byte-stream operand");
+                return fail(record, "requires a uint or double result and byte-stream operand");
             }
             return true;
 
@@ -2798,11 +2900,17 @@ private:
         case HGBCOpcode::IDiv:
         case HGBCOpcode::IRem:
         case HGBCOpcode::Lsh:
+        case HGBCOpcode::Rsh:
+        case HGBCOpcode::BitAnd:
+        case HGBCOpcode::BitOr:
+        case HGBCOpcode::BitXor:
         case HGBCOpcode::FDiv:
         case HGBCOpcode::Pow:
         case HGBCOpcode::Atan2:
             return validateArithmetic(record);
         case HGBCOpcode::Neg:
+        case HGBCOpcode::Abs:
+        case HGBCOpcode::BitNot:
         case HGBCOpcode::Not:
         case HGBCOpcode::Sin:
         case HGBCOpcode::Cos:
@@ -2820,6 +2928,8 @@ private:
             return validateAny(record);
         case HGBCOpcode::ScalarTypeCast:
             return validateScalarTypeCast(record);
+        case HGBCOpcode::BitCast:
+            return validateBitCast(record);
         case HGBCOpcode::MakeVector:
             return validateMakeVector(record);
         case HGBCOpcode::MakeArray:

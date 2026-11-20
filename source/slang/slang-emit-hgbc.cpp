@@ -1051,10 +1051,11 @@ struct HGBCBuilder
         HGBCId resultId,
         HGBCId sourceTypeId,
         HGBCId destinationTypeId,
-        HGBCId valueId)
+        HGBCId valueId,
+        HGBCOpcode opcode = HGBCOpcode::ScalarTypeCast)
     {
         uint32_t operands[] = {resultId, sourceTypeId, destinationTypeId, valueId};
-        emitInst(HGBCOpcode::ScalarTypeCast, operands, SLANG_COUNT_OF(operands));
+        emitInst(opcode, operands, SLANG_COUNT_OF(operands));
     }
 
     // Emits the common typed-binary record used by arithmetic and comparison operations.
@@ -3192,11 +3193,66 @@ struct HGBCEmitter
         }
     }
 
-    /// Emits one explicitly typed HGBC scalar cast from any basic scalar-cast IR opcode.
+    /// Describes a scalar, vector, or matrix type by its leaf type and logical lane dimensions.
+    struct NumericShape
+    {
+        IRType* scalarType = nullptr;
+        IRIntegerValue rowCount = 1;
+        IRIntegerValue columnCount = 1;
+        bool isVector = false;
+        bool isMatrix = false;
+    };
+
+    /// Finds the leaf type and constant dimensions of a numeric value type.
     ///
-    /// Consider `float(i)` and `int(f)`: their IR opcodes differ, but both become
-    /// `OpScalarTypeCast` with source and destination type IDs. A matrix `floatCast` that only
-    /// changes row/column-major storage remains a no-op because HGBC matrices store logical lanes.
+    /// For example, `uint3` gives `uint` with three columns and `float2x3` gives `float` with two
+    /// rows and three columns. A struct or a vector with a non-constant length returns false.
+    static bool tryGetNumericShape(IRType* type, NumericShape& outShape)
+    {
+        outShape = {};
+        if (isBasicScalarCastType(type))
+        {
+            outShape.scalarType = type;
+            return true;
+        }
+        if (auto vectorType = as<IRVectorType>(type))
+        {
+            auto count = as<IRIntLit>(vectorType->getElementCount());
+            if (!count || !isBasicScalarCastType(vectorType->getElementType()))
+                return false;
+            outShape.scalarType = vectorType->getElementType();
+            outShape.columnCount = count->getValue();
+            outShape.isVector = true;
+            return true;
+        }
+        if (auto matrixType = as<IRMatrixType>(type))
+        {
+            auto rowCount = as<IRIntLit>(matrixType->getRowCount());
+            auto columnCount = as<IRIntLit>(matrixType->getColumnCount());
+            if (!rowCount || !columnCount || !isBasicScalarCastType(matrixType->getElementType()))
+                return false;
+            outShape.scalarType = matrixType->getElementType();
+            outShape.rowCount = rowCount->getValue();
+            outShape.columnCount = columnCount->getValue();
+            outShape.isMatrix = true;
+            return true;
+        }
+        return false;
+    }
+
+    static bool haveSameNumericShape(const NumericShape& left, const NumericShape& right)
+    {
+        return left.isVector == right.isVector && left.isMatrix == right.isMatrix &&
+               left.rowCount == right.rowCount && left.columnCount == right.columnCount;
+    }
+
+    /// Emits one explicitly typed HGBC conversion from any basic cast IR opcode.
+    ///
+    /// Consider `float(i)`, `int(f)`, and `float3(uint3Value)`: their IR opcodes differ, but each
+    /// becomes `OpScalarTypeCast` with source and destination type IDs of the same shape, and each
+    /// lane converts as the scalar cast would. A matrix `floatCast` that only changes row/column
+    /// storage remains a no-op because HGBC matrices store logical lanes. `kIROp_BitCast` uses the
+    /// same operand layout with `OpBitCast`.
     SlangResult emitScalarTypeCastInst(IRInst* inst, HGBCId& outValueId)
     {
         if (inst->getOperandCount() != 1)
@@ -3204,33 +3260,18 @@ struct HGBCEmitter
 
         IRType* destinationType = inst->getDataType();
         IRType* sourceType = inst->getOperand(0)->getDataType();
-        if (inst->getOp() == kIROp_FloatCast && !isBasicScalarCastType(destinationType))
+        NumericShape sourceShape;
+        NumericShape destinationShape;
+        if (!tryGetNumericShape(sourceType, sourceShape) ||
+            !tryGetNumericShape(destinationType, destinationShape) ||
+            !haveSameNumericShape(sourceShape, destinationShape))
         {
-            auto destinationMatrixType = as<IRMatrixType>(destinationType);
-            auto sourceMatrixType = as<IRMatrixType>(sourceType);
-            auto destinationRowCount = destinationMatrixType
-                                           ? as<IRIntLit>(destinationMatrixType->getRowCount())
-                                           : nullptr;
-            auto destinationColumnCount =
-                destinationMatrixType ? as<IRIntLit>(destinationMatrixType->getColumnCount())
-                                      : nullptr;
-            auto sourceRowCount =
-                sourceMatrixType ? as<IRIntLit>(sourceMatrixType->getRowCount()) : nullptr;
-            auto sourceColumnCount =
-                sourceMatrixType ? as<IRIntLit>(sourceMatrixType->getColumnCount()) : nullptr;
-            if (!destinationMatrixType || !sourceMatrixType || !destinationRowCount ||
-                !destinationColumnCount || !sourceRowCount || !sourceColumnCount ||
-                destinationMatrixType->getElementType() != sourceMatrixType->getElementType() ||
-                destinationRowCount->getValue() != sourceRowCount->getValue() ||
-                destinationColumnCount->getValue() != sourceColumnCount->getValue())
-            {
-                return fail(inst, "non-scalar floating-point cast");
-            }
-            return emitInstResultId(inst->getOperand(0), outValueId);
+            return fail(inst, "cast between HGBC values of different or non-numeric shapes");
         }
 
-        if (!isBasicScalarCastType(sourceType) || !isBasicScalarCastType(destinationType))
-            return fail(inst, "cast between non-scalar HGBC values");
+        bool isBitCast = inst->getOp() == kIROp_BitCast;
+        if (sourceShape.scalarType == destinationShape.scalarType)
+            return emitInstResultId(inst->getOperand(0), outValueId);
 
         HGBCId sourceTypeId = 0;
         SLANG_RETURN_ON_FAIL(lowerType(sourceType, sourceTypeId));
@@ -3240,7 +3281,12 @@ struct HGBCEmitter
         SLANG_RETURN_ON_FAIL(emitInstResultId(inst->getOperand(0), valueId));
 
         outValueId = builder.allocId();
-        builder.emitScalarTypeCast(outValueId, sourceTypeId, destinationTypeId, valueId);
+        builder.emitScalarTypeCast(
+            outValueId,
+            sourceTypeId,
+            destinationTypeId,
+            valueId,
+            isBitCast ? HGBCOpcode::BitCast : HGBCOpcode::ScalarTypeCast);
         registerValueId(inst, outValueId);
         return SLANG_OK;
     }
@@ -3436,6 +3482,7 @@ struct HGBCEmitter
         case kIROp_FloatCast:
         case kIROp_CastIntToFloat:
         case kIROp_CastFloatToInt:
+        case kIROp_BitCast:
             return emitScalarTypeCastInst(inst, outValueId);
 
         case kIROp_Var:
@@ -3595,6 +3642,10 @@ struct HGBCEmitter
         case kIROp_Mul:
         case kIROp_IRem:
         case kIROp_Lsh:
+        case kIROp_Rsh:
+        case kIROp_BitAnd:
+        case kIROp_BitOr:
+        case kIROp_BitXor:
             {
                 if (inst->getOperandCount() != 2)
                     return fail(inst, "malformed binary arithmetic instructions");
@@ -3665,16 +3716,33 @@ struct HGBCEmitter
                         return fail(inst, "remainder on non-integer graph values");
                     }
                 }
-                else if (inst->getOp() == kIROp_Lsh)
+                else if (
+                    inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh ||
+                    inst->getOp() == kIROp_BitAnd || inst->getOp() == kIROp_BitOr ||
+                    inst->getOp() == kIROp_BitXor)
                 {
-                    if (scalarType->getOp() == kIROp_UIntType ||
-                        scalarType->getOp() == kIROp_IntType)
+                    if (scalarType->getOp() != kIROp_UIntType &&
+                        scalarType->getOp() != kIROp_IntType)
                     {
-                        opcode = HGBCOpcode::Lsh;
+                        return fail(inst, "shift or bitwise operation on non-integer graph values");
                     }
-                    else
+                    switch (inst->getOp())
                     {
-                        return fail(inst, "left shift on non-integer graph values");
+                    case kIROp_Lsh:
+                        opcode = HGBCOpcode::Lsh;
+                        break;
+                    case kIROp_Rsh:
+                        opcode = HGBCOpcode::Rsh;
+                        break;
+                    case kIROp_BitAnd:
+                        opcode = HGBCOpcode::BitAnd;
+                        break;
+                    case kIROp_BitOr:
+                        opcode = HGBCOpcode::BitOr;
+                        break;
+                    default:
+                        opcode = HGBCOpcode::BitXor;
+                        break;
                     }
                 }
                 builder.emitTypedBinaryOp(opcode, typeId, outValueId, typeId, leftId, rightId);
@@ -3702,6 +3770,27 @@ struct HGBCEmitter
 
                 outValueId = builder.allocId();
                 builder.emitUnary(HGBCOpcode::Neg, typeId, outValueId, valueId);
+                registerValueId(inst, outValueId);
+                return SLANG_OK;
+            }
+
+        case kIROp_BitNot:
+            {
+                IRType* scalarType = tryGetNumericScalarType(inst->getDataType());
+                if (inst->getOperandCount() != 1 || !scalarType ||
+                    (scalarType->getOp() != kIROp_IntType && scalarType->getOp() != kIROp_UIntType))
+                {
+                    return fail(inst, "bitwise not on non-integer graph values");
+                }
+
+                HGBCId typeId = 0;
+                SLANG_RETURN_ON_FAIL(lowerType(inst->getDataType(), typeId));
+
+                HGBCId valueId = 0;
+                SLANG_RETURN_ON_FAIL(emitInstResultId(inst->getOperand(0), valueId));
+
+                outValueId = builder.allocId();
+                builder.emitUnary(HGBCOpcode::BitNot, typeId, outValueId, valueId);
                 registerValueId(inst, outValueId);
                 return SLANG_OK;
             }
@@ -4432,6 +4521,7 @@ struct HGBCEmitter
         case kIROp_FloatCast:
         case kIROp_CastIntToFloat:
         case kIROp_CastFloatToInt:
+        case kIROp_BitCast:
         case kIROp_Var:
         case kIROp_Load:
         case kIROp_CastDescriptorHandleToResource:
@@ -4456,6 +4546,11 @@ struct HGBCEmitter
         case kIROp_Mul:
         case kIROp_IRem:
         case kIROp_Lsh:
+        case kIROp_Rsh:
+        case kIROp_BitAnd:
+        case kIROp_BitOr:
+        case kIROp_BitXor:
+        case kIROp_BitNot:
         case kIROp_Neg:
         case kIROp_Eql:
         case kIROp_Neq:

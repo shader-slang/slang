@@ -35,12 +35,27 @@ public void closeByteStream(ByteStream stream)
     };
 }
 
+/// Returns the stream's total size in bytes; fails for streams larger than 4 GiB.
 public uint getByteStreamSize(ByteStream stream)
 {
     return hgbc_asm
     {
     result:
         $$uint = OpByteStreamGetSize $stream;
+    };
+}
+
+/// Returns the stream's total size in bytes as a double, which is exact up to 2^53 bytes.
+///
+/// HGBC has no 64-bit integer type yet, so a file larger than 4 GiB reports its size here. For
+/// example, a 5 GiB tiled image returns 5368709120.0, which a loader can compare exactly against
+/// `double(tileCount) * double(tileByteCount) + double(headerByteCount)`.
+public double getByteStreamSizeAsDouble(ByteStream stream)
+{
+    return hgbc_asm
+    {
+    result:
+        $$double = OpByteStreamGetSize $stream;
     };
 }
 

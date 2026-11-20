@@ -178,9 +178,9 @@ SlangResult compileAndRunHGBC(
         entryPointName,
         additionalSearchPathPointers.getBuffer(),
         additionalSearchPathPointers.getCount(),
-        debug                ? SLANG_DEBUG_INFO_LEVEL_STANDARD
-        : events.isEnabled() ? SLANG_DEBUG_INFO_LEVEL_MINIMAL
-                             : SLANG_DEBUG_INFO_LEVEL_NONE,
+        // Line tables are always kept so validation and runtime failures can name the source line;
+        // staging skips debug records, so they do not slow execution.
+        debug ? SLANG_DEBUG_INFO_LEVEL_STANDARD : SLANG_DEBUG_INFO_LEVEL_MINIMAL,
         diagnosticColor,
         code,
         diagnostics,

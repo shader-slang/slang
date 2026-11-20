@@ -561,16 +561,18 @@ struct Unary
     Address operandAddress;
 };
 
-/// Stores one scalar cast after both HGBC type IDs have become direct execution codes.
+/// Stores one lane-wise conversion after both HGBC type IDs have become direct execution codes.
 ///
-/// Consider `float(i)`: staging records `Int32`, `Float32`, and `i`'s address. Execution performs
-/// two compact enum dispatches and never resolves either source type record or the runtime value's
-/// type. `header.resultAddress` already has the destination type's size and alignment.
+/// Consider `float3(uint3Value)`: staging records `UInt32`, `Float32`, lane count three, and the
+/// source address. Execution performs two compact enum dispatches and converts each packed lane;
+/// `header.resultAddress` already has the destination type's size and alignment. `OpBitCast`
+/// uses the same record and copies the lanes' bits instead of converting their values.
 struct ScalarTypeCast
 {
     Header header;
     ScalarType sourceType = ScalarType::UInt32;
     ScalarType destinationType = ScalarType::UInt32;
+    uint32_t laneCount = 1;
     Address sourceAddress;
 };
 
@@ -985,6 +987,8 @@ struct CloseByteStream
 {
     Header header;
     Address streamAddress;
+    /// The size query's result representation: `UInt32`, or `Float64` for sizes beyond 4 GiB.
+    ScalarType resultType = ScalarType::UInt32;
 };
 
 /// Describes one exact raw transfer between a stream and a statically selected endpoint kind.

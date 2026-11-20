@@ -376,19 +376,20 @@ Address StagedRecordBuilder::emitUnary(
 }
 
 Address StagedRecordBuilder::emitScalarTypeCast(
+    HGBCOpcode opcode,
     Address resultAddress,
     ScalarType sourceType,
     ScalarType destinationType,
+    uint32_t laneCount,
     Address sourceAddress)
 {
     StagedRecord::ScalarTypeCast record;
-    record.header = makeHeader(
-        uint32_t(HGBCOpcode::ScalarTypeCast),
-        1,
-        StagedRecord::getByteSize<StagedRecord::ScalarTypeCast>());
+    record.header =
+        makeHeader(uint32_t(opcode), 1, StagedRecord::getByteSize<StagedRecord::ScalarTypeCast>());
     record.header.resultAddress = resultAddress;
     record.sourceType = sourceType;
     record.destinationType = destinationType;
+    record.laneCount = laneCount;
     record.sourceAddress = sourceAddress;
     return emitRecord(record);
 }
@@ -933,13 +934,15 @@ Address StagedRecordBuilder::emitByteStreamFromFile(
 Address StagedRecordBuilder::emitCloseByteStream(
     HGBCOpcode opcode,
     Address resultAddress,
-    Address streamAddress)
+    Address streamAddress,
+    ScalarType resultType)
 {
     StagedRecord::CloseByteStream record;
     record.header =
         makeHeader(uint32_t(opcode), 1, StagedRecord::getByteSize<StagedRecord::CloseByteStream>());
     record.header.resultAddress = resultAddress;
     record.streamAddress = streamAddress;
+    record.resultType = resultType;
     return emitRecord(record);
 }
 

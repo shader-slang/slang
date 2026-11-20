@@ -2510,6 +2510,106 @@ M.opcodes = {
             }),
         }
     ),
+    opcode(
+        "Rsh",
+        0xd4,
+        "FUNC",
+        {
+            inline_asm = true,
+            operands = operands({
+                type_id("type"),
+                result_id("result"),
+                type_id("operandType"),
+                ref_id("value"),
+                ref_id("amount"),
+            }),
+        }
+    ),
+    opcode(
+        "BitAnd",
+        0xd5,
+        "FUNC",
+        {
+            inline_asm = true,
+            operands = operands({
+                type_id("type"),
+                result_id("result"),
+                type_id("operandType"),
+                ref_id("left"),
+                ref_id("right"),
+            }),
+        }
+    ),
+    opcode(
+        "BitOr",
+        0xd6,
+        "FUNC",
+        {
+            inline_asm = true,
+            operands = operands({
+                type_id("type"),
+                result_id("result"),
+                type_id("operandType"),
+                ref_id("left"),
+                ref_id("right"),
+            }),
+        }
+    ),
+    opcode(
+        "BitXor",
+        0xd7,
+        "FUNC",
+        {
+            inline_asm = true,
+            operands = operands({
+                type_id("type"),
+                result_id("result"),
+                type_id("operandType"),
+                ref_id("left"),
+                ref_id("right"),
+            }),
+        }
+    ),
+    opcode(
+        "BitNot",
+        0xd8,
+        "FUNC",
+        {
+            inline_asm = true,
+            operands = operands({
+                type_id("type"),
+                result_id("result"),
+                ref_id("value"),
+            }),
+        }
+    ),
+    opcode(
+        "Abs",
+        0xd9,
+        "FUNC",
+        {
+            inline_asm = true,
+            operands = operands({
+                type_id("type"),
+                result_id("result"),
+                ref_id("value"),
+            }),
+        }
+    ),
+    opcode(
+        "BitCast",
+        0xda,
+        "FUNC",
+        {
+            inline_asm = true,
+            operands = operands({
+                result_id("result"),
+                type_id("sourceType"),
+                type_id("type"),
+                ref_id("value"),
+            }),
+        }
+    ),
 }
 
 local operand_kinds = {

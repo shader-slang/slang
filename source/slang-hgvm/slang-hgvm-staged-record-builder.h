@@ -191,11 +191,13 @@ public:
         uint32_t laneCount,
         Address operandAddress);
 
-    /// Emits one complete ScalarTypeCast record from resolved operands.
+    /// Emits one complete ScalarTypeCast record, used by `OpScalarTypeCast` and `OpBitCast`.
     Address emitScalarTypeCast(
+        HGBCOpcode opcode,
         Address resultAddress,
         ScalarType sourceType,
         ScalarType destinationType,
+        uint32_t laneCount,
         Address sourceAddress);
 
     /// Emits one complete Binary record from resolved operands.
@@ -390,7 +392,11 @@ public:
         Address pathAddress);
 
     /// Emits one complete CloseByteStream record from resolved operands.
-    Address emitCloseByteStream(HGBCOpcode opcode, Address resultAddress, Address streamAddress);
+    Address emitCloseByteStream(
+        HGBCOpcode opcode,
+        Address resultAddress,
+        Address streamAddress,
+        ScalarType resultType = ScalarType::UInt32);
 
     /// Emits one complete ByteStreamTransfer record from resolved operands.
     Address emitByteStreamTransfer(
