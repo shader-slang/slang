@@ -1166,31 +1166,6 @@ public:
         addUnconstrainedGenericParamCost();
         m_outBaseCost += m_context.typePromotionCost + computeFinalWitnessCost();
 
-        // Consider `read<let V : Mode = Mode.hlslMode>()`. Folding the default gives the
-        // canonical integer argument, while its checked expression carries the case's
-        // capability requirement. Preserve it only if the default won: `read<Mode.spirvMode>()`
-        // must not inherit requirements from the unused HLSL default. The returned decl-ref
-        // already carries all substitutions, so these expressions retain source dependencies.
-        if (m_context.defaultArgumentExpressions)
-        {
-            for (auto genericDecl : m_genericDecls)
-            {
-                for (auto member : genericDecl->getDirectMemberDecls())
-                {
-                    auto argInfo = m_argInfo.tryGetValue(member);
-                    if (!argInfo || argInfo->getState() != ArgState::DefaultGenericArg)
-                        continue;
-                    Expr* defaultExpr = nullptr;
-                    if (auto typeParam = as<GenericTypeParamDecl>(member))
-                        defaultExpr = typeParam->initType.exp;
-                    else if (auto valueParam = as<GenericValueParamDecl>(member))
-                        defaultExpr = valueParam->initExpr;
-                    if (defaultExpr)
-                        m_context.defaultArgumentExpressions->add(defaultExpr);
-                }
-            }
-        }
-
         // The final decl-ref uses the current argument arrays: ordinary
         // arguments first, then witness arguments. Returning the inner decl-ref
         // lets overload resolution proceed as if the generic application had
@@ -1688,14 +1663,10 @@ private:
         if (!substArg)
             return ConstraintSolvingState::Failed;
 
-        // Canonicalize the substituted answer before comparing or storing it so
-        // repeated retries of the same default do not look like progress.
-        substArg = substArg->resolve();
-        if (auto substArgType = as<Type>(substArg))
-            substArg = substArgType->getCanonicalType();
-
         // A default constraint can be woken multiple times. If it recomputes the
         // same argument, report `Done` so dependents are not needlessly woken.
+        // `equals` compares canonical values; keep the substituted value itself
+        // so source requirements on the selected default remain available.
         auto& argInfo = m_argInfo[constraint.decl];
         if (auto previousDefaultArg = argInfo.getSubstitutedDefaultArg())
         {

@@ -506,6 +506,9 @@ class EnumDecl : public AggTypeDecl
 {
     FIDDLE(...)
     FIDDLE() Type* tagType = nullptr;
+
+    // Set after checking case modifiers; shared by semantic checking and IR lowering.
+    FIDDLE() bool hasCapabilityRestrictedCases = false;
 };
 
 // A single case in an enum.

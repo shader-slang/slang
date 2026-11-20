@@ -3,6 +3,7 @@
 #include "slang-ir-late-require-capability.h"
 
 #include "slang-ir-call-graph.h"
+#include "slang-ir-dce.h"
 #include "slang.h"
 #include "slang/ir/slang-ir-insts.h"
 #include "slang/ir/slang-ir.h"
@@ -37,8 +38,9 @@ struct ProcessLateRequireCapabilityInstsContext
     void checkCapability(
         IRFunc* entry,
         Profile profile,
-        IRLateRequireCapability* irInst,
-        IRCapabilitySet* capSet)
+        IRInst* irInst,
+        IRCapabilitySet* capSet,
+        const char* requirementName = "__requireCapability")
     {
         CapabilitySet stageTargetCaps = m_targetCaps;
         CapabilitySet stageCapabilitySet = profile.getCapabilityName();
@@ -93,22 +95,100 @@ struct ProcessLateRequireCapabilityInstsContext
                 .location = entry->sourceLoc,
             });
 
-        m_sink->diagnose(Diagnostics::SeeCallOfFunc{
-            .name = "__requireCapability",
-            .location = irInst->sourceLoc});
+        m_sink->diagnose(
+            Diagnostics::SeeCallOfFunc{.name = requirementName, .location = irInst->sourceLoc});
         diagnoseCallStack(irInst, m_sink);
+    }
+
+    // Select the case after generic specialization has made the conversion's input concrete.
+    // Consider `Mode choose<let N : int>() { return Mode(N + 1); }`. Lowering keeps the tag
+    // calculation and this check separate, so returning or simplifying the numeric value does
+    // not erase the selected case's capability requirement.
+    void checkEnumCast(IRFunc* func, IRCheckEnumCast* inst)
+    {
+        auto value = inst->getValue();
+        auto enumName = String(inst->getEnumName()->getStringSlice());
+        if (!as<IRIntLit>(value) && !as<IRBoolLit>(value))
+        {
+            m_sink->diagnose(Diagnostics::EnumCastSpecializationNotConstant{
+                .enumName = enumName,
+                .location = inst->sourceLoc});
+            diagnoseCallStack(inst, m_sink);
+            return;
+        }
+
+        IREnumCaseInfo* selectedCase = nullptr;
+        for (UInt i = 0; i < inst->getCaseCount(); ++i)
+        {
+            auto caseInfo = inst->getCase(i);
+            // Lowering gives the input and every tag the enum's underlying integer type.
+            // Canonical IR literals therefore identify the matching value without another
+            // integer-conversion or equality implementation here.
+            if (caseInfo->getTag() != value)
+                continue;
+            SLANG_RELEASE_ASSERT(!selectedCase);
+            selectedCase = caseInfo;
+        }
+        if (!selectedCase)
+        {
+            m_sink->diagnose(Diagnostics::EnumCastSpecializationNoMatchingCase{
+                .enumName = enumName,
+                .location = inst->sourceLoc});
+            diagnoseCallStack(inst, m_sink);
+            return;
+        }
+
+        if (m_optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+            return;
+        auto entryPoints = m_mapInstToReferencingEntryPoints.tryGetValue(func);
+        if (!entryPoints)
+            return;
+        for (auto entryPoint : *entryPoints)
+        {
+            auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>();
+            if (!entryPointDecor)
+                continue;
+            auto required = selectedCase->getCapabilitySet()->getCaps();
+            auto targetCaps = m_targetCaps;
+            targetCaps.join(entryPointDecor->getProfile().getCapabilityName());
+            if (targetCaps.isIncompatibleWith(required))
+            {
+                StringBuilder capabilities;
+                printDiagnosticArg(capabilities, required);
+                m_sink->diagnose(Diagnostics::EnumCastSpecializationCapabilityUnavailable{
+                    .enumCase = String(selectedCase->getCaseName()->getStringSlice()),
+                    .enumName = enumName,
+                    .capabilities = capabilities.produceString(),
+                    .location = inst->sourceLoc});
+                diagnoseCallStack(inst, m_sink);
+            }
+            else
+            {
+                checkCapability(
+                    entryPoint,
+                    entryPointDecor->getProfile(),
+                    inst,
+                    selectedCase->getCapabilitySet(),
+                    "enum conversion");
+            }
+        }
     }
 
     void processFunc(IRFunc* func)
     {
-        List<IRLateRequireCapability*> instsToRemove;
+        List<IRInst*> instsToRemove;
 
         // scan the function for IRLateRequireCapability instructions
         for (auto block : func->getBlocks())
         {
             for (auto inst : block->getOrdinaryInsts())
             {
-                if (auto lateRequireCap = as<IRLateRequireCapability>(inst))
+                if (auto enumCast = as<IRCheckEnumCast>(inst))
+                {
+                    checkEnumCast(func, enumCast);
+                    instsToRemove.add(enumCast);
+                }
+                else if (auto lateRequireCap = as<IRLateRequireCapability>(inst))
                 {
                     instsToRemove.add(lateRequireCap);
 
@@ -172,6 +252,9 @@ void processLateRequireCapabilityInsts(
         sink);
 
     context.processModule();
+
+    // Case tables are compiler metadata used only by the checks removed above.
+    eliminateDeadCode(module);
 }
 
 } // namespace Slang

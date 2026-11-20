@@ -3500,6 +3500,24 @@ local insts = {
 		-- Parameters: IRCapabilitySet
 		operands = { { "capabilitySet", "IRCapabilitySet" } },
 	} },
+	{ EnumCaseInfo = {
+		-- Preserve a named case's normalized tag and requirements after enum types are lowered.
+		hoistable = true,
+		operands = {
+			{ "tag" },
+			{ "capabilitySet", "IRCapabilitySet" },
+			{ "caseName", "IRStringLit" },
+		},
+	} },
+	{ CheckEnumCast = {
+		-- Validate a compile-time integer-to-enum conversion after specialization. This is a
+		-- separate obligation so simplifying the converted value cannot discard the check.
+		operands = {
+			{ "value" },
+			{ "enumName", "IRStringLit" },
+		},
+		min_operands = 2,
+	} },
 
 	-- Constexpr arithmetic ops. These are hoistable variants of the regular
 	-- arithmetic ops, used for lowering compile-time integer expressions

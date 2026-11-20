@@ -52,7 +52,9 @@ Type* SemanticsVisitor::ExtractTypeFromTypeRepr(Expr* typeRepr)
 {
     if (!typeRepr)
         return nullptr;
-    if (auto typeType = as<TypeType>(typeRepr->type))
+    // Checked type expressions have a TypeType directly. Read its source type without
+    // canonicalizing away requirements on folded generic arguments or array dimensions.
+    if (auto typeType = dynamicCast<TypeType>(typeRepr->type.type))
     {
         return typeType->getType();
     }
@@ -136,7 +138,7 @@ Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
         expr = resolveOverloadedExpr(overloadedExpr, LookupMask::type);
     }
 
-    if (const auto typeType = as<TypeType>(expr->type); typeType)
+    if (const auto typeType = dynamicCast<TypeType>(expr->type.type); typeType)
     {
         return expr;
     }
@@ -162,7 +164,7 @@ Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
 Type* SemanticsVisitor::ExpectAType(Expr* expr)
 {
     auto typeRepr = ExpectATypeRepr(expr);
-    if (auto typeType = as<TypeType>(typeRepr->type))
+    if (auto typeType = dynamicCast<TypeType>(typeRepr->type.type))
     {
         return typeType->getType();
     }
@@ -219,7 +221,7 @@ Val* SemanticsVisitor::ExtractGenericArgVal(
         // assume that if it is overloaded, we want a type
         exp = resolveOverloadedExpr(overloadedExpr, LookupMask::type);
     }
-    if (auto typeType = as<TypeType>(exp->type))
+    if (auto typeType = dynamicCast<TypeType>(exp->type.type))
     {
         return typeType->getType();
     }
@@ -284,7 +286,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
     {
         expr = maybeResolveOverloadedExpr(expr, LookupMask::type, diagSink);
 
-        if (auto typeType = as<TypeType>(expr->type))
+        if (auto typeType = dynamicCast<TypeType>(expr->type.type))
         {
             type = typeType->getType();
         }
@@ -441,29 +443,6 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
         result = DeclRefType::create(
             getASTBuilder(),
             getASTBuilder()->getGenericAppDeclRef(genericDeclRef, args.getArrayView()));
-
-        // A bare generic type name uses every declared default. Preserve those checked
-        // expressions on the type reference, just as explicit generic application does,
-        // so `struct Holder<let V : Mode = Mode.hlslMode> {}; Holder value;` retains the
-        // case requirement.
-        // A speculative proper-type query must not mutate its input expression.
-        if (diagSink)
-        {
-            if (auto declRefExpr = as<DeclRefExpr>(expr))
-            {
-                declRefExpr->genericArgumentExpressions.clear();
-                for (auto member : genericDeclRef.getDecl()->getDirectMemberDecls())
-                {
-                    if (auto typeParam = as<GenericTypeParamDecl>(member))
-                    {
-                        if (typeParam->initType.exp)
-                            declRefExpr->genericArgumentExpressions.add(typeParam->initType.exp);
-                    }
-                    else if (auto valueParam = as<GenericValueParamDecl>(member))
-                        declRefExpr->genericArgumentExpressions.add(valueParam->initExpr);
-                }
-            }
-        }
     }
 
     // default case: we expect this to already be a proper type

@@ -3542,17 +3542,38 @@ err(
 )
 
 err(
-    "enum-cast-ambiguous-case",
+    "duplicate-enum-case-value",
     32009,
-    "enum cast matches multiple cases",
-    span { loc = "expr:Expr", message = "multiple cases of enum '~enumDecl:Decl' have this value; name the intended case explicitly" }
+    "capability-restricted enum cases must have distinct values",
+    span { loc = "decl:Decl", message = "enum case '~decl' has the same value as '~previousDecl:Decl'; cases of capability-restricted enum '~enumDecl:Decl' must have distinct values" }
 )
 
 warning(
-    "enum-constant-cast-requires-case-capability",
+    "enum-cast-requires-case-capability",
     32010,
-    "enum constant cast inherits case capability requirements",
-    span { loc = "expr:Expr", message = "this conversion selects case '~enumCase:Decl' and inherits its capability requirements; use the named case explicitly" }
+    "enum integer conversion may require case capabilities",
+    span { loc = "expr:Expr", message = "integer conversion to capability-restricted enum '~enumDecl:Decl' may introduce a case capability requirement; use a named case when possible" }
+)
+
+err(
+    "enum-cast-specialization-not-constant",
+    32012,
+    "enum conversion is not constant after specialization",
+    span { loc = "location", message = "enum '~enumName:String' conversion must resolve to a compile-time constant after specialization" }
+)
+
+err(
+    "enum-cast-specialization-no-matching-case",
+    32013,
+    "enum conversion has no matching case after specialization",
+    span { loc = "location", message = "no named case of enum '~enumName:String' has this value after specialization" }
+)
+
+err(
+    "enum-cast-specialization-capability-unavailable",
+    32014,
+    "enum conversion selects an unavailable case",
+    span { loc = "location", message = "selected case '~enumCase:String' of enum '~enumName:String' requires capabilities '~capabilities:String' that are unavailable for this target" }
 )
 
 -- 303xx: interfaces and associated types

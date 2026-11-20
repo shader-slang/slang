@@ -461,9 +461,6 @@ struct OverloadCandidate
     // phases. Currently this is only needed for generics.
     SubstitutionSet subst;
 
-    // Checked generic arguments belonging to this candidate survive callee reconstruction.
-    List<Expr*> genericArgumentExpressions;
-
     // For a generic candidate, the number of leading ordinary generic arguments
     // that were supplied explicitly (as opposed to filled from a parameter's
     // default). `TryCheckOverloadCandidateConstraints` hands this prefix to the
@@ -3181,7 +3178,10 @@ public:
     struct ConstantFoldingCircularityInfo
     {
         ConstantFoldingCircularityInfo(DeclRefBase* declRef, ConstantFoldingCircularityInfo* next)
-            : declRef(declRef), next(next), depth(next ? next->depth + 1 : 1)
+            : declRef(declRef)
+            , next(next)
+            , depth(next ? next->depth + 1 : 1)
+            , requirements(next ? next->requirements : nullptr)
         {
         }
 
@@ -3193,7 +3193,15 @@ public:
 
         /// Current recursion depth of constant folding/evaluation.
         UInt depth = 0;
+
+        // The outer fold owns the source obligations; recursive arithmetic folds only values.
+        List<Val*>* requirements = nullptr;
     };
+    IntVal* tryConstantFoldExprImpl(
+        SubstExpr<Expr> expr,
+        ConstantFoldingKind kind,
+        ConstantFoldingCircularityInfo* circularityInfo);
+
     /// Try to apply front-end constant folding to determine the value of `invokeExpr`.
     IntVal* tryConstantFoldExpr(
         SubstExpr<InvokeExpr> invokeExpr,
@@ -3616,9 +3624,6 @@ public:
         // resolution selects the failed candidate.
         GenericArgumentInferenceFailure* failure = nullptr;
         SourceLoc applicationLoc = SourceLoc();
-
-        // Return checked expressions only for defaults that remain selected after solving.
-        List<Expr*>* defaultArgumentExpressions = nullptr;
     };
 
     bool isRelevantGeneric(GenericInferenceContext& system, Decl* generic);
@@ -3838,9 +3843,6 @@ public:
 
         Expr* baseExpr = nullptr;
 
-        // The checked generic arguments on the expression currently supplying candidates.
-        const List<Expr*>* genericArgumentExpressions = nullptr;
-
         // Are we still trying out candidates, or are we
         // checking the chosen one for real?
         Mode mode = Mode::JustTrying;
@@ -3931,11 +3933,7 @@ public:
     void TryCheckOverloadCandidate(OverloadResolveContext& context, OverloadCandidate& candidate);
 
     // Create the representation of a given generic applied to some arguments
-    Expr* createGenericDeclRef(
-        Expr* baseExpr,
-        Expr* originalExpr,
-        SubstitutionSet substSet,
-        const List<Expr*>& genericArgumentExpressions);
+    Expr* createGenericDeclRef(Expr* baseExpr, Expr* originalExpr, SubstitutionSet substSet);
 
     // Take an overload candidate that previously got through
     // `TryCheckOverloadCandidate` above, and try to finish
@@ -4165,8 +4163,7 @@ public:
         ArrayView<Val*> providedOrdinaryArgs,
         ConversionCost& outBaseCost,
         List<QualType>* innerParameterTypes = nullptr,
-        GenericArgumentInferenceFailure* outFailure = nullptr,
-        List<Expr*>* outDefaultArgumentExpressions = nullptr);
+        GenericArgumentInferenceFailure* outFailure = nullptr);
 
     void AddTypeOverloadCandidates(Type* type, OverloadResolveContext& context);
 

@@ -341,10 +341,6 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     //
     List<Val*> checkedArgs;
 
-    candidate.genericArgumentExpressions.clear();
-    if (context.args)
-        candidate.genericArgumentExpressions.addRange(*context.args);
-
     // Rather than bail out as soon as we hit a problem,
     // we are going to process *all* of the parameters of the
     // generic and place suitable arguments into the `checkedArgs`
@@ -480,8 +476,6 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                         return false;
                     }
                     checkedArgs.add(substType);
-                    if (auto defaultTypeExpr = typeParamRef.getDecl()->initType.exp)
-                        candidate.genericArgumentExpressions.add(defaultTypeExpr);
                     continue;
                 }
             }
@@ -559,7 +553,6 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                         return false;
                     }
                     checkedArgs.add(defaultVal);
-                    candidate.genericArgumentExpressions.add(defaultExpr.getExpr());
                     continue;
                 }
             }
@@ -1453,8 +1446,7 @@ void SemanticsVisitor::TryCheckOverloadCandidate(
 Expr* SemanticsVisitor::createGenericDeclRef(
     Expr* baseExpr,
     Expr* originalExpr,
-    SubstitutionSet substArgs,
-    const List<Expr*>& genericArgumentExpressions)
+    SubstitutionSet substArgs)
 {
     auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
     if (!baseDeclRefExpr)
@@ -1481,14 +1473,12 @@ Expr* SemanticsVisitor::createGenericDeclRef(
 
     auto base = GetBaseExpr(baseExpr);
 
-    auto result = ConstructDeclRefExpr(
+    return ConstructDeclRefExpr(
         innerDeclRef,
         base,
         innerDeclRef.getName(),
         originalExpr->loc,
         originalExpr);
-    result->genericArgumentExpressions = genericArgumentExpressions;
-    return result;
 }
 
 Expr* SemanticsVisitor::CompleteOverloadCandidate(
@@ -1657,8 +1647,6 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 candidate.item.declRef.getName(),
                 context.funcLoc,
                 context.originalExpr);
-            if (auto declRefExpr = as<DeclRefExpr>(baseExpr))
-                declRefExpr->genericArgumentExpressions = candidate.genericArgumentExpressions;
             break;
         case OverloadCandidate::Flavor::Expr:
         default:
@@ -1689,23 +1677,6 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                     return CreateErrorExpr(callExpr);
 
                 callExpr->type = QualType(candidate.resultType);
-
-                // Only selected defaults contribute dependencies. For example, passing
-                // Mode.spirvMode to `readMode(Mode mode = Mode.hlslMode)` must not inherit
-                // the unused HLSL default. Lowering still specializes and supplies defaults
-                // through the selected callee; these expressions preserve their source uses.
-                callExpr->defaultArgumentExpressions.clear();
-                Index parameterIndex = 0;
-                for (auto parameter : getParametersForCallableSignature(
-                         m_astBuilder,
-                         candidate.item.declRef.as<CallableDecl>()))
-                {
-                    if (parameterIndex++ >= callExpr->arguments.getCount())
-                    {
-                        if (auto initializer = parameter.getDecl()->initExpr)
-                            callExpr->defaultArgumentExpressions.add(initializer);
-                    }
-                }
 
                 // A call may yield an l-value, and we should take a look at the candidate to be
                 // sure
@@ -1795,7 +1766,6 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 expr->originalExpr = context.originalExpr;
                 expr->baseExpr = baseExpr;
                 expr->baseGenericDeclRef = as<DeclRefExpr>(baseExpr)->declRef.as<GenericDecl>();
-                expr->genericArgumentExpressions = candidate.genericArgumentExpressions;
                 auto args =
                     tryGetGenericArguments(candidate.subst, expr->baseGenericDeclRef.getDecl());
                 // Store only the ordinary argument prefix. The later call-site
@@ -1806,11 +1776,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 return expr;
             }
 
-            return createGenericDeclRef(
-                baseExpr,
-                context.originalExpr,
-                candidate.subst,
-                candidate.genericArgumentExpressions);
+            return createGenericDeclRef(baseExpr, context.originalExpr, candidate.subst);
             break;
 
         default:
@@ -2607,9 +2573,6 @@ void SemanticsVisitor::AddOverloadCandidate(
     OverloadCandidate& candidate,
     ConversionCost baseCost)
 {
-    if (context.genericArgumentExpressions)
-        candidate.genericArgumentExpressions = *context.genericArgumentExpressions;
-
     // Try the candidate out, to see if it is applicable at all.
     TryCheckOverloadCandidate(context, candidate);
 
@@ -2952,8 +2915,7 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     ArrayView<Val*> providedOrdinaryArgs,
     ConversionCost& outBaseCost,
     List<QualType>* innerParameterTypes,
-    GenericArgumentInferenceFailure* outFailure,
-    List<Expr*>* outDefaultArgumentExpressions)
+    GenericArgumentInferenceFailure* outFailure)
 {
     // The call site may have already provided some ordinary generic arguments,
     // such as the `int` in `foo<int>(x)`. The remaining ordinary arguments and
@@ -2972,7 +2934,6 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     inferenceContext.genericDecl = genericDeclRef.getDecl();
     inferenceContext.failure = outFailure;
     inferenceContext.applicationLoc = context.loc;
-    inferenceContext.defaultArgumentExpressions = outDefaultArgumentExpressions;
     if (outFailure)
         *outFailure = GenericArgumentInferenceFailure();
 
@@ -3207,17 +3168,13 @@ void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
 
     // Try to infer generic arguments, based on the context
     GenericArgumentInferenceFailure genericInferenceFailure;
-    List<Expr*> genericArgumentExpressions;
-    if (context.genericArgumentExpressions)
-        genericArgumentExpressions = *context.genericArgumentExpressions;
     DeclRef<Decl> innerRef = inferGenericArguments(
         genericDeclRef,
         context,
         providedOrdinaryArgs,
         baseCost,
         nullptr,
-        &genericInferenceFailure,
-        &genericArgumentExpressions);
+        &genericInferenceFailure);
 
     if (innerRef)
     {
@@ -3227,9 +3184,6 @@ void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
         LookupResultItem innerItem;
         innerItem.breadcrumbs = genericItem.breadcrumbs;
         innerItem.declRef = innerRef;
-        auto savedGenericArgumentExpressions = context.genericArgumentExpressions;
-        SLANG_DEFER(context.genericArgumentExpressions = savedGenericArgumentExpressions);
-        context.genericArgumentExpressions = &genericArgumentExpressions;
         AddDeclRefOverloadCandidates(innerItem, context, baseCost);
     }
     else
@@ -3339,8 +3293,6 @@ void SemanticsVisitor::AddOverloadCandidates(
 
 void SemanticsVisitor::AddOverloadCandidates(Expr* funcExpr, OverloadResolveContext& context)
 {
-    auto savedGenericArgumentExpressions = context.genericArgumentExpressions;
-    SLANG_DEFER(context.genericArgumentExpressions = savedGenericArgumentExpressions);
     // A call of the form `(<something>)(<args>)` should be
     // resolved as if the user wrote `<something>(<args>)`,
     // so that we avoid introducing intermediate expressions
@@ -3355,7 +3307,6 @@ void SemanticsVisitor::AddOverloadCandidates(Expr* funcExpr, OverloadResolveCont
 
     if (auto declRefExpr = as<DeclRefExpr>(funcExpr))
     {
-        context.genericArgumentExpressions = &declRefExpr->genericArgumentExpressions;
         // The expression directly referenced a declaration,
         // so we can use that declaration directly to look
         // for anything applicable.
@@ -3387,8 +3338,6 @@ void SemanticsVisitor::AddOverloadCandidates(Expr* funcExpr, OverloadResolveCont
     }
     else if (auto partiallyAppliedGenericExpr = as<PartiallyAppliedGenericExpr>(funcExpr))
     {
-        context.genericArgumentExpressions =
-            &partiallyAppliedGenericExpr->genericArgumentExpressions;
         // A partially-applied generic is allowed as an overload candidate. It
         // carries the ordinary argument prefix already provided by `<>`; this
         // call-site inference pass solves the remaining ordinary arguments and

@@ -9,9 +9,9 @@ struct CodeGenContext;
 class DiagnosticSink;
 struct IRModule;
 
-/// Process and eliminate the LateRequireCapability IR insts. Diagnose missing
-/// capabilities as warnings or errors depending on whether restrictive
-/// capability checks are enabled (-restrictive-capability-check).
+/// Validate and eliminate late capability requirements and deferred enum conversions. Diagnose
+/// missing capabilities as warnings or errors depending on whether restrictive capability checks
+/// are enabled (-restrictive-capability-check).
 void processLateRequireCapabilityInsts(
     IRModule* module,
     CodeGenContext* codeGenContext,

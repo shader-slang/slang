@@ -887,5 +887,7 @@ return {
 	["Type.TraceProgramDescriptor"] = 911,
 	["metalTraceRay"] = 912,
 	["Decoration.Artificial"] = 913,
-	["Decoration.assumeValidResourceOperands"] = 914
+	["Decoration.assumeValidResourceOperands"] = 914,
+	["EnumCaseInfo"] = 915,
+	["CheckEnumCast"] = 916
 }

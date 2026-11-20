@@ -992,67 +992,6 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
     return false;
 }
 
-// Collect the checked source expressions used by an omitted aggregate initializer.
-// Consider `struct S { Mode mode = Mode.hlslMode; }; S values[2] = {};`.
-// The initializer has no positional arguments, and lowering supplies the field default
-// for each array element. Remember that source expression here so capability checking
-// sees the case reference. Do not insert it into the runtime argument list: lowering
-// still owns the substitution context in which a generic field default is evaluated.
-struct DefaultInitializerExpressionCollector
-{
-    SemanticsVisitor* visitor;
-    List<Expr*> expressions;
-    HashSet<Type*> visitedTypes;
-
-    void collect(DeclRef<VarDecl> fieldDeclRef)
-    {
-        visitor->ensureDecl(fieldDeclRef, DeclCheckState::DefinitionChecked);
-        if (auto initExpr = fieldDeclRef.getDecl()->initExpr)
-            expressions.add(initExpr);
-        else
-            collect(getType(visitor->getASTBuilder(), fieldDeclRef));
-    }
-
-    void collect(Type* type)
-    {
-        type = unwrapModifiedType(type)->getCanonicalType();
-        // A repeated element type contributes the same source dependencies only once.
-        if (!visitedTypes.add(type))
-            return;
-
-        if (auto arrayType = as<ArrayExpressionType>(type))
-        {
-            collect(arrayType->getElementType());
-        }
-        else if (auto tupleType = as<TupleType>(type))
-        {
-            for (Index i = 0; i < tupleType->getMemberCount(); ++i)
-                collect(tupleType->getMember(i));
-        }
-        else if (auto declRefType = as<DeclRefType>(type))
-        {
-            auto aggregate = declRefType->getDeclRef().as<AggTypeDecl>();
-            // Abstract and link-time aggregate types have no selected concrete fields yet.
-            // Their default construction is resolved later, just as in getDefaultVal().
-            if (!aggregate || !aggregate.getDecl()->hasBody || aggregate.getDecl()->aliasedType)
-                return;
-            if (!aggregate.as<StructDecl>() && !aggregate.as<ClassDecl>() &&
-                !aggregate.as<GLSLInterfaceBlockDecl>())
-                return;
-
-            auto astBuilder = visitor->getASTBuilder();
-            if (auto structDeclRef = aggregate.as<StructDecl>())
-            {
-                if (auto baseType = findBaseStructType(astBuilder, structDeclRef))
-                    collect(baseType);
-            }
-            for (auto field :
-                 getMembersOfType<VarDecl>(astBuilder, aggregate, MemberFilterStyle::Instance))
-                collect(field);
-        }
-    }
-};
-
 bool SemanticsVisitor::_readAggregateValueFromInitializerList(
     Type* inToType,
     Expr** outToExpr,
@@ -1067,7 +1006,6 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
     // In the case where we need to build a result expression,
     // we will collect the new arguments here
     List<Expr*> coercedArgs;
-    DefaultInitializerExpressionCollector defaults{this};
 
     if (isEffectivelyScalarForInitializerLists(toType))
     {
@@ -1097,8 +1035,6 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             // as an `InitializerListExpr` with zero arguments,
             // and then have the IR generation logic deal with
             // synthesizing default values.
-            if (outToExpr)
-                defaults.collect(toType);
         }
     }
     else if (auto toVecType = as<VectorExpressionType>(toType))
@@ -1224,11 +1160,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 toMakeArrayFromElementExpr->loc = fromInitializerListExpr->loc;
                 toMakeArrayFromElementExpr->type = QualType(toType);
                 if (outToExpr)
-                {
-                    defaults.collect(toElementType);
-                    toMakeArrayFromElementExpr->defaultArgumentExpressions = defaults.expressions;
                     *outToExpr = toMakeArrayFromElementExpr;
-                }
                 return true;
             }
             for (UInt ee = 0; ee < elementCount; ++ee)
@@ -1247,10 +1179,6 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 if (coercedArg)
                 {
                     coercedArgs.add(coercedArg);
-                }
-                else if (outToExpr)
-                {
-                    defaults.collect(toElementType);
                 }
             }
         }
@@ -1379,10 +1307,6 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             {
                 coercedArgs.add(coercedArg);
             }
-            else if (outToExpr)
-            {
-                defaults.collect(elementType);
-            }
         }
     }
     else if (auto toDeclRefType = as<DeclRefType>(toType))
@@ -1413,10 +1337,6 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 {
                     coercedArgs.add(coercedArg);
                 }
-                else if (outToExpr)
-                {
-                    defaults.collect(baseStructType);
-                }
             }
 
             // We will go through the fields in order and try to match them
@@ -1441,10 +1361,6 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 if (coercedArg)
                 {
                     coercedArgs.add(coercedArg);
-                }
-                else if (outToExpr)
-                {
-                    defaults.collect(fieldDeclRef);
                 }
             }
         }
@@ -1474,7 +1390,6 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         toInitializerListExpr->loc = fromInitializerListExpr->loc;
         toInitializerListExpr->type = QualType(toType);
         toInitializerListExpr->args = coercedArgs;
-        toInitializerListExpr->defaultArgumentExpressions = defaults.expressions;
 
         // Wrap initalizer list args if we're creating a non-differentiable struct within a
         // differentiable function.
@@ -1833,33 +1748,38 @@ static bool isMatrixLayoutConversion(Type* toType, Type* fromType)
     return false;
 }
 
-// Resolve a checked constant tag to one named case, preserving the case's declaration identity.
+// Check a constant enum conversion and identify its case when the tag is already concrete.
 // Consider `enum Mode { [require(hlsl)] hlslMode = 0, [require(spirv)] spirvMode = 1 }`.
-// `Mode(0)` must carry hlslMode's requirement, while a runtime tag cannot identify which case
-// is being constructed. Equal tags on different cases are ambiguous because those cases can
-// have different requirements; the caller must name the intended case explicitly.
-static DeclRef<EnumCaseDecl> findEnumCaseForConstantCast(
+// `Mode(0)` selects hlslMode immediately. In `Mode(N)` with a generic integer parameter N,
+// the tag is a compile-time expression whose value and case requirements are checked after
+// specialization. A runtime tag cannot identify a case and must be rejected here.
+static bool checkConstantEnumCast(
     SemanticsVisitor* visitor,
     DeclRef<EnumDecl> enumDeclRef,
     Expr* tagExpr,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    DeclRef<EnumCaseDecl>& outCase)
 {
-    IntegerLiteralValue tagValue = 0;
     auto foldedTag = visitor->tryConstantFoldExpr(
         tagExpr,
         SemanticsVisitor::ConstantFoldingKind::CompileTime,
         nullptr);
-    if (!tryGetConstantIntVal(foldedTag, tagValue))
+    if (!foldedTag)
     {
         if (sink)
             sink->diagnose(Diagnostics::EnumCastRequiresConstantCase{
                 .enumDecl = enumDeclRef.getDecl(),
                 .expr = tagExpr});
-        return {};
+        return false;
     }
+    if (as<ErrorIntVal>(foldedTag))
+        return false;
+
+    IntegerLiteralValue tagValue = 0;
+    if (!tryGetConstantIntVal(foldedTag, tagValue))
+        return true;
 
     visitor->ensureDecl(enumDeclRef, DeclCheckState::DefinitionChecked);
-    DeclRef<EnumCaseDecl> matchingCase;
     for (auto caseDecl : enumDeclRef.getDecl()->getMembersOfType<EnumCaseDecl>())
     {
         IntegerLiteralValue caseValue = 0;
@@ -1869,21 +1789,15 @@ static DeclRef<EnumCaseDecl> findEnumCaseForConstantCast(
             continue;
         if (caseValue != tagValue)
             continue;
-        if (matchingCase)
-        {
-            if (sink)
-                sink->diagnose(Diagnostics::EnumCastAmbiguousCase{
-                    .enumDecl = enumDeclRef.getDecl(),
-                    .expr = tagExpr});
-            return {};
-        }
-        matchingCase = visitor->getASTBuilder()->getMemberDeclRef(enumDeclRef, caseDecl);
+        // Definition checking requires distinct tags for every case of this enum.
+        outCase = visitor->getASTBuilder()->getMemberDeclRef(enumDeclRef, caseDecl);
+        return true;
     }
-    if (!matchingCase && sink)
+    if (sink)
         sink->diagnose(Diagnostics::EnumCastHasNoMatchingCase{
             .enumDecl = enumDeclRef.getDecl(),
             .expr = tagExpr});
-    return matchingCase;
+    return false;
 }
 
 bool SemanticsVisitor::_coerce(
@@ -2492,9 +2406,7 @@ bool SemanticsVisitor::_coerce(
                 DeclRef<EnumCaseDecl> targetEnumCase;
                 if (requiresNamedCase)
                 {
-                    targetEnumCase =
-                        findEnumCaseForConstantCast(this, toEnumDeclRef, tagExpr, sink);
-                    if (!targetEnumCase)
+                    if (!checkConstantEnumCast(this, toEnumDeclRef, tagExpr, sink, targetEnumCase))
                         return false;
                 }
                 if (outCost)

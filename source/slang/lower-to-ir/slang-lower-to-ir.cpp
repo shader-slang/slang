@@ -1932,6 +1932,76 @@ static IRInst* ensureAbstractThisWitnessVisibleFromCurrentScope(
     Type* thisType);
 bool isAbstractWitnessTable(IRInst* inst);
 
+// Keep a deferred conversion's case table independent of its runtime enum type. Consider
+// `Mode choose<let N : int>() { return Mode(N); }`. Enum lowering replaces Mode with its tag
+// type before specialization, while this obligation must remain until N becomes concrete.
+static void emitEnumCastCheck(IRGenContext* context, Type* enumType, IRInst* value)
+{
+    auto enumRef = isDeclRefTypeOf<EnumDecl>(enumType);
+    SLANG_RELEASE_ASSERT(enumRef && enumRef.getDecl()->hasCapabilityRestrictedCases);
+    auto builder = context->irBuilder;
+    auto tagType =
+        lowerType(context, enumRef.substitute(context->astBuilder, enumRef.getDecl()->tagType));
+
+    List<IRInst*> args;
+    args.add(builder->emitConstexprCast(tagType, value));
+    args.add(builder->getStringValue(enumRef.getName()->text.getUnownedSlice()));
+    for (auto caseDecl : enumRef.getDecl()->getMembersOfType<EnumCaseDecl>())
+    {
+        auto tagVal = caseDecl->tagVal->substitute(context->astBuilder, SubstitutionSet(enumRef));
+        auto tag = getSimpleVal(context, lowerVal(context, tagVal));
+        IRInst* caseArgs[] = {
+            builder->emitConstexprCast(tagType, tag),
+            builder->getCapabilityValue(CapabilitySet(caseDecl->inferredCapabilityRequirements)),
+            builder->getStringValue(caseDecl->getName()->text.getUnownedSlice())};
+        args.add(builder->emitIntrinsicInst(
+            builder->getVoidType(),
+            kIROp_EnumCaseInfo,
+            SLANG_COUNT_OF(caseArgs),
+            caseArgs));
+    }
+    builder->emitIntrinsicInst(
+        builder->getVoidType(),
+        kIROp_CheckEnumCast,
+        args.getCount(),
+        args.getBuffer());
+}
+
+// Emit deferred conversions before numeric resolution or the Val lowering cache discards
+// their source obligations. Consider `consume<int(Mode(N)) * 0>()`: its numeric argument is
+// zero, but its IntValWithRequirements still records the conversion that needs specialization.
+// Known case references are checked by the frontend and need no additional IR obligation.
+static void emitValRequirements(IRGenContext* context, Val* value, HashSet<Val*>& visited)
+{
+    if (!value || !visited.add(value))
+        return;
+    if (auto withRequirements = as<IntValWithRequirements>(value))
+    {
+        for (auto requirement : withRequirements->getRequirements())
+        {
+            if (auto cast = as<TypeCastIntVal>(requirement))
+            {
+                auto input = getSimpleVal(context, lowerVal(context, cast->getBase()));
+                emitEnumCastCheck(context, cast->getType(), input);
+            }
+        }
+    }
+
+    // Checked types and declaration references keep their source generic arguments as Val
+    // operands. Inspect those operands directly; resolving a parent first loses their sugar.
+    for (auto operand : value->m_operands)
+    {
+        if (operand.kind == ValNodeOperandKind::ValNode)
+            emitValRequirements(context, operand.getVal(), visited);
+    }
+}
+
+static void emitValRequirements(IRGenContext* context, Val* value)
+{
+    HashSet<Val*> visited;
+    emitValRequirements(context, value, visited);
+}
+
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredValInfo>
 {
     IRGenContext* context;
@@ -3131,6 +3201,7 @@ LoweredValInfo lowerValWithCache(IRGenContext* context, Val* val, F const& lower
 
 LoweredValInfo lowerVal(IRGenContext* context, Val* val)
 {
+    emitValRequirements(context, val);
     auto resolvedVal = val->resolve();
     return lowerValWithCache(
         context,
@@ -3145,6 +3216,7 @@ LoweredValInfo lowerVal(IRGenContext* context, Val* val)
 
 IRType* lowerType(IRGenContext* context, Type* type)
 {
+    emitValRequirements(context, type);
     auto loweredValue = lowerValWithCache(
         context,
         type,
@@ -5050,6 +5122,7 @@ struct ExprLoweringContext
             // In this case we know exactly what declaration we
             // are going to call, and so we can resolve things
             // appropriately.
+            emitValRequirements(context, resolvedInfo.funcDeclRef.declRefBase);
             auto funcDeclRef =
                 DeclRef<Decl>(as<DeclRefBase>(resolvedInfo.funcDeclRef.declRefBase->resolve()));
             auto baseExpr = resolvedInfo.baseExpr;
@@ -6770,6 +6843,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         auto irType = lowerType(context, expr->type);
         auto irVal = getSimpleVal(context, lowerRValueExpr(context, expr->base));
+        if (auto enumRef = isDeclRefTypeOf<EnumDecl>(expr->type))
+        {
+            if (enumRef.getDecl()->hasCapabilityRestrictedCases && !expr->targetEnumCase)
+                emitEnumCastCheck(context, expr->type, irVal);
+        }
         return LoweredValInfo::simple(context->irBuilder->emitCast(irType, irVal));
     }
 
@@ -15271,6 +15349,9 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
 
 LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType* type)
 {
+    // Declaration-reference expressions bypass lowerVal, so preserve their deferred conversion
+    // obligations before constructing the canonical IR specialization.
+    emitValRequirements(context, declRef.declRefBase);
     auto info = emitDeclRef(context, declRef.getDecl(), declRef.declRefBase, type);
 
     if (info.flavor == LoweredValInfo::Flavor::Simple)

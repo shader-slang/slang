@@ -677,6 +677,7 @@ void calcRequiredLoweringPassSet(
         result.sumVectorMatrix = true;
         break;
     case kIROp_LateRequireCapability:
+    case kIROp_CheckEnumCast:
         result.lateRequireCapability = true;
         break;
     case kIROp_MatrixType:
@@ -2660,11 +2661,11 @@ Result linkAndOptimizeIR(
     //
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
-    // Check the remaining LateRequireCapability IR insts
+    // Check the remaining capability requirements and deferred enum conversions.
     //
     // #11917: Gated on `lateRequireCapability` to skip this whole-module walk
     // (and its entry-point reference-graph build) when no
-    // `kIROp_LateRequireCapability` IR is present. That opcode is produced only
+    // `kIROp_LateRequireCapability` or `kIROp_CheckEnumCast` IR is present. Both are produced only
     // by the front end (slang-lower-to-ir.cpp), so it is present before the last
     // `calcRequiredLoweringPassSet` scan; the flag cannot be a false-negative.
     // The pass diagnoses only from these insts, so when the flag is false it is a

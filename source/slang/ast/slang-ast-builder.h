@@ -451,10 +451,10 @@ public:
         return DeclRef<T>(getOrCreate<MemberDeclRef>(memberDecl, parent.declRefBase));
     }
 
-    ConstantIntVal* getIntVal(Type* type, IntegerLiteralValue value)
-    {
-        return getOrCreate<ConstantIntVal>(type, value);
-    }
+    ConstantIntVal* getIntVal(Type* type, IntegerLiteralValue value);
+
+    // Retain source obligations without changing the canonical numeric value.
+    IntVal* getIntValWithRequirements(IntVal* value, ConstArrayView<Val*> requirements);
 
     IntVal* getTypeCastIntVal(Type* type, Val* base)
     {

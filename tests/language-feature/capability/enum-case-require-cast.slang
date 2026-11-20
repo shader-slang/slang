@@ -12,12 +12,14 @@ enum TargetValue
 TargetValue castRuntime(int value)
 {
     return TargetValue(value);
+//CHECK: enum integer conversion may require case capabilities
 //CHECK: enum cast requires a compile-time constant case
 }
 
 TargetValue castUnknownConstant()
 {
     return (TargetValue)42;
+//CHECK: enum integer conversion may require case capabilities
 //CHECK: enum cast has no matching case
 }
 
@@ -54,21 +56,6 @@ Ordinary ordinaryCasts(int value)
     return direct | logical | tagged;
 }
 
-// Numeric spelling cannot choose which case requirement to apply when tags coincide.
-enum AmbiguousValue
-{
-    [require(hlsl)]
-    hlslOnly = 0,
-    [require(spirv)]
-    spirvOnly = 0,
-}
-
-AmbiguousValue castAmbiguousConstant()
-{
-    return AmbiguousValue(0);
-//CHECK: enum cast matches multiple cases
-}
-
 // The runtime restriction also applies when the target supports every declared case.
 enum HlslValue
 {
@@ -79,5 +66,6 @@ enum HlslValue
 HlslValue castRuntimeOnSupportedTarget(int value)
 {
     return HlslValue(value);
+//CHECK: enum integer conversion may require case capabilities
 //CHECK: enum cast requires a compile-time constant case
 }

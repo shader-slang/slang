@@ -1063,8 +1063,6 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     List<SourceLoc> sourceLocStack;
 
-    // Canonical types retain type requirements, but not the source of folded value arguments.
-    bool visitingTypeExpressionDependencies = false;
     HashSet<Expr*> activeDefaultArgumentExpressions;
 
     struct PushSourceLocRAII
@@ -1109,34 +1107,19 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     }
     void dispatchIfNotNull(Val* val)
     {
-        if (!val || visitingTypeExpressionDependencies)
+        if (!val)
             return;
         return ValVisitor<VisitorType>::dispatch(val);
     }
 
-    // Visit only expression dependencies that are absent from the canonical type. Consider
-    // `Holder<Mode.hlslMode>`: its type already names Holder and the integer argument, while
-    // its checked expression retains the named case. Visiting the unspecialized Holder
-    // reference again would duplicate type analysis instead of recovering the case dependency.
-    void visitTypeExpressionDependencies(Expr* expr)
-    {
-        auto saved = visitingTypeExpressionDependencies;
-        SLANG_DEFER(visitingTypeExpressionDependencies = saved);
-        visitingTypeExpressionDependencies = true;
-        dispatchIfNotNull(expr);
-    }
-
-    // Value arguments need ordinary reference analysis, including array dimensions in
-    // `float[int(Mode.hlslMode) + 1]`. Type arguments need only source dependencies absent
-    // from the enclosing application's canonical type.
     void visitArgumentExpression(Expr* expr)
     {
         if (!expr)
             return;
-        auto saved = visitingTypeExpressionDependencies;
-        SLANG_DEFER(visitingTypeExpressionDependencies = saved);
-        visitingTypeExpressionDependencies = as<TypeType>(expr->type) != nullptr;
-        dispatchIfNotNull(expr);
+        if (as<TypeType>(expr->type))
+            dispatchIfNotNull(expr->type.type);
+        else
+            dispatchIfNotNull(expr);
     }
 
     // Default expressions are shared declaration dependencies, so their edges form a graph.
@@ -1156,11 +1139,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         }
     }
 
-    void visitTypeExp(TypeExp const& typeExp)
-    {
-        dispatchIfNotNull(typeExp.type);
-        visitTypeExpressionDependencies(typeExp.exp);
-    }
+    void visitTypeExp(TypeExp const& typeExp) { dispatchIfNotNull(typeExp.type); }
     void dispatchIfNotNull(DeclBase* val)
     {
         if (!val)
@@ -1210,7 +1189,27 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->functionExpr);
         for (auto arg : expr->arguments)
             dispatchIfNotNull(arg);
-        visitDefaultArgumentExpressions(expr->defaultArgumentExpressions);
+
+        // Only omitted parameters contribute default requirements. For example,
+        // `readMode(Mode mode = Mode.hlslMode)` uses the HLSL default in `readMode()`,
+        // but `readMode(Mode.spirvMode)` must not inherit that unused requirement.
+        if (auto callee = as<DeclRefExpr>(expr->functionExpr))
+        {
+            if (auto callable = callee->declRef.as<CallableDecl>())
+            {
+                List<Expr*> defaults;
+                Index parameterIndex = 0;
+                for (auto parameter : getParametersForCallableSignature(getASTBuilder(), callable))
+                {
+                    if (parameterIndex++ >= expr->arguments.getCount())
+                    {
+                        if (auto initializer = parameter.getDecl()->initExpr)
+                            defaults.add(initializer);
+                    }
+                }
+                visitDefaultArgumentExpressions(defaults);
+            }
+        }
     }
 
     // A fast-path builtin operator (e.g. `getClock() + 1`) is a `BuiltinOperatorExpr`, not an
@@ -1244,28 +1243,8 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->declRef.declRefBase);
     }
 
-    void visitDeclRefExpressionDependencies(DeclRefExpr* expr)
-    {
-        for (auto arg : expr->genericArgumentExpressions)
-            visitArgumentExpression(arg);
-        // `typealias HlslHolder = Holder<Mode.hlslMode>` expands to Holder<0> in the
-        // canonical type. Preserve the alias declaration's dependencies when its source
-        // reference is visited, just as we preserve the value argument on a direct use.
-        if (visitingTypeExpressionDependencies && expr->declRef.as<TypeDefDecl>())
-        {
-            auto saved = visitingTypeExpressionDependencies;
-            SLANG_DEFER(visitingTypeExpressionDependencies = saved);
-            visitingTypeExpressionDependencies = false;
-            dispatchIfNotNull(expr->declRef.declRefBase);
-            processDeclModifiers(expr->declRef.getDecl(), expr->loc);
-        }
-    }
-
     void visitDeclRefExpr(DeclRefExpr* expr)
     {
-        visitDeclRefExpressionDependencies(expr);
-        if (visitingTypeExpressionDependencies)
-            return;
         dispatchIfNotNull(expr->type.type);
         dispatchIfNotNull(expr->declRef.declRefBase);
 
@@ -1281,8 +1260,8 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitStaticMemberExpr(StaticMemberExpr* expr)
     {
-        visitTypeExpressionDependencies(expr->baseExpression);
-        visitDeclRefExpressionDependencies(expr);
+        if (expr->baseExpression)
+            dispatchIfNotNull(expr->baseExpression->type.type);
         dispatchIfNotNull(expr->declRef.declRefBase);
     }
     void visitInitializerListExpr(InitializerListExpr* expr)
@@ -1291,12 +1270,68 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         {
             dispatchIfNotNull(arg);
         }
-        visitDefaultArgumentExpressions(expr->defaultArgumentExpressions);
+        visitAggregateDefaults(expr->type, expr->args.getCount());
     }
 
     void visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr)
     {
-        visitDefaultArgumentExpressions(expr->defaultArgumentExpressions);
+        visitAggregateDefaults(expr->type, 0);
+    }
+
+    HashSet<Type*> activeDefaultTypes;
+
+    // Visit only omitted aggregate elements, using the same positional prefix as lowering.
+    // Consider `struct S { Mode mode = Mode.hlslMode; }; S values[2] = {};`.
+    // Neither array element has an explicit expression, so its field initializer supplies
+    // the requirement. An explicit field value replaces that default and adds no such use.
+    void visitAggregateDefaults(Type* type, Index explicitCount)
+    {
+        type = unwrapModifiedType(type);
+        if (!activeDefaultTypes.add(type))
+            return;
+        SLANG_DEFER(activeDefaultTypes.remove(type));
+        if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            IntegerLiteralValue count;
+            if (!tryGetConstantIntVal(arrayType->getElementCount(), count) || explicitCount < count)
+                visitAggregateDefaults(arrayType->getElementType(), 0);
+        }
+        else if (auto tupleType = as<TupleType>(type))
+        {
+            for (Index i = explicitCount; i < tupleType->getMemberCount(); ++i)
+                visitAggregateDefaults(tupleType->getMember(i), 0);
+        }
+        else if (auto declRefType = as<DeclRefType>(type))
+        {
+            auto aggregate = declRefType->getDeclRef().as<AggTypeDecl>();
+            if (!aggregate || !aggregate.getDecl()->hasBody || aggregate.getDecl()->aliasedType)
+                return;
+            if (!aggregate.as<StructDecl>() && !aggregate.as<ClassDecl>() &&
+                !aggregate.as<GLSLInterfaceBlockDecl>())
+                return;
+            Index fieldIndex = 0;
+            if (auto structRef = aggregate.as<StructDecl>())
+            {
+                if (auto baseType = findBaseStructType(getASTBuilder(), structRef))
+                    if (fieldIndex++ >= explicitCount)
+                        visitAggregateDefaults(baseType, 0);
+            }
+            for (auto field :
+                 getMembersOfType<VarDecl>(getASTBuilder(), aggregate, MemberFilterStyle::Instance))
+            {
+                if (fieldIndex++ < explicitCount)
+                    continue;
+                ensureDecl(field, DeclCheckState::DefinitionChecked);
+                if (auto initializer = field.getDecl()->initExpr)
+                {
+                    List<Expr*> defaults;
+                    defaults.add(initializer);
+                    visitDefaultArgumentExpressions(defaults);
+                }
+                else
+                    visitAggregateDefaults(getType(getASTBuilder(), field), 0);
+            }
+        }
     }
 
     void visitThisExpr(ThisExpr*) { return; }
@@ -9560,6 +9595,7 @@ Stmt* _synthesizeMemberAssignMemberHelper(
 
 bool SemanticsVisitor::enumHasCapabilityRestrictedCases(EnumDecl* enumDecl)
 {
+    bool hasRestrictedCases = false;
     for (auto caseDecl : enumDecl->getMembersOfType<EnumCaseDecl>())
     {
         // Enum bases are established before case bodies are checked. ModifiersChecked is
@@ -9567,9 +9603,10 @@ bool SemanticsVisitor::enumHasCapabilityRestrictedCases(EnumDecl* enumDecl)
         // which may itself refer to the enum and need its completed inheritance list.
         ensureDecl(caseDecl, DeclCheckState::ModifiersChecked);
         if (caseDecl->hasModifier<RequireCapabilityAttribute>())
-            return true;
+            hasRestrictedCases = true;
     }
-    return false;
+    enumDecl->hasCapabilityRestrictedCases = hasRestrictedCases;
+    return hasRestrictedCases;
 }
 
 bool SemanticsVisitor::trySynthesizeEnumTypeMethodRequirementWitness(
@@ -13776,6 +13813,37 @@ static bool _incrementEnumerator(IntegerLiteralValue& value, BaseType baseType, 
     }
 }
 
+// Require distinct final tags when any case has a capability requirement. For example,
+// `enum Mode { [require(hlsl)] first = 0, alias = first }` cannot identify which case's
+// requirements an integer conversion should select. Check the completed tag values so
+// explicit tag coercions and implicit numbering use the same representation.
+static void validateRestrictedEnumCaseTags(SemanticsVisitor* visitor, EnumDecl* enumDecl)
+{
+    if (!visitor->enumHasCapabilityRestrictedCases(enumDecl))
+        return;
+
+    Dictionary<IntegerLiteralValue, EnumCaseDecl*> casesByTag;
+    for (auto caseDecl : enumDecl->getMembersOfType<EnumCaseDecl>())
+    {
+        IntegerLiteralValue tagValue = 0;
+        // Invalid tag expressions have already been diagnosed by definition checking.
+        if (!tryGetConstantIntVal(caseDecl->tagVal, tagValue))
+            continue;
+
+        EnumCaseDecl* previousCase = nullptr;
+        if (casesByTag.tryGetValue(tagValue, previousCase))
+        {
+            visitor->getSink()->diagnose(Diagnostics::DuplicateEnumCaseValue{
+                .previousDecl = previousCase,
+                .enumDecl = enumDecl,
+                .decl = caseDecl});
+            visitor->getSink()->diagnose(Diagnostics::SeeDeclarationOf{.decl = previousCase});
+        }
+        else
+            casesByTag.add(tagValue, caseDecl);
+    }
+}
+
 void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
 {
     SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
@@ -13788,6 +13856,7 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
         return;
 
     auto isEnumFlags = decl->hasModifier<FlagsAttribute>();
+    bool hasRestrictedCases = enumHasCapabilityRestrictedCases(decl);
 
     // Resolve the underlying integer kind
     BaseType tagBaseType;
@@ -13835,9 +13904,12 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
             if (explicitTagVal)
             {
                 caseDecl->tagVal = explicitTagVal;
-                if (auto constIntVal = as<ConstantIntVal>(explicitTagVal))
+                if (tryGetConstantIntVal(explicitTagVal, defaultTag))
                 {
-                    defaultTag = constIntVal->getValue();
+                    // Restricted enum values identify a case. Its tag must remain an integer
+                    // so constructing that enum value does not recursively consult itself.
+                    if (hasRestrictedCases)
+                        caseDecl->tagVal = m_astBuilder->getIntVal(tagType, defaultTag);
                 }
                 else
                 {
@@ -13873,12 +13945,15 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
             tagValExpr->type = QualType(tagType);
             tagValExpr->value = defaultTag;
             caseDecl->tagExpr = tagValExpr;
-            caseDecl->tagVal = m_astBuilder->getIntVal(enumType, defaultTag);
+            caseDecl->tagVal =
+                m_astBuilder->getIntVal(hasRestrictedCases ? tagType : enumType, defaultTag);
         }
 
         // compute the next default tag value with the info whether it overflowed
         defaultTagWrappedAround = _incrementEnumerator(defaultTag, tagBaseType, isEnumFlags);
     }
+
+    validateRestrictedEnumCaseTags(this, decl);
 }
 
 void SemanticsDeclBodyVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
@@ -23293,7 +23368,7 @@ void SemanticsDeclCapabilityVisitor::visitEnumCaseDecl(EnumCaseDecl* enumCaseDec
     // Keep each case's requirements on its declaration so referencing the enum type does not
     // require every case's capabilities. Consider this example:
     //
-    //     enum Mode { [require(hlsl)] hlslMode = 0, alias = hlslMode }
+    //     enum Mode { [require(hlsl)] hlslMode = 0, nextHlslMode = hlslMode + 1 }
     //
     // Both cases require HLSL: the first declares that requirement, and the second references
     // it in its checked tag expression. The ordinary declaration-reference walk then propagates

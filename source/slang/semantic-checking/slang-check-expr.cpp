@@ -2944,7 +2944,67 @@ IntVal* SemanticsVisitor::tryConstantFoldBuiltinOperatorExpr(
     }
 }
 
+// Collect case requirements from a checked type before a layout query replaces it with an
+// integer. Consider `read<sizeof(Holder<Mode.hlslMode>)>()`: sizeof folds to the size of
+// Holder, so its numeric result no longer contains the argument that selected hlslMode.
+// The type's existing Val operands are the semantic source of those dependencies. We walk
+// them without resolving the type, just as declaration-reference analysis does, and retain
+// only enum requirements rather than making every layout constant carry its source type.
+static void collectEnumCaseRequirements(Val* value, List<Val*>& requirements)
+{
+    List<Val*> workList;
+    HashSet<Val*> visited;
+    workList.add(value);
+    while (workList.getCount())
+    {
+        auto current = workList.getLast();
+        workList.removeLast();
+        if (!current || !visited.add(current))
+            continue;
+        if (auto enumCase = as<EnumCaseIntVal>(current))
+            requirements.add(enumCase->getDeclRef().declRefBase);
+        if (auto wrapped = as<IntValWithRequirements>(current))
+            for (auto requirement : wrapped->getRequirements())
+                requirements.add(requirement);
+        for (auto operand : current->m_operands)
+            if (operand.kind == ValNodeOperandKind::ValNode)
+                workList.add(operand.getVal());
+    }
+}
+
 IntVal* SemanticsVisitor::tryConstantFoldExpr(
+    SubstExpr<Expr> expr,
+    ConstantFoldingKind kind,
+    ConstantFoldingCircularityInfo* circularityInfo)
+{
+    // Collect obligations while walking the checked expression, before numeric folding can
+    // cancel terms. Nested folds share this collector, so `(int(Mode.a) + N) * 0` keeps
+    // Mode.a's requirement even though its canonical result is the ordinary integer zero.
+    List<Val*> requirements;
+    ConstantFoldingCircularityInfo frame(nullptr, circularityInfo);
+    bool ownsRequirements = !frame.requirements;
+    if (ownsRequirements)
+    {
+        frame.requirements = &requirements;
+        // Owning a collector does not introduce a recursive declaration reference.
+        frame.depth = circularityInfo ? circularityInfo->depth : 0;
+        circularityInfo = &frame;
+    }
+    auto result = tryConstantFoldExprImpl(expr, kind, circularityInfo);
+    if (auto wrapped = as<IntValWithRequirements>(result))
+    {
+        for (auto requirement : wrapped->getRequirements())
+            circularityInfo->requirements->add(requirement);
+        result = wrapped->getValue();
+    }
+    if (auto enumCase = as<EnumCaseIntVal>(result))
+        circularityInfo->requirements->add(enumCase->getDeclRef().declRefBase);
+    return ownsRequirements
+               ? m_astBuilder->getIntValWithRequirements(result, requirements.getArrayView())
+               : result;
+}
+
+IntVal* SemanticsVisitor::tryConstantFoldExprImpl(
     SubstExpr<Expr> expr,
     ConstantFoldingKind kind,
     ConstantFoldingCircularityInfo* circularityInfo)
@@ -2975,6 +3035,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             auto type = arrayLengthExpr.getExpr()->arrayExpr->type.type->substitute(
                 m_astBuilder,
                 expr.getSubsts());
+            collectEnumCaseRequirements(type, *circularityInfo->requirements);
             if (auto arrayType = as<ArrayExpressionType>(type))
             {
                 if (!arrayType->isUnsized())
@@ -2999,6 +3060,8 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
         auto type = as<Type>(
             sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
+
+        collectEnumCaseRequirements(type, *circularityInfo->requirements);
 
         if (sizeOfLikeExpr.getExpr()->dataLayoutType)
         {
@@ -3257,6 +3320,21 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
                 auto intVal = as<IntVal>(tryConstantFoldExpr(tagExpr, kind, &newCircularityInfo));
                 if (!intVal)
                     return nullptr;
+                if (auto enumDecl = as<EnumDecl>(enumTypeDecl);
+                    enumDecl && enumDecl->hasCapabilityRestrictedCases)
+                {
+                    // A preceding case can be referenced while this enum's tags are still
+                    // being checked. Use the folded tag here instead of reading tagVal,
+                    // which the declaration visitor has not necessarily published yet.
+                    auto tag = m_astBuilder->getTypeCastIntVal(enumDecl->tagType, intVal);
+                    IntegerLiteralValue value;
+                    if (!tryGetConstantIntVal(tag, value))
+                        return nullptr;
+                    return m_astBuilder->getOrCreate<EnumCaseIntVal>(
+                        enumCaseDecl->getType(),
+                        value,
+                        enumRef);
+                }
                 return as<IntVal>(
                     m_astBuilder->getTypeCastIntVal(enumCaseDecl->getType(), intVal)->resolve());
             }
@@ -3299,6 +3377,9 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             if (foldVal)
                 return foldVal;
             auto result = m_astBuilder->getTypeCastIntVal(substType, val);
+            if (auto enumDecl = isEnumType(substType);
+                enumDecl && enumDecl->hasCapabilityRestrictedCases)
+                circularityInfo->requirements->add(result);
             return result;
         }
     }
@@ -4377,18 +4458,24 @@ void SemanticsVisitor::settlePendingTryCoverage(
 
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
-    auto rs = ResolveInvoke(expr);
-    if (auto castExpr = as<BuiltinCastExpr>(rs);
-        castExpr && castExpr->targetEnumCase &&
-        (expr->arguments.getCount() != 1 || rs != expr->arguments[0]))
+    if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
+        isScalarIntegerType(expr->arguments[0]->type))
     {
-        // ResolveInvoke has selected an actual conversion, so emit the warning here rather
-        // than from coercion probes or their temporary diagnostic sink. An identity cast
-        // returns its argument unchanged and must not warn again about an inner conversion.
-        getSink()->diagnose(Diagnostics::EnumConstantCastRequiresCaseCapability{
-            .enumCase = castExpr->targetEnumCase.getDecl(),
-            .expr = expr});
+        if (auto typeType = as<TypeType>(expr->functionExpr->type))
+        {
+            if (auto enumDeclRef = isDeclRefTypeOf<EnumDecl>(typeType->getType());
+                enumDeclRef && enumHasCapabilityRestrictedCases(enumDeclRef.getDecl()))
+            {
+                // This is an explicit integer conversion, including attempts that will fail.
+                // Warn at the source invocation so speculative coercions cannot duplicate the
+                // warning. An enum-to-itself cast does not enter this integer-only path.
+                getSink()->diagnose(Diagnostics::EnumCastRequiresCaseCapability{
+                    .enumDecl = enumDeclRef.getDecl(),
+                    .expr = expr});
+            }
+        }
     }
+    auto rs = ResolveInvoke(expr);
     if (auto invoke = as<InvokeExpr>(rs))
     {
         if (!invoke->functionExpr)

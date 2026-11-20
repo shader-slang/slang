@@ -90,8 +90,8 @@ void spirvMain()
     outputBuffer[8] = selectForTarget();
 }
 
-// Ordinary enums retain direct and generic integer construction.
-enum Ordinary { zero, one }
+// Ordinary enums retain duplicate tags, aliases, and direct/generic integer construction.
+enum Ordinary { zero = 0, aliasZero = zero, one, duplicateOne = 1 }
 
 T fromInteger<T : ILogical>(int value)
 {
