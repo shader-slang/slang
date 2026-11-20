@@ -43,9 +43,10 @@ public:
     virtual bool shouldEmitSwitchCaseTerminatingBreak() SLANG_OVERRIDE { return false; }
 
     // Emit loops with a simple counter as `for (var i = init; ; i = i + step)`. A `for`
-    // update clause becomes the loop's `continuing` block, and Tint's PreventInfiniteLoops
-    // robustness transform does not add its 64-bit iteration counter to a loop whose index
-    // is updated there by a constant, so downstream compilers can still unroll the loop. The
+    // update clause becomes the loop's `continuing` block. That lets Tint's PreventInfiniteLoops
+    // robustness transform recognize some loops as finite and leave out its 64-bit iteration
+    // counter, so downstream compilers can still unroll them. It does not promise either: Tint
+    // can still add the counter to a loop whose update is a constant (for example `i += 2`). The
     // exit test stays in the body (`if (i < n) {} else { break; }`) with an empty `for`
     // condition; counted-loop-for.slang checks this shape.
     virtual bool shouldEmitCountedLoopsAsFor() SLANG_OVERRIDE { return true; }

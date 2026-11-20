@@ -4210,6 +4210,10 @@ bool CLikeSourceEmitter::tryMatchCountedLoop(
         auto counter = as<IRVar>(updateStore->getPtr());
         if (!counter)
             continue;
+        // A `precise` counter keeps the plain declaration, whose modifiers the target emits (WGSL
+        // warns there that it drops `precise`); the `for` header writes no modifiers.
+        if (counter->findDecoration<IRPreciseDecoration>())
+            continue;
         auto counterType = counter->getDataType()->getValueType();
         if (!counterType ||
             (counterType->getOp() != kIROp_IntType && counterType->getOp() != kIROp_UIntType))
