@@ -46,6 +46,12 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         if (as<IRCastDescriptorHandleToResource>(arg))
             return true;
 
+        // The descriptor-heap instructions are hoisted to module scope, so any
+        // specialized callee can refer to them directly, just like a global
+        // parameter.
+        if (as<IRSPIRVResourceHeap>(arg) || as<IRSPIRVSamplerHeap>(arg))
+            return true;
+
         // As we will see later, we can also
         // specialize a call when the argument
         // is the result of indexing into an
@@ -68,6 +74,11 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         // 0) is, so we trace through it to that base. Without this case a bindless
         // resource argument would not be recognized as specializable.
         case kIROp_CastDynamicResource:
+        // A `SPIRVLoadDescriptorFromHeap` selects an opaque descriptor from the
+        // descriptor heap (`heap[index]`). It is not a data load — it has no byte
+        // offset and no side effects — so it is safe to move into a specialized
+        // callee exactly like an element access.
+        case kIROp_SPIRVLoadDescriptorFromHeap:
             {
                 auto base = arg->getOperand(0);
 
@@ -573,6 +584,13 @@ struct FunctionParameterSpecializationContext
             // Similarly for other global constants
             ioInfo.key.vals.add(globalConstant);
         }
+        else if (as<IRSPIRVResourceHeap>(oldArg) || as<IRSPIRVSamplerHeap>(oldArg))
+        {
+            // A descriptor heap is a module-scope instruction, so the specialized
+            // callee can refer to it directly without a new parameter. Its
+            // identity keys the specialization, mirroring the global cases above.
+            ioInfo.key.vals.add(oldArg);
+        }
         else if (isUserPointerType(oldArg->getDataType()))
         {
             // If the arg is a user pointer, we can pass it as an ordinary argument,
@@ -850,6 +868,10 @@ struct FunctionParameterSpecializationContext
         case kIROp_GetElement:
         case kIROp_RWStructuredBufferGetElementPtr:
         case kIROp_StructuredBufferLoad:
+        // `SPIRVLoadDescriptorFromHeap` has the same `(heap, index)` operand
+        // layout as the element accesses above, so the existing
+        // base/index specialization logic applies to it unchanged.
+        case kIROp_SPIRVLoadDescriptorFromHeap:
             return true;
         }
         return false;
@@ -902,6 +924,12 @@ struct FunctionParameterSpecializationContext
             // As above, the identity of the specialized function is sufficient
             // to resolve the uses
             return globalFunc;
+        }
+        if (as<IRSPIRVResourceHeap>(oldArg) || as<IRSPIRVSamplerHeap>(oldArg))
+        {
+            // A descriptor heap lives at module scope, so the specialized callee
+            // refers to the same heap instruction the original argument did.
+            return oldArg;
         }
         else if (isElementAccessInst(oldArg))
         {
