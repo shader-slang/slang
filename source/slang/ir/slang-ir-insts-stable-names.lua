@@ -893,5 +893,7 @@ return {
 	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedStructuredBuffer"] = 917,
 	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedRWStructuredBuffer"] = 918,
 	["sizedBufferToUnsizedBuffer"] = 919,
-	["Type.PtrTypeBase.BorrowInParamBase.ByValueBorrowInParam"] = 920
+	["Type.PtrTypeBase.BorrowInParamBase.ByValueBorrowInParam"] = 920,
+	["Decoration.cudaLaunchBounds"] = 921,
+	["Decoration.cudaMaxRegisters"] = 922
 }

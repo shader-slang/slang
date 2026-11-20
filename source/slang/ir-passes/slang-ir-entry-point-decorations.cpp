@@ -26,6 +26,9 @@ public:
     {
         for (auto inst : m_module->getGlobalInsts())
         {
+            if (isCUDATarget(m_target))
+                checkCudaKernelAttributes(inst);
+
             const auto func = as<IRFunc>(inst);
             if (!func)
                 continue;
@@ -54,6 +57,52 @@ private:
             {
                 checkWaveSizeDecoration(entryPoint, waveSize);
             }
+        }
+    }
+
+    // `[CudaLaunchBounds]` and `[CudaMaxRegisters]` are emitted only on a function that the CUDA
+    // emitter writes as a `__global__` kernel: an entry point other than a callable shader (which
+    // is a `__device__` function), or a `[CudaKernel]` function. On any other function they would
+    // be dropped silently, so we warn. The check runs before specialization, so a generic
+    // function is checked through the function it returns.
+    void checkCudaKernelAttributes(IRInst* inst)
+    {
+        auto func = as<IRFunc>(inst);
+        if (auto generic = as<IRGeneric>(inst))
+            func = as<IRFunc>(findInnerMostGenericReturnVal(generic));
+        if (!func)
+            return;
+
+        if (auto entryPointDecoration = func->findDecoration<IREntryPointDecoration>())
+        {
+            if (entryPointDecoration->getProfile().getStage() != Stage::Callable)
+                return;
+        }
+        else if (
+            func->findDecoration<IRCudaKernelDecoration>() ||
+            inst->findDecoration<IRCudaKernelDecoration>())
+        {
+            // Lowering puts `[CudaKernel]` on the outermost generic of a generic function.
+            return;
+        }
+
+        for (auto decoration : func->getDecorations())
+        {
+            const char* attrName = nullptr;
+            if (as<IRCudaLaunchBoundsDecoration>(decoration))
+                attrName = "CudaLaunchBounds";
+            else if (as<IRCudaMaxRegistersDecoration>(decoration))
+                attrName = "CudaMaxRegisters";
+            else
+                continue;
+
+            String funcName;
+            if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
+                funcName = nameHint->getName();
+            m_sink->diagnose(Diagnostics::CudaKernelAttributeOnNonKernel{
+                .attrName = attrName,
+                .func = funcName,
+                .location = decoration->sourceLoc});
         }
     }
 
