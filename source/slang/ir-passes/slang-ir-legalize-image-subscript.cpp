@@ -11,6 +11,36 @@
 
 namespace Slang
 {
+/// Return `loadedTexel` with the component that the runtime `index` selects replaced by
+/// `storedValue`.
+///
+/// Consider `t[coord][channel] = v` with `channel` read from a cbuffer: the texel is rebuilt one
+/// component at a time, taking the stored value on the selected component and the loaded texel
+/// on every other component. A runtime index that matches no component (out of range) leaves the
+/// texel unchanged; that graceful no-op applies to runtime indices only, because an
+/// out-of-range constant index stays on the swizzle path and fails at emission.
+static IRInst* emitTexelWithComponentReplaced(
+    IRBuilder& builder,
+    IRType* vector4Type,
+    IRType* componentType,
+    IRInst* loadedTexel,
+    IRInst* storedValue,
+    IRInst* index)
+{
+    Array<IRInst*, 4> components;
+    for (UInt component = 0; component < 4; component++)
+    {
+        auto oldComponent = builder.emitSwizzle(componentType, loadedTexel, 1, &component);
+        // The component constant takes the index's own integer type, so the comparison stays
+        // between same-typed operands with no inserted cast.
+        auto componentValue = builder.getIntValue(index->getDataType(), component);
+        auto isTargetComponent = builder.emitEql(index, componentValue);
+        IRInst* selectArgs[] = {isTargetComponent, storedValue, oldComponent};
+        components.add(builder.emitIntrinsicInst(componentType, kIROp_Select, 3, selectArgs));
+    }
+    return builder.emitMakeVector(vector4Type, components.getCount(), components.getBuffer());
+}
+
 void legalizeStore(
     TargetRequest* target,
     IRBuilder& builder,
@@ -122,6 +152,8 @@ void legalizeStore(
             {
                 auto originalValue = builder.emitImageLoad(vector4Type, loadParams);
                 auto index = getElementPtr->getIndex();
+                // The swizzle below requires a compile-time-constant component index; a runtime
+                // index instead rebuilds the texel with per-component selects.
                 if (as<IRIntLit>(index))
                 {
                     newValue =
@@ -130,29 +162,13 @@ void legalizeStore(
                 }
                 else
                 {
-                    // The component index is a runtime value, but swizzles can only carry
-                    // compile-time lane indices. Consider `t[coord][channel] = v` with `channel`
-                    // read from a cbuffer: we build the updated texel one lane at a time, taking
-                    // the stored value on the lane the runtime index selects and the previously
-                    // loaded texel on every other lane. An out-of-range index matches no lane, so
-                    // the store leaves the texel unchanged.
-                    Array<IRInst*, 4> lanes;
-                    for (UInt lane = 0; lane < 4; lane++)
-                    {
-                        auto oldLane = builder.emitSwizzle(vectorBaseType, originalValue, 1, &lane);
-                        auto laneValue = builder.getIntValue(index->getDataType(), lane);
-                        IRInst* equalArgs[] = {index, laneValue};
-                        auto isTargetLane = builder.emitIntrinsicInst(
-                            builder.getBoolType(),
-                            kIROp_Eql,
-                            2,
-                            equalArgs);
-                        IRInst* selectArgs[] = {isTargetLane, legalizedStore, oldLane};
-                        lanes.add(
-                            builder.emitIntrinsicInst(vectorBaseType, kIROp_Select, 3, selectArgs));
-                    }
-                    newValue =
-                        builder.emitMakeVector(vector4Type, lanes.getCount(), lanes.getBuffer());
+                    newValue = emitTexelWithComponentReplaced(
+                        builder,
+                        vector4Type,
+                        vectorBaseType,
+                        originalValue,
+                        legalizedStore,
+                        index);
                 }
             }
             else
