@@ -4669,7 +4669,10 @@ private:
     bool isGLSLOperatorScope();
 };
 
-struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmtVisitor>
+/// Check statements and their condition clauses in the current semantic context.
+struct SemanticsStmtVisitor : public SemanticsVisitor,
+                              StmtVisitor<SemanticsStmtVisitor>,
+                              ConditionClauseVisitor<SemanticsStmtVisitor>
 {
     SemanticsStmtVisitor(SemanticsContext const& outer)
         : SemanticsVisitor(outer)
@@ -4678,7 +4681,14 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     FunctionDeclBase* getParentFunc() { return m_parentFunc; }
 
+    using StmtVisitor<SemanticsStmtVisitor>::dispatch;
+
     void checkStmt(Stmt* stmt);
+
+    /// Check a condition clause in place.
+    void checkConditionClause(ConditionClause* conditionClause);
+    void visitExprConditionClause(ExprConditionClause* conditionClause);
+    void visitDeclConditionClause(DeclConditionClause* conditionClause);
 
     Stmt* findOuterStmtWithLabel(Name* label);
 

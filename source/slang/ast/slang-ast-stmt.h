@@ -80,11 +80,45 @@ class DeclStmt : public Stmt
     FIDDLE() DeclBase* decl = nullptr;
 };
 
-FIDDLE()
-class IfStmt : public Stmt
+/// A clause that supplies the value of a control-flow test.
+FIDDLE(abstract)
+class ConditionClause : public SyntaxNode
 {
     FIDDLE(...)
-    FIDDLE() Expr* predicate = nullptr;
+};
+
+/// A condition written as an expression.
+FIDDLE()
+class ExprConditionClause : public ConditionClause
+{
+    FIDDLE(...)
+    /// The parsed expression, replaced by the checked predicate during semantic checking.
+    FIDDLE() Expr* expr = nullptr;
+};
+
+/// A condition written as a variable declaration whose value is tested.
+FIDDLE()
+class DeclConditionClause : public ConditionClause
+{
+    FIDDLE(...)
+    /// The variable declaration in the enclosing statement's scope, available after parsing.
+    FIDDLE() VarDeclBase* decl = nullptr;
+
+    /// The implicit read and conversion to `bool`, null until semantic checking.
+    FIDDLE() Expr* predicateExpr = nullptr;
+};
+
+/// Return the predicate expression of a checked condition clause.
+Expr* getPredicateExpr(ConditionClause* conditionClause);
+
+/// An `if` statement with a condition and an optional `else` arm.
+///
+/// A variable declared in the condition belongs to the statement's scope.
+FIDDLE()
+class IfStmt : public ScopeStmt
+{
+    FIDDLE(...)
+    FIDDLE() ConditionClause* condition = nullptr;
     FIDDLE() Stmt* positiveStatement = nullptr;
     FIDDLE() Stmt* negativeStatement = nullptr;
     FIDDLE() SourceLoc afterLoc;
@@ -231,20 +265,24 @@ class UnscopedForStmt : public ForStmt
     FIDDLE(...)
 };
 
+/// A loop that tests its condition before entering the body.
+///
+/// A variable declared in the condition belongs to the statement's scope.
 FIDDLE()
 class WhileStmt : public LoopStmt
 {
     FIDDLE(...)
-    FIDDLE() Expr* predicate = nullptr;
+    FIDDLE() ConditionClause* condition = nullptr;
     FIDDLE() Stmt* statement = nullptr;
 };
 
+/// A loop whose test expression follows the body.
 FIDDLE()
 class DoWhileStmt : public LoopStmt
 {
     FIDDLE(...)
     FIDDLE() Stmt* statement = nullptr;
-    FIDDLE() Expr* predicate = nullptr;
+    FIDDLE() ExprConditionClause* condition = nullptr;
 };
 
 // A compile-time, range-based `for` loop, which will not appear in the output code

@@ -1387,7 +1387,7 @@ bool SemanticsVisitor::isWitnessUncheckedOptional(SubtypeWitness* witness)
         if (!ifStmt)
             continue;
 
-        IsTypeExpr* isType = as<IsTypeExpr>(ifStmt->predicate);
+        IsTypeExpr* isType = as<IsTypeExpr>(getPredicateExpr(ifStmt->condition));
         if (!isType)
             continue;
         VarExpr* var = as<VarExpr>(isType->value);

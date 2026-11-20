@@ -1660,6 +1660,13 @@ err(
 )
 
 err(
+    "variable-declaration-not-allowed-as-condition",
+    30444,
+    "a variable declaration is not allowed as a condition",
+    span { loc = "location" }
+)
+
+err(
     "expected-a-type",
     30060,
     "expected a type",
