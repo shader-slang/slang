@@ -173,6 +173,11 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
         throw InternalError(_getMessage(type, message));
     }
 #else
+    // No catch handler can report this signal when exceptions are disabled. Flush its reason
+    // before the breakpoint, including aborts raised directly without a diagnostic sink.
+    fprintf(stderr, "%s\n", g_lastSignalMessage.getBuffer());
+    fflush(stderr);
+
     // Attempt to drop out into the debugger. If a debugger isn't attached this will likely crash -
     // which is probably the best we can do.
 
