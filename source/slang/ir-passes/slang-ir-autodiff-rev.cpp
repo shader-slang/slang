@@ -982,7 +982,9 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
     // so strip it; a custom `__func_extension __apply`'s adapter is the synthesized extension
     // function, which carries no name hint, so use the context type the remat adapter passes
     // through — the same source the identity remat's own name uses. Give it debug info from
-    // the apply adapter, which carries the user's source location.
+    // the apply adapter, which carries the user's source location. The operands are already
+    // resolved here, unlike the identity remat, whose operand the memoized translation flow
+    // may not have resolved yet.
     String wrapperName;
     if (auto applyNameHint = applyBwdFunc->findDecoration<IRNameHintDecoration>())
     {
@@ -995,12 +997,10 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
         else
             wrapperName = name;
     }
-    else if (auto rematFuncType = as<IRFuncType>(rematFunc->getDataType());
-             rematFuncType && rematFuncType->getParamCount() > 0)
+    else if (
+        auto ctxNameHint = rematFuncType->getParamType(0)->findDecoration<IRNameHintDecoration>())
     {
-        if (auto ctxNameHint =
-                rematFuncType->getParamType(0)->findDecoration<IRNameHintDecoration>())
-            wrapperName = ctxNameHint->getName();
+        wrapperName = ctxNameHint->getName();
     }
     if (wrapperName.getLength() > 0)
     {
