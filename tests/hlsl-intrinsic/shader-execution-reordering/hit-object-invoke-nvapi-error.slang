@@ -9,6 +9,10 @@
 // __target_switch, which the target-switch specializer selects for an NVAPI target.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -entry rayGenerationMain -stage raygeneration -profile sm_6_9 -capability ser_nvapi
+// A low-profile NVAPI target without native SER reaches the same arm: the 2-argument
+// overload's [require(nvapi, ser_raygen_closesthit_miss)] admits it, and the
+// static_assert explains the missing NVAPI form rather than a capability error.
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -capability ser_nvapi
 
 //TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
