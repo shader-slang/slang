@@ -8,10 +8,10 @@
 // `nonuniformEXT` are the surface forms and survival is directly observable, and through DXC on
 // the DXIL leg, which pins the propagated non-uniform flag on each `createHandleFromHeap`. On
 // both textual backends the marker must sit directly on the scalar heap index, not nested inside
-// the `uint2` / `uvec2` construction that the emitted handle round-trip passes through before
-// the peephole fold collapses it. The `.Handle` construction spelling, which performs that
-// round-trip in source, is covered by `desc-heap-nonuniform-handle.slang`; SPIR-V decoration
-// is covered by `desc-heap-nonuniform-spirv.slang`.
+// the `uint2` / `uvec2` construction that the emitted untyped-handle wrap/unwrap passes through
+// before the peephole fold collapses it. The `.Handle` construction spelling, which performs the
+// matching uint2-to-handle round-trip in source, is covered by `desc-heap-nonuniform-handle.slang`;
+// SPIR-V decoration is covered by `desc-heap-nonuniform-spirv.slang`.
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -profile cs_6_6
 //TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain -profile cs_6_6
