@@ -976,25 +976,37 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
 
     builder.emitReturn();
 
-    // The wrapper is the callable form of the primal's backward derivative. The apply adapter it
-    // dispatches to is named "s_apply_<primal>" by both producers of apply adapters
-    // (BackwardDiffTranslationContext::translateFunc and
-    // maybeTranslateLegacyToNewBackwardDerivative), so the primal's name is recoverable by
-    // swapping that prefix: name the wrapper "s_bwd_<primal>" and give it debug info from the
-    // apply adapter, which carries the primal's source location.
+    // The wrapper is the callable form of the primal's backward derivative, dispatched to an
+    // apply adapter. Name it after what it adapts so its debug record is distinguishable: a
+    // synthesized adapter is named "s_apply_<primal>" (both adapter producers use that prefix),
+    // so strip it; a custom `__func_extension __apply`'s adapter is the synthesized extension
+    // function, which carries no name hint, so use the context type the remat adapter passes
+    // through — the same source the identity remat's own name uses. Give it debug info from
+    // the apply adapter, which carries the user's source location.
+    String wrapperName;
     if (auto applyNameHint = applyBwdFunc->findDecoration<IRNameHintDecoration>())
     {
         String name = applyNameHint->getName();
-        auto applyPrefix = UnownedStringSlice("s_apply_");
+        auto applyPrefix = UnownedStringSlice(kApplyAdapterNamePrefix);
         if (name.startsWith(applyPrefix))
-        {
-            StringBuilder nameSb;
-            nameSb << "s_bwd_"
-                   << name.subString(
-                          applyPrefix.getLength(),
-                          name.getLength() - applyPrefix.getLength());
-            builder.addNameHintDecoration(bwdDiffFunc, nameSb.getUnownedSlice());
-        }
+            wrapperName = String(name.subString(
+                applyPrefix.getLength(),
+                name.getLength() - applyPrefix.getLength()));
+        else
+            wrapperName = name;
+    }
+    else if (auto rematFuncType = as<IRFuncType>(rematFunc->getDataType());
+             rematFuncType && rematFuncType->getParamCount() > 0)
+    {
+        if (auto ctxNameHint =
+                rematFuncType->getParamType(0)->findDecoration<IRNameHintDecoration>())
+            wrapperName = ctxNameHint->getName();
+    }
+    if (wrapperName.getLength() > 0)
+    {
+        StringBuilder nameSb;
+        nameSb << "s_bwd_" << wrapperName;
+        builder.addNameHintDecoration(bwdDiffFunc, nameSb.getUnownedSlice());
     }
     copyDebugInfoForSynthesizedFunc(&builder, applyBwdFunc, bwdDiffFunc);
 
