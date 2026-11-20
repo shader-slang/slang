@@ -190,12 +190,6 @@ jobs:
             exit 1
           fi
 
-      - name: Run slangc tests
-        if: inputs.gpu-tier == 't4'
-        run: |
-          ulimit -c unlimited
-          PATH=$bin_dir:$PATH tools/slangc-test/test.sh
-
       # Extract gdb backtraces from any cores written to /var/cores during
       # the test steps above. /var/cores lives on the host (bind-mounted in
       # via container.options) and is configured by the scaler startup

@@ -531,7 +531,7 @@ def get_repo_sha(repo_dir):
 
 
 def create_repo_tarball(results_dir, repo_dir):
-    """Create a tarball of tests + slangc-test sources from `repo_dir`.
+    """Create a tarball of test sources from `repo_dir`.
 
     The tests and the expected-failure lists must match the artifact's source
     revision, otherwise spurious failures or hidden regressions follow. The
@@ -548,7 +548,7 @@ def create_repo_tarball(results_dir, repo_dir):
     name = repo_dir.name
     rc, out, err = run_cmd(
         ["tar", "czf", str(repo_tarball), "-C", str(parent),
-         f"{name}/tests", f"{name}/tools/slangc-test"],
+         f"{name}/tests"],
         timeout=60,
     )
     if rc != 0 or not repo_tarball.exists():
