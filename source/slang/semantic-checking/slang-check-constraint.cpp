@@ -317,11 +317,15 @@ Type* SemanticsVisitor::TryJoinTypes(
     // conflicting-requirements error, mixed-priority constraints fall back
     // to the caller's priority arbitration, and other callers treat a
     // failed join as no new information. The rule governs element types,
-    // so composite joins (vector/scalar, vector/vector, type packs) fail
-    // the same way when their element types tie. This deliberately differs
-    // from `unifyBaseType`, which promotes `bool` to the other operand's
-    // type for built-in operators; generic inference has no preferred
-    // side, so it fails.
+    // so composite joins (vector/scalar, vector/vector, type packs) behave
+    // the same way when their element types tie.
+    //
+    // The `bool` tie is a one-off exception: when exactly one side is
+    // `bool`, the other side wins. This is not a principled rule — the two
+    // conversion costs are equal — but existing code relies on mixed
+    // bool/number inference (e.g. `?:` and `select` arms) compiling, the
+    // way `unifyBaseType` already promotes `bool` to the other operand's
+    // type for built-in operators. All other equal-cost ties still fail.
     if (auto leftBasic = as<BasicExpressionType>(left))
     {
         if (auto rightBasic = as<BasicExpressionType>(right))
@@ -333,6 +337,12 @@ Type* SemanticsVisitor::TryJoinTypes(
             if (costConvertRightToLeft > costConvertLeftToRight)
                 return right;
             if (costConvertLeftToRight > costConvertRightToLeft)
+                return left;
+
+            // Equal cost: the `bool` side loses; any other tie fails.
+            if (leftBasic->getBaseType() == BaseType::Bool)
+                return right;
+            if (rightBasic->getBaseType() == BaseType::Bool)
                 return left;
             return nullptr;
         }
