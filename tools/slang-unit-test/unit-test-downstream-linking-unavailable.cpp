@@ -274,7 +274,7 @@ SlangResult linkTwoModules(IDownstreamCompiler* compiler, ComPtr<IArtifact>& out
 
 // When the linker entry point is absent, `link` must say "not available" rather than call through a
 // null pointer.
-SLANG_UNIT_TEST(downstreamLinkReportsUnavailableWhenSymbolMissing)
+SLANG_UNIT_TEST(downstreamLinkReportsUnavailableWhenSymbolMissing, NoRenderApi)
 {
     ComPtr<ISlangSharedLibraryLoader> loader(new FakeLoader(FakeLinkerState::Absent));
     RefPtr<DownstreamCompilerSet> set;
@@ -296,7 +296,7 @@ SLANG_UNIT_TEST(downstreamLinkReportsUnavailableWhenSymbolMissing)
 
 // The control for the test above: a linker that is present and rejects the modules must keep
 // returning `SLANG_FAIL`, so an unconditional `SLANG_E_NOT_AVAILABLE` cannot satisfy both tests.
-SLANG_UNIT_TEST(downstreamLinkReportsFailWhenLinkerRejects)
+SLANG_UNIT_TEST(downstreamLinkReportsFailWhenLinkerRejects, NoRenderApi)
 {
     ComPtr<ISlangSharedLibraryLoader> loader(new FakeLoader(FakeLinkerState::PresentRejecting));
     RefPtr<DownstreamCompilerSet> set;
@@ -319,7 +319,7 @@ SLANG_UNIT_TEST(downstreamLinkReportsFailWhenLinkerRejects)
 // The success path, which neither failure test covers: a linker that is present and accepts must
 // produce an artifact, and must get its result buffer back exactly once so the library that
 // allocated it can free it.
-SLANG_UNIT_TEST(downstreamLinkSucceedsWhenLinkerAccepts)
+SLANG_UNIT_TEST(downstreamLinkSucceedsWhenLinkerAccepts, NoRenderApi)
 {
     ComPtr<ISlangSharedLibraryLoader> loader(new FakeLoader(FakeLinkerState::PresentAccepting));
     RefPtr<DownstreamCompilerSet> set;
@@ -348,7 +348,7 @@ SLANG_UNIT_TEST(downstreamLinkSucceedsWhenLinkerAccepts)
 
 // A `slang-glslang` without `glslang_freeLinkResult` must still link: the caller skips the free
 // rather than calling through a null pointer.
-SLANG_UNIT_TEST(downstreamLinkSucceedsWithoutFreeLinkResult)
+SLANG_UNIT_TEST(downstreamLinkSucceedsWithoutFreeLinkResult, NoRenderApi)
 {
     ComPtr<ISlangSharedLibraryLoader> loader(
         new FakeLoader(FakeLinkerState::PresentAcceptingWithoutFree));
@@ -512,7 +512,7 @@ FakeGlslangCompileOutcome compileWithFakeGlslang(
 
 // The consumer half: linking two modules with the linker absent must name the missing capability
 // rather than fail silently, which is what the guard alone would produce.
-SLANG_UNIT_TEST(downstreamLinkingUnavailableDiagnosesMissingLinker)
+SLANG_UNIT_TEST(downstreamLinkingUnavailableDiagnosesMissingLinker, NoRenderApi)
 {
     const FakeGlslangCompileOutcome outcome = compileWithFakeGlslang(FakeLinkerState::Absent, true);
     const UnownedStringSlice diagnosticSlice = outcome.diagnostics.getUnownedSlice();
@@ -542,7 +542,7 @@ SLANG_UNIT_TEST(downstreamLinkingUnavailableDiagnosesMissingLinker)
 // The other side of the caller's branch: a linker that is present and rejects the modules must not
 // produce the "unavailable" diagnostic, so routing every failure to that message cannot satisfy
 // both this test and the one above.
-SLANG_UNIT_TEST(downstreamLinkRejectionDoesNotDiagnoseUnavailable)
+SLANG_UNIT_TEST(downstreamLinkRejectionDoesNotDiagnoseUnavailable, NoRenderApi)
 {
     const FakeGlslangCompileOutcome outcome =
         compileWithFakeGlslang(FakeLinkerState::PresentRejecting, true);
@@ -562,7 +562,7 @@ SLANG_UNIT_TEST(downstreamLinkRejectionDoesNotDiagnoseUnavailable)
 // optimization level leaves `needsOptimization` true. So this compile must succeed and stay silent
 // even though `glslang_linkSPIRV` is just as absent as in the test above: it rules out the
 // diagnostic being triggered by merely loading a linker-less library.
-SLANG_UNIT_TEST(downstreamLinkingUnavailableIsSilentForSingleModule)
+SLANG_UNIT_TEST(downstreamLinkingUnavailableIsSilentForSingleModule, NoRenderApi)
 {
     const FakeGlslangCompileOutcome outcome =
         compileWithFakeGlslang(FakeLinkerState::Absent, false);

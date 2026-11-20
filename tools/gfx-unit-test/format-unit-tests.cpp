@@ -1485,19 +1485,19 @@ void formatTestsImpl(IDevice* device, UnitTestContext* context)
     }
 }
 
-SLANG_UNIT_TEST(FormatTestsD3D11)
+SLANG_UNIT_TEST(FormatTestsD3D11, D3D11)
 {
     runTestImpl(formatTestsImpl, unitTestContext, Slang::RenderApiFlag::D3D11);
 }
 
 #if SLANG_WINDOWS_FAMILY
-SLANG_UNIT_TEST(FormatTestsD3D12)
+SLANG_UNIT_TEST(FormatTestsD3D12, D3D12)
 {
     runTestImpl(formatTestsImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 #endif
 
-SLANG_UNIT_TEST(FormatTestsVulkan)
+SLANG_UNIT_TEST(FormatTestsVulkan, Vulkan)
 {
     runTestImpl(formatTestsImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
 }

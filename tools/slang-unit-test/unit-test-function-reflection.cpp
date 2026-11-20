@@ -21,7 +21,7 @@ static String getTypeFullName(slang::TypeReflection* type)
 // Lookup on the importing module must find static methods supplied by an imported extension.
 // This uses the same findDeclFromString path as entry-name lookup, without requiring the method
 // to be an entry point declared in the importing module.
-SLANG_UNIT_TEST(functionReflectionImportedExtension)
+SLANG_UNIT_TEST(functionReflectionImportedExtension, NoRenderApi)
 {
     const char* librarySource = R"(
         namespace Pixel
@@ -159,7 +159,7 @@ static String resolveFunctionReturnTypeForLanguageVersion(
 
 // Test that the reflection API provides correct info about entry point and ordinary functions.
 
-SLANG_UNIT_TEST(functionReflection)
+SLANG_UNIT_TEST(functionReflection, NoRenderApi)
 {
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(
@@ -360,7 +360,7 @@ SLANG_UNIT_TEST(functionReflection)
 // Reflection overload resolution has no primary source module, but it still needs an effective
 // Slang language version. Verify that it uses the session option: Slang 2026 applies the deprecated
 // final fallback, while Slang 202c leaves the otherwise-tied candidates ambiguous.
-SLANG_UNIT_TEST(reflectionOverloadUsesSessionLanguageVersion)
+SLANG_UNIT_TEST(reflectionOverloadUsesSessionLanguageVersion, NoRenderApi)
 {
     SLANG_CHECK(
         resolveFunctionReturnTypeForLanguageVersion(SLANG_LANGUAGE_VERSION_2026, "choose") ==
@@ -381,7 +381,7 @@ SLANG_UNIT_TEST(reflectionOverloadUsesSessionLanguageVersion)
 // Legacy compile requests can process command-line options after reflection has initialized its
 // ad hoc semantic context. Verify that changing `-std` replaces that context instead of retaining
 // overload rules from its originally cached language version.
-SLANG_UNIT_TEST(reflectionRefreshesChangedLanguageVersion)
+SLANG_UNIT_TEST(reflectionRefreshesChangedLanguageVersion, NoRenderApi)
 {
     auto session = spCreateSession();
     auto request = spCreateCompileRequest(session);
@@ -418,7 +418,7 @@ SLANG_UNIT_TEST(reflectionRefreshesChangedLanguageVersion)
 // structural queries see the inner type, regardless of whether they reach
 // the boundary via a function return, a function parameter, or a struct
 // field — every accessor flows through the same `convert(Type*)` helper.
-SLANG_UNIT_TEST(functionReflectionNoDiffSpecializedReturn)
+SLANG_UNIT_TEST(functionReflectionNoDiffSpecializedReturn, NoRenderApi)
 {
     const char* source = R"(
         [Differentiable]
@@ -519,7 +519,7 @@ SLANG_UNIT_TEST(functionReflectionNoDiffSpecializedReturn)
     SLANG_CHECK(getTypeFullName(snormField) == "float");
 }
 
-SLANG_UNIT_TEST(functionReflectionSpecializeGroupSharedAndOutParams)
+SLANG_UNIT_TEST(functionReflectionSpecializeGroupSharedAndOutParams, NoRenderApi)
 {
     const char* source = R"(
         public T readShared<T>(groupshared T x) { return x; }
@@ -566,7 +566,7 @@ SLANG_UNIT_TEST(functionReflectionSpecializeGroupSharedAndOutParams)
 
 // Test that findFunctionByNameInType finds all functions with the same name but different
 // signatures
-SLANG_UNIT_TEST(findFunctionByNameInType)
+SLANG_UNIT_TEST(findFunctionByNameInType, NoRenderApi)
 {
     // Test shader with extensions that have functions with same name but different signatures
     const char* userSourceBody = R"(
@@ -674,7 +674,7 @@ SLANG_UNIT_TEST(findFunctionByNameInType)
 }
 
 
-SLANG_UNIT_TEST(findFunctionByNameGenericOverload)
+SLANG_UNIT_TEST(findFunctionByNameGenericOverload, NoRenderApi)
 {
     // Test shader with extensions that have functions with same name but different signatures
     const char* userSourceBody = R"(

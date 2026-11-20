@@ -783,7 +783,7 @@ static SlangResult _test(FileSystemType type)
     return SLANG_OK;
 }
 
-SLANG_UNIT_TEST(fileSystem)
+SLANG_UNIT_TEST(fileSystem, NoRenderApi)
 {
     for (Index i = 0; i < Count(FileSystemType::CountOf); ++i)
     {
@@ -813,7 +813,7 @@ SLANG_UNIT_TEST(fileSystem)
 // path type, from every implementation. Pin both across the OS, memory and zip file systems on
 // every platform — including Windows, where an inflated spelling can exceed the legacy
 // ~260-character path limit — so the contract cannot drift between implementations.
-SLANG_UNIT_TEST(calcCombinedPathProducesSimplifiedPaths)
+SLANG_UNIT_TEST(calcCombinedPathProducesSimplifiedPaths, NoRenderApi)
 {
     List<ISlangFileSystemExt*> fileSystems;
     {
@@ -892,12 +892,12 @@ static SlangResult _testZipReadWriteTransition()
     return _checkFile(mutableFileSystem, "after.txt", "after");
 }
 
-SLANG_UNIT_TEST(zipReadWriteTransitionPreservesAllocatorOwnership)
+SLANG_UNIT_TEST(zipReadWriteTransitionPreservesAllocatorOwnership, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testZipReadWriteTransition()));
 }
 
-SLANG_UNIT_TEST(zipRejectsOversizedUncompressedEntry)
+SLANG_UNIT_TEST(zipRejectsOversizedUncompressedEntry, NoRenderApi)
 {
 #if SLANG_CAN_PATCH_ARCHIVE_BOMB_SIZE
     SLANG_CHECK(SLANG_SUCCEEDED(_testZipRejectsOversizedUncompressedEntry()));
@@ -906,7 +906,7 @@ SLANG_UNIT_TEST(zipRejectsOversizedUncompressedEntry)
 #endif
 }
 
-SLANG_UNIT_TEST(riffRejectsOversizedUncompressedEntry)
+SLANG_UNIT_TEST(riffRejectsOversizedUncompressedEntry, NoRenderApi)
 {
 #if SLANG_CAN_PATCH_ARCHIVE_BOMB_SIZE
     SLANG_CHECK(SLANG_SUCCEEDED(_testRiffRejectsOversizedUncompressedEntry()));
@@ -915,17 +915,17 @@ SLANG_UNIT_TEST(riffRejectsOversizedUncompressedEntry)
 #endif
 }
 
-SLANG_UNIT_TEST(archiveUncompressedSizeBounds)
+SLANG_UNIT_TEST(archiveUncompressedSizeBounds, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testArchiveUncompressedSizeBounds()));
 }
 
-SLANG_UNIT_TEST(scopedAllocationRejectsMaxTerminatedSize)
+SLANG_UNIT_TEST(scopedAllocationRejectsMaxTerminatedSize, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testScopedAllocationRejectsMaxTerminatedSize()));
 }
 
-SLANG_UNIT_TEST(memoryFileSystemRejectsNullNonEmptySave)
+SLANG_UNIT_TEST(memoryFileSystemRejectsNullNonEmptySave, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testMemoryFileSystemRejectsNullNonEmptySave()));
 }

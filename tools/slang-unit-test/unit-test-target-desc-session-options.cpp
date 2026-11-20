@@ -77,7 +77,7 @@ static String compileWithSessionOptions(
 
 // `FloatingPointMode` precise in the session options reaches a target whose TargetDesc leaves
 // `floatingPointMode` at its default: on SPIR-V the multiply and the add get NoContraction.
-SLANG_UNIT_TEST(targetDescDefaultKeepsSessionFloatingPointMode)
+SLANG_UNIT_TEST(targetDescDefaultKeepsSessionFloatingPointMode, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -119,7 +119,7 @@ SLANG_UNIT_TEST(targetDescDefaultKeepsSessionFloatingPointMode)
 
 // `LineDirectiveMode` none in the session options reaches a target whose TargetDesc leaves
 // `lineDirectiveMode` at its default.
-SLANG_UNIT_TEST(targetDescDefaultKeepsSessionLineDirectiveMode)
+SLANG_UNIT_TEST(targetDescDefaultKeepsSessionLineDirectiveMode, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -161,7 +161,7 @@ SLANG_UNIT_TEST(targetDescDefaultKeepsSessionLineDirectiveMode)
 
 // `GLSLForceScalarLayout` in the session options reaches a target whose TargetDesc leaves
 // `forceGLSLScalarBufferLayout` false: the GLSL buffers use the scalar layout.
-SLANG_UNIT_TEST(targetDescDefaultKeepsSessionGLSLScalarLayout)
+SLANG_UNIT_TEST(targetDescDefaultKeepsSessionGLSLScalarLayout, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 

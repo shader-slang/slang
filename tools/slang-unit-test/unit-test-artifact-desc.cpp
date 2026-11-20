@@ -47,7 +47,7 @@ ArtifactDesc makeDesc(ArtifactKind k, ArtifactPayload p, ArtifactStyle s = Artif
 
 } // namespace
 
-SLANG_UNIT_TEST(artifactKindHierarchy)
+SLANG_UNIT_TEST(artifactKindHierarchy, NoRenderApi)
 {
     // Kind hierarchy: every child should be derived from its parent.
     SLANG_CHECK(isDerivedFrom(ArtifactKind::Source, ArtifactKind::Base));
@@ -58,14 +58,14 @@ SLANG_UNIT_TEST(artifactKindHierarchy)
     SLANG_CHECK(!isDerivedFrom(ArtifactKind::Source, ArtifactKind::SharedLibrary));
 }
 
-SLANG_UNIT_TEST(artifactPayloadHierarchy)
+SLANG_UNIT_TEST(artifactPayloadHierarchy, NoRenderApi)
 {
     SLANG_CHECK(isDerivedFrom(ArtifactPayload::HLSL, ArtifactPayload::Source));
     SLANG_CHECK(isDerivedFrom(ArtifactPayload::SPIRV, ArtifactPayload::Base));
     SLANG_CHECK(isDerivedFrom(ArtifactPayload::HLSL, ArtifactPayload::HLSL));
 }
 
-SLANG_UNIT_TEST(artifactStyleHierarchy)
+SLANG_UNIT_TEST(artifactStyleHierarchy, NoRenderApi)
 {
     SLANG_CHECK(isDerivedFrom(ArtifactStyle::Kernel, ArtifactStyle::Base));
     SLANG_CHECK(isDerivedFrom(ArtifactStyle::Host, ArtifactStyle::Base));
@@ -75,7 +75,7 @@ SLANG_UNIT_TEST(artifactStyleHierarchy)
 // Distinct kinds must produce distinct human-readable names so
 // callers (diagnostic / log code) can tell artifacts apart in
 // output. A naming collision would confuse error messages.
-SLANG_UNIT_TEST(artifactKindNamesAreDistinct)
+SLANG_UNIT_TEST(artifactKindNamesAreDistinct, NoRenderApi)
 {
     auto src = getName(ArtifactKind::Source);
     auto so = getName(ArtifactKind::SharedLibrary);
@@ -89,7 +89,7 @@ SLANG_UNIT_TEST(artifactKindNamesAreDistinct)
     SLANG_CHECK(so != obj);
 }
 
-SLANG_UNIT_TEST(artifactPayloadNamesAreDistinct)
+SLANG_UNIT_TEST(artifactPayloadNamesAreDistinct, NoRenderApi)
 {
     auto hlsl = getName(ArtifactPayload::HLSL);
     auto glsl = getName(ArtifactPayload::GLSL);
@@ -108,7 +108,7 @@ SLANG_UNIT_TEST(artifactPayloadNamesAreDistinct)
     SLANG_CHECK(spirv != dxil);
 }
 
-SLANG_UNIT_TEST(artifactDescIsCpuTarget)
+SLANG_UNIT_TEST(artifactDescIsCpuTarget, NoRenderApi)
 {
     auto cpuObj = makeDesc(ArtifactKind::ObjectCode, ArtifactPayload::HostCPU);
     SLANG_CHECK(ArtifactDescUtil::isCpuLikeTarget(cpuObj));
@@ -119,7 +119,7 @@ SLANG_UNIT_TEST(artifactDescIsCpuTarget)
     SLANG_CHECK(!ArtifactDescUtil::isCpuBinary(spirv));
 }
 
-SLANG_UNIT_TEST(artifactDescIsGpuUsable)
+SLANG_UNIT_TEST(artifactDescIsGpuUsable, NoRenderApi)
 {
     auto spirv = makeDesc(ArtifactKind::Executable, ArtifactPayload::SPIRV);
     SLANG_CHECK(ArtifactDescUtil::isGpuUsable(spirv));
@@ -129,7 +129,7 @@ SLANG_UNIT_TEST(artifactDescIsGpuUsable)
     SLANG_CHECK(!ArtifactDescUtil::isGpuUsable(hlslSource));
 }
 
-SLANG_UNIT_TEST(artifactDescIsText)
+SLANG_UNIT_TEST(artifactDescIsText, NoRenderApi)
 {
     auto hlslSource = makeDesc(ArtifactKind::Source, ArtifactPayload::HLSL);
     SLANG_CHECK(ArtifactDescUtil::isText(hlslSource));
@@ -141,7 +141,7 @@ SLANG_UNIT_TEST(artifactDescIsText)
     SLANG_CHECK(!ArtifactDescUtil::isText(spirvBin));
 }
 
-SLANG_UNIT_TEST(artifactDescDerivedFrom)
+SLANG_UNIT_TEST(artifactDescDerivedFrom, NoRenderApi)
 {
     auto hlslSource = makeDesc(ArtifactKind::Source, ArtifactPayload::HLSL);
     auto sourceBase = makeDesc(ArtifactKind::Source, ArtifactPayload::Source);
@@ -154,7 +154,7 @@ SLANG_UNIT_TEST(artifactDescDerivedFrom)
     SLANG_CHECK(!ArtifactDescUtil::isDescDerivedFrom(glslSource, hlslSource));
 }
 
-SLANG_UNIT_TEST(artifactDescGetDescFromExtension)
+SLANG_UNIT_TEST(artifactDescGetDescFromExtension, NoRenderApi)
 {
     auto hlsl = ArtifactDescUtil::getDescFromExtension(toSlice("hlsl"));
     SLANG_CHECK(isDerivedFrom(hlsl.payload, ArtifactPayload::HLSL));
@@ -167,7 +167,7 @@ SLANG_UNIT_TEST(artifactDescGetDescFromExtension)
     SLANG_CHECK(isDerivedFrom(spv.payload, ArtifactPayload::SPIRV));
 }
 
-SLANG_UNIT_TEST(artifactDescGetDescFromPath)
+SLANG_UNIT_TEST(artifactDescGetDescFromPath, NoRenderApi)
 {
     auto hlsl = ArtifactDescUtil::getDescFromPath(toSlice("path/to/foo.hlsl"));
     SLANG_CHECK(isDerivedFrom(hlsl.payload, ArtifactPayload::HLSL));
@@ -180,7 +180,7 @@ SLANG_UNIT_TEST(artifactDescGetDescFromPath)
 // the diagnostic can identify the artifact. Different descs must
 // produce different strings (otherwise the rendering is useless
 // for distinguishing artifacts).
-SLANG_UNIT_TEST(artifactDescGetTextMentionsPayload)
+SLANG_UNIT_TEST(artifactDescGetTextMentionsPayload, NoRenderApi)
 {
     String hlslText =
         ArtifactDescUtil::getText(makeDesc(ArtifactKind::Source, ArtifactPayload::HLSL));
@@ -197,7 +197,7 @@ SLANG_UNIT_TEST(artifactDescGetTextMentionsPayload)
 // `getDescFromExtension`. So if we extend an arbitrary base path
 // with the default extension, then ask "what desc does that file
 // have?", we should recover the (kind, payload) we started with.
-SLANG_UNIT_TEST(artifactDescAppendDefaultExtensionRoundTrips)
+SLANG_UNIT_TEST(artifactDescAppendDefaultExtensionRoundTrips, NoRenderApi)
 {
     auto hlslSource = makeDesc(ArtifactKind::Source, ArtifactPayload::HLSL);
     StringBuilder hlslBuf;
@@ -214,7 +214,7 @@ SLANG_UNIT_TEST(artifactDescAppendDefaultExtensionRoundTrips)
     SLANG_CHECK(isDerivedFrom(recoveredGlsl.payload, ArtifactPayload::GLSL));
 }
 
-SLANG_UNIT_TEST(artifactDescMakeDescForCompileTarget)
+SLANG_UNIT_TEST(artifactDescMakeDescForCompileTarget, NoRenderApi)
 {
     auto spv = ArtifactDescUtil::makeDescForCompileTarget(SLANG_SPIRV);
     SLANG_CHECK(isDerivedFrom(spv.payload, ArtifactPayload::SPIRV));
@@ -223,7 +223,7 @@ SLANG_UNIT_TEST(artifactDescMakeDescForCompileTarget)
     SLANG_CHECK(isDerivedFrom(hlsl.payload, ArtifactPayload::HLSL));
 }
 
-SLANG_UNIT_TEST(artifactDescGetCompileTargetFromDesc)
+SLANG_UNIT_TEST(artifactDescGetCompileTargetFromDesc, NoRenderApi)
 {
     auto spv = makeDesc(ArtifactKind::Executable, ArtifactPayload::SPIRV);
     SLANG_CHECK(ArtifactDescUtil::getCompileTargetFromDesc(spv) == SLANG_SPIRV);
@@ -232,14 +232,14 @@ SLANG_UNIT_TEST(artifactDescGetCompileTargetFromDesc)
     SLANG_CHECK(ArtifactDescUtil::getCompileTargetFromDesc(hlsl) == SLANG_HLSL);
 }
 
-SLANG_UNIT_TEST(artifactDescIsKindBinaryLinkable)
+SLANG_UNIT_TEST(artifactDescIsKindBinaryLinkable, NoRenderApi)
 {
     SLANG_CHECK(ArtifactDescUtil::isKindBinaryLinkable(ArtifactKind::ObjectCode));
     SLANG_CHECK(ArtifactDescUtil::isKindBinaryLinkable(ArtifactKind::Library));
     SLANG_CHECK(!ArtifactDescUtil::isKindBinaryLinkable(ArtifactKind::Source));
 }
 
-SLANG_UNIT_TEST(artifactDescIsLinkable)
+SLANG_UNIT_TEST(artifactDescIsLinkable, NoRenderApi)
 {
     auto obj = makeDesc(ArtifactKind::ObjectCode, ArtifactPayload::HostCPU);
     SLANG_CHECK(ArtifactDescUtil::isLinkable(obj));
@@ -248,7 +248,7 @@ SLANG_UNIT_TEST(artifactDescIsLinkable)
     SLANG_CHECK(!ArtifactDescUtil::isLinkable(src));
 }
 
-SLANG_UNIT_TEST(artifactDescIsDisassembly)
+SLANG_UNIT_TEST(artifactDescIsDisassembly, NoRenderApi)
 {
     // Disassembly is encoded as `kind=Assembly` + same payload as
     // the binary form.

@@ -17,7 +17,7 @@ using namespace Slang;
 //
 // Pins the `_getOrCreateScopeForLegacyLookup` mirror: reverting that hunk makes the
 // unqualified `findTypeByName("Bar")` non-null again (the leak).
-SLANG_UNIT_TEST(usingNamespaceImportReflectionNoLeak)
+SLANG_UNIT_TEST(usingNamespaceImportReflectionNoLeak, NoRenderApi)
 {
     // A module whose PRIMARY file pulls `Foo` into scope with a top-level `using`.
     const char* usingModSource = R"(

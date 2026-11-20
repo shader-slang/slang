@@ -174,7 +174,7 @@ static void _dumpChildRun(
 
 /// A healthy server: the control. Whatever the other cases prove, they prove nothing unless
 /// the untouched path is unchanged -- no losses reported, every test passing, exit 0.
-SLANG_UNIT_TEST(testServerLossHealthyRunIsUnaffected)
+SLANG_UNIT_TEST(testServerLossHealthyRunIsUnaffected, NoRenderApi)
 {
     if (_cannotRunHere())
     {
@@ -201,7 +201,7 @@ SLANG_UNIT_TEST(testServerLossHealthyRunIsUnaffected)
 /// The tests are demonstrably fine -- they pass in the control above -- so charging them
 /// with the server's death is a false verdict. Before this handling existed, this exact
 /// scenario reported 26 failures out of 80 on a suite where all 80 pass.
-SLANG_UNIT_TEST(testServerLossInnocentTestIsNotBlamed)
+SLANG_UNIT_TEST(testServerLossInnocentTestIsNotBlamed, NoRenderApi)
 {
     if (_cannotRunHere())
     {
@@ -237,7 +237,7 @@ SLANG_UNIT_TEST(testServerLossInnocentTestIsNotBlamed)
 ///
 /// Counterpart of the innocent-loss case. A malformed reply used not to be retried at all, so
 /// whichever test was in flight failed -- and one unreadable reply reds a whole suite.
-SLANG_UNIT_TEST(testServerProtocolErrorInnocentTestIsNotBlamed)
+SLANG_UNIT_TEST(testServerProtocolErrorInnocentTestIsNotBlamed, NoRenderApi)
 {
     if (_cannotRunHere())
     {
@@ -271,7 +271,7 @@ SLANG_UNIT_TEST(testServerProtocolErrorInnocentTestIsNotBlamed)
 ///
 /// The guard on the retry: a genuinely broken channel -- the version-mismatch case the old
 /// no-retry rule assumed -- must still fail the run rather than be ground until it looks green.
-SLANG_UNIT_TEST(testServerProtocolErrorPersistentGarbleFailsTheRun)
+SLANG_UNIT_TEST(testServerProtocolErrorPersistentGarbleFailsTheRun, NoRenderApi)
 {
     if (_cannotRunHere())
     {
@@ -295,7 +295,7 @@ SLANG_UNIT_TEST(testServerProtocolErrorPersistentGarbleFailsTheRun)
 /// This stands in for an input that genuinely kills the compiler. It must fail the run: the
 /// whole risk of retrying is that a real crash gets retried until it looks green, and this
 /// is the assertion that says it does not.
-SLANG_UNIT_TEST(testServerLossPersistentKillerFailsTheRun)
+SLANG_UNIT_TEST(testServerLossPersistentKillerFailsTheRun, NoRenderApi)
 {
     if (_cannotRunHere())
     {
@@ -337,7 +337,7 @@ SLANG_UNIT_TEST(testServerLossPersistentKillerFailsTheRun)
 ///
 /// Unix only. Windows reports every termination as an exit code, so there is no signal for
 /// the client to report and nothing here to assert.
-SLANG_UNIT_TEST(testServerLossReportsTheKillingSignal)
+SLANG_UNIT_TEST(testServerLossReportsTheKillingSignal, NoRenderApi)
 {
     if (_cannotRunHere())
     {
@@ -380,7 +380,7 @@ SLANG_UNIT_TEST(testServerLossReportsTheKillingSignal)
 /// Nothing else here reaches it: every child run above uses -server-count 1, so all the
 /// losses land in one reporter and the merge is never exercised. Production CI runs
 /// -server-count 4. Deleting the two merge lines leaves every other case in this file green.
-SLANG_UNIT_TEST(testServerLossConsolidatesAcrossReporters)
+SLANG_UNIT_TEST(testServerLossConsolidatesAcrossReporters, NoRenderApi)
 {
     TestReporter parent;
     TestReporter worker;

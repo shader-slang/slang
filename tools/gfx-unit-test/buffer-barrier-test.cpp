@@ -120,7 +120,7 @@ static void barrierTestFunc(ComPtr<IDevice> device, UnitTestContext* context)
     barrierTestImpl(device.get(), context);
 }
 
-SLANG_UNIT_TEST(bufferBarrierVulkan)
+SLANG_UNIT_TEST(bufferBarrierVulkan, Vulkan)
 {
     runTestImpl(
         barrierTestFunc,

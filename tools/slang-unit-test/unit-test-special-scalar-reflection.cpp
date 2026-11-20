@@ -6,7 +6,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(specialScalarReflection)
+SLANG_UNIT_TEST(specialScalarReflection, NoRenderApi)
 {
     const char* userSourceBody = R"(
         struct TestStruct

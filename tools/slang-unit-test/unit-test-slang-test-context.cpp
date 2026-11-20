@@ -15,7 +15,7 @@ using namespace Slang;
 // runs on the main thread, whose thread index is left at the last worker it spawned a test server
 // for, so it reads a slot that no worker may ever have touched. When that slot held uninitialized
 // memory, a failing test's retry either crashed slang-test or reported the failure as a pass.
-SLANG_UNIT_TEST(slangTestContextThreadSlotsStartEmpty)
+SLANG_UNIT_TEST(slangTestContextThreadSlotsStartEmpty, NoRenderApi)
 {
     static const int kThreadCount = 8;
 
@@ -54,7 +54,7 @@ SLANG_UNIT_TEST(slangTestContextThreadSlotsStartEmpty)
 
 // A test runs when all the APIs that it needs are enabled, and a test that needs no API runs unless
 // `-compile-test false` is set.
-SLANG_UNIT_TEST(slangTestContextRunsTestsByEnabledApis)
+SLANG_UNIT_TEST(slangTestContextRunsTestsByEnabledApis, NoRenderApi)
 {
     TestContext context;
     context.options.enabledApis = RenderApiFlag::CPU | RenderApiFlag::LLVM;
@@ -69,7 +69,7 @@ SLANG_UNIT_TEST(slangTestContextRunsTestsByEnabledApis)
 // compile test and does not run, unless the caller says that GPU tests need it: a COMPILE line that
 // prepares the input of a line with an API, or a line that uses a tool that only the GPU hosts
 // have. The tests that need an API are not affected.
-SLANG_UNIT_TEST(slangTestContextCompileTestFalseKeepsOnlyWhatGpuTestsNeed)
+SLANG_UNIT_TEST(slangTestContextCompileTestFalseKeepsOnlyWhatGpuTestsNeed, NoRenderApi)
 {
     TestContext context;
     SLANG_CHECK(context.options.compileTest);
@@ -87,7 +87,7 @@ SLANG_UNIT_TEST(slangTestContextCompileTestFalseKeepsOnlyWhatGpuTestsNeed)
 // A unit test can use several APIs one after another, so it runs when at least one of them is
 // enabled. With `-compile-test false`, a unit test that uses no API is a compile test and does not
 // run.
-SLANG_UNIT_TEST(slangTestContextRunsUnitTestsByUsedApis)
+SLANG_UNIT_TEST(slangTestContextRunsUnitTestsByUsedApis, NoRenderApi)
 {
     TestContext context;
     context.options.enabledApis = RenderApiFlag::CPU | RenderApiFlag::LLVM;
@@ -116,14 +116,14 @@ extern "C" IUnitTestModule* slangUnitTestGetModule();
 
 // The test below declares APIs only to check that the registry keeps them. The declaration does not
 // make slang-test skip the test in a job that has no GPU, because the test checks nothing there.
-SLANG_UNIT_TEST_USING_APIS(slangUnitTestRegistryProbe, Vulkan | CUDA)
+SLANG_UNIT_TEST(slangUnitTestRegistryProbe, Vulkan | CUDA)
 {
     SLANG_CHECK(true);
 }
 
-// A unit test declares the APIs that it uses with SLANG_UNIT_TEST_USING_APIS, and the registry
+// A unit test declares the APIs that it uses with SLANG_UNIT_TEST, and the registry
 // reports them to slang-test. A test defined with SLANG_UNIT_TEST declares none.
-SLANG_UNIT_TEST(slangUnitTestRegistryReportsUsedApis)
+SLANG_UNIT_TEST(slangUnitTestRegistryReportsUsedApis, NoRenderApi)
 {
     IUnitTestModule* module = slangUnitTestGetModule();
     SLANG_CHECK_ABORT(module != nullptr);
@@ -154,7 +154,7 @@ SLANG_UNIT_TEST(slangUnitTestRegistryReportsUsedApis)
 // false` runs the tests of every GPU API and no test of the CPU-only job. `llvm` is the tests that
 // use
 // `-emit-cpu-via-llvm`.
-SLANG_UNIT_TEST(renderApiFlagsAllWithoutCpuAndLlvmAreTheGpuApis)
+SLANG_UNIT_TEST(renderApiFlagsAllWithoutCpuAndLlvmAreTheGpuApis, NoRenderApi)
 {
     RenderApiFlags flags = 0;
     SLANG_CHECK(SLANG_SUCCEEDED(RenderApiUtil::parseApiFlags(
@@ -211,7 +211,7 @@ struct TemporaryListFile
 
 // `-exclude-list` is another name of `-skip-list`, and both read the same format: path prefixes,
 // with comments and empty lines ignored.
-SLANG_UNIT_TEST(slangTestOptionsExcludeListIsSkipList)
+SLANG_UNIT_TEST(slangTestOptionsExcludeListIsSkipList, NoRenderApi)
 {
     TemporaryListFile list(
         "# a comment\ntests/neural/\n\n  tests/cooperative-matrix/  # trailing\n");
@@ -231,7 +231,7 @@ SLANG_UNIT_TEST(slangTestOptionsExcludeListIsSkipList)
 }
 
 // `-include-list` selects tests in the same way as the test prefixes do, so it adds to them.
-SLANG_UNIT_TEST(slangTestOptionsIncludeListAddsTestPrefixes)
+SLANG_UNIT_TEST(slangTestOptionsIncludeListAddsTestPrefixes, NoRenderApi)
 {
     TemporaryListFile list("tests/neural/\ntests/cooperative-matrix/\n");
     SLANG_CHECK_ABORT(list.path.getLength() > 0);
@@ -249,7 +249,7 @@ SLANG_UNIT_TEST(slangTestOptionsIncludeListAddsTestPrefixes)
 }
 
 // An include list that is missing or has no entries would select every test, so it is an error.
-SLANG_UNIT_TEST(slangTestOptionsIncludeListMustHaveEntries)
+SLANG_UNIT_TEST(slangTestOptionsIncludeListMustHaveEntries, NoRenderApi)
 {
     TemporaryListFile empty("# only a comment\n\n");
     SLANG_CHECK_ABORT(empty.path.getLength() > 0);
@@ -271,7 +271,7 @@ SLANG_UNIT_TEST(slangTestOptionsIncludeListMustHaveEntries)
 
 // `-compile-test` is true by default. `-api-only` turns it off, unless it is on the command line,
 // whatever the order of the options is.
-SLANG_UNIT_TEST(slangTestOptionsCompileTest)
+SLANG_UNIT_TEST(slangTestOptionsCompileTest, NoRenderApi)
 {
     struct Case
     {

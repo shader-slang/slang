@@ -663,6 +663,7 @@ jobs:
       runs-on: '["macos-latest"]'
       full-gpu-tests: true
       server-count: 3
+      gpu-tier: metal
 
   test-macos-debug-clang-aarch64-rhi:
     needs: [filter, build-macos-debug-clang-aarch64]
@@ -687,6 +688,7 @@ jobs:
       runs-on: '["macos-latest"]'
       full-gpu-tests: true
       server-count: 3
+      gpu-tier: metal
 
   test-macos-release-clang-aarch64-rhi:
     needs: [filter, build-macos-release-clang-aarch64]
@@ -1021,33 +1023,33 @@ jobs:
         static-windows-release-cl-x86_64,
         static-macos-debug-clang-aarch64,
         static-windows-debug-cl-x86_64,
-        test-windows-release-cl-x86_64-cpu,
-        test-windows-debug-cl-x86_64-cpu,
-        test-windows-release-cl-x86_64-t4,
-        test-windows-release-cl-x86_64-gpu-rhi,
-        test-windows-debug-cl-x86_64-t4,
-        test-windows-debug-cl-x86_64-gpu-rhi,
-        test-macos-release-clang-aarch64,
-        test-macos-release-clang-aarch64-rhi,
-        test-macos-debug-clang-aarch64,
-        test-macos-debug-clang-aarch64-rhi,
-        test-linux-release-gcc-x86_64-t4,
+        test-benchmark,
+        test-compile-regression,
+        test-falcor-perf,
+        test-linux-debug-gcc-aarch64-cpu,
+        test-linux-debug-gcc-x86_64-cpu,
+        test-linux-debug-gcc-x86_64-rhi,
+        test-linux-debug-gcc-x86_64-sm80,
+        test-linux-debug-gcc-x86_64-t4,
+        test-linux-release-gcc-aarch64-cpu,
+        test-linux-release-gcc-x86_64-cpu,
         test-linux-release-gcc-x86_64-rhi,
         test-linux-release-gcc-x86_64-sm80,
-        test-linux-release-gcc-x86_64-cpu,
-        test-linux-debug-gcc-x86_64-sm80,
-        test-linux-debug-gcc-x86_64-cpu,
-        test-linux-debug-gcc-x86_64-t4,
-        test-linux-debug-gcc-x86_64-rhi,
-        test-linux-release-gcc-aarch64-cpu,
-        test-linux-debug-gcc-aarch64-cpu,
+        test-linux-release-gcc-x86_64-t4,
+        test-macos-debug-clang-aarch64,
+        test-macos-debug-clang-aarch64-rhi,
+        test-macos-release-clang-aarch64,
+        test-macos-release-clang-aarch64-rhi,
         test-materialx-windows-release,
+        test-windows-debug-cl-x86_64-cpu,
+        test-windows-debug-cl-x86_64-gpu-rhi,
+        test-windows-debug-cl-x86_64-t4,
+        test-windows-release-cl-x86_64-cpu,
+        test-windows-release-cl-x86_64-gpu-rhi,
+        test-windows-release-cl-x86_64-t4,
         sanitizer-linux-clang-x86_64,
         check-cmdline-ref,
         check-capability-atoms-ref,
-        test-falcor-perf,
-        test-compile-regression,
-        test-benchmark,
         wait-for-human-priority,
       ]
     runs-on: ubuntu-latest

@@ -102,17 +102,17 @@ void existingDeviceHandleTestAPI(UnitTestContext* context, DeviceType deviceType
     existingDeviceHandleTestImpl(testDevice, context);
 }
 
-SLANG_UNIT_TEST(existingDeviceHandleD3D12)
+SLANG_UNIT_TEST(existingDeviceHandleD3D12, D3D12)
 {
     return existingDeviceHandleTestAPI(unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(existingDeviceHandleVulkan)
+SLANG_UNIT_TEST(existingDeviceHandleVulkan, Vulkan)
 {
     return existingDeviceHandleTestAPI(unitTestContext, DeviceType::Vulkan);
 }
 #if SLANG_WIN64
-SLANG_UNIT_TEST(existingDeviceHandleCUDA)
+SLANG_UNIT_TEST(existingDeviceHandleCUDA, CUDA)
 {
     return existingDeviceHandleTestAPI(unitTestContext, DeviceType::CUDA);
 }

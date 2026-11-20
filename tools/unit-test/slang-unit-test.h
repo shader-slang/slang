@@ -85,7 +85,7 @@ public:
     /// Returns the render APIs that the test uses, as a combination of RenderApiFlag bits, or 0
     /// when the test uses no render API. slang-test runs a test that uses APIs only if at least one
     /// of them is enabled, and `-compile-test false` skips the tests that return 0, so a test that
-    /// needs a GPU API declares it with SLANG_UNIT_TEST_USING_APIS.
+    /// needs a GPU API declares it with SLANG_UNIT_TEST.
     virtual SLANG_NO_THROW Slang::RenderApiFlags SLANG_MCALL getTestUsedApis(SlangInt index) = 0;
 };
 
@@ -111,16 +111,13 @@ typedef IUnitTestModule* (*UnitTestGetModuleFunc)();
 //
 // This lets slang-test keep a GPU test out of the jobs that have no GPU, and keep a test that
 // uses no GPU out of the jobs that run `-compile-test false`, so that each test runs in one kind of
-// job.
-//
-// The tests of the gfx-unit-test-tool module do not declare their APIs, because each of them passes
-// its API to runTestImpl, which ignores the test when the API is not enabled.
+// job. A test that uses no render API is a compile test, and it passes `NoRenderApi`.
 //
 // `usedApis` is an expression of the names in Slang::RenderApiFlag, written without the prefix,
-// for example `SLANG_UNIT_TEST_USING_APIS(nvrtcPrecompiledHeader, CUDA)`. The macro
+// for example `SLANG_UNIT_TEST(nvrtcPrecompiledHeader, CUDA)`, or `NoRenderApi`. The macro
 // evaluates the expression in a struct that derives from Slang::RenderApiFlag, so the names find
 // the enumerators there.
-#define SLANG_UNIT_TEST_USING_APIS(name, usedApis)                                         \
+#define SLANG_UNIT_TEST(name, usedApis)                                                    \
     struct _##name##UsedApis : Slang::RenderApiFlag                                        \
     {                                                                                      \
         static constexpr Slang::RenderApiFlags value = (usedApis);                         \
@@ -138,9 +135,6 @@ typedef IUnitTestModule* (*UnitTestGetModuleFunc)();
     }                                                                                      \
     UnitTestRegisterHelper _##name##RegisterHelper(#name, name, _##name##UsedApis::value); \
     void _##name##_impl(UnitTestContext* unitTestContext)
-
-/// Defines a unit test that needs no render API.
-#define SLANG_UNIT_TEST(name) SLANG_UNIT_TEST_USING_APIS(name, 0)
 
 #define SLANG_CHECK(x) getTestReporter()->addResultWithLocation((x), #x, __FILE__, __LINE__);
 #define SLANG_CHECK_ABORT(x)                                                                   \

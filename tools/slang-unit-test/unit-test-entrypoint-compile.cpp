@@ -11,7 +11,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(entryPointCompile)
+SLANG_UNIT_TEST(entryPointCompile, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(

@@ -488,7 +488,7 @@ static void runCoverageCudaRuntimeTest(
 
 } // anonymous namespace
 
-SLANG_UNIT_TEST_USING_APIS(coverageCudaRuntimeDispatch, CUDA)
+SLANG_UNIT_TEST(coverageCudaRuntimeDispatch, CUDA)
 {
     // The test needs three runtime facilities that vary per machine: the
     // CUDA driver (loaded dynamically above), a CUDA device, and NVRTC

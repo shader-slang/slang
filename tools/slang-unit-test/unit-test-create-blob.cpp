@@ -11,7 +11,7 @@
 using namespace Slang;
 
 // Test the slang_createBlob function
-SLANG_UNIT_TEST(createBlob)
+SLANG_UNIT_TEST(createBlob, NoRenderApi)
 {
     // Test 1: Basic functionality with valid string data
     {

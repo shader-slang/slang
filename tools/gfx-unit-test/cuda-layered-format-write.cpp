@@ -115,7 +115,7 @@ void cudaLayeredFormatWriteTestImpl(IDevice* device, UnitTestContext* context)
     checkSingleTexelWritten(device, uintTexture1DArray, 2, 0, 3, {1, 2, 3, 4}, 0);
 }
 
-SLANG_UNIT_TEST(cudaLayeredFormatWriteCUDA)
+SLANG_UNIT_TEST(cudaLayeredFormatWriteCUDA, CUDA)
 {
     runTestImpl(cudaLayeredFormatWriteTestImpl, unitTestContext, DeviceType::CUDA);
 }

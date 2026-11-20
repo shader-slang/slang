@@ -17,7 +17,7 @@ static String getTypeFullName(slang::TypeReflection* type)
 // Printing `vector<float,3>` creates decl-refs for its element type, so
 // `spReflectionType_GetFullName` must set the AST builder of the type itself. Sanitizer builds
 // report a null `ASTBuilder` here.
-SLANG_UNIT_TEST(typeFullName)
+SLANG_UNIT_TEST(typeFullName, NoRenderApi)
 {
     const char* source = R"(
         struct S

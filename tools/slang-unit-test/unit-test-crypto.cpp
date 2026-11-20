@@ -4,7 +4,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(crypto)
+SLANG_UNIT_TEST(crypto, NoRenderApi)
 {
     // HashDigest
     {

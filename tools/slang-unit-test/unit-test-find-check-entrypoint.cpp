@@ -14,7 +14,7 @@ using namespace Slang;
 // Test that the IModule::findAndCheckEntryPoint API supports discovering
 // entrypoints without a [shader] attribute.
 
-SLANG_UNIT_TEST(findAndCheckEntryPoint)
+SLANG_UNIT_TEST(findAndCheckEntryPoint, NoRenderApi)
 {
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(
@@ -75,7 +75,7 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
 // Loading the structural ray-tracing module elsewhere in the session must not make an unrelated
 // ordinary struct an entry point. Lookup finds Plain in the requested module, but it must still
 // reject that struct because Plain has no executable stage conformance.
-SLANG_UNIT_TEST(structuralRayTracingEntryPointLookupIsModuleLocal)
+SLANG_UNIT_TEST(structuralRayTracingEntryPointLookupIsModuleLocal, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -143,7 +143,7 @@ static slang::EntryPointReflection* _getEntryPointReflection(
 // Selecting two stages implemented by the same struct must give them distinct target names.
 // Qualified names should remain readable, with dots replaced by underscores. Generic types use
 // ordinary mangling to retain their arguments. Reflection exposes the overrides used by IR linking.
-SLANG_UNIT_TEST(structuralRayTracingEntryPointNamesIncludeStage)
+SLANG_UNIT_TEST(structuralRayTracingEntryPointNamesIncludeStage, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -303,7 +303,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointNamesIncludeStage)
 
 // Selecting Stage.invoke is another spelling of the structural entry selected by Stage. Both
 // spellings allow the logical input and select the same checked function and target name.
-SLANG_UNIT_TEST(structuralRayTracingEntryPointAcceptsMethodSelection)
+SLANG_UNIT_TEST(structuralRayTracingEntryPointAcceptsMethodSelection, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -380,7 +380,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointAcceptsMethodSelection)
 // tests/compute/simple.slang for PTX target generates invalid code.
 // TODO: Remove this when issue #4760 is resolved, because at that point
 // tests/compute/simple.slang should cover the same issue.
-SLANG_UNIT_TEST_USING_APIS(cudaCodeGenBug, CUDA)
+SLANG_UNIT_TEST(cudaCodeGenBug, CUDA)
 {
     // We need the CUDA backend for this test
     if (!SLANG_SUCCEEDED(

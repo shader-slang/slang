@@ -7796,18 +7796,13 @@ static TestResult _asTestResult(ToolReturnCode retCode)
 
 /// Loads a DLL containing unit test functions and run them one by one.
 ///
-/// `testsDeclareApis` tells how the module separates the tests that need a GPU from the compile
-/// tests. If it is true, a test declares the render APIs that it uses (SLANG_UNIT_TEST_USING_APIS),
-/// and a test that declares none is a compile test, so `-compile-test false` skips it. If it is
-/// false, the test chooses by itself, because it passes the API that it uses to a helper that
-/// ignores the test when the API is not enabled, as runTestImpl does in the gfx-unit-test-tool
-/// module. We run each test of such a module, and the test ignores itself.
+/// A test declares the render APIs that it uses (SLANG_UNIT_TEST), and a test that declares
+/// `NoRenderApi` is a compile test, so `-compile-test false` skips it.
 static SlangResult runUnitTestModule(
     TestContext* context,
     TestOptions& testOptions,
     SpawnType spawnType,
-    const char* moduleName,
-    bool testsDeclareApis)
+    const char* moduleName)
 {
     ISlangSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
     ComPtr<ISlangSharedLibrary> moduleLibrary;
@@ -7882,7 +7877,7 @@ static SlangResult runUnitTestModule(
 
         // A unit test that uses no API that `-api` has enabled, or that uses no API when
         // `-compile-test false` is set, belongs to another kind of job, so we do not spawn it.
-        if (testsDeclareApis && !context->canRunUnitTestUsingRenderApis(test.usedApis))
+        if (!context->canRunUnitTestUsingRenderApis(test.usedApis))
         {
             TestReporter::TestScope scopeTest(reporter, options.command);
             reporter->addResult(TestResult::Ignored);
@@ -8327,8 +8322,7 @@ SlangResult innerMain(int argc, char** argv)
         // directory) They are registered with SLANG_UNIT_TEST macro.
         //
         // With `-compile-test false`, runUnitTestModule still runs the unit tests that declare an
-        // enabled API, and it ignores the others. The tests of the gfx-unit-test-tool module are
-        // the exception, because each of them ignores itself when its API is not enabled.
+        // enabled API, and it ignores the others.
         {
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);
@@ -8352,23 +8346,13 @@ SlangResult innerMain(int argc, char** argv)
                     TestOptions testOptions;
                     testOptions.categories.add(unitTestCategory);
                     testOptions.categories.add(smokeTestCategory);
-                    runUnitTestModule(
-                        &context,
-                        testOptions,
-                        spawnType,
-                        "slang-unit-test-tool",
-                        true);
+                    runUnitTestModule(&context, testOptions, spawnType, "slang-unit-test-tool");
                 }
 
                 {
                     TestOptions testOptions;
                     testOptions.categories.add(unitTestCategory);
-                    runUnitTestModule(
-                        &context,
-                        testOptions,
-                        spawnType,
-                        "gfx-unit-test-tool",
-                        false);
+                    runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
                 }
             }
 

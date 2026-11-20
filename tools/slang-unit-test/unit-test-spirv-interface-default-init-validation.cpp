@@ -17,7 +17,7 @@
 using namespace Slang;
 using SlangUnitTest::ScopedEnvVar;
 
-SLANG_UNIT_TEST(spirvInterfaceDefaultInitValidation)
+SLANG_UNIT_TEST(spirvInterfaceDefaultInitValidation, NoRenderApi)
 {
     // Enable the built-in SPIR-V validation path in `slang-emit.cpp`.
     ScopedEnvVar validateSpirv("SLANG_RUN_SPIRV_VALIDATION", "1");

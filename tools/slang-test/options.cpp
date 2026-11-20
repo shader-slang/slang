@@ -96,9 +96,9 @@ static bool _isSubCommand(const char* arg)
         "  -skip-reference-image-generation Skip generating reference images for render tests\n"
         "  -emit-spirv-via-glsl           Emit SPIR-V through GLSL instead of directly\n"
         "  -expected-failure-list <file>  Specify file containing expected failures\n"
-        "  -skip-list <file>              Specify file containing tests to skip (path prefixes)\n"
-        "  -exclude-list <file>           Same as -skip-list\n"
         "  -include-list <file>           Specify file containing tests to run (path prefixes)\n"
+        "  -exclude-list <file>           Specify file with tests to exclude (path prefixes)\n"
+        "  -skip-list <file>              Same as -exclude-list\n"
         "  -use-shared-library            Run tests in-process using shared library\n"
         "  -use-test-server               Run tests using test server\n"
         "  -use-fully-isolated-test-server  Run each test in isolated server\n"
@@ -134,7 +134,7 @@ static bool _isSubCommand(const char* arg)
         "all tests will be run.\n");
 }
 
-// Reads a test list file, such as the file of `-skip-list`, and adds its entries to `entries`.
+// Reads a test list file, such as the file of `-exclude-list`, and adds its entries to `entries`.
 //
 // Each line is a path prefix or the name of a subtest. Everything after a '#' is a comment, and
 // empty lines are ignored. Returns the number of entries that the file has, or a negative number if

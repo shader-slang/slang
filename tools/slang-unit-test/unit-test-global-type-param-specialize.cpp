@@ -14,7 +14,7 @@ using namespace Slang;
 // code. This exercises the success path of `specializeGlobalGenericParameters`
 // — the loop that the diagnostic change touches — which is otherwise only
 // covered by GPU/disabled compute tests.
-SLANG_UNIT_TEST(globalTypeParamSpecialize)
+SLANG_UNIT_TEST(globalTypeParamSpecialize, NoRenderApi)
 {
     const char* userSourceBody = R"(
         interface IFoo { int get(); }

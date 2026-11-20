@@ -12,7 +12,7 @@ using namespace Slang;
 // The test checks NVRTC when the machine has it, and checks the other compilers on every machine.
 // Only the jobs that have a GPU have NVRTC, and the jobs that have none cover more platforms, so
 // the test declares all APIs and runs in every job.
-SLANG_UNIT_TEST_USING_APIS(getDownstreamCompilerPath, AllOf)
+SLANG_UNIT_TEST(getDownstreamCompilerPath, AllOf)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 

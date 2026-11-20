@@ -20,7 +20,7 @@ inputs:
     default: ""
   gpu-tier:
     required: false
-    description: "GPU tier of the runner: 't4', 'sm80plus', or 'nogpu' (no GPU)"
+    description: "GPU tier of the runner: 't4', 'sm80plus', 'metal' (macOS), or 'nogpu' (no GPU)"
     default: ""
 
 runs:

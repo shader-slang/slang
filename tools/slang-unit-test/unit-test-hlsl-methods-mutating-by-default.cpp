@@ -8,7 +8,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(hlslMethodsMutatingByDefaultSessionOption)
+SLANG_UNIT_TEST(hlslMethodsMutatingByDefaultSessionOption, NoRenderApi)
 {
     // A read-only body does not require a writable receiver by itself. Calling `read` on a const
     // local therefore distinguishes the method's checked receiver mode from its actual writes.
@@ -148,7 +148,7 @@ SLANG_UNIT_TEST(hlslMethodsMutatingByDefaultSessionOption)
     }
 }
 
-SLANG_UNIT_TEST(hlslMethodsMutatingByDefaultCommandLineSessionOption)
+SLANG_UNIT_TEST(hlslMethodsMutatingByDefaultCommandLineSessionOption, NoRenderApi)
 {
     // Parsing `-fhlsl-methods-mutating-by-default` for a session must preserve the flag as a public
     // boolean option. The compilation cases above exercise the behavior of that same option entry.

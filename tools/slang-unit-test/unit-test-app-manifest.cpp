@@ -27,7 +27,7 @@ using namespace Slang;
 // compiles for any Windows toolchain, so a future non-MSVC Windows build
 // would fail here — deliberately, since such a build would otherwise
 // silently lack long-path support.
-SLANG_UNIT_TEST(embeddedAppManifestDeclaresLongPathAware)
+SLANG_UNIT_TEST(embeddedAppManifestDeclaresLongPathAware, NoRenderApi)
 {
     HMODULE module = GetModuleHandleW(nullptr);
     SLANG_CHECK_ABORT(module != nullptr);

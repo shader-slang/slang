@@ -93,14 +93,14 @@ Available APIs:
 - `-generate-hlsl-baselines`: Generate HLSL test baselines
 - `-emit-spirv-via-glsl`: Emit SPIR-V through GLSL instead of directly
 - `-expected-failure-list <file>`: Specify file containing expected failures
-- `-skip-list <file>`: Specify file containing tests to skip. Each line is
+- `-include-list <file>`: Specify file containing the only tests to run, in the
+  same format as `-exclude-list`. The file must have at least one entry.
+- `-exclude-list <file>`: Specify file containing tests to exclude. Each line is
   either a source-path prefix, or the name of one expanded subtest
   (`<path>.<n>`, e.g. `tests/compute/parameter-block.slang.6`).
-- `-exclude-list <file>`: The same as `-skip-list`.
-- `-include-list <file>`: Specify file containing the only tests to run, in the
-  same format as `-skip-list`. The file must have at least one entry.
+- `-skip-list <file>`: The same as `-exclude-list`.
 - `-exclude-prefix <prefix>`: Exclude tests, with the same two forms as
-  `-skip-list`.
+  `-exclude-list`.
 
 Both forms are matched by the same rule: an entry of the form `<path>.<n>`
 selects that subtest only — `foo.slang.6` never matches `foo.slang.60` —
@@ -162,7 +162,7 @@ tests/compute/my-test.slang.1 (wgpu)
 ...
 ```
 
-The number in the name is the index of the test line in the file. It is the same for all targets of a line. Line 0 has no number. The number does not depend on the APIs of the machine, so a name is the same on every machine. Use the whole name in a list of expected failures, or in `-exclude-prefix` and `-skip-list`. The entry `tests/compute/my-test.slang.1` selects all targets of the line, and the entry `tests/compute/my-test.slang.1 (vk)` selects one target.
+The number in the name is the index of the test line in the file. It is the same for all targets of a line. Line 0 has no number. The number does not depend on the APIs of the machine, so a name is the same on every machine. Use the whole name in a list of expected failures, or in `-exclude-prefix` and `-exclude-list`. The entry `tests/compute/my-test.slang.1` selects all targets of the line, and the entry `tests/compute/my-test.slang.1 (vk)` selects one target.
 
 To test with different command-line arguments, add more lines. Each line makes its own tests for each target:
 
@@ -383,10 +383,12 @@ mistake) cannot consume the inserted default.
 
 In addition to the above test tools, there are also `slang-unit-test-tool` and `gfx-unit-test-tool`, which are invoked as in the following examples; but note that the unit tests do get run as part of `slang-test` as well.
 
+The second argument of `SLANG_UNIT_TEST` names the render APIs that the test uses, for example `Vulkan | CUDA`. A test that uses no render API passes `NoRenderApi`. `slang-test` runs a test when at least one of its APIs is enabled, and it skips a `NoRenderApi` test when `-compile-test false` is set.
+
 To ignore a unit test, use the `SLANG_IGNORE_TEST` macro:
 
 ```cpp
-SLANG_UNIT_TEST(foo)
+SLANG_UNIT_TEST(foo, NoRenderApi)
 {
     if (condition)
     {
@@ -406,7 +408,7 @@ slang-test slang-unit-test-tool/<test-name>
 slang-test slang-unit-test-tool/byteEncode
 ```
 
-These tests are located in the [tools/slang-unit-test](https://github.com/shader-slang/slang/tree/master/tools/slang-unit-test) directory, and defined with macros like `SLANG_UNIT_TEST(byteEncode)`.
+These tests are located in the [tools/slang-unit-test](https://github.com/shader-slang/slang/tree/master/tools/slang-unit-test) directory, and defined with macros like `SLANG_UNIT_TEST(byteEncode, NoRenderApi)`.
 
 ### gfx-unit-test-tool
 
@@ -418,4 +420,4 @@ slang-test gfx-unit-test-tool/<test-name>
 slang-test gfx-unit-test-tool/precompiledTargetModule2Vulkan
 ```
 
-These tests are located in [tools/gfx-unit-test](https://github.com/shader-slang/slang/tree/master/tools/gfx-unit-test), and likewise defined using macros like `SLANG_UNIT_TEST(precompiledTargetModule2Vulkan)`.
+These tests are located in [tools/gfx-unit-test](https://github.com/shader-slang/slang/tree/master/tools/gfx-unit-test), and likewise defined using macros like `SLANG_UNIT_TEST(precompiledTargetModule2Vulkan, Vulkan)`.

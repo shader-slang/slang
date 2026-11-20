@@ -124,7 +124,7 @@ static bool _areApproximatelyEqual(
     return _calcULPDistance(a, b) <= ulpsEpsilon;
 }
 
-SLANG_UNIT_TEST(string)
+SLANG_UNIT_TEST(string, NoRenderApi)
 {
     {
         UnownedStringSlice checkLines[] = {UnownedStringSlice::fromLiteral("")};

@@ -8,7 +8,7 @@
 // Object Handles (via interface recording)
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextHandle)
+SLANG_UNIT_TEST(replayContextHandle, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -58,7 +58,7 @@ SLANG_UNIT_TEST(replayContextHandle)
     playbackInput->release();
 }
 
-SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
+SLANG_UNIT_TEST(replayContextHandleMultipleBlobs, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -123,7 +123,7 @@ SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
     playIn2->release();
 }
 
-SLANG_UNIT_TEST(replayContextHandleNull)
+SLANG_UNIT_TEST(replayContextHandleNull, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -150,7 +150,7 @@ SLANG_UNIT_TEST(replayContextHandleNull)
 // These exception tests catch concrete replay exception types through ReplayContext entry points.
 // That covers the in-process slang-test path where exceptions cross the slang shared-library
 // boundary before reaching the unit-test module.
-SLANG_UNIT_TEST(replayContextUntrackedInterfaceException)
+SLANG_UNIT_TEST(replayContextUntrackedInterfaceException, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -173,7 +173,7 @@ SLANG_UNIT_TEST(replayContextUntrackedInterfaceException)
     SLANG_CHECK(caught);
 }
 
-SLANG_UNIT_TEST(replayContextHandleNotFoundException)
+SLANG_UNIT_TEST(replayContextHandleNotFoundException, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -193,7 +193,7 @@ SLANG_UNIT_TEST(replayContextHandleNotFoundException)
     SLANG_CHECK(caught);
 }
 
-SLANG_UNIT_TEST(replayContextInlineBlob)
+SLANG_UNIT_TEST(replayContextInlineBlob, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -237,7 +237,7 @@ SLANG_UNIT_TEST(replayContextInlineBlob)
     readBlob->release();
 }
 
-SLANG_UNIT_TEST(replayContextInlineBlobThenTracked)
+SLANG_UNIT_TEST(replayContextInlineBlobThenTracked, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -299,7 +299,7 @@ SLANG_UNIT_TEST(replayContextInlineBlobThenTracked)
 // TypeReflection Tests
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextTypeReflectionNull)
+SLANG_UNIT_TEST(replayContextTypeReflectionNull, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -317,7 +317,7 @@ SLANG_UNIT_TEST(replayContextTypeReflectionNull)
     SLANG_CHECK(readType == nullptr);
 }
 
-SLANG_UNIT_TEST(replayContextUnresolvedTypeException)
+SLANG_UNIT_TEST(replayContextUnresolvedTypeException, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -371,7 +371,7 @@ SLANG_UNIT_TEST(replayContextUnresolvedTypeException)
     SLANG_CHECK(caught);
 }
 
-SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
+SLANG_UNIT_TEST(replayContextTypeReflectionBasic, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -444,7 +444,7 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
     ctx().reset();
 }
 
-SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType)
+SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType, NoRenderApi)
 {
     REPLAY_TEST;
 

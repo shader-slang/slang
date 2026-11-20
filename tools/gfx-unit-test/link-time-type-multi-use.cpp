@@ -143,12 +143,12 @@ void linkTimeTypeMultiUseTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, numbersBuffer, std::array{30});
 }
 
-SLANG_UNIT_TEST(linkTimeTypeMultiUseD3D12)
+SLANG_UNIT_TEST(linkTimeTypeMultiUseD3D12, D3D12)
 {
     runTestImpl(linkTimeTypeMultiUseTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(linkTimeTypeMultiUseVulkan)
+SLANG_UNIT_TEST(linkTimeTypeMultiUseVulkan, Vulkan)
 {
     runTestImpl(linkTimeTypeMultiUseTestImpl, unitTestContext, DeviceType::Vulkan);
 }
