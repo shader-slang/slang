@@ -1050,6 +1050,11 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             if (getTargetProgram()->getOptionSet().getFloatingPointMode() !=
                 FloatingPointMode::Precise)
                 break;
+            // The `_rn` intrinsics are `__device__` functions, so a `[CudaHost]` function, which
+            // is emitted as `__host__`, keeps the plain operator.
+            if (auto func = getParentFunc(inst);
+                func && func->findDecoration<IRCudaHostDecoration>())
+                break;
             const char* prefix = nullptr;
             const char* suffix = "_rn(";
             switch (inst->getDataType()->getOp())
