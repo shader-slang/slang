@@ -5,11 +5,12 @@
 // emitted code still marks the heap index non-uniform regardless of opt-pass ordering.
 //
 // The property is asserted on the HLSL and GLSL backends, where `NonUniformResourceIndex` /
-// `nonuniformEXT` are the surface forms and survival is directly observable. On both backends
-// the marker must sit directly on the scalar heap index, not nested inside the `uint2` /
-// `uvec2` construction that the emitted untyped-handle wrap/unwrap passes through before the
-// peephole fold collapses it. The `.Handle` construction spelling, which exercises that
-// wrap/unwrap in source, is covered by `desc-heap-nonuniform-handle.slang`; SPIR-V decoration
+// `nonuniformEXT` are the surface forms and survival is directly observable, and through DXC on
+// the DXIL leg, which pins the propagated non-uniform flag on each `createHandleFromHeap`. On
+// both textual backends the marker must sit directly on the scalar heap index, not nested inside
+// the `uint2` / `uvec2` construction that the emitted handle round-trip passes through before
+// the peephole fold collapses it. The `.Handle` construction spelling, which performs that
+// round-trip in source, is covered by `desc-heap-nonuniform-handle.slang`; SPIR-V decoration
 // is covered by `desc-heap-nonuniform-spirv.slang`.
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -profile cs_6_6
@@ -41,10 +42,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // GLSL: sampler2D(_slang_resource_heap{{[0-9_]*}}[nonuniformEXT(
 // GLSL: ,_slang_resource_heap{{[0-9_]*}}[nonuniformEXT(
 
-// The DXIL directive routes the emitted HLSL through DXC. The last `i1` operand of
-// `createHandleFromHeap` is the non-uniform-index flag, so these checks pin that DXC propagates
-// the marker to each heap handle — resource heap first, then sampler heap — beyond merely
-// accepting the emitted SM6.6 heap output.
+// The DXIL directive routes the emitted HLSL through DXC. `createHandleFromHeap` takes the heap
+// index, then an `i1` selecting the sampler heap, then the non-uniform-index flag as its last
+// `i1`; these checks pin that DXC propagates the marker to each heap handle — resource heap and
+// sampler heap, in either emission order — beyond merely accepting the emitted SM6.6 heap output.
 // DXIL: define void @computeMain(
-// DXIL: @dx.op.createHandleFromHeap(i32 218, i32 %{{[0-9]+}}, i1 false, i1 true)
-// DXIL: @dx.op.createHandleFromHeap(i32 218, i32 %{{[0-9]+}}, i1 true, i1 true)
+// DXIL-DAG: @dx.op.createHandleFromHeap(i32 218, i32 %{{[0-9]+}}, i1 false, i1 true)
+// DXIL-DAG: @dx.op.createHandleFromHeap(i32 218, i32 %{{[0-9]+}}, i1 true, i1 true)
