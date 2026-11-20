@@ -1,8 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-llvm -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUFFER):
 
 import "ambiguous-extern-export-lib1.slang";
 import "ambiguous-extern-export-lib2.slang";

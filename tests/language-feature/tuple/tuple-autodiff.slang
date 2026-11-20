@@ -1,7 +1,5 @@
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // This is a test modified from autodiff/reverse-struct-multi-write.slang to test that
 // tuple types can be autodiff'ed the same way as struct types.
@@ -40,7 +38,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     var dpa = diffPair(a);
 
     A.Differential dout = makeTuple(1.0, makeTuple(1.0, 1.0));
-    
+
     bwd_diff(f)(dpa, dout);
     // CHECK: 13
     outputBuffer[0] = dpa.d._1._0; // Expect: 13

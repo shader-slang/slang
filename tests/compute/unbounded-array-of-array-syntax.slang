@@ -1,9 +1,7 @@
 //IGNORE_TEST:CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 //TEST:SIMPLE(filecheck=DXIL):-target dxbc-assembly -entry computeMain -profile cs_5_1
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -profile cs_5_1
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry computeMain -profile cs_5_1 -emit-spirv-via-glsl
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -43,13 +41,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CUDA: globalParams_0->g_aoa_0{{\[}}[[BASE]]{{\]}}.GetDimensions
     // CUDA: _S1{{\[}}[[BASE]]{{\]}}
     int index = int(dispatchThreadID.x);
-    
+
     int baseIndex = index >> 2;
     int innerIndex = index & 3;
 
     RWStructuredBuffer<int> buffer = g_aoa[NonUniformResourceIndex(baseIndex)];
 
-    // Get the size 
+    // Get the size
     uint bufferCount, bufferStride;
     buffer.GetDimensions(bufferCount, bufferStride);
 
@@ -57,5 +55,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         innerIndex = int(bufferCount - 1);
     }
-	outputBuffer[index] = buffer[innerIndex]; 
+	outputBuffer[index] = buffer[innerIndex];
 }

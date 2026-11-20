@@ -500,7 +500,7 @@ promise that some input reaches it, and its summary line does not
 identify the construct that triggers it.
 `expected-array-expression` (`30020`) is raised only by
 `SemanticsExprVisitor::visitGetArrayLengthExpr` in
-[slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp),
+[slang-check-expr.cpp](../../../../source/slang/semantic-checking/slang-check-expr.cpp),
 and the `GetArrayLengthExpr` node it inspects has no parser
 production — its only producer is
 `ASTSynthesizer::emitGetArrayLengthExpr`, called while synthesizing a

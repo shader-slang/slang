@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK): -output-using-type
 
 // Check that a buffer chosen in a branch is read correctly per thread.
 // SPIRV-NOT: VariablePointers

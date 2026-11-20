@@ -8,7 +8,7 @@
 // run without crashing (meaningful under an ASan CI lane).
 //
 // Follow-up from #11951.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-llvm -output-using-type -Xslang -O0 -Xslang -g3
+//TEST:COMPARE_COMPUTE(targets=llvm, filecheck-buffer=CHECK):-output-using-type -Xslang -O0 -Xslang -g3
 //TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 

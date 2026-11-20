@@ -81,16 +81,16 @@ You may look at these files to verify a claim in the doc is
 realizable through the surface language. You may **not** mine them
 for behaviors the doc does not claim.
 
-- `source/slang/slang-check-decl.cpp` (`getDeclVisibility`,
+- `source/slang/semantic-checking/slang-check-decl.cpp` (`getDeclVisibility`,
   module default propagation)
-- `source/slang/slang-check-expr.cpp` (`isDeclVisibleFromScope`,
+- `source/slang/semantic-checking/slang-check-expr.cpp` (`isDeclVisibleFromScope`,
   lookup-time filter)
-- `source/slang/slang-check-overload.cpp`
+- `source/slang/semantic-checking/slang-check-overload.cpp`
   (`TryCheckOverloadCandidateVisibility`)
-- `source/slang/slang-check-modifier.cpp` (`checkVisibility`,
+- `source/slang/semantic-checking/slang-check-modifier.cpp` (`checkVisibility`,
   higher-than-parent + less-visible-type)
-- `source/slang/slang-ast-modifier.h`,
-  `source/slang/slang-ast-support-types.h`
+- `source/slang/ast/slang-ast-modifier.h`,
+  `source/slang/ast/slang-ast-support-types.h`
 
 Existing single-file tests under `tests/diagnostics/` that name
 similar diagnostics (`private-visibility.slang`, `visibility.slang`,

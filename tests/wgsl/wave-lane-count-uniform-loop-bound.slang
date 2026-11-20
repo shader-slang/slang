@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -output-using-type -g0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=BUF):-output-using-type -g0
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-output-using-type
 
 // WGSL's uniformity analysis treats every read of a module-scope `var<private>` as possibly
 // non-uniform. On WGSL, `translateGlobalVaryingVar` stores `@builtin(subgroup_size)` into a

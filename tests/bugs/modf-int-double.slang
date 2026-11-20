@@ -1,6 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cpu -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -output-using-type -render-feature double
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=BUF): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF): -output-using-type -render-feature double
 
 // DXC narrows scalar `double` `modf` to `float` and crashes on double matrices, so we check
 // double-precision results on the targets whose native operations support that precision.

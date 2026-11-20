@@ -1,13 +1,11 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[1], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-// This test isn't actually testing the output, but rather that the compiler doesn't crash upon 
+// This test isn't actually testing the output, but rather that the compiler doesn't crash upon
 // encountering a specific loop pattern. ('Data' is non-differentiable here, so the expected output is 0)
-// 
+//
 
 typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;

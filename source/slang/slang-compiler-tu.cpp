@@ -3,10 +3,10 @@
 
 #include "core/slang-basic.h"
 #include "slang-capability.h"
-#include "slang-check-impl.h"
 #include "slang-compiler.h"
-#include "slang-ir-insts.h"
-#include "slang-ir-util.h"
+#include "slang/ir/slang-ir-insts.h"
+#include "slang/ir/slang-ir-util.h"
+#include "slang/semantic-checking/slang-check-impl.h"
 
 namespace Slang
 {

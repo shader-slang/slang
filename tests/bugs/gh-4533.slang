@@ -1,8 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda+cpu, filecheck-buffer=CHECK):
 
 // CHECK:      0
 // CHECK-NEXT: 1

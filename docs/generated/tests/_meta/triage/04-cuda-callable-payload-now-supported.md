@@ -35,7 +35,7 @@ unannotated rename warning.
 ## Root cause — an intentional compiler change
 
 ```
-$ git log -L 2569,2575:source/slang/slang-type-layout.cpp
+$ git log -L 2569,2575:source/slang/layout-and-binding/slang-type-layout.cpp
 5ed83a468c Add callable shader support to CUDA/OptiX backend (#12182)
  LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getCallablePayloadParameterRules()
 ```

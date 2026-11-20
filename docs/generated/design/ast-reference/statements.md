@@ -17,12 +17,12 @@ that handles statements.
 ## Source
 
 Statement classes are declared in
-[slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h). `Stmt`
+[slang-ast-stmt.h](../../../../source/slang/ast/slang-ast-stmt.h). `Stmt`
 itself is not declared there — it is one of the abstract roots in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h).
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h).
 
 The parser entry point is `Parser::ParseStatement`
-([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+([slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) line
 7281), a keyword-lookahead dispatcher that selects one of the
 `Parse*Statement` / `parse*Stmt` helpers; `Parser::parseBlockStatement`
 (line 7523) parses a `{ ... }` block. Both take an
@@ -281,7 +281,7 @@ The checker restricts what the deferred statement may contain: a
 would leave it is `E30108` / `E30109`, and a `throw` that would escape
 it is also diagnosed (`visitReturnStmt`, `visitBreakStmt`,
 `visitContinueStmt` and `visitThrowStmt` in
-[slang-check-stmt.cpp](../../../../source/slang/slang-check-stmt.cpp),
+[slang-check-stmt.cpp](../../../../source/slang/semantic-checking/slang-check-stmt.cpp),
 which test `FindOuterStmt<DeferStmt>`). What the deferred statement
 does at a `break` or `throw` exit is not stated here. See
 [../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md).

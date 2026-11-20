@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type -profile cs_5_1 -dx12 -use-dxbc -compute-dispatch 4,1,1
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type -profile cs_5_1 -cuda -use-dxbc -compute-dispatch 4,1,1
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda, filecheck-buffer=CHECK):-output-using-type -profile cs_5_1 -use-dxbc -compute-dispatch 4,1,1
 
 //TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):out,name=endpointDifferentialBuffer
 RWStructuredBuffer<float> endpointDifferentialBuffer;
@@ -85,7 +84,7 @@ DifferentialPair<LineSegment> fwd_loadLineSegment(uint id)
 }
 
 void accumulateDifferentialFixedPoint(
-    RWStructuredBuffer<int> buffer, 
+    RWStructuredBuffer<int> buffer,
     uint index,
     float.Differential df,
     float scale = 1000000.f)
@@ -142,7 +141,7 @@ float sample1DNormal(inout PRNG prng, float mu, float sigma)
 
 [BackwardDifferentiable]
 float pdf1DNormal(no_diff float x, float mu, no_diff float sigma)
-{  
+{
     float k = ((x - mu) / sigma);
     return exp(-0.5 * (k * k)) / (sigma * 2.506628);
 }
@@ -151,7 +150,7 @@ float boundaryTerm(Intersection isect)
 {
     if (!isect.isIntersected)
         return 100.0; // Large default value for missed rays.
-    
+
     float leftDist = abs(isect.x - isect.ls.x0);
     float rightDist = abs(isect.ls.x1 - isect.x);
 
@@ -206,7 +205,7 @@ float warp(Intersection isect, inout PRNG prng)
             totalWarpedPoint += attachToGeometry(aux_isect_left) * wt;
             totalWeight += wt;
         }
-        
+
         Intersection aux_isect_right = intersect(detach(y_flipped));
 
         if (aux_isect_right.isIntersected)
@@ -223,8 +222,8 @@ float warp(Intersection isect, inout PRNG prng)
 
 [BackwardDifferentiable]
 Intersection warpedIntersect(float x, inout PRNG prng)
-{   
-    // TODO: For now the jacobian here is 1.0, 
+{
+    // TODO: For now the jacobian here is 1.0,
     // but we will need to adjust the warp by the jacobian for
     // more complex intersection models.
     //
@@ -243,16 +242,16 @@ Intersection warpedIntersect(float x, inout PRNG prng)
 }
 
 [BackwardDifferentiable]
-float renderSample(inout PRNG prng) 
+float renderSample(inout PRNG prng)
 {
     float u = no_diff(prng.nextFloat1D());
-    
+
     float leftBound = 0.0;
     float rightBound = 1.0;
 
     float sample = leftBound * u + rightBound * (1 - u);
     float weight = 1.0/(rightBound - leftBound);
- 
+
     Intersection isect = warpedIntersect(sample, prng);
 
     return shadeIntersection(isect) * isect.wt;
@@ -263,15 +262,15 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
 {
     uint seed = (threadIdx.x * threadIdx.x) * 30 + 3;
     PRNG prng = PRNG(seed);
-    
+
     float d_color = 1.0 / 1000.0;
     __bwd_diff(renderSample)(prng, d_color);
 
     AllMemoryBarrierWithGroupSync();
-    
-    // Convert to floating point (but with 2 fewer digits of precision to 
+
+    // Convert to floating point (but with 2 fewer digits of precision to
     // avoid platform-specific differences in floating point precision)
-    // 
+    //
     if (threadIdx.x < 10)
         endpointDifferentialBuffer[threadIdx.x] =
             ((endpointDifferentialBufferInt[threadIdx.x]/1000) / 1000000.f) * 1000.f;

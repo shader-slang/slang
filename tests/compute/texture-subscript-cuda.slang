@@ -1,6 +1,6 @@
 // Test for verifying subscript operator support in cuda.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=cuda):
 //TEST_INPUT: Texture1D(size=4, content = one):name cudaT1D
 Texture1D<float> cudaT1D;
 //TEST_INPUT: Texture2D(size=8, content = one):name cudaT2D
@@ -59,7 +59,7 @@ RWStructuredBuffer<float> cudaOutputBuffer;
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
-    
+
     switch (idx)
     {
     case 1:
@@ -68,15 +68,15 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             float result = cudaT1D[0];
             // This is not supported in PTX.
             //cudaOutputBuffer[idx] = result;
-        }    
+        }
     break;
-    
+
     case 2:
         {
             int2 var = int2(1, 2);
             float result = cudaT2D[var];
             cudaOutputBuffer[idx] = result;
-            
+
             float2 result2 = cudaT2D_f2[var];
             cudaOutputBuffer[idx] += result2.x;
             cudaOutputBuffer[idx] += result2.y;
@@ -94,7 +94,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             int3 var = int3(1, 1, 1);
             float result = cudaT3D[var];
             cudaOutputBuffer[idx] = result;
-            
+
             float2 result2 = cudaT3D_f2[var];
             cudaOutputBuffer[idx] += result2.x;
             cudaOutputBuffer[idx] += result2.y;
@@ -112,7 +112,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             int3 var = int3(0, 0, 1);
             float result = cudaT2DArray[var];
             cudaOutputBuffer[idx] = result;
-            
+
             float2 result2 = cudaT2DArray_f2[var];
             cudaOutputBuffer[idx] += result2.x;
             cudaOutputBuffer[idx] += result2.y;
@@ -131,7 +131,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             int2 var = int2(1, 2);
             uint result = cudaT2D_uint[var];
             cudaOutputBuffer[idx] = float(result);
-            
+
             uint2 result2 = cudaT2D_uint2[var];
             cudaOutputBuffer[idx] += float(result2.x);
             cudaOutputBuffer[idx] += float(result2.y);
@@ -150,7 +150,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             int2 var = int2(1, 2);
             int result = cudaT2D_int[var];
             cudaOutputBuffer[idx] = float(result);
-            
+
             int2 result2 = cudaT2D_int2[var];
             cudaOutputBuffer[idx] += float(result2.x);
             cudaOutputBuffer[idx] += float(result2.y);
@@ -169,7 +169,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             int3 var = int3(1, 1, 1);
             uint result = cudaT3D_uint[var];
             cudaOutputBuffer[idx] = float(result);
-            
+
             uint2 result2 = cudaT3D_uint2[var];
             cudaOutputBuffer[idx] += float(result2.x);
             cudaOutputBuffer[idx] += float(result2.y);
@@ -188,7 +188,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             int3 var = int3(1, 1, 1);
             int result = cudaT3D_int[var];
             cudaOutputBuffer[idx] = float(result);
-            
+
             int2 result2 = cudaT3D_int2[var];
             cudaOutputBuffer[idx] += float(result2.x);
             cudaOutputBuffer[idx] += float(result2.y);
@@ -201,4 +201,4 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         }
     break;
     }
-} 
+}

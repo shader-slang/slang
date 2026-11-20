@@ -5,7 +5,7 @@
 // notes, and `assocTypeThroughValue` also uses the associated type so that it is checked. This
 // test compiles them and checks the computed values.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 module "suggest-constraint-applied";
 

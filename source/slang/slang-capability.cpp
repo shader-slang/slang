@@ -3,8 +3,8 @@
 
 #include "core/slang-dictionary.h"
 #include "core/slang-performance-profiler.h"
-#include "slang-ast-builder.h"
-#include "slang-capability-val.h"
+#include "slang/ast/slang-ast-builder.h"
+#include "slang/ast/slang-capability-val.h"
 
 #include <ranges>
 

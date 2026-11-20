@@ -1,7 +1,6 @@
 //DISABLE_TEST:SIMPLE(filecheck=METAL): -stage compute -entry computeMain -target metal -DEMIT_SOURCE
 //DISABLE_TEST:SIMPLE(filecheck=METALLIB): -stage compute -entry computeMain -target metallib
-//DISABLE_TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-entry computeMain -output-using-type
 
 // Test framework has issues with RWTexture2D on Metal
 // TODO: github issue #8454

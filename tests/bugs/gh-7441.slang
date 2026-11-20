@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER-MTL):-metal -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUFFER-MTL):-output-using-type
 //TEST:REFLECTION(filecheck=REFLECT):-stage compute -entry computeMain -target cuda -no-codegen
 //TEST:REFLECTION(filecheck=REFLECT-MTL):-stage compute -entry computeMain -target metal -no-codegen
 

@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 // Test that a default interface method can be differentiable.
 
@@ -21,7 +21,7 @@ struct Impl : IFoo<2>
     {
         return x*x;
     }
-    
+
     // Using the default implementation for getGreaterVal.
 }
 

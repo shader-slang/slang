@@ -3,7 +3,7 @@
 // Test that `&` in an inheritance declaration is flattened
 // into individual conformances (e.g. `struct Foo : IBar & IBaz`).
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 interface IFoo
 {

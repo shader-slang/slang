@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target glsl -entry computeMain -stage compute -profile sm_5_0
-//TEST:SIMPLE(filecheck=CHECK_IGNORE_CAPS,exit-code=-1): -target glsl -emit-spirv-directly -entry computeMain -stage compute  -profile sm_5_0 -ignore-capabilities
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target glsl -entry computeMain -stage compute -profile sm_5_0
+//TEST:SIMPLE(filecheck=CHECK_IGNORE_CAPS,exit-code=2): -target glsl -emit-spirv-directly -entry computeMain -stage compute  -profile sm_5_0 -ignore-capabilities
 
 // With -ignore-capabilities the capability error is suppressed. The unsupported wave intrinsic
 // then has no GLSL implementation, so its body ends without a return, which is an error for GLSL.

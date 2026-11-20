@@ -1,7 +1,6 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=NOBARE): -target wgsl -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+wgpu, filecheck-buffer=BUF):-output-using-type
 
 // WGSL template-list discovery treats `ident <` as the start of a template list when a `>` or
 // `>=` follows later in the same comma-separated list, so an argument list such as

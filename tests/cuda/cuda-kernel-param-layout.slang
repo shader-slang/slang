@@ -6,7 +6,7 @@
 // The REFLECTION test is to verify that structs contained within the entry point parameter struct
 // still have the trailing padding at the end of their layouts, unlike the entry point parameter struct
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type -shaderobj
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type
 //TEST:REFLECTION(filecheck=REFLECT):-stage compute -entry computeMain -target cuda -no-codegen
 
 //TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0], stride=4):name=input

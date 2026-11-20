@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_ERROR,exit-code=-1): -target spirv -entry psmain -profile vs_6_0
-//TEST:SIMPLE(filecheck=CHECK_ERROR,exit-code=-1): -target spirv -entry vsmain -profile ps_6_0
+//TEST:SIMPLE(filecheck=CHECK_ERROR,exit-code=2): -target spirv -entry psmain -profile vs_6_0
+//TEST:SIMPLE(filecheck=CHECK_ERROR,exit-code=2): -target spirv -entry vsmain -profile ps_6_0
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry vsmain -profile vs_6_0
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry psmain -profile vs_6_0 -ignore-capabilities

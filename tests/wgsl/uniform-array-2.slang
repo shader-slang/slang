@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -wgpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=CHECK):-output-using-type
 
 struct Params{
     int2 data[2];

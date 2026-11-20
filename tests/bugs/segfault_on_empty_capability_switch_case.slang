@@ -6,8 +6,8 @@ https://github.com/shader-slang/slang/pull/12357
 //TEST:SIMPLE(filecheck=CHECK): -target metal
 // Some of the switches below have no case for spirv or wgsl. The compiler must report a
 // capability error for those two targets, not crash while it analyzes the empty cases.
-//TEST:SIMPLE(filecheck=CHECK_ERR,exit-code=-1): -target spirv
-//TEST:SIMPLE(filecheck=CHECK_ERR,exit-code=-1): -target wgsl
+//TEST:SIMPLE(filecheck=CHECK_ERR,exit-code=2): -target spirv
+//TEST:SIMPLE(filecheck=CHECK_ERR,exit-code=2): -target wgsl
 
 //CHECK: comp
 //CHECK_ERR: error[E36107]: unavailable features in entry point

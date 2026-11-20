@@ -1,8 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu -output-using-type -Xslang -experimental-feature -Xslang -floating-point-mode -Xslang precise
-//TEST(compute):COMPARE_COMPUTE:-llvm -output-using-type -Xslang -experimental-feature
-//TEST(compute):COMPARE_COMPUTE:-dx12 -render-features half -output-using-type -Xslang -experimental-feature
-//TEST(compute, vulkan):COMPARE_COMPUTE:-vk -render-features half -output-using-type -Xslang -experimental-feature
-//TEST(compute):COMPARE_COMPUTE:-cuda -render-features half -output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=cpu):-output-using-type -Xslang -experimental-feature -Xslang -floating-point-mode -Xslang precise
+//TEST:COMPARE_COMPUTE(targets=llvm):-output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda):-render-features half -output-using-type -Xslang -experimental-feature
 
 // Verify numeric-operand selection through the public extrema witness, including half/float/double
 // scalars, vectors, and an explicit column-major matrix. The input NaN comes from a buffer so

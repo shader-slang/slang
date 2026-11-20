@@ -4,17 +4,16 @@
 #include "compiler-core/slang-json-value.h"
 #include "compiler-core/slang-visual-studio-compiler-util.h"
 #include "core/slang-common.h"
+#include "core/slang-platform.h"
 #include "core/slang-process-util.h"
 #include "core/slang-string-util.h"
 
 #ifdef _WIN32
-#include <shlobj.h>
 #include <windows.h>
 #endif
 
 #ifdef _MSC_VER
 #pragma comment(lib, "advapi32")
-#pragma comment(lib, "Shell32")
 #endif
 
 // The method used to invoke VS was originally inspired by some ideas in
@@ -54,11 +53,36 @@ static SlangResult _readRegistryKey(const char* path, const char* keyName, Strin
         return SLANG_FAIL;
     }
 
-    char value[MAX_PATH];
-    DWORD size = MAX_PATH;
-
-    // https://docs.microsoft.com/en-us/windows/desktop/api/winreg/nf-winreg-regqueryvalueexa
-    ret = RegQueryValueExA(key, keyName, nullptr, nullptr, (LPBYTE)value, &size);
+    // RegQueryValueExA reports the required size (in `size`) when the buffer is too small, so we
+    // grow and retry rather than silently truncating a value longer than a MAX_PATH buffer.
+    List<char> value;
+    value.setCount(MAX_PATH);
+    while (true)
+    {
+        // `size` is the buffer capacity on entry to the call; on success it is the byte count
+        // copied (including the terminator when the value has one), and on ERROR_MORE_DATA it
+        // is the required size, so we grow to 1.5x the requirement.
+        DWORD size = DWORD(value.getCount());
+        // https://docs.microsoft.com/en-us/windows/desktop/api/winreg/nf-winreg-regqueryvalueexa
+        ret = RegQueryValueExA(key, keyName, nullptr, nullptr, (LPBYTE)value.getBuffer(), &size);
+        if (ret == ERROR_MORE_DATA)
+        {
+            value.setCount(size + size / 2);
+            continue;
+        }
+        if (ret != ERROR_SUCCESS)
+        {
+            // `size` is only defined on success and on ERROR_MORE_DATA, so no buffer
+            // bookkeeping happens on any other failure code.
+            break;
+        }
+        // A REG_SZ value normally includes its terminator in the returned size; terminate
+        // explicitly (with room made for it) so a value stored without one cannot read past
+        // the copied bytes.
+        value.setCount(size + 1);
+        value[size] = 0;
+        break;
+    }
     RegCloseKey(key);
 
     if (ret != ERROR_SUCCESS)
@@ -66,7 +90,7 @@ static SlangResult _readRegistryKey(const char* path, const char* keyName, Strin
         return SLANG_FAIL;
     }
 
-    outString = value;
+    outString = value.getBuffer();
     return SLANG_OK;
 }
 
@@ -297,12 +321,33 @@ static SlangResult _findVersionsWithVSWhere(
 
     CommandLine cmd;
 
-    // Lookup directly %ProgramFiles(x86)% path
-    // https://docs.microsoft.com/en-us/windows/desktop/api/shlobj_core/nf-shlobj_core-shgetfolderpatha
-    HWND hwnd = GetConsoleWindow();
-
-    char programFilesPath[_MAX_PATH];
-    SHGetFolderPathA(hwnd, CSIDL_PROGRAM_FILESX86, NULL, 0, programFilesPath);
+    // We look up the folder through its environment variables rather than SHGetFolderPathA:
+    // SHGetFolderPathA writes into a caller-allocated MAX_PATH buffer and gives no size
+    // feedback, so a longer path would be silently truncated, while the environment lookup has
+    // no fixed bound. `ProgramFiles(x86)` is only defined on 64-bit Windows; on 32-bit Windows
+    // the same folder is `%ProgramFiles%`, so we fall back to that name (a missing variable and
+    // an empty one both leave the result empty here). A process with a stripped environment
+    // block has neither variable, in which case we fail; the caller ignores failure here and
+    // always also scans the registry for Visual Studio installs.
+    String programFilesPath;
+    {
+        StringBuilder buffer;
+        if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice::fromLiteral("ProgramFiles(x86)"),
+                buffer)) ||
+            buffer.getLength() <= 0)
+        {
+            buffer.clear();
+            SLANG_RETURN_ON_FAIL(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice::fromLiteral("ProgramFiles"),
+                buffer));
+        }
+        programFilesPath = buffer;
+    }
+    if (programFilesPath.getLength() <= 0)
+    {
+        return SLANG_FAIL;
+    }
 
     String vswherePath = programFilesPath;
     vswherePath.append("\\Microsoft Visual Studio\\Installer\\vswhere");

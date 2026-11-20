@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test that we correctly support both `out`
 // and `inout` function parameters.
@@ -16,7 +15,7 @@ void testInOut(int x, in out int y)
 
 void testInout(int x, inout int y)
 {
-	y = y + x;	
+	y = y + x;
 }
 
 int test(int inVal)

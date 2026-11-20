@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 int test(int r)
 {

@@ -185,6 +185,25 @@ bool isPositive<T : IIntegerType>(T value)
 
 It is often possible to write generic numeric code without using the `Scalar` or `Mask` associated types explicitly.
 
+### Selecting Components
+
+Every type conforming to `INumericShapedType` supports selecting components from two values with a mask of type `T.Mask`:
+
+```slang
+T replaceComponents<T : INumericShapedType>(T original, T replacement, T.Mask replaceMask)
+{
+    return select(replaceMask, replacement, original);
+}
+```
+
+Each result component comes from `replacement` where the corresponding mask component is true, and from `original` otherwise.
+For a logical scalar, the mask is a single `bool` and selects the entire value.
+Like other function calls, `select` evaluates its arguments before selecting the result; it does not short-circuit evaluation of either value argument.
+
+The generic overload calls `T.selectComponents(condition, ifTrue, ifFalse)`.
+Custom shaped types provide this static operation as part of their `INumericShapedType` conformance.
+The existing built-in `select` overloads remain available for concrete built-in types.
+
 ## Conversion from Built-In Scalar Types
 
 All types that conform to `INumeric` support being constructed from values of any built-in integer type:
@@ -471,6 +490,11 @@ extension MyComplex : IScalarShapedType
     {
         return value;
     }
+
+    static This selectComponents(bool condition, This ifTrue, This ifFalse)
+    {
+        return condition ? ifTrue : ifFalse;
+    }
 }
 ```
 
@@ -541,6 +565,10 @@ The differentiable numerics module provides various `IDifferentiable...` counter
 Operations that are inherently discontinuous or that produce classifications remain available through the base interfaces, without a differentiability guarantee.
 
 Conversion to an `IDifferentiableFractional` type from scalar floating-point values, whether through construction with a value of a built-in floating-point type or through the `fromScalar` operation, preserves differentiability when the scalar value is itself differentiable.
+
+`IDifferentiableNumericShapedType` also provides differentiable component selection.
+The `select` overload in `slang.numerics.differentiable` propagates derivatives through the selected components of its two value arguments, with the mask treated as nondifferentiable.
+Custom conformances provide a `[Differentiable]` implementation of `selectComponents` whose mask parameter is marked `no_diff`.
 
 ## Built-In Conformances and Current Limitations
 

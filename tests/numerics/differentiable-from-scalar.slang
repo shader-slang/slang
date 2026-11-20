@@ -1,13 +1,11 @@
 // Verify that a varying logical scalar remains differentiable when it is repeated across a
 // builtin or user-defined shaped numeric value.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -Xslang -experimental-feature
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 
 import slang.numerics.differentiable;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(count=12, stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [Differentiable]
@@ -55,7 +53,7 @@ float useGenericSin(float value)
 struct CustomPair : IDifferentiableNumericShapedType
 {
     typealias Scalar = float;
-    typealias Mask = bool;
+    typealias Mask = bool2;
 
     float first;
     float second;
@@ -64,6 +62,14 @@ struct CustomPair : IDifferentiableNumericShapedType
     static This fromScalar(Scalar value)
     {
         return {value, value};
+    }
+
+    [Differentiable]
+    static This selectComponents(no_diff Mask condition, This ifTrue, This ifFalse)
+    {
+        return {
+            condition.x ? ifTrue.first : ifFalse.first,
+            condition.y ? ifTrue.second : ifFalse.second};
     }
 }
 
@@ -109,4 +115,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     let sinForward = fwd_diff(useGenericSin)(diffPair(0.0, 1.0));
     outputBuffer[9] = sinForward.d; // CHECK: 1.000000
+
+    // `CustomPair` repeats a scalar into both fields. A mixed mask lets us select each field
+    // independently through the `CustomPair` conformance.
+    let customSelected = select(bool2(true, false), CustomPair(1.0, 2.0), CustomPair(3.0, 4.0));
+    outputBuffer[10] = customSelected.first; // CHECK-NEXT: {{^}}1.000000{{$}}
+    outputBuffer[11] = customSelected.second; // CHECK-NEXT: {{^}}4.000000{{$}}
 }

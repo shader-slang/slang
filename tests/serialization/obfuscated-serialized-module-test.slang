@@ -4,7 +4,7 @@
 // serialization, obfuscation and source maps.
 
 //TEST:COMPILE: tests/serialization/obfuscated-serialized-module.slang -o tests/serialization/obfuscated-serialized-module.slang-module -g -obfuscate
-//TEST:COMPARE_COMPUTE_EX:-slang -compute -Xslang... -r tests/serialization/obfuscated-serialized-module.slang-module -obfuscate -X. -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):-Xslang... -r tests/serialization/obfuscated-serialized-module.slang-module -obfuscate -X.
 
 import obfuscated_serialized_module_shared;
 
@@ -19,7 +19,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     Thing thing;
 
     int index = (int)dispatchThreadID.x;
-        
+
     thing.a = index;
     thing.b = -index;
 

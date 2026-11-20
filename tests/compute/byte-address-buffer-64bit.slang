@@ -1,8 +1,7 @@
 // byte-address-buffer.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj -profile cs_6_0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu):
+//TEST:COMPARE_COMPUTE(targets=dx12):-profile cs_6_0
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3]):name=inputBuffer
 RWByteAddressBuffer inputBuffer;

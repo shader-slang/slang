@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -compile-arg -msvc-style-bitfield-packing
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -compile-arg -msvc-style-bitfield-packing
 
 // The deprecated option packs bitfields from MSB to LSB and starts a new backing field
 // when the underlying type size changes. Actual MSVC bit order is LSB-first.

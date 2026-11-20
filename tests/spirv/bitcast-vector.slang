@@ -35,7 +35,7 @@
 // uint2 (2×32) <-> uint16_t×4 (4×16)
 // (already checked above with v4ushort)
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=OUT):-vk -compute -emit-spirv-directly -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=OUT):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[1072693248 1074790400 1065353216 1073741824 1077936128 1082130432 15360 16384 305419896 572662306], stride=4):name=inputBuffer
 RWStructuredBuffer<uint> inputBuffer;

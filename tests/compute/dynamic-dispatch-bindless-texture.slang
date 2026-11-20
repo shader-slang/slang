@@ -1,6 +1,5 @@
 // Test using interface typed shader parameters with texture typed fields.
-//TEST(compute):COMPARE_COMPUTE:-cpu
-//TEST(compute):COMPARE_COMPUTE:-cuda
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu):
 
 // Type must be marked `public` to ensure it is visible in the generated DLL.
 

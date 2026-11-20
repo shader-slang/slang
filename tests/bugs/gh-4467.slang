@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK): -d3d12 -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK): -vk -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+dx12, filecheck-buffer=CHK): -output-using-type
 
 
 // Test that we can synthesize a [mutating] interface requirement from a nonmutating implementation,

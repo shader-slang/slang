@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 error[E40012]: expected a compile-time constant
    ╭╼ tests/diagnostics/constexpr-error.slang:32:31

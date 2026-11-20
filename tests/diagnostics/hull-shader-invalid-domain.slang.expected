@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 tests/diagnostics/hull-shader-invalid-domain.slang(39): error 50053: 'Domain' should be either 'triangles' or 'quads'.
 }

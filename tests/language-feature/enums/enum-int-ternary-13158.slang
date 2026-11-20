@@ -4,7 +4,7 @@
 // vector overload.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=BUF):-output-using-type
 
 // ColorChannelU has a `uint` tag; ColorChannelI uses the default `int` tag (the
 // issue's exact shape), whose `int` result assigns to the `uint` buffer element.

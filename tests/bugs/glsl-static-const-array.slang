@@ -1,6 +1,6 @@
 // glsl-static-const-array.slang
 
-//TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk):
 
 static const int gData[4] =
 {

@@ -25,10 +25,10 @@ the per-class facts before drilling into a family page.
 ## Source
 
 The abstract root hierarchy is declared in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h). Two
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h). Two
 supporting headers belong to this layer:
 
-- [slang-ast-forward-declarations.h](../../../../source/slang/slang-ast-forward-declarations.h)
+- [slang-ast-forward-declarations.h](../../../../source/slang/ast/slang-ast-forward-declarations.h)
   is a short checked-in header that wraps the `ASTNodeType` enum and a
   block of forward `class` declarations around FIDDLE-generated output
   it `#include`s (the `slang-ast-forward-declarations.h.fiddle` block).
@@ -37,7 +37,7 @@ supporting headers belong to this layer:
   abstract intermediates such as `Decl` and `Expr` as well as concrete
   leaves — receives an enumerator, plus a trailing `CountOf`. The tag is
   what the `as<T>()` / `dynamicCast<T>()` infrastructure dispatches on.
-- [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
+- [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h)
   defines the non-node helper types that the AST API exposes
   (`DeclRef<T>`, `LookupResult`, `Modifiers`, `QualType`,
   `SubstitutionSet`, ...).
@@ -65,7 +65,7 @@ Notes on the diagram:
 - `NodeBase` is the root of every AST node. It carries an
   `astNodeType` tag and a back-pointer to the owning `ASTBuilder`.
 - The diagram shows the relationships in
-  [slang-ast-base.h](../../../../source/slang/slang-ast-base.h) only.
+  [slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h) only.
   All other abstract intermediates (`ContainerDecl`, `OperatorExpr`,
   `LoopStmt`, ...) live in the per-family headers and are documented
   in the corresponding family page's hierarchy diagram.
@@ -87,7 +87,7 @@ builder.
 - Carries the `ASTNodeType astNodeType` discriminator and a pointer
   back to the `ASTBuilder` that allocated this node.
 - The `ASTNodeType` enum is FIDDLE-generated in
-  [slang-ast-forward-declarations.h](../../../../source/slang/slang-ast-forward-declarations.h);
+  [slang-ast-forward-declarations.h](../../../../source/slang/ast/slang-ast-forward-declarations.h);
   every subclass, abstract or concrete, receives a tag at build time.
   This is what powers `as<T>()` / `dynamicCast<T>()` on AST nodes, via
   `NodeBase::getClass()`, which turns the tag back into a
@@ -108,7 +108,7 @@ Family page: (no dedicated family page)
 
 A second-level abstract base that adds no state of its own. Its parent
 `SyntaxNodeBase` (also declared in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h)) is the
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h)) is the
 abstract base for nodes that correspond to actual source text and so
 carry a `loc: SourceLoc`; `SyntaxNodeBase` is the common ancestor of
 every parsed AST node, and `SyntaxNode` is its only direct subclass.
@@ -128,7 +128,7 @@ Family page: (no dedicated family page)
 An intermediate that represents either a single declaration or a
 group of declarations. It has exactly two subclasses: the abstract
 `Decl` below, and a concrete group node declared in
-[slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h), which the
+[slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h), which the
 parser produces when one piece of syntax declares several names; see
 [declarations.md](declarations.md) for that node.
 
@@ -256,11 +256,11 @@ The abstract base for compile-time *values*. `Val`s are deduplicated
 `SourceLoc`), and use a generic operand list (`m_operands`) rather
 than per-class fields. `Val` subclasses include `Type`, `DeclRefBase`,
 the `IntVal` family, and the `Witness` family. `DeclRefBase` (declared
-in [slang-ast-base.h](../../../../source/slang/slang-ast-base.h)) is a
+in [slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h)) is a
 reference to a declaration with optional generic substitutions; it is
 itself a `Val` so that decl-refs can be hash-consed, and the
 user-facing template `DeclRef<T>` (in
-[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h))
+[slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h))
 is a thin typed wrapper around a `DeclRefBase*`. The non-Type `Val`
 subhierarchy, including `DeclRefBase`, is documented in
 [values.md](values.md).
@@ -289,32 +289,32 @@ Family page: [types.md](types.md)
 
 These helpers wrap or describe nodes and appear pervasively in the AST API.
 Most are non-node types declared in
-[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h);
+[slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h);
 `Scope`, a `NodeBase` subclass declared in the base header, is the exception.
 
 | Name | Header | Purpose |
 | --- | --- | --- |
-| `DeclRef<T>` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Typed wrapper around `DeclRefBase*`; the API instantiates it at the concrete declaration classes catalogued in [declarations.md](declarations.md). |
-| `Modifiers` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Intrusive linked list of modifiers attached to a `ModifiableSyntaxNode`. |
-| `QualType` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A `Type*` together with value-category and access flags: `isLeftValue`, `hasReadOnlyOnTarget`, `isWriteOnly` and `isReadOnlyMemoryLocation`. The last is never set together with `isLeftValue`; a `__ref_readonly` parameter is one. This is the type carried by `Expr`. |
-| `SubstitutionSet` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | The set of generic / existential substitutions used to specialize a `Val`. Holds the substituting `declRef: DeclRefBase*`, a `packExpansionIndex: int` for substituting inside an `expand each T` pattern, and a `substitutionCache: SubstitutionCache*` that memoizes one substitution operation (see the note below the table). |
-| `LookupResult`, `LookupResultItem` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Result of a name lookup; can hold zero, one, or several decl-refs together with how each was reached. |
-| `NameLoc` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Pairs a `Name*` with the `SourceLoc` where it appeared; used directly by `Decl::nameAndLoc`. |
-| `TypeExp` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A type expression as written by the user (an `Expr` plus the resolved `Type*`). |
-| `WitnessTable` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A compile-time table of interface-requirement-to-implementation mappings; see the entry in [../glossary.md](../glossary.md). |
-| `SyntaxClass<T>` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Reflection-style handle to an AST class, including abstract bases, used by the visitor and `as<T>()` infrastructure. |
-| `KnownBuiltinDeclName` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Enum of built-in declaration names. At `source_commit` it holds seventeen entries before its `COUNT` sentinel, spanning geometry streams (`GeometryStreamAppend`, `GeometryStreamRestart`), mesh and per-vertex shading (`DispatchMesh`, `GetAttributeAtVertex`), cooperation (`saturated_cooperation`, `saturated_cooperation_using`), the differentiable-interface family, `NullDifferential`, `OperatorAddressOf`, the wave intrinsics `WaveIsFirstLane` and `WaveReadLaneFirst`, and the ray-tracing intrinsics `CallShader` and `ReportHit` (declared `ReportHit = 16`). New names are appended before `COUNT`. The core module tags each such declaration with its enumerator using the `[KnownBuiltin(n)]` attribute (`attribute_syntax [KnownBuiltin(name : int)]` in [core.meta.slang](../../../../source/slang/core.meta.slang)), so the compiler locates the declaration by enum comparison rather than by string comparison. Membership is not only a lookup speed-up — it gates behavior. During checking, `OperatorAddressOf` selects an extra invalid-pointer-taking diagnostic when an argument cannot be bound as an l-value, and `GetAttributeAtVertex` triggers its per-vertex-input argument check; lowering copies the tag onto the IR as a `KnownBuiltin` decoration that later passes compare (for example the ray-tracing legalization of `CallShader` and `ReportHit`). `isDifferentiableInterfaceBuiltin` is the authoritative definition of the differentiable-interface family (`IDifferentiable`, `IDifferentiablePtr`, `IForwardDifferentiable`, `IBackwardDifferentiable`, `IBwdCallable`), whose conformance witness-table entries the linker defers when a program does not use auto-diff. `getKnownBuiltinDeclNameFromString` maps a spelling to the enumerator. |
-| `BuiltinOperationKind` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Enum tagging a builtin operator (`Add`, `Sub`, `Less`, ...) recognized by the operator fast path. Stored on the synthesized builtin-operator expression node (see [expressions.md](expressions.md)) and on its constant-folded counterpart (see [values.md](values.md)); mapped from operator-name + `OperatorArity` by `getBuiltinOperationKindFromString`. Integer values are part of the serialized/mangled form (append-only). |
-| `printDiagnosticArg` / `getDiagnosticPos` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Free-function diagnostic helpers: `printDiagnosticArg` overloads format a `Decl` / `Type` / `TypeExp` / `QualType` / `Val` / `DeclRefBase` into a diagnostic message, and `getDiagnosticPos` overloads recover the `SourceLoc` to anchor a diagnostic at. |
-| `Scope` | [slang-ast-base.h](../../../../source/slang/slang-ast-base.h) | Name-lookup data structure; technically a `NodeBase` but used as a helper rather than a syntax node. Created during parsing and attached to container declarations. |
+| `DeclRef<T>` | [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h) | Typed wrapper around `DeclRefBase*`; the API instantiates it at the concrete declaration classes catalogued in [declarations.md](declarations.md). |
+| `Modifiers` | [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h) | Intrusive linked list of modifiers attached to a `ModifiableSyntaxNode`. |
+| `QualType` | [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h) | A `Type*` together with value-category and access flags: `isLeftValue`, `hasReadOnlyOnTarget`, `isWriteOnly` and `isReadOnlyMemoryLocation`. The last is never set together with `isLeftValue`; a `__ref_readonly` parameter is one. This is the type carried by `Expr`. |
+| `SubstitutionSet` | [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h) | The set of generic / existential substitutions used to specialize a `Val`. Holds the substituting `declRef: DeclRefBase*`, a `packExpansionIndex: int` for substituting inside an `expand each T` pattern, and a `substitutionCache: SubstitutionCache*` that memoizes one substitution operation (see the note below the table). |
+| `LookupResult`, `LookupResultItem` | [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h) | Result of a name lookup; can hold zero, one, or several decl-refs together with how each was reached. |
+| `NameLoc` | [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h) | Pairs a `Name*` with the `SourceLoc` where it appeared; used directly by `Decl::nameAndLoc`. |
+| `TypeExp` | [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h) | A type expression as written by the user (an `Expr` plus the resolved `Type*`). |
+| `WitnessTable` | [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h) | A compile-time table of interface-requirement-to-implementation mappings; see the entry in [../glossary.md](../glossary.md). |
+| `SyntaxClass<T>` | [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h) | Reflection-style handle to an AST class, including abstract bases, used by the visitor and `as<T>()` infrastructure. |
+| `KnownBuiltinDeclName` | [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h) | Enum of built-in declaration names. At `source_commit` it holds seventeen entries before its `COUNT` sentinel, spanning geometry streams (`GeometryStreamAppend`, `GeometryStreamRestart`), mesh and per-vertex shading (`DispatchMesh`, `GetAttributeAtVertex`), cooperation (`saturated_cooperation`, `saturated_cooperation_using`), the differentiable-interface family, `NullDifferential`, `OperatorAddressOf`, the wave intrinsics `WaveIsFirstLane` and `WaveReadLaneFirst`, and the ray-tracing intrinsics `CallShader` and `ReportHit` (declared `ReportHit = 16`). New names are appended before `COUNT`. The core module tags each such declaration with its enumerator using the `[KnownBuiltin(n)]` attribute (`attribute_syntax [KnownBuiltin(name : int)]` in [core.meta.slang](../../../../source/slang/core.meta.slang)), so the compiler locates the declaration by enum comparison rather than by string comparison. Membership is not only a lookup speed-up — it gates behavior. During checking, `OperatorAddressOf` selects an extra invalid-pointer-taking diagnostic when an argument cannot be bound as an l-value, and `GetAttributeAtVertex` triggers its per-vertex-input argument check; lowering copies the tag onto the IR as a `KnownBuiltin` decoration that later passes compare (for example the ray-tracing legalization of `CallShader` and `ReportHit`). `isDifferentiableInterfaceBuiltin` is the authoritative definition of the differentiable-interface family (`IDifferentiable`, `IDifferentiablePtr`, `IForwardDifferentiable`, `IBackwardDifferentiable`, `IBwdCallable`), whose conformance witness-table entries the linker defers when a program does not use auto-diff. `getKnownBuiltinDeclNameFromString` maps a spelling to the enumerator. |
+| `BuiltinOperationKind` | [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h) | Enum tagging a builtin operator (`Add`, `Sub`, `Less`, ...) recognized by the operator fast path. Stored on the synthesized builtin-operator expression node (see [expressions.md](expressions.md)) and on its constant-folded counterpart (see [values.md](values.md)); mapped from operator-name + `OperatorArity` by `getBuiltinOperationKindFromString`. Integer values are part of the serialized/mangled form (append-only). |
+| `printDiagnosticArg` / `getDiagnosticPos` | [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h) | Free-function diagnostic helpers: `printDiagnosticArg` overloads format a `Decl` / `Type` / `TypeExp` / `QualType` / `Val` / `DeclRefBase` into a diagnostic message, and `getDiagnosticPos` overloads recover the `SourceLoc` to anchor a diagnostic at. |
+| `Scope` | [slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h) | Name-lookup data structure; technically a `NodeBase` but used as a helper rather than a syntax node. Created during parsing and attached to container declarations. |
 
 `SubstitutionSet::substitutionCache` points at a `SubstitutionCache`,
 which is only forward-declared in
-[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h);
+[slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h);
 its definition is not in this page's watched paths, so the description
 above is limited to what the declaration site says. The type is defined
 in
-[slang-ast-substitution.h](../../../../source/slang/slang-ast-substitution.h),
+[slang-ast-substitution.h](../../../../source/slang/ast/slang-ast-substitution.h),
 together with the
 `substituteValWithCache` helper that installs a cache for the outermost
 `substituteImpl` call and propagates it through copies of the

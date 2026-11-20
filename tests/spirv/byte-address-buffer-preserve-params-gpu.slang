@@ -1,6 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -Xslang -preserve-params
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -Xslang -preserve-params -Xslang -O2
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -Xslang -preserve-params
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -Xslang -preserve-params -Xslang -O2
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type
 
 // With -preserve-params, a shader that indexes an array of byte-address buffers and also
 // declares an unused one still runs on Vulkan and reads the right words (#14039).

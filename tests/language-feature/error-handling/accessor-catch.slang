@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -output-using-type
 
 // Accessors cannot be declared `throws`, but an error that is caught inside an accessor body
 // does not escape it, so property getters and setters and `__subscript` getters may use

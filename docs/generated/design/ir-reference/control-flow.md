@@ -24,7 +24,7 @@ break encoding of a Slang `loop` or `ifElse`.
 ## Source
 
 The control-flow opcodes live in three places in
-[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
+[slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua):
 `block` is declared at line 944 alongside the other module-level
 parent opcodes, `param` at line 1170, and `TerminatorInst` plus its
 children occupy lines 1455-1539. `discard` follows immediately at
@@ -35,7 +35,7 @@ line 1540, the backend-hint group (`RequirePrelude`,
 line 1646.
 
 The C++ wrappers for the terminators are hand-written in
-[slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h)
+[slang-ir-insts.h](../../../../source/slang/ir/slang-ir-insts.h)
 (`IRReturn` line 2059 through `IRDefer` line 2220, plus
 `IRGenericAsm` line 2954 and the `IRRequire*` / `IRStaticAssert`
 wrappers that follow it), because they need `IRUse` members and
@@ -49,17 +49,17 @@ for how that generation works.
 
 `IRTerminatorInst` (line 1156), `IRParam` (line 1170), `IRBlock`
 (line 1205), and the `IREdge` helper (line 1178) are declared in
-[slang-ir.h](../../../../source/slang/slang-ir.h); `IRBuilder`
+[slang-ir.h](../../../../source/slang/ir/slang-ir.h); `IRBuilder`
 itself is only forward-declared there and is declared in
-[slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) at
+[slang-ir-insts.h](../../../../source/slang/ir/slang-ir-insts.h) at
 line 3201. `emitBlock` is defined in
-[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) at line 5488;
+[slang-ir.cpp](../../../../source/slang/ir/slang-ir.cpp) at line 5488;
 the return and branch emitters (`emitReturn`, `emitBranch`,
 `emitLoop`, `emitIfElse`, `emitSwitch`, ...) are in the same file at
 lines 6372-6609.
 
 Lowering from the AST is driven by the statement-level visitors in
-[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp):
+[slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp):
 `lowerStmt` (line 9717) dispatches to `visitBlockStmt` (8397),
 `visitIfStmt` (7846), `visitForStmt` (7980), `visitWhileStmt`
 (8116), `visitDoWhileStmt` (8203), `visitSwitchStmt` (9123),
@@ -76,9 +76,9 @@ which reaches `emitCallToVal` at 872), and `visitExpandExpr` (6022).
 Several things this page has to cite are outside its manifest
 `watched_paths`, so changing them will not mark the page stale.
 `IREdge::isCritical` is *declared* in `slang-ir.h` but *defined* in
-[slang-ir-ssa.cpp](../../../../source/slang/slang-ir-ssa.cpp) at
+[slang-ir-ssa.cpp](../../../../source/slang/ir-passes/slang-ir-ssa.cpp) at
 line 1312; `checkForMissingReturns` is defined in
-[slang-ir-missing-return.cpp](../../../../source/slang/slang-ir-missing-return.cpp);
+[slang-ir-missing-return.cpp](../../../../source/slang/ir-passes/slang-ir-missing-return.cpp);
 `hlsl.meta.slang` declares the `Printf` and `Abort` intrinsics
 ([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang)); and the
 bool-switch legalization, `slang-emit.cpp`, and the dead-code
@@ -86,8 +86,8 @@ helpers cited below are not watched either. The other backend-hint
 opcodes are reached from `__intrinsic_op` declarations in
 [core.meta.slang](../../../../source/slang/core.meta.slang), which is
 watched, rather than from any statement visitor. Adding
-`source/slang/slang-ir-ssa.cpp`,
-`source/slang/slang-ir-missing-return.cpp`, and
+`source/slang/ir-passes/slang-ir-ssa.cpp`,
+`source/slang/ir-passes/slang-ir-missing-return.cpp`, and
 `source/slang/hlsl.meta.slang` to this page's `watched_paths` would
 close most of the gap.
 
@@ -219,7 +219,7 @@ between the last visitor and the dump — `lowerErrorHandling` (line
 `applySparseConditionalConstantPropagation` (15639), `simplifyCFG`
 (15644), `eliminateDeadCode` (15657) and mandatory early inlining
 (15697) — and dumps only afterwards, at line 15853 of
-[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
+[slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp).
 `simplifyCFG` is not unconditional: it sits inside `if
 (!minimumOptimizations)` (lines 15641-15647), as does the
 simplification in the early-inlining loop (line 15701).
@@ -239,12 +239,12 @@ basic block. The *first* N children of a block are always `param`
 instructions — they declare the values that incoming branches must
 supply — and `IRBlock::getFirstParam` / `getParams` /
 `getOrdinaryInsts` in
-[slang-ir.h](../../../../source/slang/slang-ir.h) rely on that
+[slang-ir.h](../../../../source/slang/ir/slang-ir.h) rely on that
 ordering. This is Slang IR's encoding of SSA: instead of a `phi`
 opcode that gathers values from predecessor blocks, the
 predecessor's `unconditionalBranch` carries one argument operand
 per `param`, and `IRUnconditionalBranch::getArgs` (defined in
-[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) at line 768)
+[slang-ir.cpp](../../../../source/slang/ir/slang-ir.cpp) at line 768)
 skips the leading label operands to find them: one for
 `unconditionalBranch`, three for `loop`.
 
@@ -263,7 +263,7 @@ the block to enter; `breakBlock` is where control resumes after a
 `break` (and is the structured reconvergence point of the loop),
 and `continueBlock` is the target of `continue` statements.
 `IRLoop` in
-[slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h)
+[slang-ir-insts.h](../../../../source/slang/ir/slang-ir-insts.h)
 exposes the second and third operands as `getBreakBlock()` and
 `getContinueBlock()`. Any operands beyond the first three are
 arguments bound to the target block's `param`s. `visitForStmt`
@@ -329,7 +329,7 @@ subfamily implements `getArgs`. A predecessor that must supply a
 value to a block `param` therefore has to reach that block through
 an `unconditionalBranch`, which is what forces critical edges
 (`IREdge::isCritical`, declared in
-[slang-ir.h](../../../../source/slang/slang-ir.h) line 1193) to be
+[slang-ir.h](../../../../source/slang/ir/slang-ir.h) line 1193) to be
 split before block parameters can be introduced. Nothing in AST
 lowering emits `conditionalBranch`; it is introduced by IR passes.
 
@@ -347,7 +347,7 @@ inspect a case but not to rewrite one. Replacing a case key in
 place needs the `IRUse` slot so that `IRUse::set` can unregister
 the old operand from its use list and register the new one;
 `legalizeBoolSwitch` in
-[slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp)
+[slang-ir-glsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-glsl-legalize.cpp)
 (line 5220) is the motivating consumer.
 
 The condition may be a `bool` as far as the IR is concerned, but
@@ -388,7 +388,7 @@ one of two successor blocks depending on whether the callee returns
 or throws, and `IRTryCall::getArgs()` skips the three leading
 operands to reach the call arguments. Lowering emits it from
 `emitCallToVal` (line 872 of
-[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp))
+[slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp))
 when the call has `TryClauseType::Standard`, then puts a `param` at
 the top of the success block to receive the result value and, if
 the enclosing code has no `CatchStmt` handler, a `param` plus a
@@ -405,7 +405,7 @@ ordinary `call` plus an `ifElse`. A surface program's error flow
 therefore reaches every later reader as the `Result` opcodes
 (`makeResultValue`, `makeResultError`, `isResultError`,
 `getResultError`, `getResultValue`, declared at
-[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
+[slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua)
 lines 1135-1139) rather than as `throw` and `tryCall`.
 
 ### `defer`
@@ -448,7 +448,7 @@ and WebGPU targets).
 
 `unreachable` carries no such obligation, and nothing in AST lowering
 emits it —
-[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+[slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
 never calls `emitUnreachable`. It reaches a lowering dump only
 through the mandatory passes: SCCP gives a block that still has uses
 but has lost all its predecessors a body of exactly one
@@ -459,7 +459,7 @@ return, or a `while (true)` with no `break`.
 ### Unreachable-code diagnostics come from lowering
 
 Three `Diagnostics::UnreachableCode` sites live in
-[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp),
+[slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp),
 not in the semantic checker. `startBlockIfNeeded` is
 called before lowering each statement; if the current block is
 already terminated, the statement it is about to lower has no label
@@ -511,9 +511,9 @@ backend-hint group with `Printf`.
 
 Whether a pass may delete or relocate one of these instructions is
 governed by `IRInst::mightHaveSideEffects`, declared in
-[slang-ir.h](../../../../source/slang/slang-ir.h) at line 778 and
+[slang-ir.h](../../../../source/slang/ir/slang-ir.h) at line 778 and
 defined in
-[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) at line 9488.
+[slang-ir.cpp](../../../../source/slang/ir/slang-ir.cpp) at line 9488.
 
 Neither the terminators nor `discard`, `Printf`, or `Abort` has a
 case in that function's `switch`, so they land in the conservative
@@ -529,7 +529,7 @@ is a pass-level detail; see [05-ir-passes.md](../pipeline/05-ir-passes.md).
 - [structure.md](structure.md) — the `func` parent that owns the
   blocks, and `generic`, whose body is a single block terminated by
   `return_val` (`findGenericReturnVal` in
-  [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 9985
+  [slang-ir.cpp](../../../../source/slang/ir/slang-ir.cpp) line 9985
   looks for exactly that).
 - [misc.md](misc.md) — `expand` / `Each`, whose single block is the
   one place `yield` terminates.

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -xslang -experimental-feature
 
 // Test: __func_extension __apply with a generic function, where the context type
 // stores intermediate values. The __apply extension is specialized for float,

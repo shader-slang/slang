@@ -1,7 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-dx11 -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk+dx11+cuda+cpu):
 
 // Test dynamic dispatch code gen for general `This` type.
 [anyValueSize(8)]

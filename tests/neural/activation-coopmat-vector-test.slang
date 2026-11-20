@@ -3,8 +3,8 @@
 // but uses WaveTangledVector instead of InlineVector.
 //
 // Only run on CUDA and Vulkan (SPIR-V) which support cooperative matrix operations.
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUFFER):-xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
 
 import slang.neural;
 
@@ -46,9 +46,9 @@ bool testIdentity()
 {
     ElementType[VecSize] arr = {-1.0, 0.0, 2.5};
     let input = Vec3(arr);
-    
+
     let output = IdentityActivation<ElementType>().eval<Vec3>(input);
-    
+
     // Expected: same as input
     return approxEqualVec3(output, input);
 }
@@ -58,9 +58,9 @@ bool testReLU()
 {
     ElementType[VecSize] arr = {-2.0, 0.0, 3.0};
     let input = Vec3(arr);
-    
+
     let output = ReLU<ElementType>().eval<Vec3>(input);
-    
+
     // Expected: [0, 0, 3]
     ElementType[VecSize] expectedArr = {0.0, 0.0, 3.0};
     let expected = Vec3(expectedArr);
@@ -73,9 +73,9 @@ bool testLeakyReLU()
     ElementType[VecSize] arr = {-2.0, 0.0, 3.0};
     let input = Vec3(arr);
     ElementType alpha = 0.1;
-    
+
     let output = LeakyReLU<ElementType>(alpha).eval<Vec3>(input);
-    
+
     // Expected: [-0.2, 0, 3]
     ElementType[VecSize] expectedArr = {-0.2, 0.0, 3.0};
     let expected = Vec3(expectedArr);
@@ -87,9 +87,9 @@ bool testSigmoid()
 {
     ElementType[VecSize] arr = {0.0, 1.0, -1.0};
     let input = Vec3(arr);
-    
+
     let output = Sigmoid<ElementType>().eval<Vec3>(input);
-    
+
     // Expected: sigmoid(0)=0.5, sigmoid(1)≈0.7311, sigmoid(-1)≈0.2689
     ElementType[VecSize] expectedArr = {0.5, 0.7310586, 0.2689414};
     let expected = Vec3(expectedArr);
@@ -101,9 +101,9 @@ bool testTanh()
 {
     ElementType[VecSize] arr = {0.0, 1.0, -1.0};
     let input = Vec3(arr);
-    
+
     let output = TanhActivation<ElementType>().eval<Vec3>(input);
-    
+
     // Expected: tanh(0)=0, tanh(1)≈0.7616, tanh(-1)≈-0.7616
     ElementType[VecSize] expectedArr = {0.0, 0.7615942, -0.7615942};
     let expected = Vec3(expectedArr);
@@ -115,9 +115,9 @@ bool testExp()
 {
     ElementType[VecSize] arr = {0.0, 1.0, -1.0};
     let input = Vec3(arr);
-    
+
     let output = ExpActivation<ElementType>().eval<Vec3>(input);
-    
+
     // Expected: exp(0)=1, exp(1)≈2.7183, exp(-1)≈0.3679
     ElementType[VecSize] expectedArr = {1.0, 2.7182818, 0.3678794};
     let expected = Vec3(expectedArr);
@@ -130,9 +130,9 @@ bool testSine()
     ElementType pi = 3.14159265;
     ElementType[VecSize] arr = {0.0, pi / 2.0, pi};
     let input = Vec3(arr);
-    
+
     let output = SineActivation<ElementType>().eval<Vec3>(input);
-    
+
     // Expected: sin(0)=0, sin(pi/2)=1, sin(pi)≈0
     ElementType[VecSize] expectedArr = {0.0, 1.0, 0.0};
     let expected = Vec3(expectedArr);
@@ -144,9 +144,9 @@ bool testSiLU()
 {
     ElementType[VecSize] arr = {0.0, 1.0, -1.0};
     let input = Vec3(arr);
-    
+
     let output = SiLU<ElementType>().eval<Vec3>(input);
-    
+
     // Expected: SiLU(0)=0, SiLU(1)=1*sigmoid(1)≈0.7311, SiLU(-1)=-1*sigmoid(-1)≈-0.2689
     ElementType[VecSize] expectedArr = {0.0, 0.7310586, -0.2689414};
     let expected = Vec3(expectedArr);
@@ -158,9 +158,9 @@ bool testQuickGELU()
 {
     ElementType[VecSize] arr = {0.0, 1.0, -1.0};
     let input = Vec3(arr);
-    
+
     let output = QuickGELU<ElementType>().eval<Vec3>(input);
-    
+
     // Expected: QuickGELU(0)=0, QuickGELU(1)=1*sigmoid(1.702)≈0.8458, QuickGELU(-1)=-1*sigmoid(-1.702)≈-0.1542
     ElementType[VecSize] expectedArr = {0.0, 0.8458, -0.1542};
     let expected = Vec3(expectedArr);

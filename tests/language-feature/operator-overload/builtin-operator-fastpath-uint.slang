@@ -5,9 +5,7 @@
 // *logical* right shift on a value with the high bit set, and unsigned modulo of a large value).
 // All operands are runtime values so nothing folds away.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-d3d12 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;

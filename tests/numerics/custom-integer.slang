@@ -3,7 +3,7 @@
 
 //TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o numeric-interfaces-custom-integer.hlsl -experimental-feature
 //TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o numeric-interfaces-custom-integer.spv -experimental-feature
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 44
@@ -30,6 +30,11 @@ struct WrappedInt : IScalarSignedIntegerType
     static This fromScalar(Scalar value)
     {
         return value;
+    }
+
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse)
+    {
+        return condition ? ifTrue : ifFalse;
     }
 
     static This zero()
@@ -148,6 +153,13 @@ struct SignedIntegerPair<T : IScalarSignedIntegerType> : ISignedIntegerType
     static This fromScalar(Scalar value)
     {
         return {value, value};
+    }
+
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse)
+    {
+        return {
+            condition.x ? ifTrue.x : ifFalse.x,
+            condition.y ? ifTrue.y : ifFalse.y};
     }
 
     static This zero()

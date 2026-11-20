@@ -33,11 +33,11 @@ Both are linked off `ModifiableSyntaxNode::modifiers` and walked with
 ## Source
 
 Modifier classes are declared in
-[slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h),
+[slang-ast-modifier.h](../../../../source/slang/ast/slang-ast-modifier.h),
 on top of the `Modifier` / `ModifiableSyntaxNode` pair in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h).
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h).
 Parsing happens in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp):
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp):
 `parseAttributeName` and `ParseSquareBracketAttributes` handle the
 `[name(args)]` form, and `parseUncheckedGLSLLayoutAttribute` handles
 the valued entries of a GLSL `layout(...)` group. Attributes are

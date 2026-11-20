@@ -1,4 +1,4 @@
-//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUF):-output-using-type
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 

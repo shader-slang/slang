@@ -171,7 +171,7 @@ The RIFF structures are currently being used for a few things:
 General-Purpose Hierarchical Data Serialization
 ===============================================
 
-The code in `source/slang/slang-serialize.{h,cpp}` implements a framework for serialization that is intended to be lightweight for users to adopt, while also scaling to more complicated cases like our AST serialization.
+The code in `source/slang/serialization/slang-serialize.{h,cpp}` implements a framework for serialization that is intended to be lightweight for users to adopt, while also scaling to more complicated cases like our AST serialization.
 
 In the simplest cases, all a programmer needs to know is that if they have declared a type like:
 
@@ -194,7 +194,7 @@ then they can add serialization support for their type by writing a function lik
 
 If the `OtherThing` and `SomeObject` types were already set up with their own serialization support, then that should be all that's needed.
 Of course there's a lot more to it in once you get into the details and the difficult cases.
-For now, looking at `source/slang/slang-serialize.h` is probably the best way to learn more about the approach.
+For now, looking at `source/slang/serialization/slang-serialize.h` is probably the best way to learn more about the approach.
 
 One key goal of this serialization system is that it allows the serialized format to be swapped in and out without affecting the per-type `serialize` functions.
 Currently Fossil is the only implementation.

@@ -247,8 +247,7 @@ def main():
     corePairs = filterPairs(list(combinations(coreTypes, 2)))
     coreFile = "gen-generic-type-promotion-inference.slang"
     coreDirectives = [
-        "//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type",
-        "//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type",
+        "//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda+cpu, filecheck-buffer=CHECK): -output-using-type",
     ]
     with open(coreFile, "w") as f:
         f.write(
@@ -269,7 +268,7 @@ def main():
 
     ext64File = "gen-generic-type-promotion-inference-64bit.slang"
     ext64Directives = [
-        "//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type",
+        "//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -output-using-type",
     ]
     extNote = (
         "//\n"

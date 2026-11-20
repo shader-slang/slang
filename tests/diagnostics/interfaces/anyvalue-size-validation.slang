@@ -1,6 +1,6 @@
 // anyvalue-size-validation.slang
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -entry computeMain -stage compute -conformance "A:IInterface=0" -conformance "B:IInterface=1"
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target spirv -entry computeMain -stage compute -conformance "A:IInterface=0" -conformance "B:IInterface=1"
 
 [anyValueSize(8)]
 interface IInterface

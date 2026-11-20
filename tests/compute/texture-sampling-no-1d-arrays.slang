@@ -1,8 +1,5 @@
-//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type
-//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -vk
-//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -mtl
+//TEST(compute):COMPARE_RENDER_COMPUTE(targets=all-cuda-llvm): -shaderobj -output-using-type
 // Not supported in LLVM: textures are not currently available
-//DISABLE_TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -llvm
 
 
 // WebGPU only supports 1 MIP level for 1d textures
@@ -101,9 +98,9 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
     val += t1D.Sample(samplerState, uv.x);
     val += t2D.Sample(samplerState, uv);
     val += t3D.Sample (samplerState, float3(uv, 0.5));
-    
+
     val += t2dArray.Sample(samplerState, float3(uv, 0.0));
-    
+
     val += tCubeArray.Sample(samplerState, float4(uv, 0.5, 0.0));
     val += tCube.Sample(samplerState, float3(uv, 0.5));
 

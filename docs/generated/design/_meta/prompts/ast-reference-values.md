@@ -7,7 +7,7 @@ reference family contract**.
 
 Produce `docs/generated/design/ast-reference/values.md` — the per-node
 reference for the **non-Type** `Val` subclasses declared in
-[slang-ast-val.h](../../../../source/slang/slang-ast-val.h).
+[slang-ast-val.h](../../../../source/slang/ast/slang-ast-val.h).
 
 `Type` is also a `Val`, but it has its own page at
 [types.md](types.md); do not duplicate type nodes here. The `## Source`

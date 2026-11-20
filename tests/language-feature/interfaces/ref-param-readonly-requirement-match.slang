@@ -2,8 +2,7 @@
 // aliases `const __ref` and `__ref const`, so any of these spellings satisfies a requirement
 // that uses another.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type -xslang -experimental-feature
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -entry computeMain -stage compute -experimental-feature -dump-ir -o -
 
 // IR-NOT: func %{{[^ ]*}}read{{.*}}RefParam(Array(Int, 4 : Int), 0 : UInt64

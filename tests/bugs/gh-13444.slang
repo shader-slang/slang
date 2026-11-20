@@ -10,8 +10,7 @@
 // The casts in this test come from three sources: an explicit matrix layout that differs from the
 // default one, an integer-to-float conversion, and an array of matrices with a non-default layout.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry computeMain -stage compute -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry computeMain -stage compute -matrix-layout-row-major
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -line-directive-mode none -entry computeMain -stage compute

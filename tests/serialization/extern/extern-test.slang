@@ -2,7 +2,7 @@
 
 //TEST:COMPILE: -no-codegen tests/serialization/extern/module-a.slang -o tests/serialization/extern/module-a.slang-lib
 //TEST:COMPILE: -no-codegen tests/serialization/extern/module-b.slang -o tests/serialization/extern/module-b.slang-lib
-//TEST:COMPARE_COMPUTE_EX: -slang -compute -xslang -r -xslang tests/serialization/extern/module-a.slang-lib -xslang -r -xslang tests/serialization/extern/module-b.slang-lib -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all): -xslang -r -xslang tests/serialization/extern/module-a.slang-lib -xslang -r -xslang tests/serialization/extern/module-b.slang-lib
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -21,6 +21,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     Thing a = makeThing(index + 1, index + 2);
     Thing b = makeThing(-index , index * 2);
-    
+
     outputBuffer[index] = doSomething(a, b);
 }

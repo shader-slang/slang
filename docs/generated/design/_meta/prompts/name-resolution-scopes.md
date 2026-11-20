@@ -22,16 +22,16 @@ through the AST as it descends.
 The `## Concepts` section must cover, at minimum:
 
 - `Scope` — declared in
-  [slang-ast-base.h](../../../../source/slang/slang-ast-base.h). Cite the
+  [slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h). Cite the
   `containerDecl`, `parent`, `nextSibling` fields and the line range.
 - `ContainerDecl` — the `Decl` subclass that owns a scope (it has an
   `ownedScope` member). Declared in
-  [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h).
+  [slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h).
 - `ScopeDecl` — the synthetic `Decl` subclass used to attach a scope
   to a `BlockStmt`. Declared in `slang-ast-decl.h`.
 - `ScopeStmt` — the abstract base of statements that introduce a
   scope. Declared in
-  [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h). Cite
+  [slang-ast-stmt.h](../../../../source/slang/ast/slang-ast-stmt.h). Cite
   its `scopeDecl` field.
 - `BlockStmt` — concrete scope-bearing statement; cite the field that
   links it to a `ScopeDecl`.
@@ -49,7 +49,7 @@ The `## Rules` section must explain:
    it owns a scope.
 2. **Parser scope construction**. Show how the parser threads scopes.
    Cite the parser entry points in
-   [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) that
+   [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) that
    push/pop scopes (search for `pushScope`, `popScope`,
    `currentScope`, `parseScopedStmt`, or whatever the actual helpers
    are named at `source_commit`). Include a short mermaid diagram of
@@ -62,7 +62,7 @@ The `## Rules` section must explain:
 3. **Sibling scopes**. Cover
    `addSiblingScopeForContainerDecl` (or whatever the helper is
    actually called at `source_commit`) declared in
-   [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h). Explain
+   [slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h). Explain
    the reason siblings exist: extension / partial-class / multiple
    `namespace` declarations of the same logical container.
 4. **Implicit scopes**. Generic parameter lists, extension bodies, and

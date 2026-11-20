@@ -1,4 +1,4 @@
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=CHECK):-output-using-type
 
 // 1. float groupshared T[V] round-trip
 // CHECK: type: float

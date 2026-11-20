@@ -5,9 +5,9 @@
 // the resource itself and is bound directly, so the cuda lane only confirms the expected
 // values.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -render-feature bindless -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -output-using-type -profile sm_6_6 -render-feature bindless
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -render-feature bindless
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=CHECK):-output-using-type -profile sm_6_6 -render-feature bindless
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type
 
 // CHECK: type: float
 

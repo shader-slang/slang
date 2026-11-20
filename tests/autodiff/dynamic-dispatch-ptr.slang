@@ -1,7 +1,6 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type
 
-//CHECK: 1.0 
+//CHECK: 1.0
 
 //TEST_INPUT: type_conformance Sensor:ISensor = 1;
 

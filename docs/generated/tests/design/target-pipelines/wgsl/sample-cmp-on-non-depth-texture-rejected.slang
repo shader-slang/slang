@@ -9,7 +9,7 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target wgsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target wgsl -entry main -stage compute
 
 Texture2D<float> tex;
 SamplerComparisonState cs;

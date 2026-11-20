@@ -1,7 +1,6 @@
 // byte-address-buffer-array.slang
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -d3d12 -profile cs_6_0 -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -cuda -profile cs_6_0 -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda, filecheck-buffer=CHECK):-profile cs_6_0 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type
 
 //TEST:SIMPLE(filecheck=CHECK2):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK3):-target spirv -entry computeMain -stage compute -O1
