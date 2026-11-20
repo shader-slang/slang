@@ -1,7 +1,6 @@
 implementing differentiable;
 
-/// Supports differentiable construction of a scalar or shaped numeric value from its logical
-/// scalar.
+/// Supports differentiable scalar repetition and component-wise selection for a numeric value.
 public interface IDifferentiableNumericShapedType : INumericShapedType, IDifferentiable
 {
     __constraint Scalar : IDifferentiable;
@@ -10,6 +9,14 @@ public interface IDifferentiableNumericShapedType : INumericShapedType, IDiffere
     /// through that scalar repetition.
     [Differentiable]
     static This fromScalar(Scalar value);
+
+    /// Returns each component from `ifTrue` where `condition` is true, and from `ifFalse`
+    /// otherwise.
+    ///
+    /// Each mask component controls the corresponding result component.
+    /// Derivatives propagate through the selected value components; the mask is nondifferentiable.
+    [Differentiable]
+    static This selectComponents(no_diff Mask condition, This ifTrue, This ifFalse);
 }
 
 /// Supports a differentiable dot product between values with the same logical shape.

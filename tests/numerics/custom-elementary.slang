@@ -36,6 +36,11 @@ struct CustomReal
         return value;
     }
 
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse)
+    {
+        return condition ? ifTrue : ifFalse;
+    }
+
     static This zero()
     {
         return {0.0};

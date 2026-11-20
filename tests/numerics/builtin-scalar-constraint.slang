@@ -14,6 +14,11 @@ struct CustomScalar : IScalarShapedType
     {
         return value;
     }
+
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse)
+    {
+        return condition ? ifTrue : ifFalse;
+    }
 }
 
 void requiresBuiltinScalar<T : IBuiltinScalarShapedType>(T value) {}

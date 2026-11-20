@@ -4919,35 +4919,8 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
             // Update the current decl's sup to the first type in the flattened list.
             decl->sup = TypeExp(flattenedTypes[0]);
 
-            // Create new constraint decls for the remaining types.
-            for (Index i = 1; i < flattenedTypes.getCount(); i++)
-            {
-                auto newConstraint = m_astBuilder->create<GenericTypeConstraintDecl>();
-                newConstraint->sub = decl->sub;
-                newConstraint->sup = TypeExp(flattenedTypes[i]);
-                newConstraint->loc = decl->loc;
-                newConstraint->parentDecl = parentDecl;
-                parentDecl->addDirectMemberDecl(newConstraint);
-                ensureDecl(newConstraint, DeclCheckState::SignatureChecked);
-            }
-        }
-    }
-
-    // If the super-type is an AndType (e.g. `T : A & B`), flatten it and create
-    // individual GenericTypeConstraintDecls for each element in the conjunction.
-    if (decl->sup.type && !decl->isEqualityConstraint)
-    {
-        List<Type*> flattenedTypes;
-        maybeFlattenConjunctionType(decl->sup.type, flattenedTypes);
-        if (flattenedTypes.getCount() > 1)
-        {
-            auto parentDecl = as<ContainerDecl>(decl->parentDecl);
-            SLANG_ASSERT(parentDecl);
-
-            // Update the current decl's sup to the first type in the flattened list.
-            decl->sup = TypeExp(flattenedTypes[0]);
-
-            // Create new constraint decls for the remaining types.
+            // Create new constraint decls for the remaining types, in place right after `decl`
+            // so that later constraints on them (e.g. `U : IFoo<T>`) are lowered after them.
             List<GenericTypeConstraintDecl*> newConstraints;
             for (Index i = 1; i < flattenedTypes.getCount(); i++)
             {
@@ -4955,10 +4928,9 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
                 newConstraint->sub = decl->sub;
                 newConstraint->sup = TypeExp(flattenedTypes[i]);
                 newConstraint->loc = decl->loc;
-                newConstraint->parentDecl = parentDecl;
-                parentDecl->addDirectMemberDecl(newConstraint);
                 newConstraints.add(newConstraint);
             }
+            parentDecl->_insertFlattenedConstraintDeclsAfter(decl, newConstraints);
 
             // Clear cached substitutions before proceeding with checking.
             if (auto genericParentDecl = as<GenericDecl>(parentDecl))
