@@ -1565,8 +1565,8 @@ CLikeSourceEmitter::FoldPolicy CLikeSourceEmitter::getFoldPolicy(IRInst* inst)
         return FoldPolicy::Always;
 
     case kIROp_SizedBufferToUnsizedBuffer:
-        // Native resource conversions emit their operand directly. In particular, WGSL
-        // cannot copy a storage buffer's runtime-sized array into a local variable.
+        // On native resource targets, we emit the conversion as its operand. WGSL does not
+        // allow copying a storage buffer's runtime-sized array into a local variable.
         if (!isCPUTarget(getTargetReq()) && !isCUDATarget(getTargetReq()))
             return FoldPolicy::Always;
         break;

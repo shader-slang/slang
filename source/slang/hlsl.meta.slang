@@ -160,7 +160,7 @@ For all other targets, this type maps to a buffer of 32bit unsigned integers.
 ${
 for (bool unsized : { false, true }) {
 $}
-__magic_type(HLSL$(unsized ? "UnsizedByteAddressBuffer" : "ByteAddressBuffer")Type)
+__magic_type(HLSL$(unsized ? "UnsizedByteAddressBuffer" : "SizedByteAddressBuffer")Type)
 __intrinsic_type($(unsized ? kIROp_HLSLUnsizedByteAddressBufferType : kIROp_HLSLByteAddressBufferType))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
 struct $(unsized ? "__UnsizedByteAddressBuffer" : "ByteAddressBuffer")
@@ -6674,7 +6674,7 @@ ${
 for (bool unsized : { false, true }) {
 $}
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
-__magic_type(HLSL$(unsized ? "UnsizedStructuredBuffer" : "StructuredBuffer")Type)
+__magic_type(HLSL$(unsized ? "UnsizedStructuredBuffer" : "SizedStructuredBuffer")Type)
 __intrinsic_type($(unsized ? kIROp_HLSLUnsizedStructuredBufferType : kIROp_HLSLStructuredBufferType))
 struct $(unsized ? "__UnsizedStructuredBuffer" : "StructuredBuffer")$(unsized ? "" : " : IArray<T>")
 {
@@ -6859,7 +6859,7 @@ static const struct {
     bool unsized;
 } kMutableByteAddressBufferCases[] =
 {
-    { kIROp_HLSLRWByteAddressBufferType, "RWByteAddressBuffer", "RWByteAddressBuffer", false },
+    { kIROp_HLSLRWByteAddressBufferType, "SizedRWByteAddressBuffer", "RWByteAddressBuffer", false },
     { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer", "RasterizerOrderedByteAddressBuffer", false },
     { kIROp_HLSLUnsizedRWByteAddressBufferType, "UnsizedRWByteAddressBuffer", "__UnsizedRWByteAddressBuffer", true },
 };
@@ -7963,7 +7963,7 @@ static const struct {
     bool unsized;
 } kMutableStructuredBufferCases[] =
 {
-    { kIROp_HLSLRWStructuredBufferType, "RWStructuredBuffer", "RWStructuredBuffer", false },
+    { kIROp_HLSLRWStructuredBufferType, "SizedRWStructuredBuffer", "RWStructuredBuffer", false },
     { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer", "RasterizerOrderedStructuredBuffer", false },
     { kIROp_HLSLUnsizedRWStructuredBufferType, "UnsizedRWStructuredBuffer", "__UnsizedRWStructuredBuffer", true },
 };

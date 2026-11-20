@@ -372,8 +372,14 @@ class HLSLStructuredBufferTypeBase : public BuiltinGenericType
     FIDDLE(...)
 };
 
-FIDDLE()
+FIDDLE(abstract)
 class HLSLStructuredBufferType : public HLSLStructuredBufferTypeBase
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class HLSLSizedStructuredBufferType : public HLSLStructuredBufferType
 {
     FIDDLE(...)
 };
@@ -385,8 +391,14 @@ class HLSLUnsizedStructuredBufferType : public HLSLStructuredBufferType
     FIDDLE(...)
 };
 
-FIDDLE()
+FIDDLE(abstract)
 class HLSLRWStructuredBufferType : public HLSLStructuredBufferTypeBase
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class HLSLSizedRWStructuredBufferType : public HLSLRWStructuredBufferType
 {
     FIDDLE(...)
 };
@@ -411,8 +423,14 @@ class UntypedBufferResourceType : public BuiltinType
     FIDDLE(...)
 };
 
-FIDDLE()
+FIDDLE(abstract)
 class HLSLByteAddressBufferType : public UntypedBufferResourceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class HLSLSizedByteAddressBufferType : public HLSLByteAddressBufferType
 {
     FIDDLE(...)
 };
@@ -424,8 +442,14 @@ class HLSLUnsizedByteAddressBufferType : public HLSLByteAddressBufferType
     FIDDLE(...)
 };
 
-FIDDLE()
+FIDDLE(abstract)
 class HLSLRWByteAddressBufferType : public UntypedBufferResourceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class HLSLSizedRWByteAddressBufferType : public HLSLRWByteAddressBufferType
 {
     FIDDLE(...)
 };
