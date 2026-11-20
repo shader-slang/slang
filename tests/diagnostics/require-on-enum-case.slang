@@ -12,11 +12,14 @@
 // diagnostic fails the test). The third is the control case: a whole-enum
 // [require] consumed in the same position must keep failing with E36107.
 // The fourth mirrors the first on `-target spirv` and must compile clean.
+// The fifth mirrors the second on `-target spirv` and must fail with E36107,
+// closing the symmetric direction.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKSPIRV,non-exhaustive):-target hlsl -entry computeMainSpirv -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKHLSL,exit-code=0):-target hlsl -entry computeMainHlsl -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKWHOLE,non-exhaustive):-target hlsl -entry computeMainWholeEnum -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKSPIRVCLEAN,exit-code=0):-target spirv -entry computeMainSpirv -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECKHLSLSPIRV,non-exhaustive):-target spirv -entry computeMainHlsl -stage compute
 
 enum MyEnum
 {
@@ -65,3 +68,4 @@ void computeMainWholeEnum(uint3 tid : SV_DispatchThreadID)
 
 //CHECKSPIRV: E36107
 //CHECKWHOLE: E36107
+//CHECKHLSLSPIRV: E36107
