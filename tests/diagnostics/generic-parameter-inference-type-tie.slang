@@ -1,10 +1,12 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 // A generic parameter inferred from several mixed-type arguments picks a
-// common type only when one is strictly better. Two basic types that are
-// each implicitly convertible to the other at equal cost (such as `bool`
-// and `float`) have no common type, so inference fails instead of silently
-// favoring whichever argument the solver happened to accumulate first.
+// common type only when one is strictly better, with one exception: a
+// `bool` operand loses an equal-cost tie, so mixed bool/number inference
+// keeps compiling (pinned in the companion tests). Every other equal-cost
+// pair of distinct basic types has no common type, so inference fails
+// instead of silently favoring whichever argument the solver happened to
+// accumulate first.
 
 vector<T, 3> makevec3<T>(T a, T b, T c)
 {
@@ -26,45 +28,19 @@ void main()
     let a = makevec3(1.0f, 2U, 1.0f);
     let b = makevec3(2U, 1.0f, 1.0f);
 
-    // The third argument mirrors the issue's reproducer. It never appears
-    // in the conflicts below: `uint` joins cleanly with `float` at unequal
-    // cost, so the conflict is between `bool` and `float` alone.
-    let v = makevec3(1.0f, false, 2U);
-/*CHECK: cannot deduce generic argument for 'T': conflicting requirements 'float' and 'bool'
+    // Pointer-sized ranks are excluded from the unsigned-to-signed
+    // promotion, so these pairs tie in both directions at general
+    // conversion cost; neither side is `bool`, so inference fails.
+    joinArgs(int64_t(0), uintptr_t(0));
+/*CHECK: cannot deduce generic argument for 'T': conflicting requirements 'int64_t' and 'uintptr_t'
 */
-    let u = makevec3(false, 1.0f, 2U);
-/*CHECK: cannot deduce generic argument for 'T': conflicting requirements 'bool' and 'float'
+    joinArgs(uintptr_t(0), int64_t(0));
+/*CHECK: cannot deduce generic argument for 'T': conflicting requirements 'uintptr_t' and 'int64_t'
 */
-
-    // The strictly-better rule governs element types, so a join between a
-    // vector and a scalar whose element types tie fails the same way.
-    joinArgs(float3(0.0f), false);
-/*CHECK: cannot deduce generic argument for 'T': conflicting requirements 'vector<float,3>' and 'bool'
+    joinArgs(uint32_t(0), intptr_t(0));
+/*CHECK: cannot deduce generic argument for 'T': conflicting requirements 'uint' and 'intptr_t'
 */
-    joinArgs(false, float3(0.0f));
-/*CHECK: cannot deduce generic argument for 'T': conflicting requirements 'bool' and 'vector<float,3>'
-*/
-    joinArgs(float3(0.0f), bool3(true));
-/*CHECK: cannot deduce generic argument for 'T': conflicting requirements 'vector<float,3>' and 'vector<bool,3>'
-*/
-    joinArgs(bool3(true), float3(0.0f));
-/*CHECK: cannot deduce generic argument for 'T': conflicting requirements 'vector<bool,3>' and 'vector<float,3>'
-*/
-
-    // Built-in `?:`/`select` infer their type from both arms through the
-    // same join, so mixed equal-cost arms now fail overload resolution;
-    // previously one arm's type silently won.
-    bool c = true;
-    float x = select(c, 0.5f, false);
-/*CHECK: no overload for 'select' applicable to arguments of type (bool, float, bool)
-*/
-    float y = select(c, false, 0.5f);
-/*CHECK: no overload for 'select' applicable to arguments of type (bool, bool, float)
-*/
-    float p = c ? 0.5f : false;
-/*CHECK: no overload for '?:' applicable to arguments of type (bool, float, bool)
-*/
-    float q = c ? false : 0.5f;
-/*CHECK: no overload for '?:' applicable to arguments of type (bool, bool, float)
+    joinArgs(intptr_t(0), uint32_t(0));
+/*CHECK: cannot deduce generic argument for 'T': conflicting requirements 'intptr_t' and 'uint'
 */
 }

@@ -3,9 +3,12 @@
 // Unequal conversion costs pick the strictly better type regardless of
 // argument order. This is the positive companion to
 // tests/diagnostics/generic-parameter-inference-type-tie.slang, which pins
-// the equal-cost failure cases; the explicit-type escape hatch for those
-// cases is pinned in
-// tests/diagnostics/generic-parameter-inference-explicit-type-argument.slang.
+// the non-bool equal-cost failure cases; mixed bool/number inference (the
+// one-off bool-loses tie-break) and the explicit-type escape hatch are
+// pinned in
+// tests/diagnostics/generic-parameter-inference-explicit-type-argument.slang,
+// whose diagnostic-test harness tolerates the implicit-conversion warnings
+// those calls emit.
 
 vector<T, 3> makevec3<T>(T a, T b, T c)
 {
