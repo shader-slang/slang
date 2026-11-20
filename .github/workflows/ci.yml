@@ -555,7 +555,7 @@ jobs:
       artifact-name-suffix: "-falcor"
 
   # Linux tests (self-hosted GPU runner, containerized)
-  test-linux-debug-gcc-x86_64:
+  test-linux-debug-gcc-x86_64-t4:
     needs: [filter, build-linux-debug-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test-container.yml
@@ -570,7 +570,7 @@ jobs:
     with:
       config: debug
 
-  test-linux-release-gcc-x86_64:
+  test-linux-release-gcc-x86_64-t4:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test-container.yml
@@ -597,6 +597,38 @@ jobs:
       runs-on: '["Linux", "self-hosted", "SM80Plus"]'
       gpu-tier: sm80plus
       server-count: 8
+
+  # Linux x86_64 debug SM80+ capability tests. The T4 jobs skip
+  # tests/cooperative-matrix/ and tests/neural/, so without this job no debug
+  # build runs them on a GPU. ci-slang-test-container.yml still applies
+  # tests/skip-list-debug.txt to this tier, so the slow neural tests stay
+  # skipped in debug builds.
+  test-linux-debug-gcc-x86_64-sm80:
+    needs: [filter, build-linux-debug-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test-container.yml
+    with:
+      config: debug
+      runs-on: '["Linux", "self-hosted", "SM80Plus"]'
+      gpu-tier: sm80plus
+      server-count: 8
+
+  # Linux x86_64 debug CPU-only tests (GitHub-hosted; no GPU).
+  # Same as the release CPU job below, but with a debug build, so that
+  # SLANG_ASSERT checks run on the CPU and LLVM tests.
+  test-linux-debug-gcc-x86_64-cpu:
+    needs: [filter, build-linux-debug-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: x86_64
+      config: debug
+      runs-on: '["ubuntu-24.04"]'
+      full-gpu-tests: false
+      cpu-only: true
+      server-count: 4
 
   # Linux x86_64 CPU-only tests (GitHub-hosted; no GPU).
   # Runs the test suite filtered to CPU and LLVM backends via
@@ -668,7 +700,7 @@ jobs:
       runs-on: '["macos-latest"]'
 
   # Linux ARM64 tests (GitHub-hosted, CPU only)
-  test-linux-debug-gcc-aarch64:
+  test-linux-debug-gcc-aarch64-cpu:
     needs: [filter, build-linux-debug-gcc-aarch64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -680,7 +712,7 @@ jobs:
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
 
-  test-linux-release-gcc-aarch64:
+  test-linux-release-gcc-aarch64-cpu:
     needs: [filter, build-linux-release-gcc-aarch64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -694,7 +726,7 @@ jobs:
 
   # Windows ARM64 test (GitHub-hosted, native, CPU only — no GPU on this
   # hosted image).
-  test-windows-debug-cl-aarch64:
+  test-windows-debug-cl-aarch64-cpu:
     needs: [filter, build-windows-debug-cl-aarch64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -713,7 +745,7 @@ jobs:
       # relying on it.
       cpu-only: true
 
-  test-windows-release-cl-aarch64:
+  test-windows-release-cl-aarch64-cpu:
     needs: [filter, build-windows-release-cl-aarch64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -726,8 +758,37 @@ jobs:
       full-gpu-tests: false
       cpu-only: true
 
+  # Windows x86_64 CPU-only tests (GitHub-hosted; no GPU).
+  # They use the artifact from the self-hosted build job and run only the
+  # (cpu) and (llvm) tests, so the paid T4 jobs below do not need to run them.
+  test-windows-debug-cl-x86_64-cpu:
+    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["windows-2022"]'
+      full-gpu-tests: false
+      cpu-only: true
+
+  test-windows-release-cl-x86_64-cpu:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["windows-2022"]'
+      full-gpu-tests: false
+      cpu-only: true
+
   # Windows GPU tests (self-hosted)
-  test-windows-debug-cl-x86_64-gpu:
+  test-windows-debug-cl-x86_64-t4:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -738,6 +799,9 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
+      # The windows-*-x86_64-cpu jobs run the (cpu) and (llvm) tests on free
+      # runners, so this paid T4 job runs only the GPU API tests.
+      gpu-api-only: true
       gpu-tier: t4
 
   test-windows-debug-cl-x86_64-gpu-rhi:
@@ -751,7 +815,7 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
-  test-windows-release-cl-x86_64-gpu:
+  test-windows-release-cl-x86_64-t4:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -762,6 +826,9 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
+      # The windows-*-x86_64-cpu jobs run the (cpu) and (llvm) tests on free
+      # runners, so this paid T4 job runs only the GPU API tests.
+      gpu-api-only: true
       gpu-tier: t4
 
   test-windows-release-cl-x86_64-gpu-rhi:
@@ -958,22 +1025,26 @@ jobs:
         static-windows-release-cl-x86_64,
         static-macos-debug-clang-aarch64,
         static-windows-debug-cl-x86_64,
-        test-windows-release-cl-x86_64-gpu,
+        test-windows-release-cl-x86_64-cpu,
+        test-windows-debug-cl-x86_64-cpu,
+        test-windows-release-cl-x86_64-t4,
         test-windows-release-cl-x86_64-gpu-rhi,
-        test-windows-debug-cl-x86_64-gpu,
+        test-windows-debug-cl-x86_64-t4,
         test-windows-debug-cl-x86_64-gpu-rhi,
         test-macos-release-clang-aarch64,
         test-macos-release-clang-aarch64-rhi,
         test-macos-debug-clang-aarch64,
         test-macos-debug-clang-aarch64-rhi,
-        test-linux-release-gcc-x86_64,
+        test-linux-release-gcc-x86_64-t4,
         test-linux-release-gcc-x86_64-rhi,
         test-linux-release-gcc-x86_64-sm80,
         test-linux-release-gcc-x86_64-cpu,
-        test-linux-debug-gcc-x86_64,
+        test-linux-debug-gcc-x86_64-sm80,
+        test-linux-debug-gcc-x86_64-cpu,
+        test-linux-debug-gcc-x86_64-t4,
         test-linux-debug-gcc-x86_64-rhi,
-        test-linux-release-gcc-aarch64,
-        test-linux-debug-gcc-aarch64,
+        test-linux-release-gcc-aarch64-cpu,
+        test-linux-debug-gcc-aarch64-cpu,
         test-materialx-windows-release,
         sanitizer-linux-clang-x86_64,
         check-cmdline-ref,

@@ -210,7 +210,11 @@ jobs:
           # T4 runners cannot execute SM 8.0+ cooperative matrix / neural tests
           if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
             slang_test_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
-            slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
+            # tests/expected-failure-linux-gpu.txt lists failures of the Linux
+            # T4 machines, so it applies only to Linux jobs.
+            if [[ "${{ inputs.os }}" == "linux" ]]; then
+              slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
+            fi
           fi
 
           # Skip most neural tests in debug builds to reduce CI time

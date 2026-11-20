@@ -167,7 +167,10 @@ jobs:
             slang_test_args+=("-server-count" "${{ inputs.server-count }}")
           fi
 
-          # Skip most neural tests in debug builds to reduce CI time
+          # Skip most neural tests in debug builds to reduce CI time. This
+          # applies to the sm80plus tier too: a debug sm80plus job runs all
+          # cooperative-matrix tests and the neural tests that
+          # skip-list-debug.txt keeps enabled.
           if [[ "${{ inputs.config }}" == "debug" ]]; then
             slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")
           fi
