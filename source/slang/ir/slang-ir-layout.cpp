@@ -405,6 +405,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_BorrowInOutParamType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
     case kIROp_RawPointerType:
     case kIROp_PtrType:
     case kIROp_NativePtrType:

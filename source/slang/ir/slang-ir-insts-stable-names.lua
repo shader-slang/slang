@@ -58,7 +58,7 @@ return {
 	["Type.Kind.Generic"] = 56,
 	["Type.PtrTypeBase.Ptr"] = 57,
 	["Type.PtrTypeBase.RefParam"] = 58,
-	["Type.PtrTypeBase.BorrowInParam"] = 59,
+	["Type.PtrTypeBase.BorrowInParamBase.BorrowInParam"] = 59,
 	["Type.PtrTypeBase.PseudoPtr"] = 60,
 	["Type.PtrTypeBase.OutParamTypeBase.OutParam"] = 61,
 	["Type.PtrTypeBase.OutParamTypeBase.BorrowInOutParam"] = 62,
@@ -892,5 +892,6 @@ return {
 	["Type.UntypedBufferResourceType.ByteAddressBufferTypeBase.UnsizedRWByteAddressBuffer"] = 916,
 	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedStructuredBuffer"] = 917,
 	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedRWStructuredBuffer"] = 918,
-	["sizedBufferToUnsizedBuffer"] = 919
+	["sizedBufferToUnsizedBuffer"] = 919,
+	["Type.PtrTypeBase.BorrowInParamBase.ByValueBorrowInParam"] = 920
 }

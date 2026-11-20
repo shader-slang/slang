@@ -357,13 +357,33 @@ local insts = {
 						},
 					},
 					{
-						BorrowInParam = {
+						BorrowInParamBase = {
+							-- `IRBorrowInParamType` is hand-written in slang-ir.h so that
+							-- `as<IRBorrowInParamType>` matches every opcode in this range.
 							struct_name = "BorrowInParamType",
-							operands = {
-								{ "valueType", "IRType" },
-								{ "accessQualifierOperand", "IRIntLit", optional = true },
-								{ "addressSpaceOperand", "IRIntLit", optional = true },
-								{ "dataLayout", "IRType", optional = true },
+							{
+								BorrowInParam = {
+									struct_name = "BorrowInParamType",
+									operands = {
+										{ "valueType", "IRType" },
+										{ "accessQualifierOperand", "IRIntLit", optional = true },
+										{ "addressSpaceOperand", "IRIntLit", optional = true },
+										{ "dataLayout", "IRType", optional = true },
+									},
+								},
+							},
+							{
+								ByValueBorrowInParam = {
+									-- A `borrow in` parameter that the C-like emitters declare as a
+									-- by-value parameter; see `IRByValueBorrowInParamType`.
+									struct_name = "ByValueBorrowInParamType",
+									operands = {
+										{ "valueType", "IRType" },
+										{ "accessQualifierOperand", "IRIntLit", optional = true },
+										{ "addressSpaceOperand", "IRIntLit", optional = true },
+										{ "dataLayout", "IRType", optional = true },
+									},
+								},
 							},
 						},
 					},
