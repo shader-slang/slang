@@ -7,6 +7,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC_CANCELLED,non-exhaustive):-target spirv -entry genericCancelledMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=HOLDER,non-exhaustive):-target spirv -entry holderMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC_UNMATCHED,non-exhaustive):-target hlsl -entry genericUnmatchedMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=NESTED_NARROW,non-exhaustive):-target spirv -entry nestedNarrowMain -stage compute
 // non-exhaustive: integer conversions warn and capability errors include provenance notes.
 
 enum Mode
@@ -49,6 +50,12 @@ struct IntegerHolder<let value : int>
 
 int readInt<let value : int>() { return value; }
 
+int readThroughByte<let value : int>()
+{
+    // The inner cast narrows before the outer enum conversion selects its int-valued case.
+    return readInt<int(Mode(uint8_t(value)))>();
+}
+
 struct AliasHolder<let value : uint32_t>
 {
     int payload;
@@ -63,6 +70,16 @@ int forwardAlias<let value : uint32_t>(AliasHolder<value> holder)
 {
     // Generic substitution must preserve equality between uint32_t and its canonical uint.
     return readAlias<value>(holder);
+}
+
+int readArray<let count : uint32_t>(int[count] values)
+{
+    return values[0];
+}
+
+int forwardArray<let count : uint32_t>(int[count] values)
+{
+    return readArray<count>(values);
 }
 
 int readGenericCancelled<let tag : int>()
@@ -116,6 +133,12 @@ void hlslMain()
     outputBuffer[7] = readHolder<0>();
     AliasHolder<1> aliasValue = { 4 };
     outputBuffer[8] = forwardAlias<1>(aliasValue);
+    int arrayValues[1] = { 4 };
+    outputBuffer[9] = forwardArray<1>(arrayValues);
+    AliasHolder<uint32_t(0)> aliasZero = { 9 };
+    AliasHolder<0> canonicalZero = aliasZero;
+    outputBuffer[10] = canonicalZero.payload;
+    outputBuffer[11] = readThroughByte<256>();
 }
 
 // SPIRV: OpEntryPoint GLCompute
@@ -127,6 +150,7 @@ void spirvMain()
     outputBuffer[2] = readCancelled<1>();
     outputBuffer[3] = readGenericCancelled<1>();
     outputBuffer[4] = readHolder<1>();
+    outputBuffer[5] = readThroughByte<257>();
 }
 
 [numthreads(1, 1, 1)]
@@ -176,4 +200,11 @@ void genericUnmatchedMain()
 //GENERIC_UNMATCHED: enum conversion has no matching case after specialization
 {
     outputBuffer[0] = readGenericCancelled<42>();
+}
+
+[numthreads(1, 1, 1)]
+void nestedNarrowMain()
+//NESTED_NARROW: enum conversion selects an unavailable case
+{
+    outputBuffer[0] = readThroughByte<256>();
 }

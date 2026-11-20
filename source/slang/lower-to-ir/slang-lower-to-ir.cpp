@@ -18,6 +18,7 @@
 #include "slang/ir-passes/slang-ir-entry-point-decorations.h"
 #include "slang/ir-passes/slang-ir-inline.h"
 #include "slang/ir-passes/slang-ir-insert-debug-value-store.h"
+#include "slang/ir-passes/slang-ir-late-require-capability.h"
 #include "slang/ir-passes/slang-ir-link.h"
 #include "slang/ir-passes/slang-ir-loop-inversion.h"
 #include "slang/ir-passes/slang-ir-lower-defer.h"
@@ -613,6 +614,12 @@ struct CatchHandler
     CatchHandler* prev = nullptr;
 };
 
+struct PendingEnumRequirement
+{
+    List<IRInst*> operands;
+    SourceLoc sourceLoc;
+};
+
 struct IRGenContext
 {
     ASTBuilder* astBuilder;
@@ -673,6 +680,10 @@ struct IRGenContext
 
     // Recursion depth for lowering nested invoke/default-construction chains.
     UInt invokeLoweringRecursionDepth = 0;
+
+    // Header and field conversions belong to the declaration being lowered. Its IR owner may
+    // not exist yet, so lowerDecl attaches these obligations after constructing that owner.
+    List<PendingEnumRequirement>* pendingEnumRequirements = nullptr;
 
     // A chain of nested `catch` handlers for `try` and `throw.
     CatchHandler* catchHandler = nullptr;
@@ -1960,11 +1971,54 @@ static void emitEnumCastCheck(IRGenContext* context, Type* enumType, IRInst* val
             SLANG_COUNT_OF(caseArgs),
             caseArgs));
     }
-    builder->emitIntrinsicInst(
-        builder->getVoidType(),
-        kIROp_CheckEnumCast,
-        args.getCount(),
-        args.getBuffer());
+    auto enclosingCode = builder->getInsertLoc().getFunc();
+    if (as<IRFunc>(enclosingCode) || as<IRGlobalVar>(enclosingCode))
+    {
+        builder->emitIntrinsicInst(
+            builder->getVoidType(),
+            kIROp_CheckEnumCast,
+            args.getCount(),
+            args.getBuffer());
+    }
+    else if (context->irFunc)
+    {
+        // The function is registered before its signature is lowered. Attach header checks to
+        // that exact overload, including declarations whose bodies are imported later.
+        builder->addDecoration(
+            context->irFunc,
+            kIROp_EnumCastRequirementDecoration,
+            args.getBuffer(),
+            args.getCount());
+    }
+    else
+    {
+        SLANG_RELEASE_ASSERT(context->pendingEnumRequirements);
+        auto sourceLocInfo = builder->getSourceLocInfo();
+        context->pendingEnumRequirements->add(
+            {_Move(args), sourceLocInfo ? sourceLocInfo->sourceLoc : SourceLoc()});
+    }
+}
+
+// Preserve a source use even when optimization later removes its storage or numeric result.
+// For example, accessing only `Wrapper<N>.payload` must still check a different field whose
+// declared type is `Holder<Mode(N)>`. The anchor is expanded after the type specializes.
+static void emitEnumRequirementUse(IRGenContext* context, IRInst* source)
+{
+    auto builder = context->irBuilder;
+    auto enclosingCode = builder->getInsertLoc().getFunc();
+    if (!source || (!as<IRFunc>(enclosingCode) && !as<IRGlobalVar>(enclosingCode)))
+        return;
+
+    // The anchor describes a type or a declaration, not a read of a runtime value. For
+    // example, looking up an uninitialized local before assigning it only uses its type.
+    // Keeping the local's pointer here would introduce a spurious memory use before the store.
+    auto dataType = source->getDataType();
+    bool isType = as<IRType>(source) || (dataType && dataType->getOp() == kIROp_TypeKind);
+    bool isDeclaration = as<IRGlobalValueWithCode>(source) || as<IRGlobalParam>(source) ||
+                         as<IRSpecialize>(source) || as<IRLookupWitnessMethod>(source);
+    if (!isType && !isDeclaration)
+        source = source->getFullType();
+    builder->emitIntrinsicInst(builder->getVoidType(), kIROp_CheckEnumRequirements, 1, &source);
 }
 
 // Emit deferred conversions before numeric resolution or the Val lowering cache discards
@@ -1975,11 +2029,27 @@ static void emitValRequirements(IRGenContext* context, Val* value, HashSet<Val*>
 {
     if (!value || !visited.add(value))
         return;
+    if (auto aliasType = dynamicCast<NamedExpressionType>(value))
+    {
+        // Aliases have no distinct IR type on which to store source obligations. Expand their
+        // checked type at the use, before canonicalization, so an alias cannot add requirements
+        // to an otherwise identical use of its underlying type.
+        emitValRequirements(
+            context,
+            getType(context->astBuilder, aliasType->getDeclRef()),
+            visited);
+    }
     if (auto withRequirements = as<IntValWithRequirements>(value))
     {
         for (auto requirement : withRequirements->getRequirements())
         {
-            if (auto cast = as<TypeCastIntVal>(requirement))
+            if (auto type = dynamicCast<Type>(requirement))
+            {
+                // A folded layout query still uses the whole source type. Its declaration
+                // may contain deferred conversions even when the numeric size is constant.
+                emitEnumRequirementUse(context, lowerType(context, type));
+            }
+            else if (auto cast = as<TypeCastIntVal>(requirement))
             {
                 auto input = getSimpleVal(context, lowerVal(context, cast->getBase()));
                 emitEnumCastCheck(context, cast->getType(), input);
@@ -3201,6 +3271,8 @@ LoweredValInfo lowerValWithCache(IRGenContext* context, Val* val, F const& lower
 
 LoweredValInfo lowerVal(IRGenContext* context, Val* val)
 {
+    if (auto type = dynamicCast<Type>(val))
+        return LoweredValInfo::simple(lowerType(context, type));
     emitValRequirements(context, val);
     auto resolvedVal = val->resolve();
     return lowerValWithCache(
@@ -4529,6 +4601,11 @@ void lowerAssociatedVals(IRGenContext* context, Val* val, IRInst* irVal)
         diffAttr = context->funcDecl->findModifier<DifferentiableAttribute>();
     if (!diffAttr)
         return;
+
+    // Function lowering resolves the association dictionary's keys. Use the same key here:
+    // an array extent such as N * sizeof(T) can retain source requirements in its checked type
+    // even though its resolved type is the one registered for differentiation.
+    val = val->resolve();
 
     if (context->env->seenVals.add(val))
     {
@@ -11976,6 +12053,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // plus some code to initialize it and then store to the variable.
 
         IRType* varType = lowerType(context, decl->getType());
+        // A local declaration uses its entire type even if later code reads only one field.
+        // Keep this source use here: lowerType also runs while assembling switch labels and
+        // other metadata, where inserting an executable instruction can follow a terminator.
+        emitEnumRequirementUse(context, varType);
 
         // As a special case, an immutable local variable with an
         // initializer can just lower to the SSA value of its initializer.
@@ -14982,7 +15063,34 @@ LoweredValInfo lowerDecl(IRGenContext* context, DeclBase* decl)
 
     SLANG_EXCEPTION_TRY
     {
-        return visitor.dispatch(decl);
+        List<PendingEnumRequirement> requirements;
+        auto previousRequirements = context->pendingEnumRequirements;
+        context->pendingEnumRequirements = &requirements;
+        SLANG_DEFER({ context->pendingEnumRequirements = previousRequirements; });
+        auto result = visitor.dispatch(decl);
+
+        // A type alias expands at each NamedExpressionType use; its lowered target is shared
+        // with unrelated source types and cannot own the alias's conversion obligations.
+        if (!as<TypeDefDecl>(decl) && requirements.getCount())
+        {
+            SLANG_RELEASE_ASSERT(
+                result.flavor == LoweredValInfo::Flavor::Simple ||
+                result.flavor == LoweredValInfo::Flavor::Ptr);
+            auto owner = result.val;
+            SLANG_RELEASE_ASSERT(owner);
+            if (auto generic = as<IRGeneric>(owner))
+                owner = findInnerMostGenericReturnVal(generic);
+            for (auto& requirement : requirements)
+            {
+                auto decoration = context->irBuilder->addDecoration(
+                    owner,
+                    kIROp_EnumCastRequirementDecoration,
+                    requirement.operands.getBuffer(),
+                    requirement.operands.getCount());
+                decoration->sourceLoc = requirement.sourceLoc;
+            }
+        }
+        return result;
     }
 #if SLANG_HAS_EXCEPTIONS
     // Don't emit any context message for an explicit `AbortCompilationException`
@@ -15398,6 +15506,9 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
         lowerAssociatedVals(context, declRef.declRefBase, getSimpleVal(context, info));
     }
 
+    if (info.flavor == LoweredValInfo::Flavor::Simple || info.flavor == LoweredValInfo::Flavor::Ptr)
+        emitEnumRequirementUse(context, info.val);
+
     return info;
 }
 
@@ -15752,6 +15863,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // Before we can do any validation, we need to prelink [unsafeForceInlineEarly]
     // functions.
     prelinkIR(translationUnit->module, module, context->shared->externalSymbolsToPrelink);
+
+    materializeEnumRequirements(module);
 
     // First, lower error handling logic into normal control flow.
     // This includes lowering throwing functions into functions that

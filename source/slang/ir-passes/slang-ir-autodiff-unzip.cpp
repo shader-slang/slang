@@ -814,7 +814,16 @@ struct UnzippingContext
                 }
             }
 
-            if (isDifferentialInst(child))
+            if (isEnumRequirementCheck(child))
+            {
+                // A backward derivative can discard the primal apply call when no saved
+                // state is needed. Keep its source requirements in the matching differential
+                // block as well, so generic branch elimination still controls each check.
+                IRCloneEnv cloneEnv;
+                cloneInst(&cloneEnv, &diffBuilder, child);
+                child->insertAtEnd(primalBlock);
+            }
+            else if (isDifferentialInst(child))
             {
                 child->insertAtEnd(diffBlock);
             }

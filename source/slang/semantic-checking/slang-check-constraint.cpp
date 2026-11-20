@@ -766,7 +766,9 @@ static DeclRef<GenericVariadicPackCountConstraintDecl> _findDeclaredPackCountCon
 
         auto declaredExpectedCount =
             getPackCountConstraintExpectedCount(astBuilder, constraintDeclRef);
-        if (declaredExpectedCount == expectedCount)
+        // A countof expression can retain source type requirements. Compare its canonical
+        // integer value when forwarding the proof, while keeping those requirements on the source.
+        if (areValsEqual(declaredExpectedCount, expectedCount))
             return constraintDeclRef;
     }
 

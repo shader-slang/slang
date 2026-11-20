@@ -25,6 +25,6 @@ float test()
 
 // Both candidates report the mismatch at argument index 1.
 //CHECK: candidate: func Widget.poke(float, float2) -> float
-//CHECK: argument 1 does not match: expected 'vector<float,2>', got 'Test'
+//CHECK: argument 1 does not match: expected 'float2', got 'Test'
 //CHECK: candidate: func Widget.poke(float, float3) -> float
-//CHECK: argument 1 does not match: expected 'vector<float,3>', got 'Test'
+//CHECK: argument 1 does not match: expected 'float3', got 'Test'

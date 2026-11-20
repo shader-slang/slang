@@ -38,7 +38,9 @@ ConstantIntVal* SemanticsVisitor::checkConstantIntVal(Expr* expr)
     if (!intVal)
         return nullptr;
 
-    auto constIntVal = as<ConstantIntVal>(intVal);
+    // This helper extracts the numeric result. The checked expression still carries its
+    // source requirements, including references in an unselected conditional operand.
+    auto constIntVal = as<ConstantIntVal>(intVal->resolve());
     if (!constIntVal)
     {
         getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->loc});
@@ -56,7 +58,7 @@ ConstantIntVal* SemanticsVisitor::checkConstantEnumVal(Expr* expr)
     if (!intVal)
         return nullptr;
 
-    auto constIntVal = as<ConstantIntVal>(intVal);
+    auto constIntVal = as<ConstantIntVal>(intVal->resolve());
     if (!constIntVal)
     {
         getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->loc});

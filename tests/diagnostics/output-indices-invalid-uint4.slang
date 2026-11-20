@@ -10,7 +10,7 @@
 [numthreads(1, 1, 1)]
 void main(out OutputVertices<float4, 3> verts, out OutputIndices<uint4, 1> prims)
 //diag:                                                                    ^^^^^ type cannot be used as entry-point varying parameter or return type
-//diag:                                                                    ^^^^^ type 'OutputIndices<vector<uint,4>, 1>' cannot be used as output parameter 'prims' of entry point 'main' because OutputIndices element type must be uint, uint2, or uint3
+//diag:                                                                    ^^^^^ type 'OutputIndices<uint4, 1>' cannot be used as output parameter 'prims' of entry point 'main' because OutputIndices element type must be uint, uint2, or uint3
 {
     SetMeshOutputCounts(3, 1);
 }

@@ -2,6 +2,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=SIZE,non-exhaustive):-target spirv -entry sizeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=ALIGN,non-exhaustive):-target spirv -entry alignMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=COUNT,non-exhaustive):-target spirv -entry countMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=ALIAS_SIZE,non-exhaustive):-target spirv -entry aliasSizeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=ALIAS_ALIGN,non-exhaustive):-target spirv -entry aliasAlignMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=ALIAS_COUNT,non-exhaustive):-target spirv -entry aliasCountMain -stage compute
 // non-exhaustive: capability errors include provenance notes.
 
 enum Mode
@@ -14,6 +17,8 @@ struct Holder<let mode : Mode>
     int payload;
 }
 
+typealias Alias = Holder<Mode.hlslMode>;
+
 int readInt<let value : int>() { return value; }
 
 RWStructuredBuffer<int> outputBuffer;
@@ -25,6 +30,9 @@ void hlslMain()
     outputBuffer[0] = readInt<sizeof(Holder<Mode.hlslMode>)>();
     outputBuffer[1] = readInt<alignof(Holder<Mode.hlslMode>)>();
     outputBuffer[2] = readInt<countof(Tuple<Holder<Mode.hlslMode>>) >();
+    outputBuffer[3] = readInt<sizeof(Alias)>();
+    outputBuffer[4] = readInt<alignof(Alias)>();
+    outputBuffer[5] = readInt<countof(Tuple<Alias>)>();
 }
 
 [numthreads(1, 1, 1)]
@@ -47,4 +55,25 @@ void countMain()
 //COUNT: uses features that are not available
 {
     outputBuffer[0] = readInt<countof(Tuple<Holder<Mode.hlslMode>>) >();
+}
+
+[numthreads(1, 1, 1)]
+void aliasSizeMain()
+//ALIAS_SIZE: entrypoint 'aliasSizeMain' uses features that are not available
+{
+    outputBuffer[0] = readInt<sizeof(Alias)>();
+}
+
+[numthreads(1, 1, 1)]
+void aliasAlignMain()
+//ALIAS_ALIGN: entrypoint 'aliasAlignMain' uses features that are not available
+{
+    outputBuffer[0] = readInt<alignof(Alias)>();
+}
+
+[numthreads(1, 1, 1)]
+void aliasCountMain()
+//ALIAS_COUNT: entrypoint 'aliasCountMain' uses features that are not available
+{
+    outputBuffer[0] = readInt<countof(Tuple<Alias>)>();
 }

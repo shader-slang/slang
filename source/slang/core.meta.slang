@@ -999,9 +999,10 @@ interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat, IFloatingPoint
 //
 // The compiler handles MyEnum(0x01) as a builtin cast, without calling an interface constructor.
 // The constant must match exactly one case; the cast carries that case's capability requirements
-// and warns that the numeric spelling introduces them. Runtime integers and constants without a
-// unique matching case are rejected. Omitting integer constructors from this interface prevents
-// generic code from bypassing these checks through a constructor promised by its constraint.
+// and warns that the numeric spelling introduces them. A value that depends on a generic parameter
+// is validated after specialization. Runtime integers and constants without a matching case are
+// rejected. Omitting integer constructors from this interface prevents generic code from bypassing
+// these checks through a constructor promised by its constraint.
 [builtin]
 __magic_type(RestrictedEnumType)
 interface __RestrictedEnumType : __LogicalType

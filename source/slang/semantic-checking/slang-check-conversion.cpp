@@ -2304,7 +2304,7 @@ bool SemanticsVisitor::_coerce(
     if (auto enumDecl = isEnumType(fromType))
     {
         Type* tagType = enumDecl->tagType;
-        if (tagType == toType)
+        if (tagType->equals(toType))
         {
             if (outCost)
             {
@@ -2387,6 +2387,9 @@ bool SemanticsVisitor::_coerce(
             if (requiresNamedCase && !fromExpr)
                 return false;
 
+            // A cast in a declaration's type, such as `Holder<Mode(N)> field`, can be
+            // checked before the enum's bases. Finish that phase before reading its tag type.
+            ensureDecl(toEnumDeclRef, DeclCheckState::ReadyForLookup);
             auto tagType = getTagType(m_astBuilder, toEnumDeclRef);
             if (!tagType)
                 return false;

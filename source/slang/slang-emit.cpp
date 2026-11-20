@@ -678,6 +678,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_LateRequireCapability:
     case kIROp_CheckEnumCast:
+    case kIROp_CheckEnumRequirements:
+    case kIROp_EnumCastRequirementDecoration:
+    case kIROp_EnumRequirementValidatorDecoration:
         result.lateRequireCapability = true;
         break;
     case kIROp_MatrixType:
@@ -1647,6 +1650,13 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // Specialization exposes declaration-owned enum requirements. Move them into their retained
+    // source uses before type legalization and dead-code elimination can erase those type uses.
+    if (requiredLoweringPassSet.lateRequireCapability)
+        SLANG_PASS(
+            materializeEnumRequirements,
+            EnumRequirementMaterializationPhase::AfterSpecialization);
+
     // The linker can resolve an external type to a definition containing resources or an unsized
     // array. We need to validate mutable storage after those fields become available.
     // We check the linked IR at the specialization checkpoint, before resource legalization
@@ -1920,6 +1930,13 @@ Result linkAndOptimizeIR(
         // as the later target pipelines do.
         SLANG_PASS(cleanUpVoidType);
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
+        // This is the VM pipeline's final specialization and dead-code elimination checkpoint.
+        // Validate surviving requirements here so deferred enum casts are checked and their
+        // compiler-only instructions are removed before bytecode emission.
+        if (requiredLoweringPassSet.lateRequireCapability)
+            SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
         return SLANG_OK;
     }
 

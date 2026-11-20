@@ -894,7 +894,15 @@ struct SemanticsDeclTypeResolutionVisitor : public SemanticsDeclVisitorBase,
     void visitDecl(Decl*) {}
     void visitDeclGroup(DeclGroup*) {}
 
-    void visitTypeExp(TypeExp& exp) { exp.type = resolveType(exp.type); }
+    void visitTypeExp(TypeExp& exp)
+    {
+        // Populate the type's canonical resolution without replacing its checked operands.
+        // For `Holder<Mode(N)> value`, the source type retains the deferred enum conversion
+        // that lowering must validate even if Holder never reads its generic argument.
+        // Type::resolve caches the canonical type; ordinary type queries and equality still
+        // use that result, while reference analysis and lowering can see source obligations.
+        resolveType(exp.type);
+    }
 
     void visitVarDeclBase(VarDeclBase* varDecl) { visitTypeExp(varDecl->type); }
 
@@ -1530,6 +1538,40 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitRequireCapabilityStmt(RequireCapabilityStmt*) { return; }
 
     // Val Visitor
+
+    void visitNamedExpressionType(NamedExpressionType* type)
+    {
+        if (!visitedVals.add(type))
+            return;
+
+        // Consider `Buffer<float> input`: its checked type retains the Buffer alias,
+        // while its instantiated underlying texture type selects __ShapeBuffer and its
+        // target requirements. Visit both the alias reference and its checked underlying
+        // type so preserving source spelling does not hide those dependencies. The
+        // reference also retains selected generic arguments that the alias may not use.
+        auto declRef = type->getDeclRef();
+        processReferencedDecl(declRef.getDecl());
+        dispatchIfNotNull(declRef.declRefBase);
+        dispatchIfNotNull(getType(this->getASTBuilder(), declRef));
+    }
+
+    void visitEnumCaseIntVal(EnumCaseIntVal* value)
+    {
+        processReferencedDecl(value->getDeclRef().getDecl());
+        visitVal(value);
+    }
+
+    void visitIntValWithRequirements(IntValWithRequirements* value)
+    {
+        // A retained source reference can name a member, such as Globals.copiedCase.
+        // MemberDeclRef stores that member as an AST operand, so walking Val operands
+        // alone only visits its parent. Process the selected declaration explicitly,
+        // just as visitDeclRefExpr does before its source expression is folded away.
+        for (auto requirement : value->getRequirements())
+            if (auto declRef = as<DeclRefBase>(requirement))
+                processReferencedDecl(declRef->getDecl());
+        visitVal(value);
+    }
 
     void visitDirectDeclRef(DirectDeclRef* declRef)
     {
@@ -4788,6 +4830,104 @@ void collectReferencedDecls(SemanticsVisitor* context, NodeBase* node, HashSet<D
         visitor.dispatchIfNotNull(expr);
     else if (auto decl = as<Decl>(node))
         visitor.dispatchIfNotNull(decl);
+}
+
+// Visit the capability requirements of the individual conformances in a type-pack proof.
+// Consider this example:
+//
+//     [require(metal)] interface IMetalItem {}
+//     struct Items<each T> where expand each T : IMetalItem { int payload; }
+//     int read<let N : int>() { return N; }
+//     [require(hlsl)] export int emptySize() { return read<sizeof(Items<>)>(); }
+//
+// SemanticsVisitor::isSubtype uses getSubtypeWitnessPack to represent the empty pack's
+// vacuously satisfied constraint. That canonical witness retains IMetalItem as its supertype,
+// but has no element conformances requiring Metal. Both capability analysis and collection
+// before folding must visit only the element witnesses: nonempty packs still propagate each
+// conformance's capabilities, while an empty pack contributes none. General declaration-reference
+// collection still visits the supertype because it remains part of the proof's identity.
+template<typename Visitor>
+static void visitTypePackConformanceRequirements(Visitor* visitor, TypePackSubtypeWitness* witness)
+{
+    if (!visitor->visitedVals.add(witness))
+        return;
+
+    // getCount() excludes the pack type and constraint interface.
+    for (Index i = 0; i < witness->getCount(); i++)
+        visitor->dispatchIfNotNull(witness->getWitness(i));
+}
+
+// Reuse declaration-reference analysis when folding erases a source operand. Consider
+// `read<true ? 1 : int(Mode.hlslMode)>()`: the unselected arm must not be evaluated, but
+// its named case has the same capability requirement as in an ordinary expression.
+// Retain declaration references rather than recursively inspecting their initializers:
+// `static const int k = int(Mode.hlslMode)` already owns its inferred requirement, so a
+// skipped reference to k must propagate that requirement through the ordinary checker.
+struct CollectFoldedOperandRequirementsVisitor
+    : SemanticsDeclReferenceVisitor<CollectFoldedOperandRequirementsVisitor>
+{
+    typedef SemanticsDeclReferenceVisitor<CollectFoldedOperandRequirementsVisitor> Base;
+
+    List<Val*>& requirements;
+    SubstitutionSet substitutions;
+
+    CollectFoldedOperandRequirementsVisitor(
+        SemanticsContext const& outer,
+        SubstitutionSet substitutions,
+        List<Val*>& requirements)
+        : Base(outer), requirements(requirements), substitutions(substitutions)
+    {
+    }
+
+    void collectReference(DeclRefBase* declRef)
+    {
+        if (declRef)
+            requirements.add(declRef->substitute(getASTBuilder(), substitutions));
+    }
+
+    void visitDirectDeclRef(DirectDeclRef* declRef)
+    {
+        collectReference(declRef);
+        Base::visitDirectDeclRef(declRef);
+    }
+
+    void visitVal(Val* value)
+    {
+        if (visitedVals.contains(value))
+            return;
+        collectReference(as<DeclRefBase>(value));
+        Base::visitVal(value);
+    }
+
+    void visitIntValWithRequirements(IntValWithRequirements* value)
+    {
+        if (visitedVals.contains(value))
+            return;
+        for (auto requirement : value->getRequirements())
+            requirements.add(requirement->substitute(getASTBuilder(), substitutions));
+        Base::visitIntValWithRequirements(value);
+    }
+
+    void visitTypePackSubtypeWitness(TypePackSubtypeWitness* witness)
+    {
+        visitTypePackConformanceRequirements(this, witness);
+    }
+
+    void processReferencedDecl(Decl*) override {}
+    void processDeclModifiers(Decl*, SourceLoc) override {}
+};
+
+void collectFoldedOperandRequirements(
+    SemanticsVisitor* context,
+    NodeBase* node,
+    SubstitutionSet substitutions,
+    List<Val*>& requirements)
+{
+    CollectFoldedOperandRequirementsVisitor visitor(*context, substitutions, requirements);
+    if (auto value = as<Val>(node))
+        visitor.dispatchIfNotNull(value);
+    else if (auto expr = as<Expr>(node))
+        visitor.dispatchIfNotNull(expr);
 }
 
 void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericDecl(
@@ -22881,8 +23021,12 @@ struct CapabilityDeclReferenceVisitor
         // may precede `struct Globals { static const int mode = int(Mode.hlslMode); }`.
         // Complete the declaration's new source-dependency analysis before taking the
         // requirement snapshot, including references retained by constant enum casts.
-        if (as<EnumCaseDecl>(decl) || as<TypeDefDecl>(decl) ||
-            shouldInferCapabilitiesFromVariableInitializer(decl))
+        // Preserve _propagateRequirement's cycle handling when taking this earlier snapshot.
+        // For example, a self-referencing static initializer is already diagnosed by value
+        // checking and must not re-enter its own capability analysis.
+        if (!decl->checkState.isBeingChecked() &&
+            (as<EnumCaseDecl>(decl) || as<TypeDefDecl>(decl) ||
+             shouldInferCapabilitiesFromVariableInitializer(decl)))
             this->ensureDecl(decl, DeclCheckState::CapabilityChecked);
         handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
     }
@@ -22891,33 +23035,9 @@ struct CapabilityDeclReferenceVisitor
         if (decl)
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
     }
-    // Collect the capabilities of the individual conformances in a type-pack proof.
-    // Consider this example:
-    //
-    //     [require(metal)] interface IMetalItem {}
-    //     struct Items<each T> where expand each T : IMetalItem
-    //     {
-    //         static const int count = countof(T);
-    //     }
-    //     [require(hlsl)] export int emptyCount() { return Items<>.count; }
-    //
-    // SemanticsVisitor::isSubtype uses getSubtypeWitnessPack to represent the empty pack's
-    // vacuously satisfied constraint. That canonical witness retains IMetalItem as its
-    // supertype, but has no element conformances requiring Metal. Visiting every operand
-    // would incorrectly restrict emptyCount to Metal. Visit the element witnesses instead:
-    // nonempty packs still propagate each conformance's capabilities, while an empty pack
-    // contributes none. General declaration-reference collection still visits the supertype
-    // because it remains part of the proof's identity.
     void visitTypePackSubtypeWitness(TypePackSubtypeWitness* witness)
     {
-        // Skip this witness if this capability checker has already visited it.
-        if (!this->visitedVals.add(witness))
-            return;
-
-        // Collect requirements from each element's conformance. getCount() excludes the pack
-        // type and constraint interface, so an empty pack adds no capability requirements.
-        for (Index i = 0; i < witness->getCount(); i++)
-            this->dispatchIfNotNull(witness->getWitness(i));
+        visitTypePackConformanceRequirements(this, witness);
     }
     // Join a user-defined derivative's capability requirements into the differentiating
     // function, gated on the derivative carrying an explicit `[require]`. The gate is

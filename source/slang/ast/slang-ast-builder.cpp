@@ -803,10 +803,10 @@ IntVal* ASTBuilder::getIntValWithRequirements(IntVal* value, ConstArrayView<Val*
             auto enumRef = isDeclRefTypeOf<EnumDecl>(cast->getType()->getCanonicalType());
             SLANG_RELEASE_ASSERT(enumRef && enumRef.getDecl()->hasCapabilityRestrictedCases);
         }
-        else if (auto declRef = as<DeclRefBase>(requirement))
-            SLANG_RELEASE_ASSERT(declRef->is<EnumCaseDecl>());
         else
-            SLANG_RELEASE_ASSERT(as<EnumCaseIntVal>(requirement));
+            SLANG_RELEASE_ASSERT(
+                as<DeclRefBase>(requirement) || as<EnumCaseIntVal>(requirement) ||
+                as<Type>(requirement));
         if (seen.add(requirement))
             combined.add(requirement);
     }

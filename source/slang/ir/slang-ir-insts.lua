@@ -2250,6 +2250,17 @@ local insts = {
 					min_operands = 1,
 				},
 			},
+			{ EnumRequirementValidator = {
+				-- A generic native type uses this separate generic to specialize only its checks.
+				struct_name = "EnumRequirementValidatorDecoration",
+				operands = { { "validator", "IRGeneric" } },
+			} },
+			{ EnumCastRequirement = {
+				-- A declaration owns this conversion obligation until a source use requests it.
+				struct_name = "EnumCastRequirementDecoration",
+				operands = { { "value" }, { "enumName", "IRStringLit" } },
+				min_operands = 2,
+			} },
 			{
 				keepAlive = {
 					-- A `[keepAlive]` decoration marks an instruction that should not be eliminated.
@@ -3543,6 +3554,10 @@ local insts = {
 			{ "enumName", "IRStringLit" },
 		},
 		min_operands = 2,
+	} },
+	{ CheckEnumRequirements = {
+		-- Keep a source use of a type or declaration until specialization exposes its obligations.
+		operands = { { "source" } },
 	} },
 
 	-- Constexpr arithmetic ops. These are hoistable variants of the regular

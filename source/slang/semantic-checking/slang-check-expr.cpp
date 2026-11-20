@@ -2567,6 +2567,22 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
                 !getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DisableShortCircuit);
             const Index resultArgIndex =
                 getShortCircuitResultArgIndex(opKind, constFirstArg, logicalOpsShortCircuit);
+            if (resultArgIndex >= 0)
+            {
+                // Numeric short-circuiting skips evaluation, not source capability uses.
+                // Collect named cases in the skipped arms without folding their operations.
+                for (Index skipped = 1; skipped < argCount; ++skipped)
+                {
+                    if (skipped == resultArgIndex)
+                        continue;
+                    auto skippedArg = getArg(invokeExpr, skipped);
+                    collectFoldedOperandRequirements(
+                        this,
+                        skippedArg.getExpr(),
+                        skippedArg.getSubsts(),
+                        *circularityInfo->requirements);
+                }
+            }
             if (resultArgIndex == 0)
                 return m_astBuilder->getIntVal(
                     invokeExpr.getExpr()->type.type,
@@ -2896,34 +2912,6 @@ IntVal* SemanticsVisitor::tryConstantFoldBuiltinOperatorExpr(
     }
 }
 
-// Collect case requirements from a checked type before a layout query replaces it with an
-// integer. Consider `read<sizeof(Holder<Mode.hlslMode>)>()`: sizeof folds to the size of
-// Holder, so its numeric result no longer contains the argument that selected hlslMode.
-// The type's existing Val operands are the semantic source of those dependencies. We walk
-// them without resolving the type, just as declaration-reference analysis does, and retain
-// only enum requirements rather than making every layout constant carry its source type.
-static void collectEnumCaseRequirements(Val* value, List<Val*>& requirements)
-{
-    List<Val*> workList;
-    HashSet<Val*> visited;
-    workList.add(value);
-    while (workList.getCount())
-    {
-        auto current = workList.getLast();
-        workList.removeLast();
-        if (!current || !visited.add(current))
-            continue;
-        if (auto enumCase = as<EnumCaseIntVal>(current))
-            requirements.add(enumCase->getDeclRef().declRefBase);
-        if (auto wrapped = as<IntValWithRequirements>(current))
-            for (auto requirement : wrapped->getRequirements())
-                requirements.add(requirement);
-        for (auto operand : current->m_operands)
-            if (operand.kind == ValNodeOperandKind::ValNode)
-                workList.add(operand.getVal());
-    }
-}
-
 IntVal* SemanticsVisitor::tryConstantFoldExpr(
     SubstExpr<Expr> expr,
     ConstantFoldingKind kind,
@@ -2989,7 +2977,9 @@ IntVal* SemanticsVisitor::tryConstantFoldExprImpl(
             auto type = arrayLengthExpr.getExpr()->arrayExpr->type.type->substitute(
                 m_astBuilder,
                 expr.getSubsts());
-            collectEnumCaseRequirements(type, *circularityInfo->requirements);
+            // Keep the checked type itself: it can acquire deferred field requirements
+            // after specialization even when its numeric size is already known.
+            circularityInfo->requirements->add(type);
             if (auto arrayType = as<ArrayExpressionType>(type))
             {
                 if (!arrayType->isUnsized())
@@ -3015,7 +3005,9 @@ IntVal* SemanticsVisitor::tryConstantFoldExprImpl(
         auto type = as<Type>(
             sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
 
-        collectEnumCaseRequirements(type, *circularityInfo->requirements);
+        // A layout query can erase the entire source type. Keep that semantic operand
+        // so capability analysis and later specialization see the same type use.
+        circularityInfo->requirements->add(type);
 
         if (sizeOfLikeExpr.getExpr()->dataLayoutType)
         {
@@ -3699,10 +3691,10 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
             // Validate that the array size is non-negative and fits in `int`, the type in which
             // `ArrayExpressionType` stores it. The size keeps the type of its expression here,
             // so an unsigned size such as `0xFFFFFFFFu` is too large rather than negative.
-            if (auto constElementCount = as<ConstantIntVal>(elementCount))
+            IntegerLiteralValue size;
+            if (tryGetConstantIntVal(elementCount, size))
             {
-                const IntegerLiteralValue size = constElementCount->getValue();
-                if (size < 0 && !_isUnsignedIntegerType(m_astBuilder, constElementCount->getType()))
+                if (size < 0 && !_isUnsignedIntegerType(m_astBuilder, elementCount->getType()))
                 {
                     getSink()->diagnose(Diagnostics::InvalidArraySize{
                         .location = subscriptExpr->indexExprs[0]->loc});

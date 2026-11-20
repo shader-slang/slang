@@ -2250,9 +2250,19 @@ Val* TypeCastIntVal::_substituteImplOverride(
 
 Val* TypeCastIntVal::_resolveImplOverride()
 {
-    if (auto resolved = tryFoldImpl(getCurrentASTBuilder(), getType(), getBase(), nullptr))
+    auto astBuilder = getCurrentASTBuilder();
+    auto type = getType()->getCanonicalType();
+    auto base = getBase()->resolve();
+    if (auto resolved = tryFoldImpl(astBuilder, type, base, nullptr))
         return resolved;
-    return this;
+
+    // For `let N : uint32_t`, substitution can construct `uint32_t(N)` with a
+    // canonical `uint` parameter. Resolving the cast must recover that same integer
+    // value. A cast to a different integer type still matters: `int(uint8_t(N))`
+    // must retain the inner narrowing conversion even when N is not known yet.
+    if (auto intVal = as<IntVal>(base); intVal && intVal->getType()->equals(type))
+        return intVal;
+    return astBuilder->getOrCreate<TypeCastIntVal>(type, base);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinOperationIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

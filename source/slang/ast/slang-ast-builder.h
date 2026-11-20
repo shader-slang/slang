@@ -482,10 +482,9 @@ public:
 
     IntVal* getTypeCastIntVal(Type* type, Val* base)
     {
-        // Unwrap any existing type casts.
-        while (auto baseTypeCast = as<TypeCastIntVal>(base))
-            base = baseTypeCast->getBase();
-
+        // Preserve nested conversions until normal resolution can fold or remove them.
+        // For example, Mode(uint8_t(N)) must narrow N before selecting the enum case;
+        // stripping the inner cast would incorrectly reject N = 256 instead of selecting zero.
         if (auto foldedCast = as<IntVal>(TypeCastIntVal::tryFoldImpl(this, type, base, nullptr)))
             return foldedCast;
 

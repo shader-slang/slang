@@ -165,6 +165,10 @@ class ConstantIntVal : public IntVal
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
 
+    // Constants retain their source type until canonicalization. For example, `uint(0)`
+    // and `uint32_t(0)` must resolve to the same value when used as generic arguments.
+    Val* _resolveImplOverride() { return defaultResolveImpl(); }
+
     ConstantIntVal(Type* inType, IntegerLiteralValue inValue) { setOperands(inType, inValue); }
     bool _isLinkTimeValOverride() { return false; }
 };
@@ -199,10 +203,11 @@ class IntValWithRequirements : public IntVal
             m_operands.add(ValNodeOperand(requirement));
     }
     IntVal* getValue() { return as<IntVal>(getOperand(1)); }
-    // Requirements are enum-case declaration references or deferred TypeCastIntVals targeting
-    // a restricted enum. Substitution can fold a deferred cast into an EnumCaseIntVal. All
-    // three forms preserve the selected case for declaration-reference analysis; only an
-    // unresolved cast needs an IR check after specialization.
+    // Requirements are source declaration references, checked types erased by layout queries,
+    // or deferred TypeCastIntVals targeting a restricted enum. A reference can name an alias
+    // or constant with an inferred case requirement; a type can contain deferred field checks.
+    // Substitution can fold a deferred cast into an EnumCaseIntVal. Declaration-reference
+    // analysis uses these operands, while lowering retains checks that need specialization.
     OperandView<Val> getRequirements() { return OperandView<Val>(this, 2, getOperandCount() - 2); }
     Val* _resolveImplOverride() { return getValue()->resolve(); }
     void _toTextOverride(StringBuilder& out) { getValue()->toText(out); }

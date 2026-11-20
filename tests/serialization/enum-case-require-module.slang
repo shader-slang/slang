@@ -21,3 +21,15 @@ public int readTypeDefault<T = Holder<Mode.hlslMode>>() { return 1; }
 public int readSymbolic<let tag : int>() { return int(Mode(tag + 1)); }
 
 public int readSymbolicCancelled<let tag : int>() { return int(Mode(tag)) * 0; }
+
+public struct Wrapper<let tag : int>
+{
+    public Holder<Mode(tag)> field;
+    public int payload;
+}
+
+__target_intrinsic(hlsl, "int")
+public struct NativeWrapper<let tag : int>
+{
+    public Holder<Mode(tag)> field;
+}
