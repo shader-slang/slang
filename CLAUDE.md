@@ -37,7 +37,8 @@ cmake --preset default
 
 # Configure with visual studio 2022 settings (Preferred on Windows)
 # On Windows, include -DSLANG_IGNORE_ABORT_MSG=ON to suppress
-# modal abort dialogs during unattended/LLM-driven builds.
+# modal abort and debug-CRT report dialogs during unattended/LLM-driven
+# builds (debug-CRT error/assert reports are routed to stderr).
 # Use -DSLANG_EMBED_CORE_MODULE=OFF to keep core module compilation separate
 # from C++ source compilation. This way errors in *.meta.slang files (e.g.
 # hlsl.meta.slang) do not break the C++ compile — slangc and slang-test still
@@ -530,6 +531,8 @@ On Windows, assertion failures normally open a modal dialog that blocks executio
 
 The behavior on Windows after an exception is thrown is controlled by the CMake option `SLANG_IGNORE_ABORT_MSG`.
 This option is highly recommended for unattended automation with LLM workflow; it bakes the behavior into all built executables at compile time.
+It also routes MSVC debug-CRT `_CRT_ERROR`/`_CRT_ASSERT` reports to stderr (and the debugger) at tool startup via
+`TestToolUtil::suppressCrtModalDialogs()`, so those reports no longer open a blocking modal dialog.
 
 #### RTX Remix Testing
 

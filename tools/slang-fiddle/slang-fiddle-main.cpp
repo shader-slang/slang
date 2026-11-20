@@ -408,7 +408,7 @@ int main(int argc, char const* const* argv)
     using namespace fiddle;
     using namespace Slang;
 
-    TestToolUtil::suppressCrtDebugDialogs();
+    TestToolUtil::suppressCrtModalDialogs();
 
     ComPtr<ISlangWriter> writer(
         new FileWriter(stderr, WriterFlag::IsUnowned | WriterFlag::AutoFlush));

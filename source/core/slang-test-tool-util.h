@@ -62,12 +62,16 @@ struct TestToolUtil
     /// Given a slang result, returns a return code that can be returned from an executable
     static ToolReturnCode getReturnCode(SlangResult res);
 
-    /// Stops an MSVC build from blocking an unattended run behind a modal
-    /// dialog: silences the abort() dialog, and routes debug-CRT
+    /// Stops a tool built with MSVC from blocking an unattended run behind a
+    /// modal dialog: silences the abort() dialog, and routes debug-CRT
     /// `_CRT_ERROR`/`_CRT_ASSERT` reports to stderr (and to an attached
-    /// debugger) instead of a message box. No effect on other platforms or
-    /// when SLANG_IGNORE_ABORT_MSG is not defined.
-    static void suppressCrtDebugDialogs();
+    /// debugger) instead of a message box. `_CRT_WARN` — the channel
+    /// `_CrtDumpMemoryLeaks` reports through — keeps its default destination;
+    /// a tool that wants its leak dump in logs routes it itself, as slangc
+    /// does at exit. Call once at the top of a tool main that may run
+    /// unattended. No effect on other platforms or when
+    /// SLANG_IGNORE_ABORT_MSG is not defined.
+    static void suppressCrtModalDialogs();
 
     /// Given the executable path (as located in Slang directory hierarchy), works out the absolute
     /// path to the root

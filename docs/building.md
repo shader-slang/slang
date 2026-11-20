@@ -331,7 +331,7 @@ works for any given binary.
 | `SLANG_SLANG_LLVM_BINARY_URL`         | System dependent              | URL specifying the location of the slang-llvm prebuilt library                                                                                                                                                                     |
 | `SLANG_USE_SCCACHE`                   | `FALSE`                       | Use sccache as compiler launcher (auto-disables PCH)                                                                                                                                                                               |
 | `SLANG_GENERATORS_PATH`               | ``                            | Path to an installed `all-generators` target for cross compilation                                                                                                                                                                 |
-| `SLANG_IGNORE_ABORT_MSG`              | `FALSE`                       | Suppress the Windows modal abort dialog at compile time (baked into all built executables; recommended for unattended/LLM-driven builds)                                                                                           |
+| `SLANG_IGNORE_ABORT_MSG`              | `FALSE`                       | Suppress the Windows modal abort and debug-CRT report dialogs at compile time (baked into all built executables; debug-CRT error/assert reports are routed to stderr; recommended for unattended/LLM-driven builds)                                                                                           |
 
 #### DXC GLIBC auto-detection
 

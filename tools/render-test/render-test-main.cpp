@@ -2206,7 +2206,7 @@ int main(int argc, char** argv)
 {
     using namespace Slang;
 
-    TestToolUtil::suppressCrtDebugDialogs();
+    TestToolUtil::suppressCrtModalDialogs();
 
     SlangSession* session = spCreateSession(nullptr);
 

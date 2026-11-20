@@ -60,7 +60,7 @@ namespace Slang
     return false;
 }
 
-/* static */ void TestToolUtil::suppressCrtDebugDialogs()
+/* static */ void TestToolUtil::suppressCrtModalDialogs()
 {
 #if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
     // Silencing the abort() dialog is not enough to keep an unattended run

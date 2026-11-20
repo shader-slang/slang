@@ -306,7 +306,7 @@ SlangResult TestServer::init(int argc, const char* const* argv)
     _startParentMonitorFromArgs(argc, argv);
 #endif
 
-    TestToolUtil::suppressCrtDebugDialogs();
+    TestToolUtil::suppressCrtModalDialogs();
 
     String canonicalPath;
     if (SLANG_SUCCEEDED(Path::getCanonical(m_exePath, canonicalPath)))

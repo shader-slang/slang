@@ -157,7 +157,7 @@ option(
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(
     SLANG_IGNORE_ABORT_MSG
-    "Ignore the system modal assert dialog while running build tools to help LLM workflow."
+    "Suppress modal abort and debug-CRT report dialogs while running build tools to help LLM workflow (debug-CRT error/assert reports are routed to stderr and the debugger)."
     OFF
 )
 if(SLANG_IGNORE_ABORT_MSG)

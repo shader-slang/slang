@@ -855,7 +855,7 @@ List<RefPtr<SourceFile>> gSourceFiles;
 
 int main(int argc, const char* const* argv)
 {
-    TestToolUtil::suppressCrtDebugDialogs();
+    TestToolUtil::suppressCrtModalDialogs();
 
     // Parse command-line arguments.
     List<String> inputPaths;

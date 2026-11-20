@@ -8386,7 +8386,7 @@ int main(int argc, char** argv)
     signal(SIGPIPE, SIG_IGN);
 #endif
 
-    TestToolUtil::suppressCrtDebugDialogs();
+    TestToolUtil::suppressCrtModalDialogs();
 
     // Fallback: run without cleanup if context initialization fails
     SlangResult res = innerMain(argc, argv);

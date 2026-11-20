@@ -126,7 +126,7 @@ int wmain(int argc, wchar_t** argv)
 {
     int result = 0;
 
-    TestToolUtil::suppressCrtDebugDialogs();
+    TestToolUtil::suppressCrtModalDialogs();
 
     {
         // Convert the wide-character Unicode arguments to UTF-8,
@@ -152,6 +152,12 @@ int wmain(int argc, wchar_t** argv)
     // _CrtXXX functions are functional only for debug build. The spec says,
     // "When _DEBUG isn't defined, calls to _CrtSetReportMode are removed
     // during preprocessing."
+    //
+    // Unlike the startup call above, this block is not gated on
+    // SLANG_IGNORE_ABORT_MSG: it also routes _CRT_WARN — the channel
+    // _CrtDumpMemoryLeaks reports through — so the leak dump reaches stderr
+    // in every MSVC debug build. Re-setting the _CRT_ERROR/_CRT_ASSERT modes
+    // the startup call already set is harmless.
     _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE | _CRTDBG_MODE_DEBUG);
     _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDERR);
     _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE | _CRTDBG_MODE_DEBUG);
