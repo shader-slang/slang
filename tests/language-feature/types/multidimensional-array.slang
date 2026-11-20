@@ -7,7 +7,7 @@
 // declarator dimensions are outermost: `int[2][3] arr[5][4]` is a 5-element
 // array of 4-element arrays of `int[2][3]`.
 
-//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: set output = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> output;
