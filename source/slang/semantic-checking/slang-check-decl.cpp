@@ -1053,6 +1053,7 @@ template<typename VisitorType>
 struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
                                        public StmtVisitor<VisitorType>,
                                        public ExprVisitor<VisitorType>,
+                                       public ConditionClauseVisitor<VisitorType>,
                                        public ValVisitor<VisitorType>,
                                        public DeclVisitor<VisitorType>
 {
@@ -1300,6 +1301,21 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->innerExpr);
     }
 
+    // Condition clause visitor
+
+    void visitExprConditionClause(ExprConditionClause* conditionClause)
+    {
+        dispatchIfNotNull(conditionClause->expr);
+    }
+
+    void visitDeclConditionClause(DeclConditionClause* conditionClause)
+    {
+        dispatchIfNotNull(conditionClause->decl);
+        // The implicit conversion to `bool` can introduce references beyond those
+        // in the declaration's type and initializer.
+        dispatchIfNotNull(conditionClause->predicateExpr);
+    }
+
     // Stmt Visitor
 
     void visitDeclStmt(DeclStmt* stmt) { dispatchIfNotNull(stmt->decl); }
@@ -1320,7 +1336,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitDoWhileStmt(DoWhileStmt* stmt)
     {
-        dispatchIfNotNull(stmt->predicate);
+        ConditionClauseVisitor<VisitorType>::dispatch(stmt->condition);
         dispatchIfNotNull(stmt->statement);
     }
 
@@ -1361,7 +1377,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitIfStmt(IfStmt* stmt)
     {
-        dispatchIfNotNull(stmt->predicate);
+        ConditionClauseVisitor<VisitorType>::dispatch(stmt->condition);
         dispatchIfNotNull(stmt->positiveStatement);
         dispatchIfNotNull(stmt->negativeStatement);
     }
@@ -1387,7 +1403,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitWhileStmt(WhileStmt* stmt)
     {
-        dispatchIfNotNull(stmt->predicate);
+        ConditionClauseVisitor<VisitorType>::dispatch(stmt->condition);
         dispatchIfNotNull(stmt->statement);
     }
 

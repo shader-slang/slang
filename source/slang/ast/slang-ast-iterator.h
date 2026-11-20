@@ -366,7 +366,8 @@ struct ASTIterator
         void visitDetachExpr(DetachExpr* expr) { iterator->maybeDispatchCallback(expr); }
     };
 
-    struct ASTIteratorStmtVisitor : public StmtVisitor<ASTIteratorStmtVisitor>
+    struct ASTIteratorStmtVisitor : public StmtVisitor<ASTIteratorStmtVisitor>,
+                                    public ConditionClauseVisitor<ASTIteratorStmtVisitor>
     {
         ASTIterator* iterator;
         ASTIteratorStmtVisitor(ASTIterator* iter)
@@ -378,7 +379,19 @@ struct ASTIterator
         {
             if (!stmt)
                 return;
-            this->dispatch(stmt);
+            StmtVisitor<ASTIteratorStmtVisitor>::dispatch(stmt);
+        }
+
+        void visitExprConditionClause(ExprConditionClause* conditionClause)
+        {
+            iterator->visitExpr(conditionClause->expr);
+        }
+
+        void visitDeclConditionClause(DeclConditionClause* conditionClause)
+        {
+            // The checker uses the declaration name's location for the implicit predicate.
+            // Only the declaration has tokens to report.
+            iterator->visitDecl(conditionClause->decl);
         }
 
         void visitDeclStmt(DeclStmt* stmt)
@@ -413,7 +426,7 @@ struct ASTIterator
         void visitDoWhileStmt(DoWhileStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);
-            iterator->visitExpr(stmt->predicate);
+            ConditionClauseVisitor<ASTIteratorStmtVisitor>::dispatch(stmt->condition);
             dispatchIfNotNull(stmt->statement);
         }
 
@@ -464,7 +477,7 @@ struct ASTIterator
         void visitIfStmt(IfStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);
-            iterator->visitExpr(stmt->predicate);
+            ConditionClauseVisitor<ASTIteratorStmtVisitor>::dispatch(stmt->condition);
             dispatchIfNotNull(stmt->positiveStatement);
             dispatchIfNotNull(stmt->negativeStatement);
         }
@@ -504,7 +517,7 @@ struct ASTIterator
         void visitWhileStmt(WhileStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);
-            iterator->visitExpr(stmt->predicate);
+            ConditionClauseVisitor<ASTIteratorStmtVisitor>::dispatch(stmt->condition);
             dispatchIfNotNull(stmt->statement);
         }
 

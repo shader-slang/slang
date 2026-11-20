@@ -3844,6 +3844,8 @@ DeclRef<D> createDefaultSpecializedDeclRef(
 struct StmtLoweringVisitor;
 
 static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt);
+/// Emit a debug lexical block at `loc` when debug info and an enclosing scope are available.
+static IRInst* maybeEmitDebugLexicalBlockAt(IRGenContext* context, SourceLoc loc);
 
 void maybeEmitDebugLine(
     IRGenContext* context,
@@ -7693,7 +7695,9 @@ void lowerRValueExprWithDestination(IRGenContext* context, LoweredValInfo destin
     visitor.dispatch(expr);
 }
 
-struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
+/// A visitor that emits IR for checked statements and their condition clauses.
+struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>,
+                             ConditionClauseVisitor<StmtLoweringVisitor, IRInst*>
 {
     IRGenContext* context;
 
@@ -7893,20 +7897,68 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         context->scopeEndBlock = previous;
     }
 
+    /// Emit IR to evaluate a checked condition clause and return its Boolean value.
+    IRInst* lowerConditionClause(ConditionClause* conditionClause)
+    {
+        return ConditionClauseVisitor<StmtLoweringVisitor, IRInst*>::dispatch(conditionClause);
+    }
+
+    IRInst* visitExprConditionClause(ExprConditionClause* conditionClause)
+    {
+        return getSimpleVal(context, lowerRValueExpr(context, conditionClause->expr));
+    }
+
+    IRInst* visitDeclConditionClause(DeclConditionClause* conditionClause)
+    {
+        // The checked predicate reads the declared variable. We lower its declaration first
+        // so the same initialized variable supplies the test and any references in the body.
+        lowerDecl(context, conditionClause->decl);
+        return getSimpleVal(context, lowerRValueExpr(context, conditionClause->predicateExpr));
+    }
+
+    /// Enter a debug lexical block for the statement's declarations when emitting debug info.
+    ///
+    /// Returns the enclosing debug scope. The caller restores it before inserting the exit
+    /// block because `insertBlock` emits a marker for the scope active at the new block.
+    IRInst* maybeEnterConditionDebugScope(ScopeStmt* stmt, SourceLoc conditionLoc)
+    {
+        auto enclosingDebugScope = context->currentDebugScope;
+        // The parser can give the statement a scope even for an expression condition.
+        // We keep the enclosing debug scope when the statement's own scope has no declarations.
+        if (!stmt->scopeDecl || stmt->scopeDecl->getDirectMemberDeclCount() == 0)
+            return enclosingDebugScope;
+
+        if (auto debugScope = maybeEmitDebugLexicalBlockAt(context, conditionLoc))
+        {
+            context->currentDebugScope = debugScope;
+            emitCurrentDebugScope(context);
+        }
+        return enclosingDebugScope;
+    }
+
     void visitIfStmt(IfStmt* stmt)
     {
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
 
-        auto condExpr = stmt->predicate;
+        auto conditionClause = stmt->condition;
+        auto enclosingDebugScope = maybeEnterConditionDebugScope(stmt, conditionClause->loc);
+        auto condExpr = getPredicateExpr(conditionClause);
         auto thenStmt = stmt->positiveStatement;
         auto elseStmt = stmt->negativeStatement;
 
-        auto irCond = getSimpleVal(context, lowerRValueExpr(context, condExpr));
-
-        maybeEmitDebugLine(context, this, stmt, condExpr->loc);
+        // The declaration can start on a different line from the `if` keyword.
+        // We emit the declaration's debug line before lowering its initializer so the
+        // debugger can attribute the initializer instructions to the declaration.
+        bool hasConditionDeclaration = as<DeclConditionClause>(conditionClause) != nullptr;
+        if (hasConditionDeclaration)
+            maybeEmitDebugLine(context, this, stmt, condExpr->loc);
+        auto irCond = lowerConditionClause(conditionClause);
+        if (!hasConditionDeclaration)
+            maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
         IRInst* ifInst = nullptr;
+        IRBlock* afterBlock = nullptr;
         uint32_t coverageBranchSiteID =
             context->traceBranchCoverage ? allocateCoverageBranchSiteID(context) : 0;
 
@@ -7914,7 +7966,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             auto thenBlock = createBlock();
             auto elseBlock = createBlock();
-            auto afterBlock = createBlock();
+            afterBlock = createBlock();
 
             ifInst = builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
 
@@ -7937,14 +7989,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 slang::CoverageBranchArmKind::FalseArm);
             lowerStmt(context, elseStmt);
             popScopeBlock(prevScopeEndBlock, true);
-
-            insertBlock(afterBlock);
         }
         else if (context->traceBranchCoverage)
         {
             auto thenBlock = createBlock();
             auto elseBlock = createBlock();
-            auto afterBlock = createBlock();
+            afterBlock = createBlock();
 
             ifInst = builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
 
@@ -7968,13 +8018,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 coverageBranchSiteID,
                 2,
                 slang::CoverageBranchArmKind::FalseArm);
-
-            insertBlock(afterBlock);
         }
         else
         {
             auto thenBlock = createBlock();
-            auto afterBlock = createBlock();
+            afterBlock = createBlock();
 
             ifInst = builder->emitIf(irCond, thenBlock, afterBlock);
 
@@ -7983,10 +8031,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             lowerStmt(context, thenStmt);
             popScopeBlock(prevScopeEndBlock, true);
-
-            insertBlock(afterBlock);
         }
 
+        // The condition's declared variable is visible in both arms. The merge block
+        // starts after the `if`, where the enclosing scope is active again.
+        context->currentDebugScope = enclosingDebugScope;
+        insertBlock(afterBlock);
         maybeEmitDebugLine(context, this, stmt, stmt->afterLoc);
 
         if (stmt->findModifier<FlattenAttribute>())
@@ -8179,8 +8229,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto bodyLabel = createBlock();
         auto breakLabel = createBlock();
 
-        // A `continue` inside a `while` loop always
-        // jumps to the head of hte loop.
+        // A `continue` in a `while` jumps to the loop head to evaluate the condition again.
         auto continueLabel = loopHead;
 
         // Register the `break` and `continue` labels so
@@ -8197,35 +8246,32 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         insertBlock(loopHead);
 
-        // Now that we are within the header block, we
-        // want to emit the expression for the loop condition:
-        uint32_t coverageBranchSiteID = 0;
-        SourceLoc coverageBranchLoc;
-        if (auto condExpr = stmt->predicate)
+        // We lower the whole condition at the loop head. That way, control reaches any
+        // declaration in the condition each time the loop tests the value of its variable.
+        auto conditionClause = stmt->condition;
+        auto enclosingDebugScope = maybeEnterConditionDebugScope(stmt, conditionClause->loc);
+        auto predicateLoc = getPredicateExpr(conditionClause)->loc;
+        maybeEmitDebugLine(context, this, stmt, predicateLoc);
+        auto irCondition = lowerConditionClause(conditionClause);
+
+        uint32_t coverageBranchSiteID =
+            context->traceBranchCoverage ? allocateCoverageBranchSiteID(context) : 0;
+
+        // A `break` in the body also jumps to `breakLabel`. We count a false result in a
+        // separate block so the counter is specific to evaluations of the predicate.
+        auto conditionFalseLabel = context->traceBranchCoverage ? createBlock() : breakLabel;
+        builder->emitLoopTest(irCondition, bodyLabel, conditionFalseLabel);
+
+        if (context->traceBranchCoverage)
         {
-            maybeEmitDebugLine(context, this, stmt, condExpr->loc);
-
-            auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
-
-            coverageBranchLoc = condExpr->loc;
-            coverageBranchSiteID =
-                context->traceBranchCoverage ? allocateCoverageBranchSiteID(context) : 0;
-
-            // Now we want to `break` if the loop condition is false.
-            auto conditionFalseLabel = context->traceBranchCoverage ? createBlock() : breakLabel;
-            builder->emitLoopTest(irCondition, bodyLabel, conditionFalseLabel);
-
-            if (context->traceBranchCoverage)
-            {
-                insertBlock(conditionFalseLabel);
-                emitBranchCoverageMarker(
-                    context,
-                    coverageBranchLoc,
-                    coverageBranchSiteID,
-                    2,
-                    slang::CoverageBranchArmKind::FalseArm);
-                emitBranchIfNeeded(breakLabel);
-            }
+            insertBlock(conditionFalseLabel);
+            emitBranchCoverageMarker(
+                context,
+                predicateLoc,
+                coverageBranchSiteID,
+                2,
+                slang::CoverageBranchArmKind::FalseArm);
+            emitBranchIfNeeded(breakLabel);
         }
 
         // Emit the body of the loop
@@ -8234,7 +8280,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             emitBranchCoverageMarker(
                 context,
-                coverageBranchLoc,
+                predicateLoc,
                 coverageBranchSiteID,
                 1,
                 slang::CoverageBranchArmKind::TrueArm);
@@ -8246,7 +8292,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // At the end of the body we need to jump back to the top.
         emitBranchIfNeeded(loopHead);
 
-        // Finally we insert the label that a `break` will jump to
+        // The loop exit is outside the scope of a variable declared in the condition.
+        context->currentDebugScope = enclosingDebugScope;
         insertBlock(breakLabel);
     }
 
@@ -8291,36 +8338,18 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         insertBlock(testLabel);
 
-        // Now that we are within the header block, we
-        // want to emit the expression for the loop condition:
-        if (auto condExpr = stmt->predicate)
+        // We lower the test separately from the body so `continue` can jump directly to it.
         {
-            maybeEmitDebugLine(context, this, stmt, stmt->predicate->loc);
+            auto condExpr = getPredicateExpr(stmt->condition);
+            maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
-            auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
+            auto irCondition = lowerConditionClause(stmt->condition);
 
-            // One thing to be careful here is that lowering irCondition
-            // may create additional blocks due to short circuiting, so
-            // the block we are current inserting into is not necessarily
-            // the same as `testLabel`.
-            //
+            // Lowering a short-circuit expression can leave the builder in a later block.
             auto invCondition = builder->emitNot(irCondition->getDataType(), irCondition);
 
-            // Now we want to `break` if the loop condition is false,
-            // otherwise we will jump back to the head of the loop.
-            //
-            // We need to make sure not to reuse the break block of the loop as
-            // the break/merge block of the ifelse test.
-            // Therefore, we introduce a separate merge block for the loop test.
-            //
-            // Emit the following structure:
-            //
-            // [merge(mergeBlock)]
-            // if (cond) goto loopHead;
-            // else goto mergeBlock;
-            //
-            // mergeBlock:
-            //   goto breakLabel;
+            // The conditional branch needs its own merge block. We route the path that
+            // repeats the loop through `mergeBlock` and the exit path to `breakLabel`.
             auto mergeBlock = builder->createBlock();
             if (context->traceBranchCoverage)
             {
@@ -9714,14 +9743,14 @@ static IRInst* maybeEmitDebugFunction(IRGenContext* context, IRInst* irFunc)
     return nullptr;
 }
 
-// Blocks and scoped loop initializers introduce declaration scopes. HLSL's unscoped
-// for initializer remains in the enclosing scope, matching semantic lookup.
-// Other control-flow statements get lexical blocks from their bodies, including implicit HLSL
-// blocks, rather than from the control-flow statement itself.
+// Emit debug lexical blocks for scopes that span all of `lowerStmt`. HLSL's unscoped `for`
+// initializer belongs to the enclosing scope. The scope for a declaration in a condition
+// begins when the statement visitor starts lowering that condition.
 static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
 {
-    if (context->debugInfoLevel < DebugInfoLevel::Standard || !context->currentDebugScope ||
-        stmt == context->debugFunctionBody)
+    if (context->debugInfoLevel < DebugInfoLevel::Standard)
+        return nullptr;
+    if (stmt == context->debugFunctionBody)
         return nullptr;
     auto scopedStmt = as<ScopeStmt>(stmt);
     if (!scopedStmt || !scopedStmt->scopeDecl)
@@ -9730,18 +9759,27 @@ static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
         return nullptr;
     if (!as<BlockStmt>(stmt) && !as<ForStmt>(stmt))
         return nullptr;
-    auto source = getOrEmitDebugSource(context, stmt->loc);
+    return maybeEmitDebugLexicalBlockAt(context, stmt->loc);
+}
+
+static IRInst* maybeEmitDebugLexicalBlockAt(IRGenContext* context, SourceLoc loc)
+{
+    if (context->debugInfoLevel < DebugInfoLevel::Standard || !context->currentDebugScope)
+        return nullptr;
+
+    auto source = getOrEmitDebugSource(context, loc);
     if (!source)
         return nullptr;
-    auto loc = _getDebugHumaneLoc(context, source, stmt->loc);
+    auto humaneLoc = _getDebugHumaneLoc(context, source, loc);
     IRBuilder builder(*context->irBuilder);
-    // Keep metadata inside the generic that owns the function. Its normal clone environment
-    // then remaps lexical parents and declaration scopes together with the function body.
+
+    // We keep the metadata inside the generic that owns the function so specialization can
+    // remap lexical parents and declaration scopes together with the function body.
     builder.setInsertBefore(context->irFunc);
     return builder.emitDebugLexicalBlock(
         source,
-        builder.getIntValue(builder.getUIntType(), loc.line),
-        builder.getIntValue(builder.getUIntType(), loc.column),
+        builder.getIntValue(builder.getUIntType(), humaneLoc.line),
+        builder.getIntValue(builder.getUIntType(), humaneLoc.column),
         context->currentDebugScope);
 }
 
@@ -9780,7 +9818,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
             context->irBuilder->emitIncrementCoverageCounter();
         }
 
-        visitor.dispatch(stmt);
+        visitor.StmtVisitor<StmtLoweringVisitor>::dispatch(stmt);
         if (lexicalScope)
         {
             context->currentDebugScope = previousScope;

@@ -46,6 +46,7 @@ struct ASTNodeDispatcher<$BASE, R>
 %generateDispatcher(Slang.DeclBase)
 %generateDispatcher(Slang.Decl)
 %generateDispatcher(Slang.Expr)
+%generateDispatcher(Slang.ConditionClause)
 %generateDispatcher(Slang.Stmt)
 %generateDispatcher(Slang.NodeBase)
 #else // FIDDLE OUTPUT:
