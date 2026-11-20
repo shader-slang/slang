@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -source-language hlsl -output-using-type -xslang -Wno-30081 -xslang -Wno-41024
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=CHECK): -source-language hlsl -output-using-type -xslang -Wno-30081 -xslang -Wno-41024
 //TEST:SIMPLE(filecheck=COMPILE): -no-codegen -Wno-30081 -Wno-41024
 // COMPILE: result code = 0
 
