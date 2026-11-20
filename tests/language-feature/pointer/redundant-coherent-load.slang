@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=SPIRV):-stage compute -entry computeMain -target spirv -capability vk_mem_model
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -capability vk_mem_model -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-capability vk_mem_model -output-using-type
 
 // Tests if we optimize redundant load's correctly
 
@@ -12,8 +12,8 @@ uniform int* buffer;
 void computeMain(uint3 group_thread_id: SV_GroupThreadID)
 {
     Ptr<int, Access::ReadWrite, AddressSpace::Device> ptr = __getAddress(buffer[0]);
-    
-    // Consider the load from this store-load pattern as redundant since 
+
+    // Consider the load from this store-load pattern as redundant since
     // the load is a sub-set memory-scope of the memory-scope of the store.
     // Invocation == Invocation.
     *ptr = 8;
@@ -25,7 +25,7 @@ void computeMain(uint3 group_thread_id: SV_GroupThreadID)
     // SPIRV: %[[#OUTPUT_BUFFER1:]] = OpAccessChain {{.*}} %outputBuffer %{{.*}} %int_0
     // SPIRV: OpStore %[[#OUTPUT_BUFFER1]] %int_8
 
-    // Consider the load from this store-load pattern as redundant since 
+    // Consider the load from this store-load pattern as redundant since
     // the load is a sub-set memory-scope of the memory-scope of the store.
     // Device > Workgroup.
     let offset1 = ptr + 1;

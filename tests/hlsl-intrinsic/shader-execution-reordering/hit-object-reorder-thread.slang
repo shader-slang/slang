@@ -5,8 +5,6 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage raygeneration -entry rayGenerationMain -line-directive-mode none
 
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-d3d12 -output-using-type -profile sm_6_5 -render-feature ray-query
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-vk -output-using-type -render-feature ray-query
 
 //TEST_INPUT: set scene = AccelerationStructure
 uniform RaytracingAccelerationStructure scene;

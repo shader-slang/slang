@@ -1,15 +1,12 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12  -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj
+// TODO: Remove `glsl` from the targets when https://github.com/shader-slang/slang/issues/14593 is fixed. The Vulkan validation layer
+// reports a cube image view that is used with a cube array image type
+// (VUID-vkCmdDispatch-viewType-07752).
+//TEST:COMPARE_COMPUTE(targets=all-vk-glsl-cuda-wgpu-llvm):
+//TEST:COMPARE_COMPUTE(targets=dx12):-profile cs_6_0
 // TODO(JS): Doesn't work on vk currently
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 // TODO(JS): Doesn't work on CUDA as there aren't any CUDA functions to get dimensions.
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj
 // Not supported in WGSL: 1D array texture not supported in WGSL
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 // Not supported in LLVM: textures are not currently available
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -llvm
 
 //TEST_INPUT: Texture1D(size=4, content = one):name t1D
 Texture1D<float> t1D;
@@ -37,17 +34,17 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
-    
+
     uint mipWidth = 0;
     uint mipHeight = 0;
     uint mipDepth = 0;
     uint mipCount = 1;
     uint elementCount = 0;
-    
+
     uint width = 0;
     uint height = 0;
     uint depth = 0;
-    
+
     switch (idx)
     {
         case 0:
@@ -93,18 +90,18 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
            break;
         }
     }
-   
+
     width = (mipWidth != width) ? ~0 : width;
     height = (mipHeight != height) ? ~0 : height;
     depth = (mipDepth != depth) ? ~0 : depth;
-   
+
     // Only depth or element count can be set
     if (depth == 0 && elementCount > 0)
     {
         depth = elementCount;
     }
-   
+
     uint val = ((0xff & width) << 24) | ((0xff & height) << 16) | ((0xff & depth) << 8) | (mipCount);
-   
+
     outputBuffer[idx] = val;
 }

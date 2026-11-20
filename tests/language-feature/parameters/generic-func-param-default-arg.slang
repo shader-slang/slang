@@ -2,7 +2,7 @@
 
 // Test that generic functions can have default argument values on their parameters.
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 //TEST_DISABLED:SIMPLE:-target hlsl -entry computeMain -dump-ir
 
 

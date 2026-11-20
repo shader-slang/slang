@@ -2,7 +2,7 @@
 // Byte-address-buffer legalization must rewrite heap loads to equivalent
 // structured-buffer heap loads before target emission.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=RUNTIME): -vk -shaderobj -output-using-type -render-feature bindless -emit-spirv-directly -Xslang -DRUNTIME
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=RUNTIME): -output-using-type -render-feature bindless -Xslang -DRUNTIME
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute -capability spvDescriptorHeapEXT -emit-spirv-directly
 //TEST:SIMPLE(filecheck=FRAG): -target spirv-asm -entry fragmentMain -stage fragment -capability spvDescriptorHeapEXT -emit-spirv-directly
 //TEST:SIMPLE(filecheck=DXIL): -target dxil -entry hlslMain -profile cs_6_6

@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -slang -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 #define DO_FLOOR
 #define MANUAL_DERIVATIVE
@@ -50,7 +48,7 @@ void computeMain(uint3 dtid : SV_DispatchThreadID)
   {
     x[i] = float(i + dtid.x);
   }
-  
+
   DifferentialPair<Array<float, 5>> x_pd = diffPair(x, {});
   bwd_diff(unusual_norm)(x_pd, 1.0f);
   for (int i = 0; i < 5; i++)

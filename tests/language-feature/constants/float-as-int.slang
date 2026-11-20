@@ -1,7 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -output-using-type -emit-spirv-directly
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -dx12 -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -mtl -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda, filecheck-buffer=BUF): -output-using-type
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4, count=10):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 

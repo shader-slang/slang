@@ -1,9 +1,9 @@
 // Test FFLayer backward pass via autodiff.
 // Verifies that autodiff correctly computes gradients through eval<A>().
 //
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_POINTER=0 -xslang -DTEST_TENSORVIEW=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DTEST_TENSORVIEW=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=1 -xslang -DTEST_TENSORVIEW=0
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUFFER):-xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DTEST_TENSORVIEW=0
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DTEST_TENSORVIEW=0
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=1 -xslang -DTEST_TENSORVIEW=0
 //
 // Compile-only test for TorchTensorViewAddress (CUDA target):
 //TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_TENSORVIEW=1 -DTEST_POINTER=0 -experimental-feature
@@ -83,10 +83,10 @@ void testBackwardPass(inout uint idx)
 
     // Create DifferentialPtrPair for the single base address (primal, gradient)
     var baseAddrPair = DifferentialPtrPair<Address>(baseAddr, gradBaseAddr);
-    
+
     // Create diffPair for input
     var inputPair = diffPair(x);
-    
+
     // Output gradient: dL/dy = [1, 1]
     let dOutput = Vec2(1.0);
 

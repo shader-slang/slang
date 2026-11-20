@@ -1,4 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -xslang -fvk-use-dx-layout -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-xslang -fvk-use-dx-layout
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry computeMain -stage compute -fvk-use-dx-layout
 
 struct Test_t

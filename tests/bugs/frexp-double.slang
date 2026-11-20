@@ -1,13 +1,7 @@
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-output-using-type -render-feature double
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type  -render-feature double
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -emit-spirv-directly -output-using-type  -render-feature double
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -output-using-type
-//metal currently does not support `double` 
-//DISABLE_TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -mtl -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-metal-wgpu, filecheck-buffer=BUF):-output-using-type -render-feature double
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda+cpu, filecheck-buffer=BUF):-output-using-type
+//metal currently does not support `double`
 // Not supported in WGSL: Double and other unsupported scalar types
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // BUF:      type: int32_t
 // BUF-NEXT: 1

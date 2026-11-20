@@ -1,4 +1,4 @@
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
+//TEST(smoke):COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 // CHECK:        4
 // CHECK-NEXT:  99

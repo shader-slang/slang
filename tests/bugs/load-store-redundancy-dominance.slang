@@ -27,11 +27,11 @@ ConstantBuffer<Constants> g_constants;
 float4 main(uint condition : A) : SV_Position
 {
     float3 result;
-    
+
     if (condition != 0)
     {
         result = g_constants.value;
     }
-    
+
     return float4(result, 1.0);
 }

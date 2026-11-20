@@ -12,7 +12,7 @@
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry computeMain
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=BUF):-output-using-type
 
 enum XYZ : uint
 {

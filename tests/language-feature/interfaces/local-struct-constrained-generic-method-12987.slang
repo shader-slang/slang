@@ -3,8 +3,7 @@
 // constrained generic method (`apply<T : __BuiltinArithmeticType>`), exactly as a
 // module-scope struct can. It must compile and run rather than crash the compiler.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 interface IOp
 {

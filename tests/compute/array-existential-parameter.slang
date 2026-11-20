@@ -1,7 +1,6 @@
 // Test using existential shader parameter that is an interface array.
 
-//TEST(compute):COMPARE_COMPUTE:-cpu
-//TEST(compute):COMPARE_COMPUTE:-cuda
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu):
 
 [anyValueSize(8)]
 interface IInterface

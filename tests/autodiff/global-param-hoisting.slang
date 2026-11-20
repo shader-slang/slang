@@ -4,11 +4,9 @@
 // TODO: use a pattern checker on the resulting code to make sure there is only
 // one call to `SampleLevel`.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-slang -compute -mtl -output-using-type -render-features argument-buffer-tier-2
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -output-using-type -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all-llvm):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cpu):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=metal):-output-using-type -render-features argument-buffer-tier-2
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;

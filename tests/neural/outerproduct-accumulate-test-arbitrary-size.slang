@@ -1,10 +1,10 @@
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUFFER):-xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
 
 //TEST:SIMPLE(filecheck=SPV): -target spirv -entry computeMain -stage compute -DTEST_HALF=1 -experimental-feature
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1
 
 #pragma warning(disable: 41017)
 import slang.neural;

@@ -1,6 +1,6 @@
 // direct-spirv-control-flow.slang
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST:COMPARE_COMPUTE(targets=vk):
 
 // Test direct SPIRV emit on control fl.
 

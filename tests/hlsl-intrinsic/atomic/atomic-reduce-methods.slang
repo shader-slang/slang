@@ -9,10 +9,9 @@
 // Floating-point reduceAdd is tested separately in atomic-reduce-methods-float.slang
 // because HLSL does not support floating-point atomics.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -dx12 -profile cs_6_0 -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=metal+cuda, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=BUF):-profile cs_6_0 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-output-using-type -render-feature hardware-device
 
 // Arithmetic reduction targets (IArithmeticAtomicable)
 //TEST_INPUT:ubuffer(data=[0], stride=4):name=uintAddTarget

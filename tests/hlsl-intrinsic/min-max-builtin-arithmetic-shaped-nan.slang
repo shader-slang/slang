@@ -1,8 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -Xslang -floating-point-mode -Xslang precise
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda+llvm):
+//TEST:COMPARE_COMPUTE(targets=cpu):-Xslang -floating-point-mode -Xslang precise
 
 // HLSL/DXIL and SPIR-V's `NMin`/`NMax` return the numeric operand when exactly one input is NaN,
 // and a NaN when both are NaNs. Runtime input prevents constant folding from hiding a difference

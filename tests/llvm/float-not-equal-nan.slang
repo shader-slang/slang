@@ -7,8 +7,7 @@
 // The `-llvm` directive exercises the slang-llvm JIT path; the `-cpu` directive
 // runs the emit-C++ path and pins the expected values as a control.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-llvm -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0x7FC00000 0x00000000 0x80000000 0x3F800000], stride=4):name=inputBuffer
 StructuredBuffer<uint> inputBuffer;

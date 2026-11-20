@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 // Test that interface method can have a body providing default implementation.
 
@@ -21,7 +21,7 @@ struct Impl : IFoo
     {
         return 42;
     }
-    
+
     // Using the default implementation for getGreaterVal.
 }
 

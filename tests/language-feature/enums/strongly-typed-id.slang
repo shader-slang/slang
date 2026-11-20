@@ -1,4 +1,8 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+// TODO: Remove `vk` and `glsl` from the targets when
+// https://github.com/shader-slang/slang/issues/14576 is fixed. The type of a value does not match the
+// type of the function. For vk, Slang emits invalid SPIR-V, and SPIR-V validation reports it. For glsl,
+// Slang emits invalid GLSL, and glslang reports it.
+//TEST(compute):COMPARE_COMPUTE(targets=all-vk-glsl, filecheck-buffer=CHECK): -shaderobj
 
 enum MyId : uint {}
 extension MyId { uint get() { return (uint)this; } }

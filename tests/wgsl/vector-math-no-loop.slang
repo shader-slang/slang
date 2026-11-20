@@ -1,8 +1,6 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=NOLOOP): -target wgsl -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu+wgpu, filecheck-buffer=BUF):-output-using-type
 
 // On WGSL, the vector overloads of `rsqrt`, `fmod`, `f32tof16`, `f16tof32`, `isnan`, `isinf`
 // and `isfinite` are emitted without a per-component loop, and give the same result as the

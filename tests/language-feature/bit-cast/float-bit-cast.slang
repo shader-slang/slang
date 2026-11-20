@@ -1,4 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):
 
 struct MyStruct
 {

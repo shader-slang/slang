@@ -17,8 +17,7 @@
 // Excluded pairs: integer+half (E30081, CPU backend limitation) and
 // float+double (E30082 performance warning).
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda+cpu, filecheck-buffer=CHECK): -output-using-type
 
 T add<T : IArithmetic>(T a, T b)
 {

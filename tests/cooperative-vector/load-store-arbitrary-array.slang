@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-render-feature cooperative-vector
 
 // CHECK: 1
 // CHECK-NEXT: 2

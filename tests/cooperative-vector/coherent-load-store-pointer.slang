@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=SPIRV):-stage compute -entry computeMain -target spirv
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-render-feature cooperative-vector
 
 // Ensure SPIRV emits coherent operations here
 // SPIRV: MakePointerVisible

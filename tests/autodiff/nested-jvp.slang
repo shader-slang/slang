@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -24,7 +22,7 @@ dpfloat pow_jvp(dpfloat x, dpfloat n)
 {
     return dpfloat(
         pow(x.p, n.p),
-        x.d * n.p * pow(x.p, n.p-1) + 
+        x.d * n.p * pow(x.p, n.p-1) +
             ((n.d != 0.0) ? (n.d * pow(x.p, n.p) * log(x.p)) : 0.0));
 }
 

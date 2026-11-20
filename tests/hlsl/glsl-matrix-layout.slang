@@ -1,6 +1,6 @@
 // Test that storage type lowering correctly handles matrix layout modifiers.
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -xslang -fvk-use-gl-layout
+//TEST:COMPARE_COMPUTE(targets=vk):-output-using-type -xslang -fvk-use-gl-layout
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 ], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;

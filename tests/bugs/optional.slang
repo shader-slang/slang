@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -compute -vk
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):
 
 interface IFoo
 {

@@ -1,41 +1,41 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type -Xslang -Wno-41020
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -Xslang -Wno-41020
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 //
 // Test struct fields with array of optional interface types.
-// 
+//
 
-public interface Term 
+public interface Term
 {
     float evaluate(float4 u);
 }
 
-public struct Sum 
+public struct Sum
 {
     Optional<Term> terms[16];
     uint count;
 
-    public __init() 
-    { 
-        count = 0; 
-        for (uint i = 0; i < 16; i++) 
+    public __init()
+    {
+        count = 0;
+        for (uint i = 0; i < 16; i++)
             terms[i] = none;
     }
 
     [mutating]
-    public void add(Term term, float weight) 
+    public void add(Term term, float weight)
     {
         terms[count] = term;
         count += 1;
     }
 
-    public float evaluate(float4 u) 
-    { 
+    public float evaluate(float4 u)
+    {
         if (let termOpt = terms[0])
         {
-            return termOpt.evaluate(u); 
+            return termOpt.evaluate(u);
         }
         else
         {
@@ -44,7 +44,7 @@ public struct Sum
     }
 }
 
-public struct Multiply : Term 
+public struct Multiply : Term
 {
   public float evaluate(float4 u) { return u.x * u.y; }
 }

@@ -1,5 +1,5 @@
 // array-size-group-shared.slang
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -27,7 +27,7 @@ struct GenType<T : __BuiltinIntegerType, A: IA, let N : int, let M : int>
     // particular function (and the `groupshared` declaration inside
     // it) "works," but the function itself is not something that we
     // intend to be supported in Slang.
-    // 
+    //
     [ForceInline]
     Ref<uint> weights(int index)
     {

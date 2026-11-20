@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -compute -entry computeMain
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -entry computeMain
 
 // Regression test for shader-slang/slang#11567: a C-style trailing-array typedef
 // `typedef <type> <name>[N];` should parse and produce the same array-typed alias

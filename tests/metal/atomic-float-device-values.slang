@@ -2,8 +2,7 @@
 // store on Metal. In each pair of compare-exchanges the first one matches and stores, and the
 // second one does not. The CUDA run checks the same values on machines without Metal.
 
-//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=metal+cuda, filecheck-buffer=BUF):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[1.0], stride=4):name=atomicBuffer
 RWStructuredBuffer<Atomic<float>> atomicBuffer;

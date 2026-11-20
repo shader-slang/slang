@@ -1,7 +1,6 @@
 // derived-struct-init-list.slang
 
-//TEST(compute):COMPARE_COMPUTE:
-//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test that use of an initializer list (especially
 // an empty initializer list) is still possible

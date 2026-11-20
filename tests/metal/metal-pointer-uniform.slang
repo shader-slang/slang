@@ -1,9 +1,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -emit-spirv-directly
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -metal -render-features argument-buffer-tier-2
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cpu
+//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=BUF):
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUF): -render-features argument-buffer-tier-2
 
 // This reproduces the specific case that was failing where uniform pointers
 // are used for buffer copy operations with array indexing targeting Metal.

@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK_FAIL,exit-code=2): -target spirv -entry computeMain -stage compute -DFAIL
 //TEST:SIMPLE(filecheck=CHECK_PASS): -target spirv -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -slang -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 interface ITwoParamGeneric<A, B>
 {

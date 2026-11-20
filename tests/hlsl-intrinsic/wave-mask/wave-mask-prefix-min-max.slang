@@ -2,10 +2,10 @@
 // Test WaveMaskPrefixMin and WaveMaskPrefixMax - masked exclusive prefix min/max operations
 
 // CUDA supports these via WaveMultiPrefixExclusiveMin/Max
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -capability cuda_sm_7_0 -shaderobj
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-capability cuda_sm_7_0
 
 // Vulkan/SPIRV with VK_NV_shader_subgroup_partitioned
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-directly -render-feature subgroup-partitioned-ext
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-render-feature subgroup-partitioned-ext
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

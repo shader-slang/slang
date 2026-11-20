@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):
 //TEST:SIMPLE(filecheck=SPIRV): -entry computeMain -stage compute -target spirv
 //TEST:SIMPLE(filecheck=HLSL): -entry computeMain -stage compute -target hlsl
 

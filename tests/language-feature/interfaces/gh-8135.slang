@@ -2,9 +2,7 @@
 // Using an associated type from an inherited generic interface in a child
 // interface method signature previously crashed in hoistable IR placement.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -stage compute -entry computeMain
 
 // SPV: OpEntryPoint GLCompute

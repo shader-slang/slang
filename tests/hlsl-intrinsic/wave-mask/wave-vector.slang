@@ -1,9 +1,7 @@
 //TEST_CATEGORY(wave-mask, compute)
-//DISABLE_TEST:COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_5 -shaderobj -render-feature hardware-device
-//TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -render-feature hardware-device,subgroup-partitioned-ext
-//TEST:COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=dx12):-profile cs_6_5 -render-feature hardware-device
+//TEST:COMPARE_COMPUTE(targets=vk):-render-feature hardware-device,subgroup-partitioned-ext
+//TEST:COMPARE_COMPUTE(targets=cuda):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

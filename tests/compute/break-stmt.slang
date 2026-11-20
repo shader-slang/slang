@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test that `break` from a loop works.
 

@@ -2,8 +2,7 @@
 
 // Test that an `This` type works correctly when there is an extension.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -vk
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 interface IFoo
 {
@@ -22,7 +21,7 @@ extension T
 struct FooImpl : IFoo
 {
     int v = 1;
-    static const This identity = This();   
+    static const This identity = This();
 }
 
 

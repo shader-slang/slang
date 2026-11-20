@@ -2,7 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute -profile cs_6_0
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK): -target cpp -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=BUF):-output-using-type
 
 // The most negative int64_t is written as `(-9223372036854775807LL - 1LL)`, not as
 // `-9223372036854775808LL`: the latter negates a literal that does not fit in a `long long`,

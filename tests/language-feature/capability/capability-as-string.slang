@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -profile spirv_1_3 -capability spvAtomicFloat64MinMaxEXT
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -profile spirv_1_3 -capability spvAtomicFloat64MinMaxEXT
 
 // Tests if slang being providing capabilities as a string works as intended
 

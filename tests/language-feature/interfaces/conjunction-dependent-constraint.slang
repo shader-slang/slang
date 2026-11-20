@@ -3,8 +3,7 @@
 // Test a constraint that depends on an earlier conjunction: `T : IFoo<R>` needs the witnesses
 // of both constraints flattened from `R : IA & IB`.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cpu+vk, filecheck-buffer=CHECK):-output-using-type
 
 interface IA
 {

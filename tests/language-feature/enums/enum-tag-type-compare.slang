@@ -2,7 +2,7 @@
 
 // Test comparisons for `enum`s with explicit tag types
 
-//TEST(compute):COMPARE_COMPUTE:
+//TEST:COMPARE_COMPUTE(targets=all):
 
 enum class MaterialType : uint32_t
 {

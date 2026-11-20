@@ -1,7 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX: -wgpu -compute -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX: -llvm -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE(targets=all-cuda-cpu-llvm):-shaderobj -output-using-type
 
 //TEST_INPUT: set g_texture = Texture2D(size=8, content = one)
 //TEST_INPUT: set g_sampler = Sampler
@@ -13,7 +10,7 @@ RWStructuredBuffer<float> outputBuffer;
 
 float4 sample(float2 uv, constexpr int2 ofs )
 {
-    return g_texture.SampleLevel(g_sampler, uv, 0.0, ofs); 
+    return g_texture.SampleLevel(g_sampler, uv, 0.0, ofs);
 }
 
 [numthreads(1, 1, 1)]

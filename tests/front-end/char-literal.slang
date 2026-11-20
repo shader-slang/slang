@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda+cpu, filecheck-buffer=CHECK):
 
 // Test that char literals work as expected.
 

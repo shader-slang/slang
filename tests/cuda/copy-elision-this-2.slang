@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda -compute
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUF):
 //TEST:SIMPLE(filecheck=CUDA): -stage compute -entry computeMain -target cuda -O3
 
 struct Data
@@ -114,7 +114,7 @@ void computeMain()
     // not directly using param
     int notDirectlyUsingParamVal = notDirectlyUsingParam(val, input[1]);
 
-    output[0] = 
+    output[0] =
         structVal == 3 &&
         globalParamStructVal == 3 &&
         nestedStructVal == 3 &&

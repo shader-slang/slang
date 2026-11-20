@@ -4,8 +4,8 @@
 // through the never-written sampler is behind a condition that is false at runtime, so every
 // result checked here is defined.
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -Wno-41016
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -g -xslang -Wno-41016
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -xslang -Wno-41016
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -xslang -g -xslang -Wno-41016
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):name=flags
 RWStructuredBuffer<uint> flags;

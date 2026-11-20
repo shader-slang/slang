@@ -10,13 +10,8 @@
 // Each of the four threads gets one combination of the inputs `A`, `B` and `C`. The result of each
 // operation goes to its own group of four elements in `output`, one element per thread.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx11 -profile sm_5_0 -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-wgpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda+cpu+wgpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx11, filecheck-buffer=CHECK):-profile sm_5_0 -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 1 0 1], stride=4):name=A
 StructuredBuffer<uint> A;

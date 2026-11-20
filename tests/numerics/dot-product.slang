@@ -1,6 +1,6 @@
 // Verify base dot-product dispatch and differentiable scalar/vector dot products at runtime.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 1

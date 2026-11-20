@@ -1,6 +1,6 @@
 // bit-field.slang
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUFFER):-output-using-type
 
 // Test direct SPIR-V emit on bit field operations.
 
