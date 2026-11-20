@@ -889,7 +889,7 @@ struct FunctionParameterSpecializationContext
     // heap. `isParamSuitableForSpecialization` decides which heap fetches a call
     // may specialize on (byte-address-buffer-typed ones), and `canSpecializeCall`
     // rejects the whole call when any wanting parameter's argument is unsuitable,
-    // so the callers below only see heap fetches that passed that gate.
+    // so its callers only see heap fetches that passed that gate.
     static bool isElementAccessInst(IRInst* inst)
     {
         switch (inst->getOp())
