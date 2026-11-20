@@ -46,10 +46,11 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         if (as<IRCastDescriptorHandleToResource>(arg))
             return true;
 
-        // The descriptor-heap instructions are hoisted to module scope, so any
-        // specialized callee can refer to them directly, just like a global
-        // parameter.
-        if (as<IRSPIRVResourceHeap>(arg) || as<IRSPIRVSamplerHeap>(arg))
+        // The resource-heap instruction is hoisted to module scope, so any
+        // specialized callee can refer to it directly, just like a global
+        // parameter. Only byte-address-buffer fetches trace into this leaf,
+        // so the sampler heap never appears here.
+        if (as<IRSPIRVResourceHeap>(arg))
             return true;
 
         // A `SPIRVLoadDescriptorFromHeap` selects an opaque descriptor from the
@@ -61,11 +62,13 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         // pass to retype, so the fetch itself must move into the callee. Other
         // resource parameters keep the existing value-threading shape their callers
         // already reconstruct.
-        if (as<IRSPIRVLoadDescriptorFromHeap>(arg) &&
-            as<IRByteAddressBufferTypeBase>(arg->getDataType()))
+        if (auto loadDescriptorFromHeap = as<IRSPIRVLoadDescriptorFromHeap>(arg))
         {
-            arg = arg->getOperand(0);
-            continue;
+            if (as<IRByteAddressBufferTypeBase>(loadDescriptorFromHeap->getDataType()))
+            {
+                arg = loadDescriptorFromHeap->getHeap();
+                continue;
+            }
         }
 
         // As we will see later, we can also
@@ -595,9 +598,9 @@ struct FunctionParameterSpecializationContext
             // Similarly for other global constants
             ioInfo.key.vals.add(globalConstant);
         }
-        else if (as<IRSPIRVResourceHeap>(oldArg) || as<IRSPIRVSamplerHeap>(oldArg))
+        else if (as<IRSPIRVResourceHeap>(oldArg))
         {
-            // A descriptor heap is a module-scope instruction, so the specialized
+            // The resource heap is a module-scope instruction, so the specialized
             // callee can refer to it directly without a new parameter. Its
             // identity keys the specialization, mirroring the global cases above.
             ioInfo.key.vals.add(oldArg);
@@ -936,9 +939,9 @@ struct FunctionParameterSpecializationContext
             // to resolve the uses
             return globalFunc;
         }
-        if (as<IRSPIRVResourceHeap>(oldArg) || as<IRSPIRVSamplerHeap>(oldArg))
+        if (as<IRSPIRVResourceHeap>(oldArg))
         {
-            // A descriptor heap lives at module scope, so the specialized callee
+            // The resource heap lives at module scope, so the specialized callee
             // refers to the same heap instruction the original argument did.
             return oldArg;
         }
