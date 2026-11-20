@@ -663,6 +663,9 @@ endif()
 
 if(${SLANG_USE_SYSTEM_VULKAN_HEADERS})
     find_package(VulkanHeaders REQUIRED)
+    if(NOT TARGET Vulkan-Headers)
+        add_library(Vulkan-Headers ALIAS Vulkan::Headers)
+    endif()
 endif()
 
 if(${SLANG_USE_SYSTEM_SPIRV_TOOLS})
