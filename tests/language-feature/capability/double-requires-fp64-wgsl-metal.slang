@@ -581,7 +581,8 @@ struct DoubleValue : IValue
 /*CONFFIELD:
            ^ see using of 'double'
 */
-    float get() { return v > 0.0LF ? 1.0f : 0.0f; }
+    // `get` uses no `double`, so the only requirement is the field.
+    float get() { return 1.0f; }
 };
 #else
 struct IntValue : IValue
