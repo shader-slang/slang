@@ -179,9 +179,9 @@ Use `COMPARE_COMPUTE` for a compute test. Do not write `-compute` on the line, b
 
 Use `COMPARE_COMPUTE_EX` only for a test that must choose its own mode, for example `-mesh`, `-task` or `-rt`. The command adds no argument, so the line must have the mode argument.
 
-#### No render API argument
+#### Old format: a render API argument
 
-A line of these commands cannot choose its target with an argument. The arguments that choose a target are a render API (`-vk`, `-cpu`), a language that implies one (`-wgsl`), and the path of the compiler to the code of the target (`-emit-spirv-directly`, `-emit-spirv-via-glsl`, `-emit-cpu-via-cpp`, `-emit-cpu-via-llvm`). `slang-test` reports an error, and the test fails. The text of the error names the option to use, for example `targets=glsl` for `-emit-spirv-via-glsl`. For example, the line below is an error, and the text asks for `targets=vk`:
+A line of these commands should not choose its target with an argument. The arguments that choose a target are a render API (`-vk`, `-cpu`), a language that implies one (`-wgsl`), and the path of the compiler to the code of the target (`-emit-spirv-directly`, `-emit-spirv-via-glsl`, `-emit-cpu-via-cpp`, `-emit-cpu-via-llvm`). A line like this has the old format. `slang-test` runs it as one test on that target, and prints a warning. The text of the warning names the option to use, for example `targets=glsl` for `-emit-spirv-via-glsl`. For example, the line below gets a warning that asks for `targets=vk`:
 
 ```
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type
@@ -193,7 +193,7 @@ Write the line like this:
 //TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK): -output-using-type
 ```
 
-A line that `DISABLE_TEST` disables does not run, so `slang-test` does not check it.
+A line that has both `targets=` and an argument that chooses the target is an error, because the two choose the target twice. A line that `DISABLE_TEST` disables does not run, so it gets no warning.
 
 #### The option `targets=`
 

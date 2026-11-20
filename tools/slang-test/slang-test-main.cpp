@@ -656,24 +656,6 @@ static bool _hasImplicitDeviceLanguageArg(const List<String>& args)
     return false;
 }
 
-// Returns true if the test is a line that runs once for each of its targets: a line of a
-// COMPARE_COMPUTE command.
-//
-// Consider this line:
-//
-//     //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type
-//
-// The author does not choose an API. `slang-test` runs the line for each target (`targets=all`),
-// and the line itself does not run. A line of these commands cannot choose its target with an
-// argument (`_addTestLine` reports an error), so every such line is a line of this kind. The test
-// of one target has the same command, but it has the target in `TestOptions::target`, so it is not
-// a line.
-static bool _isMultiTargetLine(const TestOptions& options)
-{
-    return isTargetsOptionSupportedByCommand(options.command.getUnownedSlice()) &&
-           options.target == 0;
-}
-
 // Returns the option `targets=` that replaces the arguments of the test line that choose the
 // target, for example `targets=vk` for `-vk`, or `targets=glsl` for `-emit-spirv-via-glsl`. The
 // arguments are a render API (`-vk`), a language that implies one (`-wgsl`), or the path of the
@@ -708,11 +690,32 @@ static String _getTargetsOptionForArgs(const List<String>& args)
     return _hasImplicitDeviceLanguageArg(args) ? String("targets=<name>") : String();
 }
 
+// Returns true if the test is a line that runs once for each of its targets: a line of a
+// COMPARE_COMPUTE command that does not choose its target with an argument.
+//
+// Consider this line:
+//
+//     //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type
+//
+// The author does not choose an API. `slang-test` runs the line for each target (`targets=all`),
+// and the line itself does not run. A line with an argument that chooses the target, as in
+// `-output-using-type -vk`, has the old format. It is not a line of this kind: `slang-test` runs
+// it as one test, like the lines of the other commands, and `_addTestLine` prints a warning. The
+// test of one target has the same command, but it has the target in `TestOptions::target`, so it
+// is not a line.
+static bool _isMultiTargetLine(const TestOptions& options)
+{
+    return isTargetsOptionSupportedByCommand(options.command.getUnownedSlice()) &&
+           options.target == 0 && _getTargetsOptionForArgs(options.args).getLength() == 0;
+}
+
 // Adds the test line `testDetails` to `outTestList`, after it checks the line.
 //
-// A line of a COMPARE_COMPUTE command cannot name a render API. The author chooses the targets with
-// the `targets=` option, and `slang-test` makes one test for each target. The line `-vk` is an
-// error, and the text of the error tells the author to write `targets=vk`.
+// The author of a COMPARE_COMPUTE line chooses the targets with the `targets=` option, and
+// `slang-test` makes one test for each target. A line that still names a render API in its
+// arguments (`-vk`) has the old format. It runs as one test on that API, and the function prints a
+// warning that tells the author to write `targets=vk`. A line that has both `targets=` and such an
+// argument is an error, because the two choose the target twice.
 //
 // Returns a failure, after it reports a run error, if the line is wrong. A test line that is wrong
 // must fail, because a silent skip would run the test on fewer targets than the author wants.
@@ -747,24 +750,44 @@ static SlangResult _addTestLine(
 
     const bool isMultiTargetLine = _isMultiTargetLine(testDetails.options);
 
-    // The line chooses its targets with `targets=`. An API argument would choose them a second
-    // time. A line that `DISABLE_TEST` disables does not run, so it has nothing to check.
-    if (isMultiTargetLine && testDetails.options.isEnabled)
+    String targetsValue;
+    const bool hasTargetsOption =
+        testDetails.options.commandOptions.tryGetValue("targets", targetsValue);
+
+    // A line of the old format chooses its target with an argument. `targets=` would choose it a
+    // second time.
+    if (isTargetsOptionSupportedByCommand(testDetails.options.command.getUnownedSlice()) &&
+        !isMultiTargetLine)
     {
         const String option = _getTargetsOptionForArgs(testDetails.options.args);
         if (option.getLength())
         {
-            StringBuilder hint;
-            hint << "'" << option << "'";
-            return reportError(
-                "the test line chooses the target with a render API or a SPIR-V path in its "
-                "arguments. Remove the argument and add the option ",
-                hint.produceString());
+            if (hasTargetsOption)
+            {
+                return reportError(
+                    "the test line has the option 'targets=' and an argument that chooses the "
+                    "target. Remove the argument. The value of 'targets=' is ",
+                    targetsValue);
+            }
+
+            // A line that `DISABLE_TEST` disables does not run, so it needs no warning.
+            if (testDetails.options.isEnabled)
+            {
+                fprintf(
+                    stderr,
+                    "warning: the test line in file '%s' chooses the target with a render API or "
+                    "a SPIR-V path in its arguments. Remove the argument and add the option "
+                    "'%s'.\n",
+                    filePath.getBuffer(),
+                    option.getBuffer());
+                fflush(stderr);
+            }
+            outTestList->tests.add(testDetails);
+            return SLANG_OK;
         }
     }
 
-    String targetsValue;
-    if (!testDetails.options.commandOptions.tryGetValue("targets", targetsValue))
+    if (!hasTargetsOption)
     {
         outTestList->tests.add(testDetails);
         return SLANG_OK;
