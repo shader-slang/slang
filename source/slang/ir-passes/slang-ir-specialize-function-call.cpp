@@ -10,6 +10,14 @@
 namespace Slang
 {
 
+// Returns true if `inst` is the module-scope SPIR-V resource-heap instruction.
+// It is hoisted to module scope, so a specialized callee can refer to it
+// directly, like a global parameter.
+static bool isSPIRVResourceHeapInst(IRInst* inst)
+{
+    return as<IRSPIRVResourceHeap>(inst) != nullptr;
+}
+
 bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
     IRParam* param,
     IRInst* inArg)
@@ -45,6 +53,29 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
 
         if (as<IRCastDescriptorHandleToResource>(arg))
             return true;
+
+        // The resource heap is a module-scope instruction a specialized callee
+        // can refer to directly (see `isSPIRVResourceHeapInst`).
+        if (isSPIRVResourceHeapInst(arg))
+            return true;
+
+        // A `SPIRVLoadDescriptorFromHeap` is a pure `heap[index]` selection over the
+        // module-scope resource heap, so it is safe to move into a specialized
+        // callee exactly like an element access. We accept it for every resource
+        // type: `canSpecializeCall` accepts a call only when every wanting
+        // parameter's argument is suitable, so leaving any fetch unsuitable keeps
+        // a mixed-signature call — and with it a byte-address-buffer parameter
+        // that byte-address legalization would retype — entirely unspecialized.
+        // A fetch from the sampler heap traces to `IRSPIRVSamplerHeap`, which is
+        // not a leaf here, so such a call stays unspecialized; that is safe
+        // today because scalar sampler parameters never want specialization on
+        // SPIR-V and array-sampler parameters receive array values, never a
+        // scalar fetch.
+        if (auto loadDescriptorFromHeap = as<IRSPIRVLoadDescriptorFromHeap>(arg))
+        {
+            arg = loadDescriptorFromHeap->getHeap();
+            continue;
+        }
 
         // As we will see later, we can also
         // specialize a call when the argument
@@ -571,6 +602,13 @@ struct FunctionParameterSpecializationContext
             // Similarly for other global constants
             ioInfo.key.vals.add(globalConstant);
         }
+        else if (isSPIRVResourceHeapInst(oldArg))
+        {
+            // The heap needs no new parameter (see `isSPIRVResourceHeapInst`);
+            // its identity keys the specialization, mirroring the global cases
+            // above.
+            ioInfo.key.vals.add(oldArg);
+        }
         else if (isUserPointerType(oldArg->getDataType()))
         {
             // If the arg is a user pointer, we can pass it as an ordinary argument,
@@ -837,8 +875,12 @@ struct FunctionParameterSpecializationContext
         }
     }
 
-    // Returns true if `inst` is an instruction that accesses an element from an array or a buffer.
-    //
+    // Returns true if `inst` is an instruction of the form `base[index]`: an
+    // element access into an array or structured buffer, or a descriptor
+    // selection from the resource heap. The predicate tests only the opcode; the
+    // callers separately guarantee that `base` is a value a callee can be
+    // specialized on, because `isParamSuitableForSpecialization` traced to that
+    // base before any of them run.
     static bool isElementAccessInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -847,6 +889,10 @@ struct FunctionParameterSpecializationContext
         case kIROp_GetElement:
         case kIROp_RWStructuredBufferGetElementPtr:
         case kIROp_StructuredBufferLoad:
+        // `SPIRVLoadDescriptorFromHeap` has the same `(heap, index)` operand
+        // layout as the element accesses above, so the existing
+        // base/index specialization logic applies to it unchanged.
+        case kIROp_SPIRVLoadDescriptorFromHeap:
             return true;
         }
         return false;
@@ -899,6 +945,12 @@ struct FunctionParameterSpecializationContext
             // As above, the identity of the specialized function is sufficient
             // to resolve the uses
             return globalFunc;
+        }
+        if (isSPIRVResourceHeapInst(oldArg))
+        {
+            // The specialized callee refers to the same heap instruction the
+            // original argument did (see `isSPIRVResourceHeapInst`).
+            return oldArg;
         }
         else if (isElementAccessInst(oldArg))
         {
