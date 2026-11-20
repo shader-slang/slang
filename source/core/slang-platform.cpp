@@ -134,11 +134,14 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 
 /* static */ SlangResult PlatformUtil::getInstancePath(StringBuilder& out)
 {
-    wchar_t path[_MAX_PATH];
-    ::GetModuleFileName(::GetModuleHandle(NULL), path, SLANG_COUNT_OF(path));
-    String pathString = String::fromWString(path);
+    // The instance path is the directory holding the executable. Path::getExecutablePath
+    // already owns the grow-retry GetModuleFileNameW query, so re-implementing it here with a
+    // fixed _MAX_PATH buffer would report the truncated path of an executable installed in a
+    // long directory.
+    String pathString = Path::getExecutablePath();
 
-    // We don't want the instance name, just the path to it
+    // We don't want the instance name, just the path to it. An empty executable path leaves
+    // the parent directory empty, and the tail check below reports that failure.
     out.clear();
     out.append(Path::getParentDirectory(pathString));
 
