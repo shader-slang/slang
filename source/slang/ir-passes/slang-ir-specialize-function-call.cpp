@@ -61,7 +61,7 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         // pass to retype, so the fetch itself must move into the callee. Other
         // resource parameters keep the existing value-threading shape their callers
         // already reconstruct.
-        if (arg->getOp() == kIROp_SPIRVLoadDescriptorFromHeap &&
+        if (as<IRSPIRVLoadDescriptorFromHeap>(arg) &&
             as<IRByteAddressBufferTypeBase>(arg->getDataType()))
         {
             arg = arg->getOperand(0);
