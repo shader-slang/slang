@@ -549,6 +549,12 @@ IRInst* DifferentiableTypeConformanceContext::buildDifferentiablePairWitness(
         auto addMethod = builder->createFunc();
         auto zeroMethod = builder->createFunc();
 
+        // The pair's add/zero methods are synthesized from a type conformance with no source
+        // function to copy debug info from (the element type's own add/zero witnesses are
+        // synthesized the same way), so they carry a name, not a DebugFunction record.
+        builder->addNameHintDecoration(addMethod, UnownedStringSlice("__diffPair_add"));
+        builder->addNameHintDecoration(zeroMethod, UnownedStringSlice("__diffPair_zero"));
+
         table = builder->createWitnessTable(
             sharedContext->differentiableInterfaceType,
             (IRType*)pairType);

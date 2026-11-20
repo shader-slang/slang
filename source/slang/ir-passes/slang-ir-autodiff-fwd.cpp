@@ -3634,6 +3634,17 @@ IRInst* maybeTranslateTrivialForwardDerivative(
             .emitIntrinsicInst(builder.getTypeKind(), kIROp_ForwardDiffFuncType, 1, &typeOperand)));
     translater.generateTrivialFwdDiffFunc(targetFunc, cast<IRFunc>(fwdDiffFunc));
 
+    // Name the trivial derivative after its source function, matching the naming the full
+    // forward translation uses, and give it debug info from the source function.
+    if (auto nameHint = targetFunc->findDecoration<IRNameHintDecoration>())
+    {
+        auto originalName = nameHint->getName();
+        StringBuilder newNameSb;
+        newNameSb << "s_fwd_" << originalName;
+        builder.addNameHintDecoration(fwdDiffFunc, newNameSb.getUnownedSlice());
+    }
+    copyDebugInfoForSynthesizedFunc(&builder, targetFunc, fwdDiffFunc);
+
     return fwdDiffFunc;
 }
 

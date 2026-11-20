@@ -728,6 +728,10 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     generateName(&builder, primalFunc, bwdPropFunc, "s_bwdProp_");
     generateName(&builder, primalFunc, fullContextType, "s_bwdCallableCtx_");
 
+    copyDebugInfoForSynthesizedFunc(&builder, primalFunc, applyFunc);
+    copyDebugInfoForSynthesizedFunc(&builder, primalFunc, rematFunc);
+    copyDebugInfoForSynthesizedFunc(&builder, primalFunc, bwdPropFunc);
+
     propagatePropertiesForSingleFunc(builder.getModule(), bwdPropFunc);
     propagatePropertiesForSingleFunc(builder.getModule(), applyFunc);
     propagatePropertiesForSingleFunc(builder.getModule(), rematFunc);
@@ -979,6 +983,28 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
         bwdPropFuncParams.getBuffer());
 
     builder.emitReturn();
+
+    // The wrapper is the callable form of the primal's backward derivative. The apply adapter it
+    // dispatches to is named "s_apply_<primal>" by both producers of apply adapters
+    // (BackwardDiffTranslationContext::translateFunc and
+    // maybeTranslateLegacyToNewBackwardDerivative), so the primal's name is recoverable by
+    // swapping that prefix: name the wrapper "s_bwd_<primal>" and give it debug info from the
+    // apply adapter, which carries the primal's source location.
+    if (auto applyNameHint = applyBwdFunc->findDecoration<IRNameHintDecoration>())
+    {
+        String name = applyNameHint->getName();
+        auto applyPrefix = UnownedStringSlice("s_apply_");
+        if (name.startsWith(applyPrefix))
+        {
+            StringBuilder nameSb;
+            nameSb << "s_bwd_"
+                   << name.subString(
+                          applyPrefix.getLength(),
+                          name.getLength() - applyPrefix.getLength());
+            builder.addNameHintDecoration(bwdDiffFunc, nameSb.getUnownedSlice());
+        }
+    }
+    copyDebugInfoForSynthesizedFunc(&builder, applyBwdFunc, bwdDiffFunc);
 
     return bwdDiffFunc;
 }
