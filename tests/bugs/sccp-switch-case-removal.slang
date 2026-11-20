@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk):
+//TEST:COMPARE_COMPUTE(targets=vk+glsl):
 
 //TEST_INPUT:ubuffer(data=[9 9 9 9], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

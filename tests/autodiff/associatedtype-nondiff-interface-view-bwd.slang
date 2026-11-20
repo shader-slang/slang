@@ -2,7 +2,7 @@
 // view does not propagate derivatives into `this` in reverse mode, even when the
 // concrete type itself is differentiable.
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;

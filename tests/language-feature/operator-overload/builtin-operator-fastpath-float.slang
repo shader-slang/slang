@@ -5,7 +5,7 @@
 // comparison, float matrix arithmetic, vector*scalar broadcast (SPIR-V OpVectorTimesScalar),
 // matrix+scalar broadcast, and mixed-type promotion (int+float, half+float, int3+float3).
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-wgpu, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu):
+//TEST:COMPARE_COMPUTE(targets=all-dx11):
 // Test emitting logic of pointer types.
 
 

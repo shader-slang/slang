@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-render-feature cooperative-vector
+//TEST:COMPARE_COMPUTE(targets=all-glsl-cuda, filecheck-buffer=CHECK):-render-feature cooperative-vector
 
 // CHECK: 1
 // CHECK-NEXT: 2

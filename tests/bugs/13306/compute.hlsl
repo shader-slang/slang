@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK): -source-language hlsl -xslang -Gec -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx12, filecheck-buffer=CHECK): -source-language hlsl -xslang -Gec -output-using-type
 
 // Every invocation starts with the input values, even after earlier invocations mutate their
 // private copies. Helper calls and `inout` arguments must observe the same copy in an invocation.

@@ -3,7 +3,7 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute
 // Metal lacks RWTexture GFX backend support.
 // Due to this, Metal compute test is disabled
-//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUF): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx12+metal, filecheck-buffer=BUF): -output-using-type
 
 //METAL-NOT: error[E41404]
 //METALLIB: @computeMain

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-source-language hlsl -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-source-language hlsl -output-using-type
 
 // HLSL loop initializers become visible in declaration order and remain visible after their
 // loops. Each result distinguishes which declaration was selected before and after a loop.

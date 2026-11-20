@@ -3,7 +3,7 @@
 // Code in a body of a reopened namespace finds the imported members of that namespace when
 // the body also declares a nested namespace, and so does code in the nested namespace.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 import reopen_lib;
 

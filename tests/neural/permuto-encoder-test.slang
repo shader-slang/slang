@@ -1,6 +1,6 @@
 // Test permuto encoder forward pass
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=BUF): -output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=BUF): -output-using-type -xslang -experimental-feature
 
 import slang.neural;
 import "permuto-reference-data";

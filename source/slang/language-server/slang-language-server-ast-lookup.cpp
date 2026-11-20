@@ -614,7 +614,11 @@ public:
     }
 };
 
-struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
+/// Search statements and their children for a match in the lookup context.
+///
+/// A visit returns true when it finds a match and the search can stop.
+struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>,
+                              public ConditionClauseVisitor<ASTLookupStmtVisitor, bool>
 {
     ASTLookupContext* context;
 
@@ -627,7 +631,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
     {
         if (!stmt)
             return false;
-        return dispatch(stmt);
+        return StmtVisitor<ASTLookupStmtVisitor, bool>::dispatch(stmt);
     }
 
     bool checkExpr(Expr* expr)
@@ -636,6 +640,16 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
             return false;
         ASTLookupExprVisitor visitor(context);
         return visitor.dispatch(expr);
+    }
+
+    bool visitExprConditionClause(ExprConditionClause* conditionClause)
+    {
+        return checkExpr(conditionClause->expr);
+    }
+
+    bool visitDeclConditionClause(DeclConditionClause* conditionClause)
+    {
+        return _findAstNodeImpl(*context, conditionClause->decl);
     }
 
     bool visitDeclStmt(DeclStmt* stmt) { return _findAstNodeImpl(*context, stmt->decl); }
@@ -668,7 +682,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitDoWhileStmt(DoWhileStmt* stmt)
     {
-        if (checkExpr(stmt->predicate))
+        if (ConditionClauseVisitor<ASTLookupStmtVisitor, bool>::dispatch(stmt->condition))
             return true;
         return dispatchIfNotNull(stmt->statement);
     }
@@ -711,7 +725,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitIfStmt(IfStmt* stmt)
     {
-        if (checkExpr(stmt->predicate))
+        if (ConditionClauseVisitor<ASTLookupStmtVisitor, bool>::dispatch(stmt->condition))
             return true;
         if (dispatchIfNotNull(stmt->positiveStatement))
             return true;
@@ -741,7 +755,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitWhileStmt(WhileStmt* stmt)
     {
-        if (checkExpr(stmt->predicate))
+        if (ConditionClauseVisitor<ASTLookupStmtVisitor, bool>::dispatch(stmt->condition))
             return true;
         return dispatchIfNotNull(stmt->statement);
     }

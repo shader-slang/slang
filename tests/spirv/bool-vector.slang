@@ -1,6 +1,6 @@
 // bool-vector.slang
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx12, filecheck-buffer=CHECK):-output-using-type
 
 // Test direct SPIR-V emit on arrays in uniforms.
 

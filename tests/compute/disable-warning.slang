@@ -1,4 +1,4 @@
-//TEST(smoke):COMPARE_COMPUTE(targets=cuda+cpu):-Xslang... -Wno-unrecommended-implicit-conversion -X.
+//TEST(smoke):COMPARE_COMPUTE(targets=all-dx11-wgpu):-Xslang... -Wno-unrecommended-implicit-conversion -X.
 
 // Test to check warning disable
 

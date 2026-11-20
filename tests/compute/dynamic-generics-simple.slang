@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu):
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test basic dynamic dispatch code gen
 

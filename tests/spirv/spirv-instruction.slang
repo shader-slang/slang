@@ -1,5 +1,5 @@
 // spirv-instruction.slang
-//TEST:COMPARE_COMPUTE(targets=vk):
+//TEST:COMPARE_COMPUTE(targets=vk+glsl):
 
 // Test using a spirv op. 128 is SpvOpIAdd
 

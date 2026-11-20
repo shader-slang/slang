@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+metal+wgpu, filecheck-buffer=CHECK):-entry computeMain -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-entry computeMain -output-using-type
 
 //TEST_INPUT:ubuffer(data=[3.5], stride=4):name inputBuffer
 StructuredBuffer<float> inputBuffer;

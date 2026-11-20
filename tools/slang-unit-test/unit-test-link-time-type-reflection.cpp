@@ -224,6 +224,68 @@ SLANG_UNIT_TEST(linkTimeStaticConstIntReflection, NoRenderApi)
     SLANG_CHECK(getStaticInt("LiteralCarrier", "Value") == 23);
 }
 
+// Test that the stored value of a `static const` with a literal initializer has the declared type.
+// The declaration-header phase folds such an initializer before it is checked, and it previously
+// stored the literal's value without converting it to the declared type, so
+// `spReflectionVariable_GetDefaultValueInt` reported 300 for `int8_t Narrowed = 300` instead of
+// the value 44 that the variable holds.
+
+SLANG_UNIT_TEST(staticConstLiteralInitializerReflection, NoRenderApi)
+{
+    const char* userSourceBody = R"(
+        module StaticConstLiteralInitializer;
+
+        public struct LiteralCarrier
+        {
+            public static const int8_t Narrowed = 300;
+            public static const uint8_t Wrapped = 0x1FF;
+            public static const int Plain = (23);
+        }
+        )";
+
+    String moduleName = "StaticConstLiteralInitializer";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        moduleName.getBuffer(),
+        (moduleName + ".slang").getBuffer(),
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto programLayout = module->getLayout();
+    SLANG_CHECK_ABORT(programLayout != nullptr);
+
+    auto type = programLayout->findTypeByName("LiteralCarrier");
+    SLANG_CHECK_ABORT(type != nullptr);
+
+    auto getDefaultValueInt = [&](const char* varName) -> int64_t
+    {
+        auto var = programLayout->findVarByNameInType(type, varName);
+        SLANG_CHECK_ABORT(var != nullptr);
+
+        int64_t value = 0;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            spReflectionVariable_GetDefaultValueInt((SlangReflectionVariable*)var, &value)));
+        return value;
+    };
+
+    SLANG_CHECK(getDefaultValueInt("Narrowed") == 44);
+    SLANG_CHECK(getDefaultValueInt("Wrapped") == 255);
+    SLANG_CHECK(getDefaultValueInt("Plain") == 23);
+}
+
 SLANG_UNIT_TEST(defaultValueBlobReflection, NoRenderApi)
 {
     const char* userSourceBody = R"(

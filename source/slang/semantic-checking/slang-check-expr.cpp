@@ -305,6 +305,24 @@ Scope* SemanticsVisitor::getScope(SyntaxNode* node)
     return nullptr;
 }
 
+/// Return whether the values of `type` are unsigned integers: `type` is a builtin unsigned
+/// integer type, such as `uint` or `uint64_t`, or an enum type whose tag type is one. For
+/// example, the cases of `enum E : uint64_t` are unsigned, so a case value with bit 63 set is
+/// large rather than negative.
+static bool _isUnsignedIntegerType(ASTBuilder* astBuilder, Type* type)
+{
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
+            type = getTagType(astBuilder, enumDeclRef);
+    }
+    auto basicType = as<BasicExpressionType>(type);
+    if (!basicType)
+        return false;
+    const BaseTypeInfo& info = BaseTypeInfo::getInfo(basicType->getBaseType());
+    return (info.flags & BaseTypeInfo::Flag::Integer) && !(info.flags & BaseTypeInfo::Flag::Signed);
+}
+
 static SourceLoc _getMemberOpLoc(Expr* expr)
 {
     if (auto m = as<MemberExpr>(expr))
@@ -1369,7 +1387,7 @@ bool SemanticsVisitor::isWitnessUncheckedOptional(SubtypeWitness* witness)
         if (!ifStmt)
             continue;
 
-        IsTypeExpr* isType = as<IsTypeExpr>(ifStmt->predicate);
+        IsTypeExpr* isType = as<IsTypeExpr>(getPredicateExpr(ifStmt->condition));
         if (!isType)
             continue;
         VarExpr* var = as<VarExpr>(isType->value);
@@ -2433,7 +2451,7 @@ Expr* SemanticsExprVisitor::visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
     //
     if (!expr->type.type)
     {
-        expr->type = m_astBuilder->getBuiltinType(expr->suffixType);
+        expr->type = getIntegerLiteralType(expr);
 
         // Check if we have an overflow diagnostics pending
         if (expr->signedMinimumIntException &&
@@ -2464,6 +2482,27 @@ Expr* SemanticsExprVisitor::visitStringLiteralExpr(StringLiteralExpr* expr)
 IntVal* SemanticsVisitor::getIntVal(IntegerLiteralExpr* expr)
 {
     return m_astBuilder->getIntVal(expr->type.type, expr->value);
+}
+
+Type* SemanticsVisitor::getIntegerLiteralType(IntegerLiteralExpr* expr)
+{
+    return m_astBuilder->getBuiltinType(expr->suffixType);
+}
+
+IntVal* SemanticsVisitor::tryFoldUncheckedLiteralInitializer(Type* type, Expr* initExpr)
+{
+    while (auto parenExpr = as<ParenExpr>(initExpr))
+        initExpr = parenExpr->base;
+
+    IntVal* literalVal = nullptr;
+    if (auto intLitExpr = as<IntegerLiteralExpr>(initExpr))
+        literalVal = m_astBuilder->getIntVal(getIntegerLiteralType(intLitExpr), intLitExpr->value);
+    else if (auto boolLitExpr = as<BoolLiteralExpr>(initExpr))
+        literalVal = m_astBuilder->getIntVal(m_astBuilder->getBoolType(), boolLitExpr->value);
+    if (!literalVal)
+        return nullptr;
+
+    return as<IntVal>(TypeCastIntVal::tryFoldImpl(m_astBuilder, type, literalVal, nullptr));
 }
 
 IntVal* SemanticsVisitor::tryConstantFoldExpr(
@@ -2507,9 +2546,13 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     if (argCount > kMaxArgs)
         return nullptr;
 
+    const BuiltinOperationKind opKind = getBuiltinOperationKindFromString(
+        getText(funcDeclRef.getName()).getUnownedSlice(),
+        argCount == 1 ? OperatorArity::Unary : OperatorArity::Binary);
+
     // Before checking the operation name, let's look at the arguments
+    List<IntVal*> newArgs;
     IntVal* argVals[kMaxArgs];
-    IntegerLiteralValue constArgVals[kMaxArgs];
     bool allConst = true;
     for (Index a = 0; a < argCount; ++a)
     {
@@ -2518,11 +2561,28 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         if (!argVal)
             return nullptr;
 
+        if (auto constFirstArg = as<ConstantIntVal>(argVal); constFirstArg && a == 0)
+        {
+            const bool logicalOpsShortCircuit =
+                !getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DisableShortCircuit);
+            const Index resultArgIndex =
+                getShortCircuitResultArgIndex(opKind, constFirstArg, logicalOpsShortCircuit);
+            if (resultArgIndex == 0)
+                return m_astBuilder->getIntVal(
+                    invokeExpr.getExpr()->type.type,
+                    constFirstArg->getValue() != 0);
+            if (resultArgIndex > 0)
+                return tryFoldIntegerConstantExpression(
+                    getArg(invokeExpr, resultArgIndex),
+                    kind,
+                    circularityInfo);
+        }
+
         argVals[a] = argVal;
 
         if (auto constArgVal = as<ConstantIntVal>(argVal))
         {
-            constArgVals[a] = constArgVal->getValue();
+            newArgs.add(constArgVal);
         }
         else
         {
@@ -2590,9 +2650,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             // re-evaluates once its operands become concrete. This is the same representation
             // the fast path's `BuiltinOperatorExpr` folds to, so there is exactly one `IntVal`
             // form per operator regardless of which path reached it.
-            auto opKind = getBuiltinOperationKindFromString(
-                getText(opName).getUnownedSlice(),
-                argCount == 1 ? OperatorArity::Unary : OperatorArity::Binary);
             if (opKind == BuiltinOperationKind::Unknown)
                 return nullptr;
             return m_astBuilder->getOrCreate<BuiltinOperationIntVal>(
@@ -2604,8 +2661,8 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         return nullptr;
     }
 
-    // At this point, all the operands had simple integer values, so we are golden.
-    IntegerLiteralValue resultValue = 0;
+    // At this point, all the operands have simple integer values.
+
     // If this is an implicit cast, we can try to fold.
     if (implicitCast)
     {
@@ -2621,157 +2678,22 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     }
     else
     {
-        auto opName = funcDeclRef.getName();
-
-        // handle unary and binary operators
-        if (opName == getName("-"))
-        {
-            if (argCount == 1)
-            {
-                resultValue = -constArgVals[0];
-            }
-            else if (argCount == 2)
-            {
-                resultValue = constArgVals[0] - constArgVals[1];
-            }
-        }
-        else if (opName == getName("+"))
-        {
-            if (argCount == 1)
-            {
-                resultValue = constArgVals[0];
-            }
-            else if (argCount == 2)
-            {
-                resultValue = static_cast<IntegerLiteralValue>(
-                    static_cast<uint64_t>(constArgVals[0]) +
-                    static_cast<uint64_t>(constArgVals[1]));
-            }
-        }
-        else if (opName == getName("!"))
-        {
-            resultValue = constArgVals[0] == 0;
-        }
-        else if (opName == getName("~"))
-        {
-            resultValue = ~constArgVals[0];
-        }
-        else if (opName == getName("&&"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = (constArgVals[0] != 0) && (constArgVals[1] != 0);
-        }
-        else if (opName == getName("||"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = (constArgVals[0] != 0) || (constArgVals[1] != 0);
-        }
-
-        // Unsigned/bitwise operators (bit pattern preserved, uint64_t cast is correct)
-#define CASE_UINT(OP)                                                                         \
-    else if (opName == getName(#OP)) do                                                       \
-    {                                                                                         \
-        if (argCount != 2)                                                                    \
-            return nullptr;                                                                   \
-        resultValue =                                                                         \
-            static_cast<uint64_t>(constArgVals[0]) OP static_cast<uint64_t>(constArgVals[1]); \
-    }                                                                                         \
-    while (0)
-
-        CASE_UINT(*);
-        CASE_UINT(&);
-        CASE_UINT(|);
-        CASE_UINT(^);
-        CASE_UINT(!=);
-        CASE_UINT(==);
-#undef CASE_UINT
-
-        // Signed comparison operators (uint64_t cast would break e.g. (-1 < 0))
-        else if (opName == getName(">="))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = constArgVals[0] >= constArgVals[1];
-        }
-        else if (opName == getName("<="))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = constArgVals[0] <= constArgVals[1];
-        }
-        else if (opName == getName("<"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = constArgVals[0] < constArgVals[1];
-        }
-        else if (opName == getName(">"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = constArgVals[0] > constArgVals[1];
-        }
-
-        // Shift operators: guard negative count (UB), use modulo for width
-        else if (opName == getName("<<"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            if (constArgVals[1] < 0)
-                return nullptr;
-            const auto shiftCount =
-                static_cast<std::make_unsigned_t<IRIntegerValue>>(constArgVals[1]) %
-                std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
-            resultValue = static_cast<IntegerLiteralValue>(
-                static_cast<std::make_unsigned_t<IntegerLiteralValue>>(constArgVals[0])
-                << shiftCount);
-        }
-        else if (opName == getName(">>"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            if (constArgVals[1] < 0)
-                return nullptr;
-            const auto shiftCount =
-                static_cast<std::make_unsigned_t<IRIntegerValue>>(constArgVals[1]) %
-                std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
-            resultValue = constArgVals[0] >> shiftCount;
-        }
-        // binary operators with chance of divide-by-zero
-        // TODO: issue a suitable error in that case
-#define CASE(OP)                                          \
-    else if (opName == getName(#OP)) do                   \
-    {                                                     \
-        if (argCount != 2)                                \
-            return nullptr;                               \
-        if (!constArgVals[1])                             \
-            return nullptr;                               \
-        resultValue = constArgVals[0] OP constArgVals[1]; \
-    }                                                     \
-    while (0)
-        CASE(/);
-        CASE(%);
-#undef CASE
-        else if (opName == getName("?:"))
-        {
-            if (argCount != 3)
-                return nullptr;
-            if (constArgVals[0] != 0)
-                resultValue = constArgVals[1];
-            else
-                resultValue = constArgVals[2];
-        }
-        // TODO(tfoley): more cases
-        else
-        {
+        if (opKind == BuiltinOperationKind::Unknown)
             return nullptr;
-        }
-    }
 
-    IntVal* result = m_astBuilder->getIntVal(invokeExpr.getExpr()->type.type, resultValue);
-    return result;
+        // special case for unary +, which returns identity
+        if (opKind == BuiltinOperationKind::Add && argCount == 1)
+            return argVals[0];
+
+        // delegate to builtin ops folder
+        return BuiltinOperationIntVal::tryFoldImpl(
+            m_astBuilder,
+            invokeExpr.getExpr()->type.type,
+            opKind,
+            newArgs,
+            getFoldDiagnosticSink(circularityInfo),
+            funcDeclRefExpr.getExpr()->loc);
+    }
 }
 
 bool SemanticsVisitor::_checkForCircularityInConstantFolding(
@@ -2803,7 +2725,8 @@ bool SemanticsVisitor::_checkForCircularityInConstantFolding(
 IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     DeclRef<VarDeclBase> const& declRef,
     ConstantFoldingKind kind,
-    ConstantFoldingCircularityInfo* circularityInfo)
+    ConstantFoldingCircularityInfo* circularityInfo,
+    bool isDeclarationCheck)
 {
     auto decl = declRef.getDecl();
 
@@ -2886,8 +2809,37 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         return nullptr;
 
     ensureDecl(declRef.getDecl(), DeclCheckState::DefinitionChecked);
+
+    // Checking the declaration folds its initializer and stores the result in `decl->val`. We
+    // reuse a stored concrete constant instead of folding the initializer again, because a
+    // `ConstantIntVal` does not depend on generic arguments, so it is the value of every
+    // reference to the declaration.
+    if (auto constantVal = as<ConstantIntVal>(decl->val))
+        return constantVal;
+
+    // A use of the declaration folds the same initializer that checking the declaration folded,
+    // unless the use supplies generic arguments or the type through which the member was looked
+    // up. Only in those cases can the use see operand values that the declaration check could
+    // not, so only then does it report fold diagnostics again.
+    //
+    // TODO: Every use with the same arguments reports the same failure again. For example, two
+    // uses of `Generic<0>.quotient` where `quotient = 10 / N` each report the division by zero
+    // at the initializer. Reporting each failure once requires recording the reported failures
+    // by operation site and concrete operands.
+    SubstitutionSet substitutions(declRef);
     ConstantFoldingCircularityInfo newCircularityInfo(declRef, circularityInfo);
+    newCircularityInfo.reportsFoldDiagnostics =
+        isDeclarationCheck || !isInitializerFoldedByDeclarationCheck(decl) ||
+        substitutions.findGenericAppDeclRef() || substitutions.findLookupDeclRef();
     return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), kind, &newCircularityInfo);
+}
+
+DiagnosticSink* SemanticsVisitor::getFoldDiagnosticSink(
+    ConstantFoldingCircularityInfo* circularityInfo)
+{
+    if (circularityInfo && !circularityInfo->reportsFoldDiagnostics)
+        return nullptr;
+    return getSink();
 }
 
 IntVal* SemanticsVisitor::tryConstantFoldBuiltinOperatorExpr(
@@ -2919,7 +2871,7 @@ IntVal* SemanticsVisitor::tryConstantFoldBuiltinOperatorExpr(
             resultType,
             op,
             argVals,
-            getSink(),
+            getFoldDiagnosticSink(circularityInfo),
             e->loc)))
         return folded;
 
@@ -3282,11 +3234,14 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         {
             if (auto floatLitExpr = typeCastOperand.as<FloatingPointLiteralExpr>())
             {
-                // When explicitly casting from float type to integer type, let's fold it as
-                // an integer value.
-                const IntegerLiteralValue value =
-                    IntegerLiteralValue(floatLitExpr.getExpr()->value);
-                val = m_astBuilder->getIntVal(substType, value);
+                // An explicit cast of a floating-point literal to an integer type folds to the
+                // integer value of the literal, truncated toward zero, when that value fits.
+                val = TypeCastIntVal::tryFoldFromFloat(
+                    m_astBuilder,
+                    substType,
+                    floatLitExpr.getExpr()->value,
+                    getFoldDiagnosticSink(circularityInfo),
+                    expr.getExpr()->loc);
             }
         }
 
@@ -3658,12 +3613,21 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                 nullptr,
                 ConstantFoldingKind::SpecializationConstant);
 
-            // Validate that array size is non-negative.
+            // Validate that the array size is non-negative and fits in `int`, the type in which
+            // `ArrayExpressionType` stores it. The size keeps the type of its expression here,
+            // so an unsigned size such as `0xFFFFFFFFu` is too large rather than negative.
             if (auto constElementCount = as<ConstantIntVal>(elementCount))
             {
-                if (constElementCount->getValue() < 0)
+                const IntegerLiteralValue size = constElementCount->getValue();
+                if (size < 0 && !_isUnsignedIntegerType(m_astBuilder, constElementCount->getType()))
                 {
                     getSink()->diagnose(Diagnostics::InvalidArraySize{
+                        .location = subscriptExpr->indexExprs[0]->loc});
+                    return CreateErrorExpr(subscriptExpr);
+                }
+                if (uint64_t(size) > uint64_t(INT32_MAX))
+                {
+                    getSink()->diagnose(Diagnostics::ArraySizeTooLarge{
                         .location = subscriptExpr->indexExprs[0]->loc});
                     return CreateErrorExpr(subscriptExpr);
                 }

@@ -2,7 +2,7 @@
 //TEST:SIMPLE(filecheck=METALLIB,exit-code=2): -target metallib -entry computeMain -stage compute
 // Metal currently lacks multisampled texture write support.
 // Due to this, Metal compute test is disabled
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF): -output-using-type
 
 //METAL_ERROR: error[E41404]: cannot write to multisampled texture
 //METALLIB: error[E41404]: cannot write to multisampled texture

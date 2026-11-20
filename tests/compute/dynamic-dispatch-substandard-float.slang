@@ -1,5 +1,5 @@
 // Test using interface typed shader parameters with texture typed fields.
-//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type -render-features fp8
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -render-features fp8
 
 [anyValueSize(4)]
 interface IFoo

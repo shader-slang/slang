@@ -13,8 +13,8 @@
 // Capability shaderDenormFlushToZeroFloat32 is VK_FALSE on the Vulkan device used for CI testing, resulting in
 // runtime error VUID-RuntimeSpirv-shaderDenormFlushToZeroFloat32-06300 during CI testing
 
-//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=PRESERVE):-profile cs_6_2 -Xslang -denorm-mode-fp32 -Xslang preserve
-//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=FTZ):-profile cs_6_2 -Xslang -denorm-mode-fp32 -Xslang ftz
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda+cpu+llvm, filecheck-buffer=PRESERVE):-profile cs_6_2 -Xslang -denorm-mode-fp32 -Xslang preserve
+//TEST:COMPARE_COMPUTE(targets=glsl+dx12+wgpu, filecheck-buffer=FTZ):-profile cs_6_2 -Xslang -denorm-mode-fp32 -Xslang ftz
 
 // CHECK_ANY-NOT: DenormPreserve
 // CHECK_ANY-NOT: DenormFlushToZero

@@ -1,7 +1,7 @@
 // NOTE we can't test on VK/gl because we will output imat3 - and imat3 is not supported by glsl.
 // NOTE we also can't do this test on fxc - as it does not allow runtime non constant indexing.
 
-//TEST:COMPARE_COMPUTE(targets=dx12+cuda+cpu+llvm):
+//TEST:COMPARE_COMPUTE(targets=all-dx11):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

@@ -1,7 +1,7 @@
 // Regression test for #13548: a value read before a store must not be re-read after it when
 // it is folded into `NonUniformResourceIndex` in textual targets.
 
-//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx12+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-llvm, filecheck-buffer=CHECK):-output-using-type
 
 //TEST:SIMPLE(filecheck=SRC): -target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SRC): -target glsl -entry computeMain -stage compute

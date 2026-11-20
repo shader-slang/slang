@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx12, filecheck-buffer=BUF):
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu-wgpu-llvm, filecheck-buffer=BUF):
 
 //TEST_INPUT:RWTexture1D(format=R32Uint, size=8, content = zero, mipMaps = 1):name=texture1D
 RWTexture1D<uint> texture1D;

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+metal):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+metal+cuda):-output-using-type
 
 //TEST_INPUT: ubuffer(data=[0]):name=buffer
 RWByteAddressBuffer buffer;

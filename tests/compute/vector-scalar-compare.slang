@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda):
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test doing vector comparisons
 

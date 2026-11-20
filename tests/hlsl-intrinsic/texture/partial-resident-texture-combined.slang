@@ -1,6 +1,6 @@
 // TODO: There are issues running tests combined texture samplers in DX12. (Github issue #6982)
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHK):-output-using-type -render-feature hardware-device -xslang -DVK -xslang -Wno-41024
+//TEST:COMPARE_COMPUTE(targets=vk+cpu+llvm, filecheck-buffer=CHK):-output-using-type -render-feature hardware-device -xslang -DVK -xslang -Wno-41024
 
 //TEST_INPUT: ubuffer(data=[2], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

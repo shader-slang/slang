@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 // Matrix and tuple swizzles are l-values exactly when their base is. Each case below writes
 // through a swizzle whose base is writable for a different reason: a field of `this` in a

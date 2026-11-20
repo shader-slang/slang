@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Regression guard for shader-slang/slang#12604: memoizing the specialization work list's
 // forward-use-closure walk must be output-neutral. Mixes generic specialization, autodiff,

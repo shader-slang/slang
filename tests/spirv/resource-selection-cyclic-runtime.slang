@@ -1,5 +1,5 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK): -output-using-type -Xslang -O0
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK): -output-using-type -Xslang -O1
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda+cpu, filecheck-buffer=CHECK): -output-using-type -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda+cpu, filecheck-buffer=CHECK): -output-using-type -Xslang -O1
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -O0 -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -validate-ir -validate-ir-detailed -O1
 

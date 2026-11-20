@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Test calling bwd_diff on a static member function using the
 // StructName::methodName syntax, e.g. bwd_diff(MyStruct::load)(...).

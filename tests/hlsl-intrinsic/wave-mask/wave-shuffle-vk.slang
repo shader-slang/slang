@@ -1,6 +1,6 @@
 //TEST_CATEGORY(wave-mask, compute)
 // Disabled because main tests is wave-shuffle.slang, this just tests VK
-//TEST:COMPARE_COMPUTE(targets=vk+cuda):
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx12+cuda):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

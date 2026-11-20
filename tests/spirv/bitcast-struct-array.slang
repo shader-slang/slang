@@ -10,7 +10,7 @@
 // CHECK-DAG: OpShiftLeftLogical
 // CHECK-DAG: OpBitwiseOr
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=OUT):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=OUT):-output-using-type
 
 struct IntPair
 {

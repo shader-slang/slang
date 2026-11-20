@@ -7,7 +7,7 @@
 // type. If `makeInfoForConcreteType` wrapped it as a payload, compilation would stop with an internal
 // error. The later `light.intersect(t)` must resolve to a direct `Light.intersect` call.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute -conformance A:IGeometry=0 -conformance B:IGeometry=1
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry computeMain -stage compute -conformance A:IGeometry=0 -conformance B:IGeometry=1
 //TEST:SIMPLE(filecheck=DXIL): -target dxil-assembly -entry computeMain -stage compute -conformance A:IGeometry=0 -conformance B:IGeometry=1

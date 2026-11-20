@@ -3163,6 +3163,20 @@ public:
 
     IntVal* getIntVal(IntegerLiteralExpr* expr);
 
+    /// Return the type of the integer literal `expr`, which its suffix determines. Checking a
+    /// literal assigns this type, and the declaration-header phase uses it to fold a literal
+    /// initializer before the initializer is checked.
+    Type* getIntegerLiteralType(IntegerLiteralExpr* expr);
+
+    /// Return the value of the not-yet-checked initializer `initExpr` converted to `type` when
+    /// `initExpr` is an integer or `bool` literal, and null otherwise. For example, the
+    /// initializer of `static const int8_t x = 300;` folds to the `int8_t` value 44, which is
+    /// what folding the initializer after it has been checked and coerced to `int8_t` produces.
+    /// The result is also null for a literal whose conversion to `type` cannot be folded, such
+    /// as `static const float F = 1;`. A null result means only that the caller has no value
+    /// from this function and relies on checking the initializer.
+    IntVal* tryFoldUncheckedLiteralInitializer(Type* type, Expr* initExpr);
+
     inline IntVal* getIntVal(SubstExpr<IntegerLiteralExpr> expr)
     {
         return getIntVal(expr.getExpr());
@@ -3187,7 +3201,37 @@ public:
 
         /// Current recursion depth of constant folding/evaluation.
         UInt depth = 0;
+
+        /// Whether folding the initializer of `declRef` reports fold diagnostics, such as a
+        /// division by zero. The innermost link of the chain decides; see
+        /// `getFoldDiagnosticSink`.
+        bool reportsFoldDiagnostics = true;
     };
+
+    /// Return the sink for the diagnostics that folding a single operation reports, such as
+    /// division by zero, or null when these diagnostics are suppressed.
+    ///
+    /// The choice depends only on `reportsFoldDiagnostics` of the innermost circularity link; we
+    /// do not record which operand values earlier folds have seen. A use of a declaration does not
+    /// report again what checking the declaration already reported, but a use that supplies
+    /// generic arguments reports every time. Consider this example:
+    ///
+    ///     static const int a = 1 / 0;
+    ///     void f() { switch (0) { case 0: case a: break; } }
+    ///
+    /// Checking the declaration of `a` folds its initializer and reports the division by zero.
+    /// The `case` label folds the same initializer with the same operand values again through
+    /// `tryConstantFoldDeclRef`, so it reports nothing. If `a` were a member of a generic type
+    /// and the use supplied the generic arguments, the use would see operand values that the
+    /// declaration check could not, so it reports. Each such use reports, even when another use
+    /// already supplied the same arguments (see the TODO in `tryConstantFoldDeclRef`).
+    DiagnosticSink* getFoldDiagnosticSink(ConstantFoldingCircularityInfo* circularityInfo);
+
+    /// Return whether checking `varDecl` folds its initializer and reports the fold diagnostics.
+    /// `_validateCircularVarDefinition` performs this fold, and folds of the same initializer
+    /// through uses of `varDecl` rely on it to suppress duplicate diagnostics.
+    bool isInitializerFoldedByDeclarationCheck(VarDeclBase* varDecl);
+
     /// Try to apply front-end constant folding to determine the value of `invokeExpr`.
     IntVal* tryConstantFoldExpr(
         SubstExpr<InvokeExpr> invokeExpr,
@@ -3213,10 +3257,13 @@ public:
         ConstantFoldingCircularityInfo* circularityInfo);
 
     /// Try to resolve a compile-time constant `IntVal` from the given `declRef`.
+    /// `isDeclarationCheck` is true when checking the declaration itself requests the fold, and
+    /// false when a use of the declaration does; see `getFoldDiagnosticSink`.
     IntVal* tryConstantFoldDeclRef(
         DeclRef<VarDeclBase> const& declRef,
         ConstantFoldingKind kind,
-        ConstantFoldingCircularityInfo* circularityInfo);
+        ConstantFoldingCircularityInfo* circularityInfo,
+        bool isDeclarationCheck = false);
 
     /// Try to extract the value of an integer constant expression, either
     /// returning the `IntVal` value, or null if the expression isn't recognized
@@ -4622,7 +4669,10 @@ private:
     bool isGLSLOperatorScope();
 };
 
-struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmtVisitor>
+/// Check statements and their condition clauses in the current semantic context.
+struct SemanticsStmtVisitor : public SemanticsVisitor,
+                              StmtVisitor<SemanticsStmtVisitor>,
+                              ConditionClauseVisitor<SemanticsStmtVisitor>
 {
     SemanticsStmtVisitor(SemanticsContext const& outer)
         : SemanticsVisitor(outer)
@@ -4631,7 +4681,14 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     FunctionDeclBase* getParentFunc() { return m_parentFunc; }
 
+    using StmtVisitor<SemanticsStmtVisitor>::dispatch;
+
     void checkStmt(Stmt* stmt);
+
+    /// Check a condition clause in place.
+    void checkConditionClause(ConditionClause* conditionClause);
+    void visitExprConditionClause(ExprConditionClause* conditionClause);
+    void visitDeclConditionClause(DeclConditionClause* conditionClause);
 
     Stmt* findOuterStmtWithLabel(Name* label);
 

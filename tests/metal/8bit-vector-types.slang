@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain
-//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=BUF):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0], stride=4, counter=1):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

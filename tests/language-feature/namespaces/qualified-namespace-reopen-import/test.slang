@@ -6,7 +6,7 @@
 // Without the first, `ImportedType` in `Local` would be an undefined identifier; without
 // the second, `outerValue` in `getOuterValue` would be.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 import qualified_reopen_lib;
 

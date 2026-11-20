@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all-dx12, filecheck-buffer=CHECK):
 //TEST:SIMPLE(filecheck=SPIRV): -entry computeMain -stage compute -target spirv
 //TEST:SIMPLE(filecheck=HLSL): -entry computeMain -stage compute -target hlsl
 

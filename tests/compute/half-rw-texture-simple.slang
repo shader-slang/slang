@@ -3,7 +3,7 @@
 // Doesn't work on DX11 currently - locks up on binding
 // Produces a different result on DX12 with DXBC than expected(!). So disabled for now
 // TODO(JS): Doesn't currently work on Vulkan - 3rd value in output appears incorrect
-//TEST:COMPARE_COMPUTE(targets=cuda):-output-using-type -render-features half
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type -render-features half
 
 //TEST_INPUT: RWTexture1D(format=R16Float, size=4, content = one, mipMaps = 1):name rwt1D
 RWTexture1D<half> rwt1D;

@@ -7,7 +7,7 @@
 // the qualified declaration reopened them. Imported members of an existing enclosing
 // namespace are covered by namespace-import-reopen/qualified-reopen.slang.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 namespace Outer
 {

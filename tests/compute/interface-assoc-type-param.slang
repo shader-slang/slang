@@ -1,6 +1,6 @@
 // Tests using associated types through an existential-struct-typed param.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu):
+//TEST:COMPARE_COMPUTE(targets=all):
 
 [anyValueSize(8)]
 interface IInterface

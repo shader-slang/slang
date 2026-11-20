@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=SPIRV):-stage compute -entry computeMain -target spirv
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-render-feature cooperative-vector
+//TEST:COMPARE_COMPUTE(targets=all-glsl-cuda, filecheck-buffer=CHECK):-render-feature cooperative-vector
 
 // Ensure SPIRV emits coherent operations here
 // SPIRV: MakePointerVisible

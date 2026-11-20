@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: The Khronos Group, Inc.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type -render-features fp8 -Xslang -O0
-//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type -render-features fp8 -Xslang -O3
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -render-features fp8 -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -render-features fp8 -Xslang -O3
 
 // Check that constant folding preserves finite FP8 values and ties-to-even rounding.
 // The expected output contains independently computed Float32 bits, so a matching

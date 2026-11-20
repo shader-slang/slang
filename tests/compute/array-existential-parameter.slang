@@ -1,6 +1,6 @@
 // Test using existential shader parameter that is an interface array.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu):
+//TEST:COMPARE_COMPUTE(targets=all-vk-glsl-wgpu-llvm):
 
 [anyValueSize(8)]
 interface IInterface

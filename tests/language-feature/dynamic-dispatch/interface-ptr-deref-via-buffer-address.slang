@@ -14,7 +14,7 @@
 // serialized existentials whose AnyValue payload includes a pointer to
 // another existential stored in a different buffer.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu+llvm, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-glsl-dx11-dx12-wgpu, filecheck-buffer=CHECK): -output-using-type
 
 [anyValueSize(8)]
 interface IValue

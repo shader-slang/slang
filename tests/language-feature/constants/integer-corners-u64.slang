@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=BUF): -output-using-type
 //TEST_INPUT:ubuffer(data=[7 7 7 7 7 7 7 7], stride=8, count=8):out,name=outputBuffer
 RWStructuredBuffer<uint64_t> outputBuffer;
 

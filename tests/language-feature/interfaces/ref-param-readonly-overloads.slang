@@ -2,7 +2,7 @@
 // or `__ref_writeonly`. They are distinct functions with distinct mangled names, and each
 // interface requirement is satisfied by the method with its passing mode.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -xslang -experimental-feature
 
 interface IReadOnly
 {

@@ -9,7 +9,7 @@
 // copy taken before the call would give the values from before the barrier, 1, 2, 3 and 0, and
 // storing the copy back after the call would overwrite the other invocations' writes.
 
-//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute -experimental-feature -line-directive-mode none
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer

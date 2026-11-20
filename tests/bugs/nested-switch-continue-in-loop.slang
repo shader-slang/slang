@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx12, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx12, filecheck-buffer=CHECK):-output-using-type -Xslang -DWHILE_LOOP
+//TEST:COMPARE_COMPUTE(targets=all-dx11, filecheck-buffer=CHECK):-output-using-type -Xslang -DWHILE_LOOP
 
 // Disable dx11/FXC: "error X3708: 'continue' cannot be used in a switch"
 

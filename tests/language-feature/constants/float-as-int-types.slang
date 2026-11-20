@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda, filecheck-buffer=BUF): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF): -output-using-type
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4, count=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 

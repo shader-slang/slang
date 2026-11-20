@@ -1,5 +1,5 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-Xslang -DBAB
+//TEST:COMPARE_COMPUTE(targets=vk+dx11+dx12+wgpu, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=vk+dx11+dx12+wgpu, filecheck-buffer=CHECK):-Xslang -DBAB
 
 //DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include -DBAB
 //DXIL: result code = 0

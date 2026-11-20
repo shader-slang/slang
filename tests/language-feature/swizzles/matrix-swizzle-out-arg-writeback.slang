@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv-asm -entry computeMain -stage compute -O1
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK_OUTPUT): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK_OUTPUT): -output-using-type
 
 // Regression test for #10212.
 // Matrix swizzles passed as out/inout arguments must write back to the selected

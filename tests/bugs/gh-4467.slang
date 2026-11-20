@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx12, filecheck-buffer=CHK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK): -output-using-type
 
 
 // Test that we can synthesize a [mutating] interface requirement from a nonmutating implementation,
