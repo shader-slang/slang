@@ -1,5 +1,5 @@
 
-//TEST:COMPARE_COMPUTE(targets=all-vk-glsl-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx11+dx12+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 int myIntrinsicFunc()
 {

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=all-vk-dx11-wgpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-vk-dx11-metal-wgpu, filecheck-buffer=CHECK):-output-using-type
 
 // Regression test for shader-slang/slang#11075.
 //

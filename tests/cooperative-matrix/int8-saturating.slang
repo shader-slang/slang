@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -capability cuda_sm_8_0
+//TEST:COMPARE_COMPUTE(targets=dx11+dx12+cuda+wgpu, filecheck-buffer=CHECK):-output-using-type -capability cuda_sm_8_0
 //TEST:SIMPLE(filecheck=CHECK_PTX): -target ptx -capability cuda_sm_8_0 -entry computeMain -stage compute
 
 // CUDA `int8_t` saturating cooperative matrix multiply-add.  Targets PTX

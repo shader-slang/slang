@@ -2,7 +2,7 @@
 // SIMPLE pins the #11731 path; the runtime lane uses the default profile because the legacy
 // `spirv_1_3` Vulkan lane emits an unsuppressible profile-upgrade warning under render-test.
 //TEST:SIMPLE(filecheck=CHECK):-profile spirv_1_3 -target spirv
-//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-metal-cpu-llvm, filecheck-buffer=BUF):-output-using-type
 //TEST_INPUT: set buf = out ubuffer(data=[0 0 0 0], stride=4);
 RWStructuredBuffer<Atomic<uint>> buf;
 

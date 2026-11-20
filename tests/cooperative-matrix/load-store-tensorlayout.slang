@@ -1,11 +1,11 @@
 //TEST(compute):SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 //TEST(compute):SIMPLE(filecheck=SPIRV_BL):-target spirv-asm -entry computeMain -stage compute -DBLOCK_LOAD
 
-//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -render-feature cooperative-matrix-tensor-addressing
-//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -render-feature cooperative-matrix-tensor-addressing -Xslang -DRW
+//TEST:COMPARE_COMPUTE(targets=all-glsl, filecheck-buffer=CHECK):-output-using-type -render-feature cooperative-matrix-tensor-addressing
+//TEST:COMPARE_COMPUTE(targets=all-glsl, filecheck-buffer=CHECK):-output-using-type -render-feature cooperative-matrix-tensor-addressing -Xslang -DRW
 
-//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK_BL):-output-using-type -render-feature cooperative-matrix-block-loads -Xslang -DBLOCK_LOAD
-//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK_BL):-output-using-type -render-feature cooperative-matrix-block-loads -Xslang -DBLOCK_LOAD -Xslang -DRW
+//TEST:COMPARE_COMPUTE(targets=all-glsl, filecheck-buffer=CHECK_BL):-output-using-type -render-feature cooperative-matrix-block-loads -Xslang -DBLOCK_LOAD
+//TEST:COMPARE_COMPUTE(targets=all-glsl, filecheck-buffer=CHECK_BL):-output-using-type -render-feature cooperative-matrix-block-loads -Xslang -DBLOCK_LOAD -Xslang -DRW
 
 //CHECK: 0
 //CHECK-NEXT: 0

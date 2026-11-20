@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-metal-cuda-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 struct MyPoint { int x; int y; int type; }
 

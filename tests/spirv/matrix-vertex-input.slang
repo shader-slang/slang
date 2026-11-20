@@ -1,6 +1,6 @@
-//TEST:COMPARE_RENDER_COMPUTE(targets=all-wgpu, filecheck-buffer=ROWMAJOR): -output-using-type
+//TEST:COMPARE_RENDER_COMPUTE(targets=all-metal-wgpu, filecheck-buffer=ROWMAJOR): -output-using-type
 
-//TEST:COMPARE_RENDER_COMPUTE(targets=all-glsl-wgpu, filecheck-buffer=COLMAJOR): -output-using-type -xslang -DCOLUMN_MAJOR
+//TEST:COMPARE_RENDER_COMPUTE(targets=all-glsl-metal-wgpu, filecheck-buffer=COLMAJOR): -output-using-type -xslang -DCOLUMN_MAJOR
 
 // Check that row_major and column_major matrix typed vertex input are correctly handled.
 

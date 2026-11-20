@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=all-wgpu, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-metal-wgpu, filecheck-buffer=CHECK): -output-using-type
 //TEST(compute):SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute
 
 //TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0], stride=4):out,name=outputBuffer

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=all-wgpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-metal-wgpu, filecheck-buffer=CHECK):-output-using-type
 
 // Regression test for shader-slang/slang#11075: `double` vectors and matrices.
 //

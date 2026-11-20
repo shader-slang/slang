@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda+cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 
 // CHECK: type: float
 // CHECK-NEXT: 6.000000

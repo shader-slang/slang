@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=BUF):-entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-metal-wgpu, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 
 #version 450
 

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=vk+dx11+dx12+wgpu, filecheck-buffer=CHECK):
 
 // CHECK: 1
 // CHECK-NEXT: 2

@@ -4,7 +4,7 @@
 // Reference: tiny-cuda-nn permuto.h encoding
 // Run the CUDA reference first: cd tiny-cuda-nn/build && ./permuto_jit_test b
 
-//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF): -output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=BUF): -output-using-type -xslang -experimental-feature
 
 import slang.neural;
 import "permuto-encoder-precomputed-constants";

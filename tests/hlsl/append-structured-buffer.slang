@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-llvm, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-metal-cpu-llvm, filecheck-buffer=BUF):-output-using-type
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
 

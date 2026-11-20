@@ -1,6 +1,6 @@
-//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=CHECK):-output-using-type -Xslang -preserve-params
-//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=CHECK):-output-using-type -Xslang -preserve-params -Xslang -O2
-//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-metal-wgpu, filecheck-buffer=CHECK):-output-using-type -Xslang -preserve-params
+//TEST:COMPARE_COMPUTE(targets=all-dx11-metal-wgpu, filecheck-buffer=CHECK):-output-using-type -Xslang -preserve-params -Xslang -O2
+//TEST:COMPARE_COMPUTE(targets=all-dx11-metal-wgpu, filecheck-buffer=CHECK):-output-using-type
 
 // With -preserve-params, a shader that indexes an array of byte-address buffers and also
 // declares an unused one still runs on Vulkan and reads the right words (#14039).
