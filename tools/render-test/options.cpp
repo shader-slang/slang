@@ -3,6 +3,7 @@
 #include "options.h"
 
 #include "compiler-core/slang-command-line-args.h"
+#include "coopmat-shape-parse.h"
 #include "core/slang-list.h"
 #include "core/slang-render-api-util.h"
 #include "core/slang-string-util.h"
@@ -37,6 +38,26 @@ static bool isValidFeatureName(const UnownedStringSlice& featureName)
         }
     }
     return false;
+}
+
+// Parses a -require-coopmat-shape value into `outDesc` (see coopmat-shape-parse.h for the
+// grammar and the shape semantics), diagnosing the value when parsing fails so a typo is
+// reported as a test-configuration error rather than silently changing which devices run
+// the test.
+static SlangResult _parseCooperativeMatrixShape(
+    const CommandLineArg& shapeArg,
+    DiagnosticSink& sink,
+    CooperativeMatrixDesc& outDesc)
+{
+    if (SLANG_FAILED(tryParseCooperativeMatrixShape(shapeArg.value.getUnownedSlice(), outDesc)))
+    {
+        sink.diagnose(
+            shapeArg.loc,
+            RenderTestDiagnostics::invalidCooperativeMatrixShape,
+            shapeArg.value);
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
 }
 
 static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
@@ -157,6 +178,19 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
                 }
                 outOptions.renderFeatures.add(value);
             }
+        }
+        else if (argValue == "-require-coopmat-shape")
+        {
+            // The name abbreviates to "coopmat" after the shader-side CoopMat type rather
+            // than spelling "cooperative matrix" out like the rhi API and the
+            // -render-feature cooperative-matrix-* names. The flag may be repeated, once
+            // per required shape, and the device must list every given shape.
+            CommandLineArg shapeArg;
+            SLANG_RETURN_ON_FAIL(reader.expectArg(shapeArg));
+
+            CooperativeMatrixDesc desc;
+            SLANG_RETURN_ON_FAIL(_parseCooperativeMatrixShape(shapeArg, sink, desc));
+            outOptions.requiredCooperativeMatrixShapes.add(desc);
         }
         else if (argValue == "-xslang" || argValue == "-compile-arg")
         {

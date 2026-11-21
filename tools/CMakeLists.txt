@@ -496,6 +496,12 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         INCLUDE_DIRECTORIES_PRIVATE
             ${slang_SOURCE_DIR}/source
             ${slang_SOURCE_DIR}/examples
+            # The coopmat-shape-parse unit test includes render-test's parsing header and
+            # the slang-rhi types it fills. Reusing slang-rhi's interface include
+            # directories (source include + generated slang-rhi-config.h) rather than
+            # adding paths by hand; the usage is header-only, so no link dependency.
+            ${slang_SOURCE_DIR}/tools/render-test
+            $<TARGET_PROPERTY:slang-rhi,INTERFACE_INCLUDE_DIRECTORIES>
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools
