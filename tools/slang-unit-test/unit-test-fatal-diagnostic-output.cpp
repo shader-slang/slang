@@ -1,4 +1,10 @@
+// Verify fatal diagnostics are written before exception-disabled builds terminate.
+// The parent launches each scenario in a child and checks its captured output. The child
+// triggers the fatal path so termination cannot kill the test runner. stderr buffering is
+// configured at runner startup, before initialization can write to that stream.
+
 #include "compiler-core/slang-diagnostic-sink.h"
+#include "compiler-core/slang-source-loc.h"
 #include "core/slang-memory-file-system.h"
 #include "core/slang-platform.h"
 #include "core/slang-process-util.h"
@@ -30,8 +36,8 @@ static const char kTestName[] = "slang-unit-test-tool/fatalDiagnosticOutputBefor
 class BufferedFatalDiagnosticWriter : public AppendBufferWriter
 {
 public:
-    BufferedFatalDiagnosticWriter()
-        : AppendBufferWriter(0)
+    BufferedFatalDiagnosticWriter(FILE* stream = stderr)
+        : AppendBufferWriter(0), m_stream(stream)
     {
     }
 
@@ -43,11 +49,13 @@ public:
 
     SLANG_NO_THROW void SLANG_MCALL flush() SLANG_OVERRIDE
     {
-        fwrite(m_buffer.getBuffer(), 1, size_t(m_buffer.getLength()), stderr);
+        fwrite(m_buffer.getBuffer(), 1, size_t(m_buffer.getLength()), m_stream);
+        fflush(m_stream);
         m_buffer.clear();
     }
 
 private:
+    FILE* m_stream;
     StringBuilder m_buffer;
 };
 
@@ -61,8 +69,6 @@ static void _runFatalDiagnosticChild(const char* mode)
     const rlimit coreLimit = {0, 0};
     setrlimit(RLIMIT_CORE, &coreLimit);
 #endif
-    static char stderrBuffer[8192];
-    setvbuf(stderr, stderrBuffer, _IOFBF, sizeof(stderrBuffer));
 
     if (strcmp(mode, "import") == 0 || strcmp(mode, "import-name") == 0)
     {
@@ -144,10 +150,15 @@ static void _runFatalDiagnosticChild(const char* mode)
     }
     else
     {
-        BufferedFatalDiagnosticWriter bufferedWriter;
-        DiagnosticSink parent;
-        DiagnosticSink sink;
-        if (strcmp(mode, "parent") == 0)
+        // A separate stream proves the child's writer was flushed even when its parent
+        // independently reports the same diagnostic to stderr.
+        const bool childWriter = strstr(mode, "child-writer") != nullptr;
+        BufferedFatalDiagnosticWriter bufferedWriter(childWriter ? stdout : stderr);
+        BufferedFatalDiagnosticWriter parentWriter;
+        SourceManager sourceManager;
+        DiagnosticSink parent(&sourceManager, nullptr);
+        DiagnosticSink sink(&sourceManager, nullptr);
+        if (strcmp(mode, "parent") == 0 || childWriter)
         {
             sink.setParentSink(&parent);
         }
@@ -155,8 +166,15 @@ static void _runFatalDiagnosticChild(const char* mode)
         {
             sink.writer = &bufferedWriter;
         }
+        if (childWriter)
+            sink.writer = &bufferedWriter;
+        if (strcmp(mode, "child-writer-parent-writer") == 0)
+            parent.writer = &parentWriter;
         sink.diagnoseRaw(Severity::Error, "earlier diagnostic marker\n");
-        if (strcmp(mode, "raw") == 0 || strcmp(mode, "parent") == 0 || strcmp(mode, "writer") == 0)
+        if (strcmp(mode, "raw") == 0 || strcmp(mode, "parent") == 0 ||
+            strcmp(mode, "writer") == 0 || strcmp(mode, "startup-warning") == 0 ||
+            strcmp(mode, "child-writer-raw") == 0 ||
+            strcmp(mode, "child-writer-parent-writer") == 0)
         {
             sink.diagnoseRaw(Severity::Fatal, "fatal diagnostic marker\n");
         }
@@ -164,8 +182,11 @@ static void _runFatalDiagnosticChild(const char* mode)
         {
             DiagnosticInfo info =
                 {90000, Severity::Fatal, "fatalOutputTest", "fatal diagnostic marker"};
-            if (strcmp(mode, "rich") == 0)
+            if (strcmp(mode, "rich") == 0 || strcmp(mode, "machine") == 0 ||
+                strcmp(mode, "child-writer-rich") == 0)
                 sink.setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
+            if (strcmp(mode, "machine") == 0)
+                sink.setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
             sink.diagnose(SourceLoc(), info);
         }
     }
@@ -192,13 +213,32 @@ SLANG_UNIT_TEST(fatalDiagnosticOutputBeforeCrash)
         return;
     }
 
-    const char* modes[] =
-        {"raw", "legacy", "rich", "parent", "writer", "signal", "import", "import-name", "codegen"};
+    const char* modes[] = {
+        "raw",
+        "legacy",
+        "rich",
+        "machine",
+        "parent",
+        "writer",
+        "child-writer-raw",
+        "child-writer-legacy",
+        "child-writer-rich",
+        "child-writer-parent-writer",
+        "startup-warning",
+        "signal",
+        "import",
+        "import-name",
+        "codegen"};
     for (const auto childMode : modes)
     {
         // Unit tests run serially within each test-server process. The child inherits this mode
         // and performs the fatal action instead of recursively launching another test runner.
         SlangUnitTest::ScopedEnvVar childEnvironment(kChildMode, childMode);
+        // Force an early stderr warning in one child; all other scenarios use a valid value
+        // so machine-readable output can be checked without unrelated startup warnings.
+        SlangUnitTest::ScopedEnvVar timeoutEnvironment(
+            "SLANG_TEST_RPC_TIMEOUT_MS",
+            strcmp(childMode, "startup-warning") == 0 ? "invalid" : "60000");
         CommandLine command;
         command.setExecutableLocation(
             ExecutableLocation(unitTestContext->executableDirectory, "slang-test"));
@@ -207,6 +247,7 @@ SLANG_UNIT_TEST(fatalDiagnosticOutputBeforeCrash)
         ExecuteResult result;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(ProcessUtil::execute(command, result)));
         SLANG_CHECK(result.resultCode != 0);
+        SLANG_CHECK(result.standardOutput.indexOf("fatal diagnostic buffering setup failed") == -1);
         SLANG_CHECK(result.standardOutput.indexOf("fatal path returned") == -1);
         if (strcmp(childMode, "import") == 0 || strcmp(childMode, "import-name") == 0)
         {
@@ -227,10 +268,35 @@ SLANG_UNIT_TEST(fatalDiagnosticOutputBeforeCrash)
         {
             SLANG_CHECK(result.standardError.indexOf("earlier diagnostic marker") != -1);
             SLANG_CHECK(result.standardError.indexOf("fatal diagnostic marker") != -1);
-            auto first = result.standardError.indexOf("earlier diagnostic marker");
-            SLANG_CHECK(
-                result.standardError.getUnownedSlice().tail(first + 1).indexOf(
-                    UnownedStringSlice("earlier diagnostic marker")) == -1);
+            const char* markers[] = {"earlier diagnostic marker", "fatal diagnostic marker"};
+            for (const auto marker : markers)
+            {
+                auto first = result.standardError.indexOf(marker);
+                SLANG_CHECK(
+                    result.standardError.getUnownedSlice().tail(first + 1).indexOf(
+                        UnownedStringSlice(marker)) == -1);
+                if (strstr(childMode, "child-writer"))
+                {
+                    auto writerFirst = result.standardOutput.indexOf(marker);
+                    SLANG_CHECK(writerFirst != -1);
+                    SLANG_CHECK(
+                        result.standardOutput.getUnownedSlice()
+                            .tail(writerFirst + 1)
+                            .indexOf(UnownedStringSlice(marker)) == -1);
+                }
+            }
+            SLANG_CHECK(result.standardError.indexOf("abort compilation:") == -1);
+            if (strcmp(childMode, "machine") == 0)
+            {
+                SLANG_CHECK(
+                    result.standardError ==
+                    "earlier diagnostic marker\n"
+                    "E90000\tfatal error\t\t0\t0\t0\t0\tfatal diagnostic marker\n");
+            }
+            if (strcmp(childMode, "startup-warning") == 0)
+                SLANG_CHECK(
+                    result.standardError.indexOf("ignoring invalid SLANG_TEST_RPC_TIMEOUT_MS") !=
+                    -1);
         }
     }
 #endif

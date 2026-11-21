@@ -602,19 +602,16 @@ SlangResult DiagnosticSink::getBlobIfNeeded(ISlangBlob** outBlob)
     // A fatal diagnostic cannot return an output blob when exceptions are disabled. For example,
     // an imported module may have reported an error before "compilation ceased" stops the load.
     // Preserve those earlier diagnostics as well as the fatal message before handleSignal traps.
-    // Parent sinks receive diagnostics first and abort before their children reach this function,
-    // so only the sink at the end of the forwarding chain reports its accumulated output.
-    if (sink->writer)
-    {
-        sink->writer->flush();
-    }
-    else
+    // Writers are flushed before forwarding. Only the final sink reports its buffer, so a
+    // chain of writerless sinks emits one copy of the diagnostics.
+    if (!sink->writer)
     {
         fwrite(sink->outputBuffer.getBuffer(), 1, size_t(sink->outputBuffer.getLength()), stderr);
     }
+    // Also flush stderr in case a writer forwarded buffered output there.
     fflush(stderr);
 #endif
-    SLANG_ABORT_COMPILATION(message);
+    handleSignal(SignalType::AbortCompilation, message, true);
 }
 
 bool DiagnosticSink::diagnoseImpl(
@@ -629,6 +626,11 @@ bool DiagnosticSink::diagnoseImpl(
     if (writer)
     {
         writer->write(formattedMessage.begin(), formattedMessage.getLength());
+#if !SLANG_HAS_EXCEPTIONS
+        // A parent sink can terminate while receiving this fatal diagnostic.
+        if (info.severity >= Severity::Fatal)
+            writer->flush();
+#endif
     }
     else
     {
@@ -703,6 +705,10 @@ bool DiagnosticSink::diagnoseRichImpl(
     if (writer)
     {
         writer->write(message.begin(), message.getLength());
+#if !SLANG_HAS_EXCEPTIONS
+        if (effectiveSeverity >= Severity::Fatal)
+            writer->flush();
+#endif
     }
     else
     {
@@ -831,6 +837,10 @@ void DiagnosticSink::diagnoseRaw(Severity severity, const UnownedStringSlice& me
     {
         // If so, pass the error string along to them.
         writer->write(message.begin(), message.getLength());
+#if !SLANG_HAS_EXCEPTIONS
+        if (severity >= Severity::Fatal)
+            writer->flush();
+#endif
     }
     else
     {

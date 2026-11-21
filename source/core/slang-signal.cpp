@@ -151,8 +151,9 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
 
 // One point of having as a single function is a choke point both for handling (allowing different
 // handling scenarios) as well as a choke point to set a breakpoint to catch 'signal' types
-[[noreturn]] void handleSignal(SignalType type, char const* message)
+[[noreturn]] void handleSignal(SignalType type, char const* message, bool alreadyReported)
 {
+    SLANG_UNUSED(alreadyReported);
     g_lastSignalMessage = _getMessage(type, message);
 
     // Can be useful to enable during debug when problem is on CI
@@ -173,9 +174,11 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
         throw InternalError(_getMessage(type, message));
     }
 #else
-    // No catch handler can report this signal when exceptions are disabled. Flush its reason
-    // before the breakpoint, including aborts raised directly without a diagnostic sink.
-    fprintf(stderr, "%s\n", g_lastSignalMessage.getBuffer());
+    // Preserve direct signal reasons without repeating diagnostics already reported by a sink.
+    if (!alreadyReported)
+    {
+        fprintf(stderr, "%s\n", g_lastSignalMessage.getBuffer());
+    }
     fflush(stderr);
 
     // Attempt to drop out into the debugger. If a debugger isn't attached this will likely crash -

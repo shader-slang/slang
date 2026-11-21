@@ -17,8 +17,9 @@ enum class SignalType
 };
 
 
-// Note that message can be passed as nullptr for no message.
-[[noreturn]] void handleSignal(SignalType type, char const* message);
+// Note that message can be passed as nullptr for no message. Diagnostic sinks pass
+// alreadyReported=true to avoid printing their diagnostics again when exceptions are disabled.
+[[noreturn]] void handleSignal(SignalType type, char const* message, bool alreadyReported = false);
 
 // Special handler for assertions that can optionally return based on environment variable.
 // Pass isReleaseAssert=true for assertions that should fire even in release-assert-only mode.
