@@ -1,0 +1,25 @@
+{
+	"name": "slang-playground-shared",
+	"version": "0.0.1",
+	"description": "Shared code for the Slang VSCode extension",
+	"main": "dist/index.umd.js",
+	"module": "dist/index.es.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.es.js",
+			"require": "./dist/index.umd.js"
+		}
+	},
+	"scripts": {
+		"build": "vite build",
+		"type-check": "vue-tsc --build"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"vscode-languageserver": "^9.0.1",
+		"@webgpu/types": "^0.1.51"
+	},
+	"type": "module"
+}
