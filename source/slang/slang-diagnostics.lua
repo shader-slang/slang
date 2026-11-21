@@ -5867,6 +5867,22 @@ err(
 )
 
 err(
+    "bit-cast-to-unsupported-descriptor-handle",
+    41205,
+    "bit_cast cannot build this DescriptorHandle",
+    span { loc = "location", message = "cannot bit_cast '~fromType:IRInst' to '~toType:IRInst': '~handleType:IRInst' cannot be built from bits on this target" },
+    note { message = "construct the handle with a DescriptorHandle constructor, such as DescriptorHandle<T>(uint2), where the target supports it", span { loc = "location" } }
+)
+
+err(
+    "bit-cast-from-unsupported-descriptor-handle",
+    41206,
+    "bit_cast cannot read this DescriptorHandle as bits",
+    span { loc = "location", message = "cannot bit_cast '~fromType:IRInst' to '~toType:IRInst': '~handleType:IRInst' cannot be read as bits on this target" },
+    note { message = "bit_cast the handle itself rather than an aggregate that contains it", span { loc = "location" } }
+)
+
+err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",
