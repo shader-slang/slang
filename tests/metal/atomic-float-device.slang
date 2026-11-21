@@ -46,15 +46,19 @@ void computeMain(uniform Args* args, uint3 tid: SV_DispatchThreadID)
     // CHECK: atomic_exchange_explicit(((atomic_float device*)
     InterlockedExchange(floatBuffer[i], 6.0f, original);
     result += original;
-    // CHECK: atomic_compare_exchange_weak_explicit(((atomic_float device*)
+    // CHECK: auto _metal_cas_ptr = ((atomic_float device*)
+    // CHECK: atomic_compare_exchange_weak_explicit(_metal_cas_ptr,
     InterlockedCompareExchange(floatBuffer[i], 0.0f, 7.0f, original);
     result += original;
-    // CHECK: atomic_compare_exchange_weak_explicit(((atomic_float device*)
+    // CHECK: auto _metal_cas_ptr = ((atomic_float device*)
+    // CHECK: atomic_compare_exchange_weak_explicit(_metal_cas_ptr,
     InterlockedCompareExchangeFloatBitwise(floatBuffer[i], 0.0f, 8.0f, original);
     result += original;
-    // CHECK: atomic_compare_exchange_weak_explicit(((atomic_float device*)
+    // CHECK: auto _metal_cas_ptr = ((atomic_float device*)
+    // CHECK: atomic_compare_exchange_weak_explicit(_metal_cas_ptr,
     InterlockedCompareStore(floatBuffer[i], 0.0f, 9.0f);
-    // CHECK: atomic_compare_exchange_weak_explicit(((atomic_float device*)
+    // CHECK: auto _metal_cas_ptr = ((atomic_float device*)
+    // CHECK: atomic_compare_exchange_weak_explicit(_metal_cas_ptr,
     InterlockedCompareStoreFloatBitwise(floatBuffer[i], 0.0f, 10.0f);
     // CHECK: atomic_fetch_add_explicit(((atomic_float device*)
     InterlockedAdd(floatBuffer[i], 11.0f, original);
