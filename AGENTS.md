@@ -153,6 +153,18 @@ Review conventions (recurring review feedback — following them avoids review r
 - Don't create a second AST/IR/`Val` representation of a value that already has one (it breaks
   `equals`/dedup); `SLANG_ASSERT` such invariants at the construction site.
 - `SLANG_RELEASE_ASSERT` on out-of-contract input instead of silently returning a default.
+- Keep process out of source comments: no issue or PR numbers, dates, or history in a comment;
+  references go in the commit message and the PR. A doc comment states the contract, an
+  implementation comment the approach; neither records what the code is not or used to be.
+- Name booleans as propositions (`isEnabled`, `shouldEmit`), never as imperative verb phrases, and
+  give every `bool` member a default initializer.
+- An assertion of a non-obvious invariant states its reason; an early-out that returns a default for
+  a shape the function must never see is asserted or explained, never left as "safe" code.
+- A helper that encodes one pass's policy lives in that pass, not in a shared utility header.
+- Use current terminology: never introduce or spread a term marked deprecated. Rename a misnamed
+  declaration when a change already touches all of its call sites.
+- A behavior downstream code must honor gets its own representation (a type or opcode), not a value
+  tucked into an existing field that every consumer has to inspect.
 
 ## Shell Scripts
 
