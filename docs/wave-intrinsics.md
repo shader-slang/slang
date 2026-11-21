@@ -201,9 +201,9 @@ uint4 WaveGetActiveMulti();
 
 uint4 WaveGetConvergedMulti();
 
-uint WaveGetNumWaves();  // Number of waves in workgroup (GLSL gl_NumSubgroups; compute-class stages only: compute/mesh/amplification)
+uint WaveGetNumWaves();  // Number of waves in workgroup (GLSL gl_NumSubgroups, HLSL GetGroupWaveCount with Shader Model 6.10; compute-class stages only: compute/mesh/amplification)
 
-uint WaveGetWaveIndex(); // Wave index in workgroup (GLSL gl_SubgroupID, WGSL subgroup_id, Metal simdgroup_index_in_threadgroup; compute-class stages only: compute/mesh/amplification)
+uint WaveGetWaveIndex(); // Wave index in workgroup (GLSL gl_SubgroupID, HLSL GetGroupWaveIndex with Shader Model 6.10, WGSL subgroup_id, Metal simdgroup_index_in_threadgroup; compute-class stages only: compute/mesh/amplification)
 
 // Prefix (exclusive scan operations, equivalent to GLSL subgroupExclusive*)
 
