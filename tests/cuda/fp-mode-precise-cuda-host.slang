@@ -27,3 +27,5 @@ export float launchAffine(float a, float b, float c)
 // CHECK: affineKernel<<<
 // CHECK-NOT: _rn(
 // CHECK: return
+// CHECK-NOT: _rn(
+// CHECK-NEXT: }
