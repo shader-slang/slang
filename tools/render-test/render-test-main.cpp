@@ -2120,6 +2120,13 @@ static SlangResult _innerMain(
         // device listing every required shape, in the same way as required features:
         // returning SLANG_E_NOT_AVAILABLE makes the test harness skip the test rather than
         // fail it on a device that cannot run it.
+        //
+        // Only the Vulkan rhi device answers this query today; the base Device
+        // implementation reports every shape as unsupported, so a test tagged with
+        // -require-coopmat-shape skips on all other backends. A failed query is also treated
+        // as unsupported — the rhi contract reports an unsupported shape as SLANG_OK with
+        // *outSupported = false, so a failure means the query itself is broken, and the skip
+        // keeps that the conservative outcome for a capability gate.
         for (const auto& desc : options.requiredCooperativeMatrixShapes)
         {
             bool supported = false;

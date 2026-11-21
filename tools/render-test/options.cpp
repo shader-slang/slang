@@ -3,6 +3,7 @@
 #include "options.h"
 
 #include "compiler-core/slang-command-line-args.h"
+#include "coopmat-shape-parse.h"
 #include "core/slang-list.h"
 #include "core/slang-render-api-util.h"
 #include "core/slang-string-util.h"
@@ -39,80 +40,16 @@ static bool isValidFeatureName(const UnownedStringSlice& featureName)
     return false;
 }
 
-// Returns the CooperativeMatrixComponentType named by `typeName`, using the lowercase
-// spellings a shader writes for the component types ("half", "float", "bfloat16", ...).
-// Returns false when the token names no component type, so a malformed
-// -require-coopmat-shape value is rejected as a test-configuration error rather than
-// silently gating the test on a default type.
-static bool _getCooperativeMatrixComponentTypeFromName(
-    const UnownedStringSlice& typeName,
-    CooperativeMatrixComponentType& outType)
-{
-    struct Entry
-    {
-        const char* name;
-        CooperativeMatrixComponentType type;
-    };
-    static const Entry kEntries[] = {
-        {"half", CooperativeMatrixComponentType::Float16},
-        {"float", CooperativeMatrixComponentType::Float32},
-        {"bfloat16", CooperativeMatrixComponentType::Bfloat16},
-        {"e4m3", CooperativeMatrixComponentType::FloatE4M3},
-        {"e5m2", CooperativeMatrixComponentType::FloatE5M2},
-        {"int8", CooperativeMatrixComponentType::Int8},
-        {"uint8", CooperativeMatrixComponentType::Uint8},
-        {"int16", CooperativeMatrixComponentType::Int16},
-        {"uint16", CooperativeMatrixComponentType::Uint16},
-        {"int32", CooperativeMatrixComponentType::Int32},
-        {"uint32", CooperativeMatrixComponentType::Uint32},
-    };
-
-    for (const auto& entry : kEntries)
-    {
-        if (typeName == UnownedStringSlice(entry.name))
-        {
-            outType = entry.type;
-            return true;
-        }
-    }
-    return false;
-}
-
-// Returns the CooperativeMatrixScope named by `scopeName` ("subgroup" or "workgroup"), or
-// false when the token names no scope.
-static bool _getCooperativeMatrixScopeFromName(
-    const UnownedStringSlice& scopeName,
-    CooperativeMatrixScope& outScope)
-{
-    if (scopeName == "subgroup")
-    {
-        outScope = CooperativeMatrixScope::Subgroup;
-        return true;
-    }
-    if (scopeName == "workgroup")
-    {
-        outScope = CooperativeMatrixScope::Workgroup;
-        return true;
-    }
-    return false;
-}
-
-// Parses a -require-coopmat-shape value of the form "<type>:<scope>:<m>:<n>:<k>", for example
-// "half:subgroup:8:8:16", into a CooperativeMatrixDesc. The shape is a matmul shape because
-// the device query matches it against the cooperative-matrix property entries the device
-// lists, and each entry describes a full matmul A (m x k) * B (k x n) = C rather than a
-// standalone accumulator; a test whose shader only loads and stores an accumulator therefore
-// picks a k that the device lists alongside the shape's other dimensions (16 for the
-// half-precision entries current NVIDIA devices list). Diagnoses and returns SLANG_FAIL on a
-// malformed value so a typo cannot silently change which devices run the test.
+// Parses a -require-coopmat-shape value into `outDesc` (see coopmat-shape-parse.h for the
+// grammar and the shape semantics), diagnosing the value when parsing fails so a typo is
+// reported as a test-configuration error rather than silently changing which devices run
+// the test.
 static SlangResult _parseCooperativeMatrixShape(
     const CommandLineArg& shapeArg,
     DiagnosticSink& sink,
     CooperativeMatrixDesc& outDesc)
 {
-    List<UnownedStringSlice> tokens;
-    StringUtil::split(shapeArg.value.getUnownedSlice(), ':', tokens);
-    if (tokens.getCount() != 5)
+    if (SLANG_FAILED(tryParseCooperativeMatrixShape(shapeArg.value.getUnownedSlice(), outDesc)))
     {
         sink.diagnose(
             shapeArg.loc,
@@ -120,47 +57,6 @@ static SlangResult _parseCooperativeMatrixShape(
             shapeArg.value);
         return SLANG_FAIL;
     }
-
-    CooperativeMatrixDesc desc = {};
-    if (!_getCooperativeMatrixComponentTypeFromName(tokens[0], desc.aType))
-    {
-        sink.diagnose(
-            shapeArg.loc,
-            RenderTestDiagnostics::invalidCooperativeMatrixShape,
-            shapeArg.value);
-        return SLANG_FAIL;
-    }
-    // The type token fills all four component-type slots. Devices list one property entry per
-    // component-type combination, and the accumulator shapes a shader declares are validated
-    // against whole entries, so the common all-same-type case only needs the one token.
-    desc.bType = desc.cType = desc.resultType = desc.aType;
-
-    if (!_getCooperativeMatrixScopeFromName(tokens[1], desc.scope))
-    {
-        sink.diagnose(
-            shapeArg.loc,
-            RenderTestDiagnostics::invalidCooperativeMatrixShape,
-            shapeArg.value);
-        return SLANG_FAIL;
-    }
-
-    Int dims[3];
-    for (Index i = 0; i < 3; ++i)
-    {
-        if (SLANG_FAILED(StringUtil::parseInt(tokens[i + 2], dims[i])) || dims[i] < 1)
-        {
-            sink.diagnose(
-                shapeArg.loc,
-                RenderTestDiagnostics::invalidCooperativeMatrixShape,
-                shapeArg.value);
-            return SLANG_FAIL;
-        }
-    }
-    desc.m = uint32_t(dims[0]);
-    desc.n = uint32_t(dims[1]);
-    desc.k = uint32_t(dims[2]);
-
-    outDesc = desc;
     return SLANG_OK;
 }
 
@@ -285,6 +181,10 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         }
         else if (argValue == "-require-coopmat-shape")
         {
+            // The name abbreviates to "coopmat" after the shader-side CoopMat type rather
+            // than spelling "cooperative matrix" out like the rhi API and the
+            // -render-feature cooperative-matrix-* names. The flag may be repeated, once
+            // per required shape, and the device must list every given shape.
             CommandLineArg shapeArg;
             SLANG_RETURN_ON_FAIL(reader.expectArg(shapeArg));
 
