@@ -8,7 +8,7 @@
 
 import glsl;
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -36,8 +36,36 @@ void computeMain()
     bool someNe = (va != vc);
     outputBuffer[3] = someNe ? 50.0 : 0.0; // -> 50.0
 
+    // GLSL `mat * vec` and `vec * mat` are algebraic products via the glsl module's rank-15
+    // overloads. The fallback `operator*` declarations that diagnose these shapes in plain
+    // Slang rank below them (-10 vs 15), so the GLSL semantics keep winning here. With m2
+    // the identity, both products equal v.
+    float2 vg = float2(a, 2.0 * a); // (1, 2)
+    float2 mv = m2 * vg;
+    float2 vm = vg * m2;
+    outputBuffer[4] = mv[0] + mv[1] + vm[0] + vm[1]; // 1+2+1+2 = 6.0
+
+    // Non-square algebraic case: the glsl module's mat-vec overload takes a vector sized
+    // to the matrix's row count, so a 3x4 matrix times a 3-vector is its product (and the
+    // fallback, which keys on the column count, does not apply).
+    float3x4 m34 = float3x4(a, 0.0, 0.0, 0.0, 0.0, a, 0.0, 0.0, 0.0, 0.0, a, 0.0); // 3x4, first three columns of identity
+    float3 vg3 = float3(a, a, a);
+    float4 mv34 = m34 * vg3; // -> (1, 1, 1, 0)
+    outputBuffer[5] = mv34[0] + mv34[1] + mv34[2] + mv34[3]; // 3.0
+
+    // Non-square mat-mat: both the glsl module's rank-15 algebraic overload and the
+    // rank -10 fallback apply to these shapes with different result types; the GLSL
+    // semantics must win, and the test only compiles when the product is a 3x3.
+    float2x3 mg = float2x3(a, 0.0, 0.0, 0.0, 0.0, a); // rows: [1,0,0],[0,0,1]
+    float3x2 mg2 = float3x2(a, 0.0, 0.0, a, 0.0, 0.0); // rows: [1,0],[0,1],[0,0]
+    float3x3 mm = mg * mg2; // algebraic: [[1,0,0],[0,0,1],[0,0,0]]
+    outputBuffer[6] = mm[0][0] + mm[1][2]; // 1.0 + 1.0 = 2.0
+
     // CHECK: 2.0
     // CHECK: 3.0
     // CHECK: 100.0
     // CHECK: 50.0
+    // CHECK: 6.0
+    // CHECK: 3.0
+    // CHECK: 2.0
 }

@@ -3522,6 +3522,13 @@ err(
     span { loc = "modifier:Modifier", message = "an '~mode:ParamPassingMode' parameter is meant to be written by its function, so '~param:Decl' cannot be 'const'" }
 )
 
+err(
+    "diagnose-on-use",
+    31233,
+    "use of a declaration marked as an error on use",
+    span { loc = "location", message = "use of '~decl:Decl' is an error: ~message" }
+)
+
 -- Enums (320xx)
 
 err(
