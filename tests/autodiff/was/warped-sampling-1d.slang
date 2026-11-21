@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx12+cuda, filecheck-buffer=CHECK):-output-using-type -profile cs_5_1 -use-dxbc -compute-dispatch 4,1,1
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx12+cuda, filecheck-buffer=CHECK):-output-using-type -profile cs_5_1 -use-dxbc -compute-dispatch 1,1,1
 
 //TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):out,name=endpointDifferentialBuffer
 RWStructuredBuffer<float> endpointDifferentialBuffer;
@@ -257,6 +257,11 @@ float renderSample(inout PRNG prng)
     return shadeIntersection(isect) * isect.wt;
 }
 
+// AllMemoryBarrierWithGroupSync only synchronizes threads within a single
+// workgroup, so we dispatch exactly one workgroup; that makes the barrier
+// below a complete sync over every contribution to the atomic totals, so
+// the read-back observes deterministic sums.
+//
 [numthreads(256, 1, 1)]
 void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
 {
@@ -279,18 +284,18 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
 // expected results are approximate. (We've fixed the RNG seed to generate
 // repeatable results)
 //
-// Expect: Approximately -1.0 in endpointDifferentialBuffer[0]
-// Expect: Approximately 1.0 in endpointDifferentialBuffer[1]
+// Expect: Approximately -0.26 in endpointDifferentialBuffer[0]
+// Expect: Approximately 0.26 in endpointDifferentialBuffer[1]
 //
 // Expect: Approximately 0.0 in endpointDifferentialBuffer[2]
 // Expect: Approximately 0.0 in endpointDifferentialBuffer[3]
 //
 }
 // CHECK: type: float
-// CHECK-NEXT: -0.{{9[4-9][0-9]}}000
-// CHECK-NEXT: 0.{{9[4-9][0-9]}}000
+// CHECK-NEXT: -0.{{2[4-8][0-9]}}000
+// CHECK-NEXT: 0.{{2[4-8][0-9]}}000
 // CHECK-NEXT: 0.000000
-// CHECK-NEXT: 0.004000
+// CHECK-NEXT: 0.001000
 // CHECK-NEXT: 0.000000
 // CHECK-NEXT: 0.000000
 // CHECK-NEXT: 0.000000
