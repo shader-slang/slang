@@ -1,6 +1,8 @@
 //TEST:SIMPLE(filecheck=WRAPPED-SAMPLE): -target spirv-asm -stage fragment -entry main -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=WRAPPED-LEVEL): -target spirv-asm -stage fragment -entry main -DUNKNOWN -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=PLAIN-SAMPLE): -target spirv-asm -stage fragment -entry mainControl -validate-ir -validate-ir-detailed
+//TEST:SIMPLE(filecheck=WRAPPED-TUPLE): -target spirv-asm -stage fragment -entry mainTuple -validate-ir -validate-ir-detailed
+//TEST:SIMPLE(filecheck=WRAPPED-INOUT): -target spirv-asm -stage fragment -entry mainInOut -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=WRAPPED-SAMPLE-GLSL): -target glsl -stage fragment -entry main -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=WRAPPED-LEVEL-GLSL): -target glsl -stage fragment -entry main -DUNKNOWN -validate-ir -validate-ir-detailed
 
@@ -9,7 +11,13 @@
 // source location of the original call, so each wrapped variant's warning points at the
 // `sampleWrapped` call site in `main` instead of printing without a location. The
 // plain-texture control never goes through that rebuild and must keep its located warning
-// unchanged. The location pins sit next to the anchored call sites (FileCheck
+// unchanged. The tuple-result variant pins the same rule for a call whose result type
+// decomposes into an out-argument: that call is deliberately outside the rebuilt call's
+// `LegalVal`, and the location must still follow it. The inout variant passes the
+// texture wrapper by reference, so the call's replacement runs through the pointer
+// cases of the leaf walk; it guards that the warning stays located through them. The
+// location pins sit next to the
+// anchored call sites (FileCheck
 // `[[# @LINE+N]]` expressions, columns literal) so edits above cannot desynchronize them.
 // The GLSL library expresses implicit sampling as a textual target intrinsic, so its
 // conservative classification yields the unknown-requirement warning instead of the
@@ -20,6 +28,10 @@
 // WRAPPED-LEVEL: warning[E56021]: resource selection introduces conditional execution
 // PLAIN-SAMPLE-NOT: warning[E5602{{[01]}}]
 // PLAIN-SAMPLE: warning[E56020]: resource selection introduces conditional execution
+// WRAPPED-TUPLE-NOT: warning[E5602{{[01]}}]
+// WRAPPED-TUPLE: warning[E56020]: resource selection introduces conditional execution
+// WRAPPED-INOUT-NOT: warning[E5602{{[01]}}]
+// WRAPPED-INOUT: warning[E56020]: resource selection introduces conditional execution
 // WRAPPED-SAMPLE-GLSL-NOT: warning[E5602{{[01]}}]
 // WRAPPED-SAMPLE-GLSL: warning[E56021]: resource selection introduces conditional execution
 // WRAPPED-LEVEL-GLSL-NOT: warning[E5602{{[01]}}]
@@ -27,10 +39,16 @@
 
 Texture2D texture;
 SamplerState firstSampler, secondSampler;
+RWStructuredBuffer<float4> outBuf;
 
 struct TextureWrapper
 {
     Texture2D texture;
+};
+
+struct WrappedResult
+{
+    Texture2D t;
 };
 
 float4 sampleWrapped(TextureWrapper value, SamplerState sampler)
@@ -45,6 +63,17 @@ float4 sampleWrapped(TextureWrapper value, SamplerState sampler)
 float4 samplePlain(Texture2D value, SamplerState sampler)
 {
     return value.Sample(sampler, float2(0));
+}
+
+WrappedResult sampleWrappedTuple(TextureWrapper value, SamplerState sampler)
+{
+    outBuf[0] = value.texture.Sample(sampler, float2(0));
+    return WrappedResult(value.texture);
+}
+
+float4 sampleInOut(inout TextureWrapper value, SamplerState sampler)
+{
+    return value.texture.Sample(sampler, float2(0));
 }
 
 [shader("fragment")]
@@ -67,4 +96,23 @@ float4 mainControl(float condition : TEXCOORD) : SV_Target
     // PLAIN-SAMPLE: --> {{.*}}:[[# @LINE+2]]:23
     // PLAIN-SAMPLE-NOT: warning[E5602{{[01]}}]
     return samplePlain(texture, condition > 0 ? firstSampler : secondSampler);
+}
+
+[shader("fragment")]
+float4 mainTuple(float condition : TEXCOORD) : SV_Target
+{
+    // WRAPPED-TUPLE: --> {{.*}}:[[# @LINE+2]]:41
+    // WRAPPED-TUPLE-NOT: warning[E5602{{[01]}}]
+    WrappedResult r = sampleWrappedTuple({ texture }, condition > 0 ? firstSampler : secondSampler);
+    return r.t.Sample(firstSampler, float2(0));
+}
+
+[shader("fragment")]
+float4 mainInOut(float condition : TEXCOORD) : SV_Target
+{
+    // WRAPPED-INOUT: --> {{.*}}:[[# @LINE+3]]:28
+    // WRAPPED-INOUT-NOT: warning[E5602{{[01]}}]
+    TextureWrapper w = { texture };
+    outBuf[0] = sampleInOut(w, condition > 0 ? firstSampler : secondSampler);
+    return float4(0);
 }

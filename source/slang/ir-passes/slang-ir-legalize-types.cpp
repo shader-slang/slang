@@ -469,14 +469,19 @@ private:
             m_call->getCallee(),
             m_args.getCount(),
             m_args.getArrayView().getBuffer());
-        // A rebuilt instruction takes the place of the original in the IR, so it must carry the
-        // source location the user wrote. Diagnostics that fire after legalization (for example,
-        // the resource-selection warnings) report that location; without it they can at best
-        // report a use of the call rather than the call site itself. The same replacement rule
-        // holds on the legalizer's other rebuild paths (the generic recreate in legalizeInst,
-        // printf, cooperative-matrix element functors, and abort), each of which copies the
-        // location the same way.
+        // The emitted call is not always part of the returned `LegalVal`: a
+        // `none` result returns an empty value, and a `tuple` result returns
+        // only the out-arguments that receive the decomposed pieces. The
+        // replacement bookkeeping in `processInst` stamps only what the
+        // returned value reaches, so this rebuild site applies it itself:
+        // the rebuilt call takes the original's place, so it carries the
+        // original's source location and decorations. For a call that ends
+        // up inside the returned value this is a redundant first
+        // application that the bookkeeping in `processInst` then makes a
+        // no-op (the location is already set, the original already
+        // stripped of decorations).
         newCall->sourceLoc = m_call->sourceLoc;
+        m_call->transferDecorationsTo(newCall);
         return newCall;
     }
 };
@@ -768,11 +773,17 @@ static LegalVal legalizeUnconditionalBranch(
             SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor.");
         }
     }
-    context->builder->emitIntrinsicInst(
+    auto newBranch = context->builder->emitIntrinsicInst(
         nullptr,
         branchInst->getOp(),
         newArgs.getCount(),
         newArgs.getArrayView().getBuffer());
+    // The rebuilt terminator sits outside the returned (empty) value, so it
+    // carries the replacement bookkeeping itself, like a call whose result
+    // was discarded: the original terminator's decorations — for example the
+    // loop pragmas that the loop-unroll pass reads — must survive onto it.
+    newBranch->sourceLoc = branchInst->sourceLoc;
+    branchInst->transferDecorationsTo(newBranch);
     return LegalVal();
 }
 
@@ -829,10 +840,7 @@ static LegalVal legalizeLoad(IRTypeLegalizationContext* context, LegalVal legalP
     }
 }
 
-static LegalVal legalizePrintf(
-    IRTypeLegalizationContext* context,
-    IRInst* inst,
-    ArrayView<LegalVal> args)
+static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<LegalVal> args)
 {
     ShortList<IRInst*> legalArgs;
     for (auto arg : args)
@@ -856,7 +864,6 @@ static LegalVal legalizePrintf(
         kIROp_Printf,
         (UInt)legalArgs.getCount(),
         legalArgs.getArrayView().getBuffer());
-    newPrintf->sourceLoc = inst->sourceLoc;
     return LegalVal::simple(newPrintf);
 }
 
@@ -937,8 +944,6 @@ static LegalVal legalizeAbort(
         kIROp_Abort,
         (UInt)legalArgs.getCount(),
         legalArgs.getArrayView().getBuffer());
-    newAbort->sourceLoc = originalInst->sourceLoc;
-    originalInst->transferDecorationsTo(newAbort);
     return LegalVal::simple(newAbort);
 }
 
@@ -2192,7 +2197,7 @@ static LegalVal legalizeInst(
         result = legalizeUnconditionalBranch(context, args, (IRUnconditionalBranch*)inst);
         break;
     case kIROp_Printf:
-        result = legalizePrintf(context, inst, args);
+        result = legalizePrintf(context, args);
         break;
     case kIROp_Abort:
         result = legalizeAbort(context, inst, args);
@@ -2368,9 +2373,12 @@ static LegalVal legalizeCoopMatMapElementIFunc(
                         inst->getFullType(),
                         legalArg.getSimple(),
                         inst->getOperand(1));
-                    newInst->sourceLoc = inst->sourceLoc;
                     inst->replaceUsesWith(newInst);
-                    inst->removeAndDeallocate();
+                    // The original is kept unlinked until the pass's cleanup so the
+                    // replacement bookkeeping in `processInst` can still read its
+                    // location and decorations.
+                    inst->removeFromParent();
+                    context->replacedInstructions.add(inst);
                     return LegalVal::simple(newInst);
                 }
                 break;
@@ -2387,9 +2395,11 @@ static LegalVal legalizeCoopMatMapElementIFunc(
                     inst->getOperand(0),
                     inst->getOperand(1));
 
-                newInst->sourceLoc = inst->sourceLoc;
                 inst->replaceUsesWith(newInst);
-                inst->removeAndDeallocate();
+                // Deferred removal, as in the simple-capture case above, keeps
+                // the original readable for the replacement bookkeeping.
+                inst->removeFromParent();
+                context->replacedInstructions.add(inst);
                 return LegalVal::simple(newInst);
             }
         case LegalVal::Flavor::pair:
@@ -2514,7 +2524,6 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
                 inst->getOp(),
                 argCount,
                 newArgs.getArrayView().getBuffer());
-            newInst->sourceLoc = inst->sourceLoc;
             inst->replaceUsesWith(newInst);
             inst->removeFromParent();
             context->replacedInstructions.add(inst);
@@ -2920,10 +2929,6 @@ static LegalVal declareSimpleVar(
             auto globalParam = builder->createGlobalParam(type);
             globalParam->removeFromParent();
             globalParam->insertBefore(context->insertBeforeGlobal);
-            // The new parameter replaces part of the original global parameter, which is the
-            // instruction we insert before, so it keeps that parameter's source location for
-            // diagnostics that later passes report about it.
-            globalParam->sourceLoc = context->insertBeforeGlobal->sourceLoc;
 
             // Add originating entry point decoration if original global param
             // comes from an entry point parameter. This is required in cases where the global
@@ -3733,6 +3738,117 @@ static LegalVal legalizeGlobalParam(
 static constexpr int kHasBeenAddedOrProcessedScratchBitIndex = 0;
 static constexpr int kHasBeenAddedScratchBitIndex = 1;
 
+/// Give every non-constant `simple` leaf of a decomposed `LegalVal` the source
+/// location of the original instruction it replaces, unless the leaf already
+/// has a location of its own. Constants are deduplicated module-wide and
+/// shared between use sites, so a constant must not absorb the location of
+/// any one original. An empty (`none`) value is expected input — an empty
+/// `pair` side, or a rebuild whose result carries nothing — and has no leaves
+/// to locate.
+static void setSourceLocOnLegalValLeaves(IRInst* originalInst, LegalVal const& legalVal)
+{
+    switch (legalVal.flavor)
+    {
+    case LegalVal::Flavor::simple:
+        {
+            auto leaf = legalVal.getSimple();
+            if (!as<IRConstant>(leaf) && !leaf->sourceLoc.isValid())
+                leaf->sourceLoc = originalInst->sourceLoc;
+        }
+        return;
+
+    case LegalVal::Flavor::none:
+        return;
+
+    case LegalVal::Flavor::tuple:
+        for (auto element : legalVal.getTuple()->elements)
+            setSourceLocOnLegalValLeaves(originalInst, element.val);
+        return;
+
+    case LegalVal::Flavor::pair:
+        setSourceLocOnLegalValLeaves(originalInst, legalVal.getPair()->ordinaryVal);
+        setSourceLocOnLegalValLeaves(originalInst, legalVal.getPair()->specialVal);
+        return;
+
+    case LegalVal::Flavor::implicitDeref:
+        setSourceLocOnLegalValLeaves(originalInst, legalVal.getImplicitDeref());
+        return;
+
+    case LegalVal::Flavor::wrappedBuffer:
+        setSourceLocOnLegalValLeaves(originalInst, legalVal.getWrappedBuffer()->base);
+        return;
+
+    default:
+        SLANG_UNEXPECTED("unhandled LegalVal flavor when setting source locations");
+        return;
+    }
+}
+
+/// Apply the replacement bookkeeping for `originalInst` to the value that
+/// legalization produced in its place. "Replacement bookkeeping" is this
+/// pass's term for transferring the original's source location (only if the
+/// target has none) and, for a fresh one-for-one replacement, its
+/// decorations.
+///
+/// What happens depends on the value's shape: a `simple` replacement that is
+/// a distinct, non-constant instruction receives the location and — unless
+/// it is a value forwarded through a decomposition — the original's
+/// decorations; a composite value (`pair`, `tuple`, `implicitDeref`,
+/// `wrappedBuffer`) only has the location stamped on its `simple` leaves,
+/// because a decomposition into multiple values has no single obvious
+/// destination for the original's decorations. Consider a call that passes
+/// a struct containing a `Texture2D`: the legalizer rebuilds the call, and
+/// the rebuilt call must keep an `[IgnoreSideEffects]` decoration, because
+/// `mightHaveSideEffects` reads that decoration when deciding whether
+/// dead-code elimination may remove the call.
+///
+/// The bookkeeping here only reaches instructions that appear in the
+/// returned `LegalVal`. Rebuilds whose product sits outside that value
+/// apply it at their own site: `LegalCallBuilder::_emitCall` for calls
+/// whose result legalizes to nothing (`none`) or decomposes into
+/// out-arguments (`tuple`), and `legalizeUnconditionalBranch` for rebuilt
+/// terminators (their decorations include loop pragmas that the
+/// loop-unroll pass reads).
+static void transferSourceLocAndDecorationsToLegalizedInst(
+    IRTypeLegalizationContext* context,
+    IRInst* originalInst,
+    LegalVal const& legalVal)
+{
+    if (legalVal.flavor != LegalVal::Flavor::simple)
+    {
+        setSourceLocOnLegalValLeaves(originalInst, legalVal);
+        return;
+    }
+
+    auto replacement = legalVal.getSimple();
+
+    // The legal value of an instruction that legalizes to itself is that
+    // same instruction: nothing was replaced, so there is nothing to inherit.
+    if (replacement == originalInst)
+        return;
+
+    // A constant target is a deduplicated value shared module-wide; it must
+    // not absorb any one original's location or decorations.
+    if (as<IRConstant>(replacement))
+        return;
+
+    if (!replacement->sourceLoc.isValid())
+        replacement->sourceLoc = originalInst->sourceLoc;
+
+    // A replacement that was itself already processed as an original (the
+    // work list legalizes operands before users, so anything this pass did
+    // not create carries that registration) is a value forwarded through a
+    // decomposition, with users of its own — the original's decorations
+    // must not move onto it.
+    if (context->mapValToLegalVal.containsKey(replacement))
+        return;
+
+    // Decorations are moved, not copied, and arrive on the replacement in
+    // reverse order; the readers that consult them (`findDecoration`-style
+    // scans) are order-insensitive.
+    originalInst->transferDecorationsTo(replacement);
+}
+
 struct IRTypeLegalizationPass
 {
     IRTypeLegalizationContext* context = nullptr;
@@ -3932,6 +4048,15 @@ struct IRTypeLegalizationPass
 
         LegalVal legalVal = legalizeInst(context, inst);
         registerLegalizedValue(context, inst, legalVal);
+
+        // The replacement bookkeeping (see
+        // `transferSourceLocAndDecorationsToLegalizedInst` above for its
+        // full rules) runs before the re-queue scan below: a decoration is
+        // itself an instruction whose operands may need legalization, and
+        // one that misses the scan would keep stale operand references into
+        // instructions the pass removes. Running first keeps a moved
+        // decoration visible to the scan as a child of the replacement.
+        transferSourceLocAndDecorationsToLegalizedInst(context, inst, legalVal);
 
         // Once the instruction has been processed, we need to consider
         // whether any other instructions might now be ready to process.
