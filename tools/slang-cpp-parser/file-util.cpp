@@ -86,7 +86,7 @@ struct DiagnosticReporter
 
     StreamWriter writer;
     SLANG_RETURN_ON_FAIL(reporter.report(writer.init(stream)));
-    SLANG_RETURN_ON_FAIL(reporter.report(writer.write(text)))
+    SLANG_RETURN_ON_FAIL(reporter.report(writer.write(text)));
     return SLANG_OK;
 }
 
