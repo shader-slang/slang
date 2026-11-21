@@ -181,6 +181,31 @@ if(SLANG_ENABLE_SLANGI)
     )
 endif()
 
+if(SLANG_ENABLE_GFX OR (SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI))
+    if(SLANG_USE_SYSTEM_GLM)
+        find_package(glm CONFIG REQUIRED)
+        set(slang_glm_includes
+            "$<TARGET_PROPERTY:glm::glm,INTERFACE_INCLUDE_DIRECTORIES>"
+        )
+    elseif(SLANG_OVERRIDE_GLM_PATH)
+        set(slang_glm_includes "${SLANG_OVERRIDE_GLM_PATH}/glm")
+    else()
+        set(slang_glm_includes "${slang_SOURCE_DIR}/external/glm")
+    endif()
+    if(SLANG_USE_SYSTEM_TINYOBJLOADER)
+        find_package(tinyobjloader CONFIG REQUIRED)
+        set(slang_tinyobj_includes
+            "$<TARGET_PROPERTY:tinyobjloader::tinyobjloader,INTERFACE_INCLUDE_DIRECTORIES>"
+        )
+    elseif(SLANG_OVERRIDE_TINYOBJLOADER_PATH)
+        set(slang_tinyobj_includes
+            "${SLANG_OVERRIDE_TINYOBJLOADER_PATH}/tinyobjloader"
+        )
+    else()
+        set(slang_tinyobj_includes "${slang_SOURCE_DIR}/external/tinyobjloader")
+    endif()
+endif()
+
 if(SLANG_ENABLE_GFX)
     #
     # GFX
@@ -194,7 +219,7 @@ if(SLANG_ENABLE_GFX)
         LINK_WITH_PRIVATE
             core
             slang
-            Vulkan-Headers
+            Vulkan::Headers
             metal-cpp
             stb
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
@@ -256,6 +281,7 @@ if(SLANG_ENABLE_GFX)
             MACHO_COMPATIBILITY_VERSION 0.0.0
             MACHO_CURRENT_VERSION ${SLANG_VERSION_NUMERIC}
     )
+    target_include_directories(gfx PRIVATE ${slang_glm_includes})
 
     # Since slang-test does not depend on gfx, we just copy the gfx modules to the slangc
     # directory. So even if slang-test is not built, the gfx modules are still available.
@@ -440,6 +466,16 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
         INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
         EXPORT_MACRO_PREFIX SLANG_PLATFORM
+    )
+    target_include_directories(
+        platform
+        PUBLIC "$<BUILD_INTERFACE:${slang_glm_includes}>"
+        PRIVATE ${slang_tinyobj_includes}
+    )
+    target_compile_definitions(
+        platform
+        PRIVATE
+            SLANG_USE_SYSTEM_TINYOBJLOADER=$<BOOL:${SLANG_USE_SYSTEM_TINYOBJLOADER}>
     )
 
     slang_add_target(
