@@ -221,7 +221,32 @@ jobs:
           printf ' %q' "${slang_test_args[@]}"
           printf '\n'
 
-          "$bin_dir/slang-test" "${slang_test_args[@]}"
+          status=0
+          "$bin_dir/slang-test" "${slang_test_args[@]}" || status=$?
+
+          # The tests that need a T4 machine select only the cpu API, so the run
+          # above leaves them out. A second run executes them. It takes the
+          # arguments of the first run, without the options that choose the
+          # tests of the tier.
+          if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
+            t4_args=()
+            for ((i = 0; i < ${#slang_test_args[@]}; i++)); do
+              case "${slang_test_args[i]}" in
+                -api | -compile-test | -exclude-list)
+                  i=$((i + 1))
+                  ;;
+                *)
+                  t4_args+=("${slang_test_args[i]}")
+                  ;;
+              esac
+            done
+            t4_args+=("-api" "cpu+llvm" "-include-list" "tests/tests-require-t4.txt")
+            printf '+ %q' "$bin_dir/slang-test"
+            printf ' %q' "${t4_args[@]}"
+            printf '\n'
+            "$bin_dir/slang-test" "${t4_args[@]}" || status=$?
+          fi
+          exit "$status"
 
       - name: Check slang-test worktree cleanliness
         if: always()
