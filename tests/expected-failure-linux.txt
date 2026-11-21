@@ -15,3 +15,7 @@ slang-unit-test-tool/RecordReplay_cpu_hello_world.internal
 
 # Ray tracing tests - CUDA/OptiX issues on T4
 tests/pipeline/ray-tracing/raygen.slang (cuda)
+
+# Fails at random on the Linux T4 runner.
+# TODO: Remove this entry when https://github.com/shader-slang/slang/issues/14687 is fixed.
+tests/autodiff/was/warped-sampling-1d.slang (glsl)
