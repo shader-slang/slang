@@ -3786,6 +3786,13 @@ public:
 
     // Try to compute the "join" between two types.
     //
+    // Two basic types join when one is strictly better, i.e. converting the
+    // other into it costs strictly less than the reverse; an equal-cost pair
+    // of distinct basic types has no better side and does not join — except
+    // that a `bool` operand loses to the other side, keeping mixed
+    // bool/number inference (e.g. `?:`/`select` arms) compiling the way
+    // built-in operators already promote `bool`.
+    //
     // `allowEnumScalarJoin` opts in to decaying an enum to its tag type so it can
     // join with a scalar; it is enabled only for common-type/convertibility
     // inference of ordinary call arguments (e.g. the arms of `?:`/`select`), and
