@@ -242,7 +242,7 @@ bool moduleHasDirectDeclaration(slang::IModule* module, UnownedStringSlice name)
 
 } // namespace
 
-SLANG_UNIT_TEST(serializedModuleVersionValidation)
+SLANG_UNIT_TEST(serializedModuleVersionValidation, NoRenderApi)
 {
     const char* source = R"(
         module version_test;
@@ -451,7 +451,7 @@ SLANG_UNIT_TEST(serializedModuleVersionValidation)
     }
 }
 
-SLANG_UNIT_TEST(serializedModuleVersionLibraryReference)
+SLANG_UNIT_TEST(serializedModuleVersionLibraryReference, NoRenderApi)
 {
     const char* source = R"(
         module version_test_library;
@@ -503,7 +503,7 @@ SLANG_UNIT_TEST(serializedModuleVersionLibraryReference)
     }
 }
 
-SLANG_UNIT_TEST(serializedModuleVersionImportFallback)
+SLANG_UNIT_TEST(serializedModuleVersionImportFallback, NoRenderApi)
 {
     const char* binarySource = R"(
         module future;

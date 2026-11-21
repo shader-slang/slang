@@ -31,7 +31,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(sliceAllocatorAllocateFromCStr)
+SLANG_UNIT_TEST(sliceAllocatorAllocateFromCStr, NoRenderApi)
 {
     SliceAllocator alloc;
     TerminatedCharSlice s = alloc.allocate("hello");
@@ -41,7 +41,7 @@ SLANG_UNIT_TEST(sliceAllocatorAllocateFromCStr)
     SLANG_CHECK(s.begin()[s.count] == '\0');
 }
 
-SLANG_UNIT_TEST(sliceAllocatorAllocateFromSlice)
+SLANG_UNIT_TEST(sliceAllocatorAllocateFromSlice, NoRenderApi)
 {
     SliceAllocator alloc;
     UnownedStringSlice in = toSlice("hello world");
@@ -51,7 +51,7 @@ SLANG_UNIT_TEST(sliceAllocatorAllocateFromSlice)
     SLANG_CHECK(s.begin()[s.count] == '\0');
 }
 
-SLANG_UNIT_TEST(sliceAllocatorAllocateFromString)
+SLANG_UNIT_TEST(sliceAllocatorAllocateFromString, NoRenderApi)
 {
     SliceAllocator alloc;
     String in = "owned-string";
@@ -60,7 +60,7 @@ SLANG_UNIT_TEST(sliceAllocatorAllocateFromString)
     SLANG_CHECK(strcmp(s.begin(), in.getBuffer()) == 0);
 }
 
-SLANG_UNIT_TEST(sliceAllocatorAllocateFromRange)
+SLANG_UNIT_TEST(sliceAllocatorAllocateFromRange, NoRenderApi)
 {
     SliceAllocator alloc;
     const char* full = "abcdefg";
@@ -72,7 +72,7 @@ SLANG_UNIT_TEST(sliceAllocatorAllocateFromRange)
     SLANG_CHECK(s.begin()[3] == '\0');
 }
 
-SLANG_UNIT_TEST(sliceAllocatorAllocatedDataIsIndependent)
+SLANG_UNIT_TEST(sliceAllocatorAllocatedDataIsIndependent, NoRenderApi)
 {
     SliceAllocator alloc;
 
@@ -93,7 +93,7 @@ SLANG_UNIT_TEST(sliceAllocatorAllocatedDataIsIndependent)
     SLANG_CHECK(strcmp(s.begin(), "snapshot-me") == 0);
 }
 
-SLANG_UNIT_TEST(sliceAllocatorListAllocate)
+SLANG_UNIT_TEST(sliceAllocatorListAllocate, NoRenderApi)
 {
     SliceAllocator alloc;
     List<String> in;
@@ -108,7 +108,7 @@ SLANG_UNIT_TEST(sliceAllocatorListAllocate)
     SLANG_CHECK(strcmp(out[2].begin(), "gamma") == 0);
 }
 
-SLANG_UNIT_TEST(sliceAllocatorEmptyInputs)
+SLANG_UNIT_TEST(sliceAllocatorEmptyInputs, NoRenderApi)
 {
     SliceAllocator alloc;
 
@@ -121,7 +121,7 @@ SLANG_UNIT_TEST(sliceAllocatorEmptyInputs)
     SLANG_CHECK(empty2.begin()[0] == '\0');
 }
 
-SLANG_UNIT_TEST(sliceAllocatorMultipleAllocations)
+SLANG_UNIT_TEST(sliceAllocatorMultipleAllocations, NoRenderApi)
 {
     SliceAllocator alloc;
     const Index count = 256;
@@ -141,7 +141,7 @@ SLANG_UNIT_TEST(sliceAllocatorMultipleAllocations)
     }
 }
 
-SLANG_UNIT_TEST(sliceAllocatorDeallocateAllClearsArena)
+SLANG_UNIT_TEST(sliceAllocatorDeallocateAllClearsArena, NoRenderApi)
 {
     SliceAllocator alloc;
     (void)alloc.allocate("first");
@@ -156,7 +156,7 @@ SLANG_UNIT_TEST(sliceAllocatorDeallocateAllClearsArena)
     SLANG_CHECK(strcmp(fresh.begin(), "after-reset") == 0);
 }
 
-SLANG_UNIT_TEST(sliceAllocatorPreservesEmbeddedNuls)
+SLANG_UNIT_TEST(sliceAllocatorPreservesEmbeddedNuls, NoRenderApi)
 {
     // The slice form should preserve the full input length, even if
     // it contains an embedded NUL — but the `const char*` form stops
@@ -176,7 +176,7 @@ SLANG_UNIT_TEST(sliceAllocatorPreservesEmbeddedNuls)
     SLANG_CHECK(s.begin()[5] == '\0');
 }
 
-SLANG_UNIT_TEST(sliceAllocatorArenaIsTheSameArena)
+SLANG_UNIT_TEST(sliceAllocatorArenaIsTheSameArena, NoRenderApi)
 {
     // The arena exposed via getArena() must be the *same* arena
     // that allocate(...) uses, so callers can safely co-allocate

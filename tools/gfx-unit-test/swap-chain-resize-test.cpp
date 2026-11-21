@@ -211,12 +211,12 @@ void swapchainResizeTestImpl(IDevice* device, UnitTestContext* context)
     t.run();
 }
 
-SLANG_UNIT_TEST(swapchainResizeD3D12)
+SLANG_UNIT_TEST(swapchainResizeD3D12, D3D12)
 {
     runTestImpl(swapchainResizeTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(swapchainResizeVulkan)
+SLANG_UNIT_TEST(swapchainResizeVulkan, Vulkan)
 {
     runTestImpl(swapchainResizeTestImpl, unitTestContext, DeviceType::Vulkan);
 }

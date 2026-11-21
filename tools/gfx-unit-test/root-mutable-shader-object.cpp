@@ -93,12 +93,12 @@ void mutableRootShaderObjectTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, numbersBuffer, std::array{3.0f, 4.0f, 5.0f, 6.0f});
 }
 
-SLANG_UNIT_TEST(mutableRootShaderObjectD3D12)
+SLANG_UNIT_TEST(mutableRootShaderObjectD3D12, D3D12)
 {
     runTestImpl(mutableRootShaderObjectTestImpl, unitTestContext, DeviceType::D3D12, {});
 }
 
-/*SLANG_UNIT_TEST(mutableRootShaderObjectVulkan)
+/*SLANG_UNIT_TEST(mutableRootShaderObjectVulkan, Vulkan)
 {
     runTestImpl(mutableRootShaderObjectTestImpl, unitTestContext, DeviceType::Vulkan, {});
 }*/

@@ -12,7 +12,7 @@
 using namespace Slang;
 
 // Test loading a precompiled module that imports other modules.
-SLANG_UNIT_TEST(multiFileModuleCache)
+SLANG_UNIT_TEST(multiFileModuleCache, NoRenderApi)
 {
     // Prepare the virtual file system with the module files.
     const char* commonAttrSource = R"(

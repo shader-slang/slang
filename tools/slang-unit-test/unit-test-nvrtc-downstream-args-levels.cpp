@@ -135,7 +135,7 @@ static bool contains(const String& ptx, const char* text)
 // reach NVRTC, session level first: adding an unrelated argument at one level keeps the arguments
 // of the others, and arguments given one token per entry arrive exactly as given. NVRTC compiles
 // to PTX without a GPU, so the test only needs a loadable NVRTC; otherwise it reports Ignored.
-SLANG_UNIT_TEST(nvrtcDownstreamArgsComposeAcrossLevels)
+SLANG_UNIT_TEST(nvrtcDownstreamArgsComposeAcrossLevels, CUDA)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
     if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))

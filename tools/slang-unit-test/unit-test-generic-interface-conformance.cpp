@@ -14,7 +14,7 @@ using namespace Slang;
 // Test that the IModule::findAndCheckEntryPoint API supports discovering
 // entrypoints without a [shader] attribute.
 
-SLANG_UNIT_TEST(genericInterfaceConformance)
+SLANG_UNIT_TEST(genericInterfaceConformance, NoRenderApi)
 {
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(

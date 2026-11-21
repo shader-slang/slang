@@ -7,7 +7,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(builtinModuleCache)
+SLANG_UNIT_TEST(builtinModuleCache, NoRenderApi)
 {
     String cachePath;
     SLANG_CHECK_ABORT(

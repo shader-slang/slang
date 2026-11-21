@@ -13,7 +13,7 @@ static String getTypeFullName(slang::TypeReflection* type)
     return String((const char*)blob->getBufferPointer());
 }
 
-SLANG_UNIT_TEST(matrixTypeFullName)
+SLANG_UNIT_TEST(matrixTypeFullName, NoRenderApi)
 {
     const char* source = R"(
         struct S

@@ -5,7 +5,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(slangTestOptimizationArgDetection)
+SLANG_UNIT_TEST(slangTestOptimizationArgDetection, NoRenderApi)
 {
     const char* optimizationArgs[] = {
         "-O",
@@ -50,7 +50,7 @@ SLANG_UNIT_TEST(slangTestOptimizationArgDetection)
     }
 }
 
-SLANG_UNIT_TEST(slangTestRenderOptimizationArgDetection)
+SLANG_UNIT_TEST(slangTestRenderOptimizationArgDetection, NoRenderApi)
 {
     {
         List<String> args;
@@ -136,7 +136,7 @@ SLANG_UNIT_TEST(slangTestRenderOptimizationArgDetection)
     }
 }
 
-SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
+SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion, NoRenderApi)
 {
     {
         CommandLine cmdLine;
@@ -316,7 +316,7 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
     }
 }
 
-SLANG_UNIT_TEST(slangTestDefaultOptimizationOverride)
+SLANG_UNIT_TEST(slangTestDefaultOptimizationOverride, NoRenderApi)
 {
     // A compiler test with no pinned level takes the command-line override.
     {

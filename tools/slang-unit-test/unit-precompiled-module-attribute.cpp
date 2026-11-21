@@ -37,7 +37,7 @@ using namespace Slang;
 // checking of [__AttributeUsage] on struct decls, regardless of whether the attribute
 // is used in the defining module or not.
 //
-SLANG_UNIT_TEST(precompiledModuleWithUserDefinedAttribute)
+SLANG_UNIT_TEST(precompiledModuleWithUserDefinedAttribute, NoRenderApi)
 {
     // Prepare the virtual file system with the module files.
     const char* fooSource = R"(

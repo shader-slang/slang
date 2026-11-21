@@ -15,7 +15,7 @@ using namespace Slang;
 // compiling a program with multiple entrypoints and retrieving a single
 // compiled module that contains all the entrypoints.
 //
-SLANG_UNIT_TEST(getTargetCode)
+SLANG_UNIT_TEST(getTargetCode, NoRenderApi)
 {
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(

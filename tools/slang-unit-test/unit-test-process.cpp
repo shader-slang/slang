@@ -666,7 +666,7 @@ static SlangResult _reflectTest(UnitTestContext* context)
     return SLANG_OK;
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReadToCompletion)
+SLANG_UNIT_TEST(CommandLineProcessReadToCompletion, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 1)));
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10)));
@@ -674,81 +674,81 @@ SLANG_UNIT_TEST(CommandLineProcessReadToCompletion)
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10000)));
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReadAfterImmediateCrash)
+SLANG_UNIT_TEST(CommandLineProcessReadAfterImmediateCrash, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 1, 1 / 2)));
 }
 
 // Crash halfway through increasingly large output streams to exercise partial pipe reads.
-SLANG_UNIT_TEST(CommandLineProcessReadAfterSmallStreamCrash)
+SLANG_UNIT_TEST(CommandLineProcessReadAfterSmallStreamCrash, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10, 10 / 2)));
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReadAfterMediumStreamCrash)
+SLANG_UNIT_TEST(CommandLineProcessReadAfterMediumStreamCrash, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 1000, 1000 / 2)));
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReadAfterLargeStreamCrash)
+SLANG_UNIT_TEST(CommandLineProcessReadAfterLargeStreamCrash, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10000, 10000 / 2)));
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReadLargeStreamToCompletion)
+SLANG_UNIT_TEST(CommandLineProcessReadLargeStreamToCompletion, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 100000)));
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReadAfterVeryLargeStreamCrash)
+SLANG_UNIT_TEST(CommandLineProcessReadAfterVeryLargeStreamCrash, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 100000, 100000 / 2)));
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReflect)
+SLANG_UNIT_TEST(CommandLineProcessReflect, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_reflectTest(unitTestContext)));
 }
 
-SLANG_UNIT_TEST(HTTPPacketConnectionReflect)
+SLANG_UNIT_TEST(HTTPPacketConnectionReflect, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_httpReflectTest(unitTestContext)));
 }
 
-SLANG_UNIT_TEST(HTTPPacketConnectionPeerCrash)
+SLANG_UNIT_TEST(HTTPPacketConnectionPeerCrash, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_httpCrashTest(unitTestContext)));
 }
 
 #if defined(_WIN32)
-SLANG_UNIT_TEST(TestServerParentMonitorForcefulTermination)
+SLANG_UNIT_TEST(TestServerParentMonitorForcefulTermination, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_parentMonitorParentExitTest(unitTestContext, true)));
 }
 
-SLANG_UNIT_TEST(TestServerParentMonitorGracefulExit)
+SLANG_UNIT_TEST(TestServerParentMonitorGracefulExit, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_parentMonitorParentExitTest(unitTestContext, false)));
 }
 
-SLANG_UNIT_TEST(TestServerParentMonitorInvalidArguments)
+SLANG_UNIT_TEST(TestServerParentMonitorInvalidArguments, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_parentMonitorFailureModeTests(unitTestContext)));
 }
 #endif
 
-SLANG_UNIT_TEST(HTTPHeaderContentLengthValidation)
+SLANG_UNIT_TEST(HTTPHeaderContentLengthValidation, NoRenderApi)
 {
     _checkHTTPHeaderContentLengthValidation();
 }
 
-SLANG_UNIT_TEST(JSONRPCReadErrorClassification)
+SLANG_UNIT_TEST(JSONRPCReadErrorClassification, NoRenderApi)
 {
     _checkJSONRPCReadErrorClassification();
 }
 
 #if defined(_WIN32)
-SLANG_UNIT_TEST(TestServerParentMonitorIntegration)
+SLANG_UNIT_TEST(TestServerParentMonitorIntegration, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testServerParentMonitorIntegrationTest(unitTestContext)));
 }

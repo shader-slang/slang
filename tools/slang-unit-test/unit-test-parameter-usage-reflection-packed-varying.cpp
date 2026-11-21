@@ -170,12 +170,12 @@ static void testParameterLocationUsed(SlangCompileTarget format)
     }
 }
 
-SLANG_UNIT_TEST(isParameterLocationUsedReflectionWGSL)
+SLANG_UNIT_TEST(isParameterLocationUsedReflectionWGSL, NoRenderApi)
 {
     testParameterLocationUsed(SLANG_WGSL);
 }
 
-SLANG_UNIT_TEST(isParameterLocationUsedReflectionMetal)
+SLANG_UNIT_TEST(isParameterLocationUsedReflectionMetal, NoRenderApi)
 {
     testParameterLocationUsed(SLANG_METAL);
 }

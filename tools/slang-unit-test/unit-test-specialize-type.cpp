@@ -13,7 +13,7 @@ using namespace Slang;
 // reflection valid for the unspecialized type, but specializing `LoopNode<int>` forces the
 // non-empty branch and produces an infinitely recursive type. The API should report the
 // recursion diagnostic and return `nullptr` instead of leaking an exception.
-SLANG_UNIT_TEST(specializeTypeInfiniteRecursion)
+SLANG_UNIT_TEST(specializeTypeInfiniteRecursion, NoRenderApi)
 {
     const char* source = R"(
         struct EmptyNode

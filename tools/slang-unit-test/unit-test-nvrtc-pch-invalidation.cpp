@@ -80,7 +80,7 @@ static SlangResult compileCudaSource(
 // cannot be observed through getEntryPointCode (that is what unit-test-nvrtc-pch.cpp guards).
 // Requires a loadable NVRTC 12.8 or newer (where the driver adds `-pch`) and the include-form
 // prelude; Ignored otherwise. NVRTC compiles to PTX without a GPU, so no device is needed.
-SLANG_UNIT_TEST(nvrtcPrecompiledHeaderInvalidation)
+SLANG_UNIT_TEST(nvrtcPrecompiledHeaderInvalidation, CUDA)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 

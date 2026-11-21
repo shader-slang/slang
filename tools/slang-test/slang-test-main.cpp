@@ -6910,7 +6910,24 @@ static void _calcSynthesizedCompileTargetTests(
     }
 }
 
-static bool _canIgnore(TestContext* context, const TestDetails& details)
+// The backends that only a machine with a GPU has. The CUDA toolkit, which has NVRTC, is installed
+// on the GPU hosts only, so a test line that uses NVRTC cannot run in the job that has no GPU, even
+// when the line needs no GPU API. For example, `-target ptx` compiles with NVRTC and does not
+// run the result.
+static const PassThroughFlags kGpuHostOnlyBackends = PassThroughFlag::NVRTC;
+
+// Returns true if the test `details` can be ignored in this run.
+//
+// `fileHasRunnableApiTest` tells whether the file of the test has a test line that uses a render
+// API and can run (see _hasRunnableApiTest). It matters only with `-compile-test false`, which
+// skips the compile tests, which are the test lines that use no API. A COMPILE line is not a
+// compile test in that case when the file has such a line, because the COMPILE line can prepare
+// the input of it. A line that uses a backend that only the GPU hosts have is not one either
+// (kGpuHostOnlyBackends).
+static bool _canIgnore(
+    TestContext* context,
+    const TestDetails& details,
+    bool fileHasRunnableApiTest)
 {
     if (details.options.isEnabled == false)
     {
@@ -6921,7 +6938,10 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
 
     // Check if it's possible in principal to run this test with the render api flags used by this
     // test
-    if (!context->canRunTestWithRenderApiFlags(requirements.usedRenderApiFlags))
+    const bool isCompileStep = details.options.command == "COMPILE";
+    const bool isNeededByGpuTests = (isCompileStep && fileHasRunnableApiTest) ||
+                                    (requirements.usedBackendFlags & kGpuHostOnlyBackends) != 0;
+    if (!context->canRunTestWithRenderApiFlags(requirements.usedRenderApiFlags, isNeededByGpuTests))
     {
         return true;
     }
@@ -6950,6 +6970,41 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
         return true;
     }
 
+    return false;
+}
+
+// Returns true if a test line in `tests` uses a render API and can run in this run.
+//
+// The `-compile-test false` option exists to keep the compile tests, which need no GPU, out of the
+// jobs that have a GPU, because the CPU job runs them. A test file can still use a COMPILE line to
+// prepare the input for a line that uses an API. Consider this example:
+//
+//     //TEST:COMPILE: tests/library/library.slang -o tests/library/library.slang-module
+//     //TEST:COMPARE_COMPUTE(targets=cuda): -r tests/library/library.slang-module
+//
+// The COMPILE line needs no API, but the COMPARE_COMPUTE line loads its output. If
+// `-compile-test false` skipped the COMPILE line, the COMPARE_COMPUTE line would fail. So when a
+// file has a line that uses an API and can run, the COMPILE lines of the file run too. The other
+// lines of the file that need no API, such as a SIMPLE line, are compile tests, and they do not
+// run.
+//
+// A COMPILE line that this keeps can run in the CPU job too, if the file also has a line for the
+// CPU. We do not look at which line reads the output of which, because the lines pass the files by
+// their names in the arguments, and the names do not tell us the producer.
+static bool _hasRunnableApiTest(TestContext* context, const List<TestDetails>& tests)
+{
+    for (const auto& details : tests)
+    {
+        // A line with targets does not run. The test of each target is in the list too.
+        if (_isMultiTargetLine(details.options))
+            continue;
+
+        if (details.requirements.usedRenderApiFlags == 0)
+            continue;
+
+        if (!_canIgnore(context, details, false))
+            return true;
+    }
     return false;
 }
 
@@ -7211,6 +7266,12 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             [&](Index a, Index b) { return getTestPrefixIndex(a) < getTestPrefixIndex(b); });
     }
 
+    // With `-compile-test false`, a COMPILE line runs only to prepare the input of a line that
+    // needs an API, so we need to know whether this file has such a line (see
+    // _hasRunnableApiTest).
+    const bool fileHasRunnableApiTest =
+        !context->options.compileTest && _hasRunnableApiTest(context, testList.tests);
+
     // We have found a test to run!
     for (Index orderIdx = 0; orderIdx < testOrder.getCount(); orderIdx++)
     {
@@ -7379,7 +7440,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
                     : _findUnusedExpectedFile(filePath, subTestIndex, testList);
 
             // If this test can be ignored
-            if (_canIgnore(context, testDetails))
+            if (_canIgnore(context, testDetails, fileHasRunnableApiTest))
             {
                 testResult = TestResult::Ignored;
                 context->getTestReporter()->addResult(testResult);
@@ -7734,6 +7795,9 @@ static TestResult _asTestResult(ToolReturnCode retCode)
 }
 
 /// Loads a DLL containing unit test functions and run them one by one.
+///
+/// A test declares the render APIs that it uses (SLANG_UNIT_TEST), and a test that declares
+/// `NoRenderApi` is a compile test, so `-compile-test false` skips it.
 static SlangResult runUnitTestModule(
     TestContext* context,
     TestOptions& testOptions,
@@ -7776,6 +7840,7 @@ static SlangResult runUnitTestModule(
         UnitTestFunc testFunc;
         String testName;
         String command;
+        RenderApiFlags usedApis; ///< The render APIs that the test declares, or 0 for none
     };
 
     List<TestItem> tests;
@@ -7793,7 +7858,7 @@ static SlangResult runUnitTestModule(
         {
             if (testPassesCategoryMask(context, testOptions))
             {
-                tests.add(TestItem{testFunc, testName, command});
+                tests.add(TestItem{testFunc, testName, command, testModule->getTestUsedApis(i)});
             }
         }
     }
@@ -7809,6 +7874,15 @@ static SlangResult runUnitTestModule(
         auto reporter = context->getTestReporter();
         TestOptions options = testOptions;
         options.command = test.command;
+
+        // A unit test that uses no API that `-api` has enabled, or that uses no API when
+        // `-compile-test false` is set, belongs to another kind of job, so we do not spawn it.
+        if (!context->canRunUnitTestUsingRenderApis(test.usedApis))
+        {
+            TestReporter::TestScope scopeTest(reporter, options.command);
+            reporter->addResult(TestResult::Ignored);
+            return;
+        }
 
         if (spawnType == SpawnType::UseTestServer ||
             spawnType == SpawnType::UseFullyIsolatedTestServer)
@@ -8245,10 +8319,10 @@ SlangResult innerMain(int argc, char** argv)
         }
 
         // Run the unit tests (these are internal C++ tests - not specified via files in a
-        // directory) They are registered with SLANG_UNIT_TEST macro
+        // directory) They are registered with SLANG_UNIT_TEST macro.
         //
-        //
-        if (context.canRunUnitTests())
+        // With `-compile-test false`, runUnitTestModule still runs the unit tests that declare an
+        // enabled API, and it ignores the others.
         {
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);

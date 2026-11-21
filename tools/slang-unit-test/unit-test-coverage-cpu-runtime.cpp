@@ -586,7 +586,7 @@ static bool createCppHostCallableGlobalSession(ComPtr<slang::IGlobalSession>& ou
 
 } // anonymous namespace
 
-SLANG_UNIT_TEST(coverageCpuRuntimeDispatch)
+SLANG_UNIT_TEST(coverageCpuRuntimeDispatch, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     if (!createCppHostCallableGlobalSession(globalSession))
@@ -600,7 +600,7 @@ SLANG_UNIT_TEST(coverageCpuRuntimeDispatch)
     runCoverageCpuRuntimeTest(globalSession, 4);
 }
 
-SLANG_UNIT_TEST(coverageCpuRuntimeExpressionBranches)
+SLANG_UNIT_TEST(coverageCpuRuntimeExpressionBranches, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     if (!createCppHostCallableGlobalSession(globalSession))

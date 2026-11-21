@@ -13,7 +13,7 @@ using namespace Slang;
 
 // Test that the isParameterLocationUsed API works.
 
-SLANG_UNIT_TEST(isParameterLocationUsedReflection)
+SLANG_UNIT_TEST(isParameterLocationUsedReflection, NoRenderApi)
 {
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(
@@ -107,7 +107,7 @@ SLANG_UNIT_TEST(isParameterLocationUsedReflection)
     SLANG_CHECK(isUsed);
 }
 
-SLANG_UNIT_TEST(isParameterLocationUsedParameterBlockConstantBuffer)
+SLANG_UNIT_TEST(isParameterLocationUsedParameterBlockConstantBuffer, NoRenderApi)
 {
     const char* shaderSource = R"(
         struct Foo {

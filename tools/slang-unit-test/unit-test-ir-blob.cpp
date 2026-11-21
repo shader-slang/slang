@@ -15,7 +15,7 @@
 using namespace Slang;
 
 // Test the slang_loadModuleFromIRBlob and slang_loadModuleInfoFromIRBlob functions
-SLANG_UNIT_TEST(irBlob)
+SLANG_UNIT_TEST(irBlob, NoRenderApi)
 {
     // Test source code for creating IR data
     const char* testModuleSource = R"(
@@ -482,7 +482,7 @@ SLANG_UNIT_TEST(irBlob)
 //
 // We change only a valid module's version to the value immediately below the supported range
 // and require the unsupported-version diagnostic, so incompatible AST IDs are never decoded.
-SLANG_UNIT_TEST(irBlobRejectsOlderModuleVersion)
+SLANG_UNIT_TEST(irBlobRejectsOlderModuleVersion, NoRenderApi)
 {
     const char* moduleText = R"(
         module version_guard;
@@ -616,7 +616,7 @@ SLANG_UNIT_TEST(irBlobRejectsOlderModuleVersion)
 //
 // The scenario was requested on the issue by @pdeayton-nv; running it is both the
 // empirical answer and the regression lock.
-SLANG_UNIT_TEST(irBlobImportUpToDateCheck)
+SLANG_UNIT_TEST(irBlobImportUpToDateCheck, NoRenderApi)
 {
     // A dependency module exposing a public function, and an importer that calls
     // it -- the call makes the importer genuinely depend on the dependency.
