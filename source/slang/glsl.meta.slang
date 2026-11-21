@@ -8425,16 +8425,8 @@ public uvec4 subgroupBallot(bool value)
     return WaveActiveBallot(value);
 }
 
-// logic for HLSL and CUDA which lack InverseBalloc
-// CUDA: works exclusivly 32 waves, therefore only need comp x
-// HLSL:{
-// 1. index into comp I want: index = trunc(float(lane)*(1/32))
-// 2. lane & value[index]
-// note: 1/32 wil be converted to multiplication
-// we do 1/32 since 1 uint stores 32 threads
-// note 2: we have a waveLaneCount check because based on wave lane count we can determine if we can do a
-// fast path or slow path (know index is 0 or non 0)
-// }
+// CUDA and HLSL have no inverse-ballot operation, so on those targets we read the bit of the
+// current lane with subgroupBallotBitExtract.
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
@@ -8444,20 +8436,8 @@ public bool subgroupInverseBallot(uvec4 value)
     __target_switch
     {
     case cuda:
-        // only has 32 warps
-        __intrinsic_asm "(($0).x >> (_getLaneId()) & 1)";
     case hlsl:
-        // much like _WaveCountBits, but here we hope that we hit case 0; we can then avoid the expensive logic
-        const uint waveLaneCount = WaveGetLaneCount();
-        switch ((waveLaneCount - 1) / 32)
-        {
-        case 0:
-            __intrinsic_asm "(($0)[0] >> WaveGetLaneIndex()) & 1)";
-        case 1:
-        case 2:
-        case 3:
-            __intrinsic_asm "((($0)[uint(float(WaveGetLaneIndex())*0.03125f)] >> WaveGetLaneIndex()) & 1)";
-        }
+        return subgroupBallotBitExtract(value, WaveGetLaneIndex());
     case glsl:
         __intrinsic_asm "subgroupInverseBallot($0)";
     case spirv:
@@ -8469,7 +8449,12 @@ public bool subgroupInverseBallot(uvec4 value)
     return false;
 }
 
-// same logic as subgroupInverseBallot
+// CUDA and HLSL have no ballot-bit-extract operation, so on those targets we compute the bit.
+// A ballot stores lanes 32*i to 32*i+31 in component i, so the bit for `index` is bit
+// `index % 32` of component `index / 32`. We pick the component with comparisons because a
+// dynamically indexed vector becomes an `alloca` in DXC, and an `index` of 128 or more would read
+// past it. An `index` at or above the subgroup size has an undefined result; here it gives a bit
+// of the ballot (bit `index % 32` of `value.w` once `index` >= 128).
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
@@ -8479,18 +8464,9 @@ public bool subgroupBallotBitExtract(uvec4 value, uint index)
     __target_switch
     {
     case cuda:
-        __intrinsic_asm "($1 & ($0).x) != 0";
     case hlsl:
-        const uint waveLaneCount = WaveGetLaneCount();
-        switch ((waveLaneCount - 1) / 32)
-        {
-        case 0:
-            __intrinsic_asm "($0)[0] & ($1)";
-        case 1:
-        case 2:
-        case 3:
-            __intrinsic_asm "($0)[uint(float($1)*0.03125f)] & ($1)";
-        }
+        uint component = index < 64 ? (index < 32 ? value.x : value.y) : (index < 96 ? value.z : value.w);
+        return ((component >> (index % 32)) & 1) != 0;
     case glsl:
         __intrinsic_asm "subgroupBallotBitExtract($0, $1)";
     case spirv:
