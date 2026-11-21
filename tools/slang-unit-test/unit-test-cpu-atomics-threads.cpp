@@ -122,7 +122,7 @@ static void diagnoseIfNeeded(slang::IBlob* diagnostics, const char* label)
 
 } // namespace
 
-SLANG_UNIT_TEST(cpuAtomicsAreThreadSafe)
+SLANG_UNIT_TEST(cpuAtomicsAreThreadSafe, NoRenderApi)
 {
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SHADER_HOST_CALLABLE;
