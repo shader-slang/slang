@@ -120,19 +120,23 @@ float4 fragmentMain(float4 p: SV_Position) : SV_Target
 }
 
 // GLSL: #extension GL_ARB_sparse_texture_clamp
-// GLSL: textureClampARB(
+// The bias-bearing clamp builtins take the clamp before the optional bias:
+// textureClampARB(sampler, P, lodClamp [, bias]) and
+// textureOffsetClampARB(sampler, P, offset, lodClamp [, bias]).
+// GLSL: {{textureClampARB\(samplerCube[^;]*, \(0\.75\), \(0\.125\)\)}}
 // GLSL: textureGradClampARB(
-// GLSL: textureOffsetClampARB(
+// GLSL: {{textureOffsetClampARB\(sampler2D[^;]*, \(0\.5\), \(0\.25\)\)}}
+// GLSL: {{textureOffsetClampARB\(\(combined2D_0\), [^;]*, \(0\.625\), \(0\.375\)\)}}
 float4 glslMain(float4 p: SV_Position) : SV_Target
 {
     float4 result = 0;
     result += cubeTex.Sample(samplerState, normalize(p.xyz), 0.5);
-    result += cubeTex.SampleBias(samplerState, normalize(p.xyz), 0.25, 0.5);
+    result += cubeTex.SampleBias(samplerState, normalize(p.xyz), 0.125, 0.75);
     result += cubeTex.SampleGrad(samplerState, normalize(p.xyz), ddx(p.xyz), ddy(p.xyz), 0.5);
     result += tex2D.SampleBias(samplerState, p.xy, 0.25, int2(1, 0), 0.5);
     result += combinedCube.Sample(normalize(p.xyz), 0.5);
     result += combinedCube.SampleGrad(normalize(p.xyz), ddx(p.xyz), ddy(p.xyz), 0.5);
-    result += combined2D.SampleBias(p.xy, 0.25, int2(1, 0), 0.5);
+    result += combined2D.SampleBias(p.xy, 0.375, int2(1, 0), 0.625);
     return result;
 }
 
