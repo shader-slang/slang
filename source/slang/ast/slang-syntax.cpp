@@ -1179,6 +1179,11 @@ Type* UniformParameterGroupType::getLayoutType()
     return as<Type>(getGenericArg(getDeclRef(), 1));
 }
 
+Type* HLSLStructuredBufferTypeBase::getLayoutType()
+{
+    return as<Type>(getGenericArg(getDeclRef(), 1));
+}
+
 ModuleDecl* getModuleDecl(Decl* decl)
 {
     for (auto dd = decl; dd; dd = dd->parentDecl)
