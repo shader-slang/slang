@@ -203,8 +203,6 @@ jobs:
           # jobs turn them off.
           if [[ "${{ inputs.config }}" == "release" ]]; then
             slang_test_args+=("-enable-debug-layers" "true")
-            # Skip the tests that fail with the validation layers.
-            slang_test_args+=("-exclude-list" "tests/skip-list-validation-layers.txt")
           else
             slang_test_args+=("-enable-debug-layers" "false")
           fi

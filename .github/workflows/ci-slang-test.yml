@@ -220,11 +220,6 @@ jobs:
             slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux.txt")
           fi
 
-          # Skip the tests that fail with the validation layers.
-          if [[ "$enable_debug_layers" == "true" ]]; then
-            slang_test_args+=("-exclude-list" "tests/skip-list-validation-layers.txt")
-          fi
-
           # Skip most neural tests in debug builds to reduce CI time
           if [[ "${{ inputs.config }}" == "debug" ]]; then
             slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")

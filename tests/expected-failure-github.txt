@@ -19,3 +19,8 @@ tests/bugs/array-size-groupshared.slang (wgpu)
 tests/bugs/generic-groupshared.slang (wgpu)
 tests/compute/groupshared.slang (wgpu)
 tests/metal/groupshared-threadlocal-same-parameter.slang (wgpu)
+# VVL error VUID-RuntimeSpirv-cooperativeMatrixFlexibleDimensions-10165: line 3 of
+# reduce.slang uses an 8x8 half cooperative matrix, and the L4 GPU does not list this
+# shape in VkCooperativeMatrixPropertiesKHR. The test fails only in a job that turns on
+# the validation layers, which is a release job.
+tests/cooperative-matrix/reduce.slang.3 (vk)
