@@ -240,7 +240,7 @@ jobs:
                   ;;
               esac
             done
-            t4_args+=("-api" "cpu+llvm" "-include-list" "tests/tests-require-t4.txt")
+            t4_args+=("-include-list" "tests/tests-require-t4.txt")
             printf '+ %q' "$bin_dir/slang-test"
             printf ' %q' "${t4_args[@]}"
             printf '\n'
