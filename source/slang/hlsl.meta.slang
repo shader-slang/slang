@@ -1684,6 +1684,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
+    // The stacked [require] clauses are alternatives: the first keeps the overload
+    // available on its fallback targets, the second gates the spirv path on sparse
+    // residency (sm_5_0 implies the spvMinLod the MinLod operand needs, through the
+    // sm_4_0 capability chain).
     [require(cpp_glsl_hlsl_metal, texture_sm_4_1_clamp_fragment)]
     [require(spirv, sm_5_0, spvSparseResidency)]
     [__readNone]
@@ -1724,6 +1728,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     // the implicit-LOD methods (Sample, SampleBias, SampleGrad and the SampleCmp family),
     // status-only forms on the explicit-LOD methods (SampleLevel, SampleCmpLevel,
     // SampleCmpLevelZero), and (offset, clamp[, status]) forms on noncube shapes.
+    // SampleCmpGrad alone further excludes cube-array, following the SM 6.8
+    // comparison-sampling proposal. The clamp forms exclude the cpp target: the
+    // CPU sampling path has no minimum-LOD clamp implementation.
 
     [__readNone]
     [ForceInline]
@@ -2267,7 +2274,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, status);
         case spirv:
-            // The forwarder's shape domain must stay within SampleCmpLevel's.
+            // SampleCmpLevelZero forwards its status form to SampleCmpLevel at level
+            // 0, so the shapes this overload allows must stay a subset of the shapes
+            // SampleCmpLevel's status overload allows.
             return SampleCmpLevel(location, compareValue, 0.0, status);
         }
     }
@@ -2540,9 +2549,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(hlsl, texture_shadowgrad)]
-    // The short (offset, status) form has no HLSL counterpart: DXC reads its last
-    // argument as the clamp. It stays available on SPIR-V, where it lowers to sparse
-    // residency; the HLSL spelling is the (offset, clamp, status) form.
     [require(spirv, texture_shadowgrad, spvSparseResidency)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
@@ -2628,6 +2634,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
+    // The short (offset, status) form has no HLSL counterpart: DXC reads its last
+    // argument as the clamp. It stays available on SPIR-V, where it lowers to sparse
+    // residency; the HLSL spelling is the (offset, clamp, status) form above.
     [require(spirv, texture_shadowgrad, spvSparseResidency)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
@@ -3899,6 +3908,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         }
     }
 
+    // The stacked [require] clauses are alternatives: the first keeps the overload
+    // available on its fallback targets, the second gates the spirv path on sparse
+    // residency (sm_5_0 implies the spvMinLod the MinLod operand needs, through the
+    // sm_4_0 capability chain).
     [require(cpp_glsl_hlsl_metal, texture_sm_4_1_clamp_fragment)]
     [require(spirv, sm_5_0, spvSparseResidency)]
     [__readNone]
@@ -3941,6 +3954,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     // the implicit-LOD methods (Sample, SampleBias, SampleGrad and the SampleCmp family),
     // status-only forms on the explicit-LOD methods (SampleLevel, SampleCmpLevel,
     // SampleCmpLevelZero), and (offset, clamp[, status]) forms on noncube shapes.
+    // SampleCmpGrad alone further excludes cube-array, following the SM 6.8
+    // comparison-sampling proposal. The clamp forms exclude the cpp target: the
+    // CPU sampling path has no minimum-LOD clamp implementation.
 
     [__readNone]
     [ForceInline]
@@ -4616,7 +4632,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevelZero";
         case spirv:
-            // The forwarder's shape domain must stay within SampleCmpLevel's.
+            // SampleCmpLevelZero forwards its status form to SampleCmpLevel at level
+            // 0, so the shapes this overload allows must stay a subset of the shapes
+            // SampleCmpLevel's status overload allows.
             return SampleCmpLevel(s, location, compareValue, 0.0, status);
         }
     }
@@ -4923,6 +4941,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
+    // The short (offset, status) form has no HLSL counterpart: DXC reads its last
+    // argument as the clamp. It stays available on SPIR-V, where it lowers to sparse
+    // residency; the HLSL spelling is the (offset, clamp, status) form above.
     [require(spirv, texture_shadowgrad, spvSparseResidency)]
     float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {

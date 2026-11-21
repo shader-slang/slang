@@ -36,7 +36,7 @@ flowchart LR
 
 ## Omitted atoms
 
-The 56 aliases that only abbreviate a list of targets are not drawn, and the
+The 57 aliases that only abbreviate a list of targets are not drawn, and the
 arrows to them are removed. For example, `cuda_glsl_hlsl_spirv` is `cuda | glsl | hlsl | spirv`,
 and it exists only for readability. The atom counts below do not include them.
 
@@ -47,11 +47,11 @@ and it exists only for readability. The atom counts below do not include them.
 | Target    |      12 |    11 |       0 |          1 |
 | Stage     |      22 |     7 |      14 |          1 |
 | Version   |      79 |    15 |      64 |          0 |
-| EXT       |     177 |   107 |      70 |          0 |
+| EXT       |     186 |   116 |      70 |          0 |
 | Compound  |     160 |     0 |     160 |          0 |
 | Other     |      32 |     0 |      32 |          0 |
 | Internal  |     125 |   118 |       7 |          0 |
-| **Total** | **607** |       |         |            |
+| **Total** | **616** |       |         |            |
 
 ## Target
 
@@ -931,7 +931,7 @@ flowchart LR
 
 ## EXT
 
-Extensions. (177 atoms)
+Extensions. (186 atoms)
 
 ### EXT: gl 1/2
 
@@ -997,6 +997,7 @@ flowchart LR
     n_spvSparseResidency["spvSparseResidency (EXT)"]:::external
     n__GL_ARB_sparse_texture2["_GL_ARB_sparse_texture2 (Internal)"]:::external
     n__GL_ARB_sparse_texture_clamp["_GL_ARB_sparse_texture_clamp (Internal)"]:::external
+    n_spvMinLod["spvMinLod (EXT)"]:::external
     n__GL_ARB_texture_gather["_GL_ARB_texture_gather (Internal)"]:::external
     n_spvImageGatherExtended["spvImageGatherExtended (EXT)"]:::external
     n__GL_ARB_texture_multisample["_GL_ARB_texture_multisample (Internal)"]:::external
@@ -1058,7 +1059,7 @@ flowchart LR
     n_GL_ARB_sparse_texture2 -.-> n__GL_ARB_sparse_texture2
     n_GL_ARB_sparse_texture2 -.-> n_spvSparseResidency
     n_GL_ARB_sparse_texture_clamp -.-> n__GL_ARB_sparse_texture_clamp
-    n_GL_ARB_sparse_texture_clamp -.-> n_spvSparseResidency
+    n_GL_ARB_sparse_texture_clamp -.-> n_spvMinLod
     n_GL_ARB_texture_gather -.-> n__GL_ARB_texture_gather
     n_GL_ARB_texture_gather -.-> n_spvImageGatherExtended
     n_GL_ARB_texture_gather -.-> n_metal
@@ -1340,6 +1341,7 @@ flowchart LR
     n_SPV_EXT_shader_atomic_float_add["SPV_EXT_shader_atomic_float_add"]:::def
     n_SPV_EXT_shader_atomic_float_min_max["SPV_EXT_shader_atomic_float_min_max"]:::def
     n_SPV_EXT_shader_invocation_reorder["SPV_EXT_shader_invocation_reorder"]:::def
+    n_SPV_EXT_shader_subgroup_partitioned["SPV_EXT_shader_subgroup_partitioned"]:::def
     n_SPV_GOOGLE_user_type["SPV_GOOGLE_user_type"]:::def
     n_SPV_KHR_abort["SPV_KHR_abort"]:::def
     n_SPV_KHR_bfloat16["SPV_KHR_bfloat16"]:::def
@@ -1378,6 +1380,7 @@ flowchart LR
     n_spvAtomicFloat64MinMaxEXT["spvAtomicFloat64MinMaxEXT"]:::def
     n_spvBFloat16KHR["spvBFloat16KHR"]:::def
     n_spvBindlessTextureNV["spvBindlessTextureNV"]:::def
+    n_spvComputeShaderDerivativesKHR["spvComputeShaderDerivativesKHR"]:::def
     n_spvCooperativeMatrixBlockLoadsNV["spvCooperativeMatrixBlockLoadsNV"]:::def
     n_spvCooperativeMatrixConversionsNV["spvCooperativeMatrixConversionsNV"]:::def
     n_spvCooperativeMatrixKHR["spvCooperativeMatrixKHR"]:::def
@@ -1396,8 +1399,6 @@ flowchart LR
     n_spvFragmentFullyCoveredEXT["spvFragmentFullyCoveredEXT"]:::def
     n_spvFragmentShaderPixelInterlockEXT["spvFragmentShaderPixelInterlockEXT"]:::def
     n_spvGroupNonUniform["spvGroupNonUniform"]:::def
-    n_spvGroupNonUniformArithmetic["spvGroupNonUniformArithmetic"]:::def
-    n_spvGroupNonUniformBallot["spvGroupNonUniformBallot"]:::def
     n__spirv_1_4["_spirv_1_4 (Internal)"]:::external
     n__spirv_1_0["_spirv_1_0 (Internal)"]:::external
     n__spirv_1_3["_spirv_1_3 (Internal)"]:::external
@@ -1418,6 +1419,7 @@ flowchart LR
     n_SPV_EXT_shader_invocation_reorder --> n__spirv_1_4
     n_SPV_EXT_shader_invocation_reorder --> n_SPV_KHR_ray_tracing
     n_SPV_EXT_shader_invocation_reorder --> n_SPV_KHR_physical_storage_buffer
+    n_SPV_EXT_shader_subgroup_partitioned --> n__spirv_1_3
     n_SPV_GOOGLE_user_type --> n__spirv_1_0
     n_SPV_KHR_abort --> n__spirv_1_0
     n_SPV_KHR_bfloat16 --> n__spirv_1_0
@@ -1461,6 +1463,7 @@ flowchart LR
     n_spvAtomicFloat64MinMaxEXT --> n_SPV_EXT_shader_atomic_float_min_max
     n_spvBFloat16KHR --> n_SPV_KHR_bfloat16
     n_spvBindlessTextureNV --> n_SPV_NV_bindless_texture
+    n_spvComputeShaderDerivativesKHR --> n_SPV_KHR_compute_shader_derivatives
     n_spvCooperativeMatrixBlockLoadsNV --> n_SPV_NV_cooperative_matrix2
     n_spvCooperativeMatrixConversionsNV --> n_SPV_NV_cooperative_matrix2
     n_spvCooperativeMatrixKHR --> n_SPV_KHR_cooperative_matrix
@@ -1480,8 +1483,6 @@ flowchart LR
     n_spvFragmentFullyCoveredEXT --> n_SPV_EXT_fragment_fully_covered
     n_spvFragmentShaderPixelInterlockEXT --> n_SPV_EXT_fragment_shader_interlock
     n_spvGroupNonUniform --> n__spirv_1_3
-    n_spvGroupNonUniformArithmetic --> n__spirv_1_3
-    n_spvGroupNonUniformBallot --> n__spirv_1_3
     classDef def fill:#dbeafe,stroke:#1e40af,color:#111827
     classDef alias fill:#dcfce7,stroke:#166534,color:#111827
     classDef abstract fill:#fef9c3,stroke:#854d0e,color:#111827
@@ -1491,11 +1492,14 @@ flowchart LR
 
 ### EXT: spv 2/2
 
-36 atoms.
+45 atoms.
 
 ```mermaid
 flowchart LR
+    n_spvGroupNonUniformArithmetic["spvGroupNonUniformArithmetic"]:::def
+    n_spvGroupNonUniformBallot["spvGroupNonUniformBallot"]:::def
     n_spvGroupNonUniformClustered["spvGroupNonUniformClustered"]:::def
+    n_spvGroupNonUniformPartitionedEXT["spvGroupNonUniformPartitionedEXT"]:::def
     n_spvGroupNonUniformPartitionedNV["spvGroupNonUniformPartitionedNV"]:::def
     n_spvGroupNonUniformQuad["spvGroupNonUniformQuad"]:::def
     n_spvGroupNonUniformRotateKHR["spvGroupNonUniformRotateKHR"]:::def
@@ -1509,6 +1513,9 @@ flowchart LR
     n_spvMaximalReconvergenceKHR["spvMaximalReconvergenceKHR"]:::def
     n_spvMeshShadingEXT["spvMeshShadingEXT"]:::def
     n_spvMinLod["spvMinLod"]:::def
+    n_spvNonSemanticInfoKHR["spvNonSemanticInfoKHR"]:::def
+    n_spvPhysicalStorageBufferEXT["spvPhysicalStorageBufferEXT"]:::def
+    n_spvPhysicalStorageBufferKHR["spvPhysicalStorageBufferKHR"]:::def
     n_spvQuadControlKHR["spvQuadControlKHR"]:::def
     n_spvRayQueryKHR["spvRayQueryKHR"]:::def
     n_spvRayQueryPositionFetchKHR["spvRayQueryPositionFetchKHR"]:::def
@@ -1528,15 +1535,22 @@ flowchart LR
     n_spvShaderNonUniform["spvShaderNonUniform"]:::def
     n_spvShaderNonUniformEXT["spvShaderNonUniformEXT"]:::def
     n_spvSparseResidency["spvSparseResidency"]:::def
+    n_spvSubgroupRotateKHR["spvSubgroupRotateKHR"]:::def
     n_spvTensorAddressingNV["spvTensorAddressingNV"]:::def
+    n_spvUserTypeGOOGLE["spvUserTypeGOOGLE"]:::def
+    n_spvVariablePointersKHR["spvVariablePointersKHR"]:::def
     n_spvVulkanMemoryModelDeviceScopeKHR["spvVulkanMemoryModelDeviceScopeKHR"]:::def
     n_spvVulkanMemoryModelKHR["spvVulkanMemoryModelKHR"]:::def
     n__spirv_1_3["_spirv_1_3 (Internal)"]:::external
+    n_SPV_EXT_shader_subgroup_partitioned["SPV_EXT_shader_subgroup_partitioned (EXT)"]:::external
     n_SPV_NV_shader_subgroup_partitioned["SPV_NV_shader_subgroup_partitioned (EXT)"]:::external
     n_SPV_NV_shader_image_footprint["SPV_NV_shader_image_footprint (EXT)"]:::external
     n__spirv_1_0["_spirv_1_0 (Internal)"]:::external
     n_SPV_KHR_maximal_reconvergence["SPV_KHR_maximal_reconvergence (EXT)"]:::external
     n_SPV_EXT_mesh_shader["SPV_EXT_mesh_shader (EXT)"]:::external
+    n_SPV_KHR_non_semantic_info["SPV_KHR_non_semantic_info (EXT)"]:::external
+    n_SPV_EXT_physical_storage_buffer["SPV_EXT_physical_storage_buffer (EXT)"]:::external
+    n_SPV_KHR_physical_storage_buffer["SPV_KHR_physical_storage_buffer (EXT)"]:::external
     n_SPV_KHR_quad_control["SPV_KHR_quad_control (EXT)"]:::external
     n_SPV_KHR_ray_query["SPV_KHR_ray_query (EXT)"]:::external
     n_SPV_KHR_ray_tracing_position_fetch["SPV_KHR_ray_tracing_position_fetch (EXT)"]:::external
@@ -1550,11 +1564,19 @@ flowchart LR
     n_SPV_EXT_shader_invocation_reorder["SPV_EXT_shader_invocation_reorder (EXT)"]:::external
     n_SPV_NV_shader_invocation_reorder["SPV_NV_shader_invocation_reorder (EXT)"]:::external
     n_SPV_EXT_descriptor_indexing["SPV_EXT_descriptor_indexing (EXT)"]:::external
+    n_SPV_KHR_subgroup_rotate["SPV_KHR_subgroup_rotate (EXT)"]:::external
     n_SPV_NV_tensor_addressing["SPV_NV_tensor_addressing (EXT)"]:::external
+    n_SPV_GOOGLE_user_type["SPV_GOOGLE_user_type (EXT)"]:::external
+    n_SPV_KHR_variable_pointers["SPV_KHR_variable_pointers (Internal)"]:::external
     n_SPV_KHR_vulkan_memory_model["SPV_KHR_vulkan_memory_model (EXT)"]:::external
+    n_spvGroupNonUniformArithmetic --> n__spirv_1_3
+    n_spvGroupNonUniformBallot --> n__spirv_1_3
     n_spvGroupNonUniformClustered --> n__spirv_1_3
+    n_spvGroupNonUniformPartitionedEXT --> n__spirv_1_3
+    n_spvGroupNonUniformPartitionedEXT --> n_SPV_EXT_shader_subgroup_partitioned
     n_spvGroupNonUniformPartitionedNV --> n__spirv_1_3
     n_spvGroupNonUniformPartitionedNV --> n_SPV_NV_shader_subgroup_partitioned
+    n_spvGroupNonUniformPartitionedNV --> n_spvGroupNonUniformPartitionedEXT
     n_spvGroupNonUniformQuad --> n__spirv_1_3
     n_spvGroupNonUniformRotateKHR --> n__spirv_1_3
     n_spvGroupNonUniformShuffle --> n__spirv_1_3
@@ -1567,6 +1589,9 @@ flowchart LR
     n_spvMaximalReconvergenceKHR --> n_SPV_KHR_maximal_reconvergence
     n_spvMeshShadingEXT --> n_SPV_EXT_mesh_shader
     n_spvMinLod --> n__spirv_1_0
+    n_spvNonSemanticInfoKHR --> n_SPV_KHR_non_semantic_info
+    n_spvPhysicalStorageBufferEXT --> n_SPV_EXT_physical_storage_buffer
+    n_spvPhysicalStorageBufferKHR --> n_SPV_KHR_physical_storage_buffer
     n_spvQuadControlKHR --> n_SPV_KHR_quad_control
     n_spvRayQueryKHR --> n_SPV_KHR_ray_query
     n_spvRayQueryPositionFetchKHR --> n_SPV_KHR_ray_tracing_position_fetch
@@ -1591,7 +1616,10 @@ flowchart LR
     n_spvShaderNonUniform --> n_spvShaderNonUniformEXT
     n_spvShaderNonUniformEXT --> n_SPV_EXT_descriptor_indexing
     n_spvSparseResidency --> n__spirv_1_0
+    n_spvSubgroupRotateKHR --> n_SPV_KHR_subgroup_rotate
     n_spvTensorAddressingNV --> n_SPV_NV_tensor_addressing
+    n_spvUserTypeGOOGLE --> n_SPV_GOOGLE_user_type
+    n_spvVariablePointersKHR --> n_SPV_KHR_variable_pointers
     n_spvVulkanMemoryModelDeviceScopeKHR --> n_SPV_KHR_vulkan_memory_model
     n_spvVulkanMemoryModelKHR --> n_SPV_KHR_vulkan_memory_model
     classDef def fill:#dbeafe,stroke:#1e40af,color:#111827
@@ -2453,7 +2481,7 @@ flowchart LR
 
 ### Compound: subgroup 1/2
 
-12 atoms.
+11 atoms.
 
 ```mermaid
 flowchart LR
@@ -2473,11 +2501,11 @@ flowchart LR
     n_subgroup_clustered(["subgroup_clustered"]):::alias
     n_subgroup_partitioned(["subgroup_partitioned"]):::alias
     c_subgroup_partitioned_2(("all of")):::helper
+    c_subgroup_partitioned_3(("all of")):::helper
     n_subgroup_quad(["subgroup_quad"]):::alias
     n_subgroup_rotate(["subgroup_rotate"]):::alias
     n_subgroup_shuffle(["subgroup_shuffle"]):::alias
     n_subgroup_shufflerelative(["subgroup_shufflerelative"]):::alias
-    n_subgroup_vote(["subgroup_vote"]):::alias
     n_GL_KHR_shader_subgroup_arithmetic["GL_KHR_shader_subgroup_arithmetic (EXT)"]:::external
     n__sm_6_0["_sm_6_0 (Internal)"]:::external
     n__cuda_sm_7_0["_cuda_sm_7_0 (Internal)"]:::external
@@ -2493,13 +2521,17 @@ flowchart LR
     n_cuda["cuda (Target)"]:::external
     n_GL_KHR_shader_subgroup_clustered["GL_KHR_shader_subgroup_clustered (EXT)"]:::external
     n__sm_6_5["_sm_6_5 (Internal)"]:::external
-    n_GL_NV_shader_subgroup_partitioned["GL_NV_shader_subgroup_partitioned (EXT)"]:::external
+    n__GL_KHR_shader_subgroup_ballot["_GL_KHR_shader_subgroup_ballot (Internal)"]:::external
+    n__GL_KHR_shader_subgroup_arithmetic["_GL_KHR_shader_subgroup_arithmetic (Internal)"]:::external
+    n__GL_NV_shader_subgroup_partitioned["_GL_NV_shader_subgroup_partitioned (Internal)"]:::external
+    n_spvGroupNonUniformBallot["spvGroupNonUniformBallot (EXT)"]:::external
+    n_spvGroupNonUniformArithmetic["spvGroupNonUniformArithmetic (EXT)"]:::external
+    n_spvGroupNonUniformPartitionedEXT["spvGroupNonUniformPartitionedEXT (EXT)"]:::external
     n_GL_KHR_shader_subgroup_quad["GL_KHR_shader_subgroup_quad (EXT)"]:::external
     n_GL_KHR_shader_subgroup_rotate["GL_KHR_shader_subgroup_rotate (EXT)"]:::external
     n__cuda_sm_5_0["_cuda_sm_5_0 (Internal)"]:::external
     n_GL_KHR_shader_subgroup_shuffle["GL_KHR_shader_subgroup_shuffle (EXT)"]:::external
     n_GL_KHR_shader_subgroup_shuffle_relative["GL_KHR_shader_subgroup_shuffle_relative (EXT)"]:::external
-    n_GL_KHR_shader_subgroup_vote["GL_KHR_shader_subgroup_vote (EXT)"]:::external
     n_subgroup_arithmetic -.-> n_GL_KHR_shader_subgroup_arithmetic
     n_subgroup_arithmetic -.-> n__sm_6_0
     n_subgroup_arithmetic -.-> n__cuda_sm_7_0
@@ -2552,9 +2584,13 @@ flowchart LR
     n_subgroup_partitioned -.-> n__sm_6_5
     n_subgroup_partitioned -.-> n__cuda_sm_7_0
     n_subgroup_partitioned -.-> c_subgroup_partitioned_2
-    c_subgroup_partitioned_2 --> n_GL_KHR_shader_subgroup_ballot
-    c_subgroup_partitioned_2 --> n_GL_KHR_shader_subgroup_arithmetic
-    c_subgroup_partitioned_2 --> n_GL_NV_shader_subgroup_partitioned
+    c_subgroup_partitioned_2 --> n__GL_KHR_shader_subgroup_ballot
+    c_subgroup_partitioned_2 --> n__GL_KHR_shader_subgroup_arithmetic
+    c_subgroup_partitioned_2 --> n__GL_NV_shader_subgroup_partitioned
+    n_subgroup_partitioned -.-> c_subgroup_partitioned_3
+    c_subgroup_partitioned_3 --> n_spvGroupNonUniformBallot
+    c_subgroup_partitioned_3 --> n_spvGroupNonUniformArithmetic
+    c_subgroup_partitioned_3 --> n_spvGroupNonUniformPartitionedEXT
     n_subgroup_quad -.-> n_GL_KHR_shader_subgroup_quad
     n_subgroup_quad -.-> n__sm_6_0
     n_subgroup_quad -.-> n__cuda_sm_7_0
@@ -2573,11 +2609,6 @@ flowchart LR
     n_subgroup_shufflerelative -.-> n__cuda_sm_7_0
     n_subgroup_shufflerelative -.-> n_wgsl
     n_subgroup_shufflerelative -.-> n_metal
-    n_subgroup_vote -.-> n_GL_KHR_shader_subgroup_vote
-    n_subgroup_vote -.-> n__sm_6_0
-    n_subgroup_vote -.-> n__cuda_sm_7_0
-    n_subgroup_vote -.-> n_wgsl
-    n_subgroup_vote -.-> n_metal
     classDef def fill:#dbeafe,stroke:#1e40af,color:#111827
     classDef alias fill:#dcfce7,stroke:#166534,color:#111827
     classDef abstract fill:#fef9c3,stroke:#854d0e,color:#111827
@@ -2587,22 +2618,29 @@ flowchart LR
 
 ### Compound: subgroup 2/2
 
-1 atoms.
+2 atoms.
 
 ```mermaid
 flowchart LR
+    n_subgroup_vote(["subgroup_vote"]):::alias
     n_subgroup_workgroup_index(["subgroup_workgroup_index"]):::alias
     c_subgroup_workgroup_index_0(("all of")):::helper
     c_subgroup_workgroup_index_1(("all of")):::helper
     c_subgroup_workgroup_index_2(("all of")):::helper
-    n_GL_KHR_shader_subgroup_basic["GL_KHR_shader_subgroup_basic (EXT)"]:::external
-    n_compute["compute (Stage)"]:::external
-    n_mesh["mesh (Stage)"]:::external
-    n_amplification["amplification (Stage)"]:::external
+    n_GL_KHR_shader_subgroup_vote["GL_KHR_shader_subgroup_vote (EXT)"]:::external
     n__sm_6_0["_sm_6_0 (Internal)"]:::external
     n__cuda_sm_7_0["_cuda_sm_7_0 (Internal)"]:::external
     n_wgsl["wgsl (Target)"]:::external
     n_metal["metal (Target)"]:::external
+    n_GL_KHR_shader_subgroup_basic["GL_KHR_shader_subgroup_basic (EXT)"]:::external
+    n_compute["compute (Stage)"]:::external
+    n_mesh["mesh (Stage)"]:::external
+    n_amplification["amplification (Stage)"]:::external
+    n_subgroup_vote -.-> n_GL_KHR_shader_subgroup_vote
+    n_subgroup_vote -.-> n__sm_6_0
+    n_subgroup_vote -.-> n__cuda_sm_7_0
+    n_subgroup_vote -.-> n_wgsl
+    n_subgroup_vote -.-> n_metal
     n_subgroup_workgroup_index -.-> c_subgroup_workgroup_index_0
     c_subgroup_workgroup_index_0 --> n_GL_KHR_shader_subgroup_basic
     c_subgroup_workgroup_index_0 --> n_compute

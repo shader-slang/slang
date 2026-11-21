@@ -8,7 +8,7 @@
 // The profile is sm_6_8 so the SampleCmpLevel (SM 6.7 on HLSL) and the comparison clamp forms
 // clear their capability checks without profile-upgrade warnings.
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage fragment -entry fragmentMain -profile sm_6_8
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage fragment -entry fragmentMain
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -profile sm_6_8 -stage fragment -entry fragmentMain
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -profile glsl_460 -stage fragment -entry glslMain
 //TEST:SIMPLE(filecheck=MTL):-target metal -stage fragment -entry metalMain
 
@@ -29,6 +29,7 @@ SamplerComparisonState comparisonSampler;
 SamplerCube combinedCube;
 SamplerCubeShadow combinedCubeShadow;
 Sampler2D combined2D;
+Sampler2DShadow combined2DShadow;
 
 float4 fragmentMain(float4 p: SV_Position) : SV_Target
 {
@@ -116,6 +117,37 @@ float4 fragmentMain(float4 p: SV_Position) : SV_Target
     // SPV: OpImageSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|ConstOffset|MinLod
     result += combined2D.SampleBias(p.xy, 0.25, int2(1, 0), 0.5);
 
+    // The remaining combined-sampler forms: bias/grad clamp with status, explicit-LOD status,
+    // and the comparison (offset, clamp) and (clamp, status) shapes.
+    // SPV: OpImageSparseSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|MinLod
+    result += combinedCube.SampleBias(normalize(p.xyz), 0.25, 0.5, status);
+    // SPV: OpImageSparseSampleExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Grad|MinLod
+    result += combinedCube.SampleGrad(normalize(p.xyz), ddx(p.xyz), ddy(p.xyz), 0.5, status);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Lod %{{[A-Za-z0-9_.]+}}
+    result += combinedCube.SampleLevel(normalize(p.xyz), 0.0, status);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|ConstOffset|MinLod
+    result += combined2D.SampleBias(p.xy, 0.25, int2(1, 0), 0.5, status);
+    // SPV: OpImageSampleDrefImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} ConstOffset|MinLod
+    result += combined2DShadow.SampleCmp(p.xy, 0.5, int2(1, 0), 0.25);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleDrefImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} ConstOffset|MinLod
+    result += combined2DShadow.SampleCmp(p.xy, 0.5, int2(1, 0), 0.25, status);
+    // SPV: OpImageSampleDrefImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|ConstOffset|MinLod
+    result += combined2DShadow.SampleCmpBias(p.xy, 0.5, 0.25, int2(1, 0), 0.5);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleDrefImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|ConstOffset|MinLod
+    result += combined2DShadow.SampleCmpBias(p.xy, 0.5, 0.25, int2(1, 0), 0.5, status);
+    // SPV: OpImageSampleDrefExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Grad|ConstOffset|MinLod
+    result += combined2DShadow.SampleCmpGrad(p.xy, 0.5, ddx(p.xy), ddy(p.xy), int2(1, 0), 0.25);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleDrefExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Grad|ConstOffset|MinLod
+    result += combined2DShadow.SampleCmpGrad(p.xy, 0.5, ddx(p.xy), ddy(p.xy), int2(1, 0), 0.25, status);
+    // SPV: OpImageSampleDrefImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|MinLod
+    result += combinedCubeShadow.SampleCmpBias(normalize(p.xyz), 0.5, 0.25, 0.5);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleDrefImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|MinLod
+    result += combinedCubeShadow.SampleCmpBias(normalize(p.xyz), 0.5, 0.25, 0.5, status);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleDrefExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Lod
+    result += combinedCubeShadow.SampleCmpLevel(normalize(p.xyz), 0.5, 0.0, status);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleDrefExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Lod %float_0
+    result += combinedCubeShadow.SampleCmpLevelZero(normalize(p.xyz), 0.5, status);
+
     return result + status;
 }
 
@@ -151,5 +183,8 @@ float4 metalMain(float4 p: SV_Position) : SV_Target
     result += tex2D.SampleBias(samplerState, p.xy, 0.25, int2(1, 0), 0.5);
     result += combinedCube.SampleBias(normalize(p.xyz), 0.25, 0.5);
     result += combinedCube.SampleGrad(normalize(p.xyz), ddx(p.xyz), ddy(p.xyz), 0.5);
+    result += tex3D.SampleBias(samplerState, p.xyz, 0.25, int3(1, 0, 0), 0.5);
+    result += tex2DArray.SampleBias(samplerState, float3(p.xy, 0), 0.25, int2(1, 0), 0.5);
+    result += combined2D.SampleBias(p.xy, 0.25, int2(1, 0), 0.5);
     return result;
 }

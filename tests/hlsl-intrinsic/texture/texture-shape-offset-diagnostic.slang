@@ -11,6 +11,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=DEPTH3D_CMP,exit-code=2):-target spirv -stage fragment -entry depth3DSampleCmpLevelZero
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=D3_CMP_GRAD,exit-code=2):-target spirv -stage fragment -entry tex3DSampleCmpGrad
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=D3_CMP_BIAS,exit-code=2):-target spirv -stage fragment -entry tex3DSampleCmpBias
+// The clamp-only form exists on cube shapes; a 2D call of it must diagnose, not resolve elsewhere.
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=D2_CUBEONLY_CLAMP,exit-code=2):-target spirv -stage fragment -entry tex2DCubeOnlyClamp
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=WGSL_CUBE,exit-code=2):-target wgsl -stage fragment -entry wgslCubeSampleOffset
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=WGSL_1D,exit-code=2):-target wgsl -stage fragment -entry wgsl1DSampleOffset
 // Offset-free cube forms are unaffected by the shape checks.
@@ -21,6 +23,7 @@ TextureCubeArray<float4> cubeArrayTex;
 Texture3D<float4> tex3D;
 DepthTexture3D depthTex3D;
 Texture1D<float4> tex1D;
+Texture2D<float4> tex2D;
 SamplerState samplerState;
 SamplerComparisonState comparisonSampler;
 
@@ -87,6 +90,13 @@ float4 tex3DSampleCmpGrad(float4 p: SV_Position) : SV_Target
 float4 tex3DSampleCmpBias(float4 p: SV_Position) : SV_Target
 {
     return float4(tex3D.SampleCmpBias(comparisonSampler, p.xyz, 0.5, 0.25), 0, 0, 1);
+}
+
+// D2_CUBEONLY_CLAMP: error[E41400]: static assertion failed
+// D2_CUBEONLY_CLAMP: Sample with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray
+float4 tex2DCubeOnlyClamp(float4 p: SV_Position) : SV_Target
+{
+    return tex2D.Sample(samplerState, p.xy, 0.5);
 }
 
 // WGSL_CUBE: error[E41400]: static assertion failed
