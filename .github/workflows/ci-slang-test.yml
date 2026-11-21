@@ -126,6 +126,7 @@ jobs:
             export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
           else
             enable_debug_layers=false
+            unset VK_INSTANCE_LAYERS
           fi
           # Force AVX-512 off in slang-llvm's JIT TargetMachine. We have observed
           # intermittent illegal-instruction failures on both GitHub-hosted and
