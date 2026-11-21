@@ -9,7 +9,7 @@ using namespace Slang;
 // A matrix with more than 4 columns is laid out as an array of rows, each row an array. The row
 // layout that reflection hands out for such a matrix reports the array's element stride (16 bytes
 // under std140), not the scalar size.
-SLANG_UNIT_TEST(largeMatrixRowStrideReflection)
+SLANG_UNIT_TEST(largeMatrixRowStrideReflection, NoRenderApi)
 {
     const char* userSourceBody = R"(
         cbuffer constants
