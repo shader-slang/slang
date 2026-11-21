@@ -3,6 +3,9 @@
 //TEST:COMPARE_COMPUTE(targets=glsl, filecheck-buffer=CHECK):
 //TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=CHECK):-profile sm_6_5
 //TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-xslang -DCUDA
+// Metal emulates the scans with simd_shuffle; it has no double, and its SIMD-group functions take
+// no 8- or 64-bit integers.
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=CHECK):-xslang -DMETAL
 
 //TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-xslang -DUSE_GLSL_SYNTAX -render-feature subgroup-partitioned-ext
 
@@ -67,10 +70,12 @@ bool testSumProduct(uint4 mask)
         & testVSumProduct<float, 2>(mask)
         & testVSumProduct<float, 3>(mask)
         & testVSumProduct<float, 4>(mask)
+#if !defined(METAL)
         & test1SumProduct<double>(mask)
         & testVSumProduct<double, 2>(mask)
         & testVSumProduct<double, 3>(mask)
         & testVSumProduct<double, 4>(mask)
+#endif
 
 #if defined(VK)
         & test1SumProduct<int8_t>(mask)
@@ -88,18 +93,20 @@ bool testSumProduct(uint4 mask)
         & testVSumProduct<int16_t, 2>(mask)
         & testVSumProduct<int16_t, 3>(mask)
         & testVSumProduct<int16_t, 4>(mask)
-        & test1SumProduct<int64_t>(mask)
-        & testVSumProduct<int64_t, 2>(mask)
-        & testVSumProduct<int64_t, 3>(mask)
-        & testVSumProduct<int64_t, 4>(mask)
         & test1SumProduct<uint16_t>(mask)
         & testVSumProduct<uint16_t, 2>(mask)
         & testVSumProduct<uint16_t, 3>(mask)
         & testVSumProduct<uint16_t, 4>(mask)
+#if !defined(METAL)
+        & test1SumProduct<int64_t>(mask)
+        & testVSumProduct<int64_t, 2>(mask)
+        & testVSumProduct<int64_t, 3>(mask)
+        & testVSumProduct<int64_t, 4>(mask)
         & test1SumProduct<uint64_t>(mask)
         & testVSumProduct<uint64_t, 2>(mask)
         & testVSumProduct<uint64_t, 3>(mask)
         & testVSumProduct<uint64_t, 4>(mask)
+#endif
         & test1SumProduct<half>(mask)
         & testVSumProduct<half, 2>(mask)
         & testVSumProduct<half, 3>(mask)
