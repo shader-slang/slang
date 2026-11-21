@@ -34,6 +34,8 @@ review focused on comments/naming/terminology. Run the repository-local skills u
    submitted as one proper GitHub PR review. In a harness, do NOT use `slang-review-post-github`:
    fold the surviving candidates into Step 5's single pending review as additional inline
    comments — one review per PR, always.
+7. Post at most eight clarity candidates per PR, highest confidence first. The rest stay in the
+   candidate file; the review body links to it.
 
 These skills write candidate comment files under `tmp/review-candidates/`. Do not feed their
 output through Step 3's bug/gap/question filter unless the user explicitly asks for that. A
@@ -127,7 +129,6 @@ Rules (applied in order, before any posting):
 1. **Evidence quote is mandatory for every Keep row.** Paste a verbatim snippet from the diff or surrounding source that _supports the title's claim of a plausible bug mechanism on the quoted lines_. The quote does not have to prove the full causal chain end-to-end; it must make the title plausible on the quoted code. If the quote cannot support the title as written, rewrite the title to match the quote, or mark Drop. No Keep row may ship with an empty Evidence quote. **If Rule 4 applies** (the finding depends on unverified language/runtime semantics), include the verification quote from source/test/doc in the same column, prefixed with `Verification:` so both quotes are distinguishable.
 
 2. **Severity rules (applied strictly):**
-
    - 🔴 **Bug** — requires a concrete failing input, UB, crash, data loss, or public API-contract break. State the input and the wrong behavior. "Could be wrong" or "might break" is not a bug.
    - 🟡 **Gap** — requires one of: (a) missing test for a changed behavior, naming the new behavior; (b) public API contradiction (docstring vs impl, interface vs default), naming the contradicting lines; (c) **silent behavior change in an IR pass, emitter, peephole, or layout/legalization rule, even without a concrete failing test** — quote the diff line that changes the behavior and name the visible difference (e.g. `sizeof(T, DefaultDataLayout)` returning Natural-rule size before, LLVM-rule size after). Vague "inconsistency" without a named behavior → Drop.
    - 🔵 **Question** — post ONLY if the PR cannot be judged without author intent AND you name the exact binary decision the author must make. "Is this intentional?" without a decision → convert to a Gap with a concrete expected-vs-actual mismatch, or Drop.
@@ -173,72 +174,61 @@ Post EXACTLY ONE review. Do NOT post multiple reviews or separate comments.
 
 ## Inline Comment Format
 
-Each inline comment should be a mini-analysis, not just a one-liner. Use this structure:
+Six lines: a title, one or two sentences on why it is wrong, one evidence line, one fix line.
+Reviewer attention is the scarce resource; the comment states the defect and the fix, not a
+tutorial. The example scenario stays only for 🔴 Bug.
 
-````
+```
 🔴 **Bug**: <short title>
 
-<What this code does and why it's wrong — 2-3 sentences explaining the issue in context>
-
-**Example**: <concrete scenario showing the bug, e.g., specific inputs that trigger wrong behavior>
-
-**Suggested fix**:
+<Why this is wrong — 1-2 sentences in context.>
+**Evidence**: `file:line` or a quoted expression.
+**Example**: <inputs that trigger the wrong behavior>
+**Fix**: <one line, or a short code snippet>
 ```
-<code snippet showing the fix>
-```
-````
-
-For gaps and questions, adapt accordingly:
 
 ```
 🟡 **Gap**: <short title>
 
-<What's missing and why it matters — 2-3 sentences>
-
-**Suggestion**: <specific actionable recommendation>
+<What is missing and why it matters — 1-2 sentences.>
+**Evidence**: `file:line`
+**Fix**: <specific, actionable>
 ```
 
 ```
 🔵 **Question**: <short title>
 
-<What's unclear and why it matters — 1-2 sentences. Ask a specific question, don't just note confusion.>
+<What is unclear and why it matters — 1 sentence. Ask a specific question.>
+**Evidence**: `file:line`
 ```
 
 ---
 
 ## Review Body Format
 
-The review body is the SUMMARY. The detailed analysis goes in inline comments. Use this structure:
+The review body is the INDEX. The detail goes in inline comments. The author wrote the PR, so
+the body does not restate what the PR changes. Use this structure:
 
 ```
 **Verdict**: 🔴 Has issues — N bug(s), M gap(s) | OR | ✅ Clean — no significant issues found
 
-<1-3 sentence TECHNICAL summary: what the PR changes and what problems were found.>
-
-<details>
-<summary>Changes Overview</summary>
-
-**<Feature/Module Group 1>** (<list of files>)
-- What changed: <1-2 sentences describing the before/after>
-
-**<Feature/Module Group 2>** (<list of files>)
-- What changed: <1-2 sentences describing the before/after>
-
-</details>
+<One sentence: what was checked and what was found.>
 
 <details>
 <summary>Findings (N total)</summary>
 
 | Severity | Location | Finding |
 |----------|----------|---------|
-| 🔴 Bug | `file:line` | <one-line description — detail is in the inline comment> |
-| 🟡 Gap | `file:line` | <one-line description — detail is in the inline comment> |
-| 🔵 Question | `file:line` | <one-line description — detail is in the inline comment> |
+| 🔴 Bug | `file:line` | <one line — detail is in the inline comment> |
+| 🟡 Gap | `file:line` | <one line> |
+| 🔵 Question | `file:line` | <one line> |
 
 </details>
 ```
 
-Omit the Findings section if there are 0 findings. Changes Overview is ALWAYS included.
+With 0 findings the body is the verdict line only. The posted review (body plus inline
+comments) stays under 4,000 characters; when findings exceed five, each extra finding may add
+at most 400. No Changes Overview.
 
 ### Severity badges:
 
@@ -254,5 +244,5 @@ Omit the Findings section if there are 0 findings. Changes Overview is ALWAYS in
 - Do NOT praise the code. No "well-structured", "clean", "good", "nice", "solid", "well-designed", "LGTM".
 - Do NOT say "Approve" or "looks good to merge" anywhere in the review.
 - Do NOT use sections like "What works well", "Positive aspects", "Highlights".
-- If no issues found, say `✅ Clean — no significant issues found` and provide the Changes Overview only.
+- If no issues found, the body is `✅ Clean — no significant issues found` and nothing else.
 - Put the DETAIL in inline comments, keep the body as a summary/index.
