@@ -2112,6 +2112,23 @@ static SlangResult _innerMain(
                 return SLANG_E_NOT_AVAILABLE;
             }
         }
+
+        // Which cooperative-matrix shapes a device accepts is a runtime property: the Vulkan
+        // device lists each supported shape as a cooperative-matrix property entry (or a
+        // granularity under cooperativeMatrixFlexibleDimensions), and a shader that declares
+        // a shape the device does not list fails pipeline creation. We gate such tests on the
+        // device listing every required shape, in the same way as required features:
+        // returning SLANG_E_NOT_AVAILABLE makes the test harness skip the test rather than
+        // fail it on a device that cannot run it.
+        for (const auto& desc : options.requiredCooperativeMatrixShapes)
+        {
+            bool supported = false;
+            if (SLANG_FAILED(deviceWrapper->isCooperativeMatrixSupported(desc, &supported)) ||
+                !supported)
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
+        }
     }
 
     // Bind this invocation's callback to the device's bridge for the adapter query and rendering;
