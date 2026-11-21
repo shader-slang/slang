@@ -81,9 +81,13 @@ Recurring review feedback distilled into rules — following them avoids review 
 govern how code reads and is structured; the Problem-Solving Methodology above governs what to
 change.)
 
+- **Thread comments through function bodies (literate style).** Put each step of the explanation
+  immediately before the code it justifies, not in one block above the function, even if nearby
+  code is sparse. See "Comments and Documentation" in `docs/design/coding-conventions.md`.
+  Use the `slang-review-fine-grained-clarity` skill to specifically review comments.
 - **Comment functions as complete sentences: what, then why.** Say what the function does first;
-  then, if non-obvious, why it exists. Include a concrete example for non-trivial behavior; avoid
-  terse fragment/bullet-only function comments.
+  then, if surprising, why it behaves that way (not its role, e.g. "Helper used by X"). Include a
+  concrete example for non-trivial behavior; avoid terse fragment/bullet-only function comments.
 - **Write comments as declarative statements, not imperatives.** State how the code is structured
   and why, in the present tense ("We split X into Y because Z"), not as an instruction ("Keep X in
   Y") — imperative phrasing tends to state what without why. Don't open a paragraph with an
