@@ -91,7 +91,7 @@ static List<StagedRecord::RayShaderArgument> getRayRegistrationArguments(
     List<StagedRecord::RayShaderArgument> arguments;
     for (const auto& value : registration->arguments)
         arguments.add(
-            {Address::fromHeapPointer(value->bytes),
+            {Address::fromNativePointer(value->bytes),
              value->typeInfoAddress,
              value->parameterIndex,
              value->stage,

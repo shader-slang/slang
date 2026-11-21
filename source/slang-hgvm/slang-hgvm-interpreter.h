@@ -62,6 +62,14 @@ public:
         IEventSink* eventSink = nullptr;
         IStepControl* stepControl = nullptr;
         IDebugHandler* debugHandler = nullptr;
+        /// Selects the frame stack storage; `Default` reserves address space on native hosts
+        /// and uses page-stable segments on the web.
+        FrameStackKind frameStackKind = FrameStackKind::Default;
+        /// Maximum frame stack size of one execution context. A call that would exceed it fails
+        /// the invocation with a stack-overflow error that lists the call chain.
+        size_t frameStackByteLimit = size_t(64) * 1024 * 1024;
+        /// Size of each segment of a segmented frame stack.
+        size_t frameStackSegmentSize = size_t(256) * 1024;
     };
 
     /// Creates an HGVM interpreter core with no active program or invocation.

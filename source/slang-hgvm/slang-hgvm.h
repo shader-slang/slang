@@ -228,6 +228,14 @@ struct Desc
     /// Borrowed for this interpreter's lifetime; callbacks execute synchronously on its thread.
     IStepControl* stepControl = nullptr;
     IDebugHandler* debugHandler = nullptr;
+    /// Selects the frame stack storage; `Default` reserves address space on native hosts
+    /// and uses page-stable segments on the web.
+    FrameStackKind frameStackKind = FrameStackKind::Default;
+    /// Maximum frame stack size of one execution context. A call that would exceed it fails
+    /// the invocation with a stack-overflow error that lists the call chain.
+    size_t frameStackByteLimit = size_t(64) * 1024 * 1024;
+    /// Size of each segment of a segmented frame stack.
+    size_t frameStackSegmentSize = size_t(256) * 1024;
 };
 
 /// Stages and executes host graph code using the HGVM interpreter.
@@ -285,7 +293,7 @@ public:
     const StagedRecord::Header* getRecord(DebugInstructionAddress address) const;
 
     /// Copies memory only during a stopped callback and while the call remains active.
-    /// Heap reads are limited to live owned objects; no native stack pointers escape.
+    /// Native addresses must lie in live frames, the program's literals, or live owned objects.
     bool readDebugMemory(
         DebugCallId call,
         Address address,
