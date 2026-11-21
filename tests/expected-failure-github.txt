@@ -23,4 +23,5 @@ tests/metal/groupshared-threadlocal-same-parameter.slang (wgpu)
 # reduce.slang uses an 8x8 half cooperative matrix, and the L4 GPU does not list this
 # shape in VkCooperativeMatrixPropertiesKHR. The test fails only in a job that turns on
 # the validation layers, which is a release job.
+# TODO: Remove this entry when https://github.com/shader-slang/slang/issues/14684 is fixed.
 tests/cooperative-matrix/reduce.slang.3 (vk)
