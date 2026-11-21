@@ -4,6 +4,7 @@
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -92,6 +93,8 @@ void computeMain(
     au[4].exchange(tid.x);
     af[0].add(0.5f);
     af[1].max(float(tid.x));
+    af[2].min(float(tid.x));
+    af[3].max(float(tid.x));
     ai64[0].sub(1);
 }
 )";
@@ -174,7 +177,8 @@ SLANG_UNIT_TEST(cpuAtomicsAreThreadSafe, NoRenderApi)
     uint64_t u64[1] = {0};
     float f[1] = {0.0f};
     uint32_t au[5] = {0, 0, 0, 0, 0xffffffffu};
-    float af[2] = {0.0f, -1.0f};
+    // af[2] and af[3] start as NaN: min and max replace a NaN in memory with the number.
+    float af[4] = {0.0f, -1.0f, NAN, NAN};
     int64_t ai64[1] = {0};
     KernelParams params = {u, i, u64, f, au, af, ai64};
 
@@ -224,5 +228,7 @@ SLANG_UNIT_TEST(cpuAtomicsAreThreadSafe, NoRenderApi)
     SLANG_CHECK(au[4] < total);
     SLANG_CHECK(af[0] == 0.5f * float(total));
     SLANG_CHECK(af[1] == float(total - 1));
+    SLANG_CHECK(af[2] == 0.0f);
+    SLANG_CHECK(af[3] == float(total - 1));
     SLANG_CHECK(ai64[0] == -int64_t(total));
 }

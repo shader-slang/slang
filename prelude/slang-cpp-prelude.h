@@ -337,7 +337,9 @@ public:                                                                         
 // 1 acquire, 2 release, 3 acquire-release, 4 sequentially consistent).
 // `compare_exchange` compares bit patterns, as `InterlockedCompareExchange`
 // does for floats on the GPU targets. Integer operations wrap around. Float
-// add/sub and all min/max are compare-and-swap loops.
+// add/sub and all min/max are compare-and-swap loops. Float min/max treat a NaN
+// as missing data, as `fmin`/`fmax` and SPIR-V `OpAtomicFMinEXT` do: a NaN in
+// memory is replaced by a number, and a NaN operand leaves memory unchanged.
 //
 // Compiler coverage:
 //   - MSVC:        `_Interlocked*` intrinsics. They are full barriers, so any
@@ -622,13 +624,14 @@ template<typename T>
 struct _SlangAtomicMinOp
 {
     T v;
-    T operator()(T old) const { return v < old ? v : old; }
+    // `old != old` holds only for a NaN, so it is always false for integers.
+    T operator()(T old) const { return (v < old || old != old) ? v : old; }
 };
 template<typename T>
 struct _SlangAtomicMaxOp
 {
     T v;
-    T operator()(T old) const { return old < v ? v : old; }
+    T operator()(T old) const { return (old < v || old != old) ? v : old; }
 };
 template<typename T>
 struct _SlangAtomicAddOp
