@@ -231,9 +231,11 @@ from source if it is not up-to-date.
 > #### Standalone precompiled modules
 >
 > When a `.slang-module` file is distributed without its original `.slang` source on the search paths, `UseUpToDateBinaryModule` will
-> still allow the binary to load: if the module's primary source file cannot be found, the freshness check accepts the binary as
-> up-to-date instead of treating it as stale. A missing *secondary* dependency (a transitively included file) still marks the module
-> stale, since the source-backed cache layout in that case is incomplete. Note that with the primary source absent, the compiler
+> still allow the binary to load: if the module's primary source file cannot be found relative to the binary, on the search paths or
+> relative to the working directory, the freshness check accepts the binary as up-to-date instead of treating it as stale. A file at
+> the module's recorded source path in one of those places is taken as its source, so an unrelated file there makes the binary stale.
+> A missing *secondary* dependency (a transitively included file, looked up only relative to the primary source) still marks the
+> module stale, since the source-backed cache layout in that case is incomplete. Note that with the primary source absent, the compiler
 > cannot validate that the binary was produced with a matching Slang version and option set — the stored content hash is not
 > compared in that path. Callers who need that validation should keep the original sources reachable via the configured search paths.
 
