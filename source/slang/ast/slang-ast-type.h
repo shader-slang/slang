@@ -83,6 +83,15 @@ DeclRef<T> isDeclRefTypeOf(Val* type)
     return DeclRef<T>();
 }
 
+// Classify types through their canonical form, just like as<T>(Type*). A checked type can
+// retain an alias such as int4 for source requirements, while constructor lookup must see
+// its vector declaration. The caller still owns the original checked type.
+template<typename T>
+DeclRef<T> isDeclRefTypeOf(Type* type)
+{
+    return isDeclRefTypeOf<T>(static_cast<Val*>(type ? type->getCanonicalType() : nullptr));
+}
+
 bool isTypePack(Type* type);
 bool isAbstractTypePack(Type* type);
 bool isPackType(Type* type);
@@ -908,7 +917,14 @@ class DynamicType : public BuiltinType
     FIDDLE(...)
 };
 
-// Type built-in `__EnumType` type
+// The built-in `__RestrictedEnumType` interface shared by all enums.
+FIDDLE()
+class RestrictedEnumType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+// The built-in `__EnumType` interface for enums that allow integer construction.
 FIDDLE()
 class EnumTypeType : public BuiltinType
 {

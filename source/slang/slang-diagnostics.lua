@@ -3555,6 +3555,55 @@ warning(
     }
 )
 
+err(
+    "enum-cast-requires-constant-case",
+    32007,
+    "enum cast requires a compile-time constant case",
+    span { loc = "expr:Expr", message = "enum '~enumDecl:Decl' has capability-restricted cases; use a compile-time constant matching a unique named case" }
+)
+
+err(
+    "enum-cast-has-no-matching-case",
+    32008,
+    "enum cast has no matching case",
+    span { loc = "expr:Expr", message = "no named case of enum '~enumDecl:Decl' has this value; use a named case" }
+)
+
+err(
+    "duplicate-enum-case-value",
+    32009,
+    "capability-restricted enum cases must have distinct values",
+    span { loc = "decl:Decl", message = "enum case '~decl' has the same value as '~previousDecl:Decl'; cases of capability-restricted enum '~enumDecl:Decl' must have distinct values" }
+)
+
+warning(
+    "enum-cast-requires-case-capability",
+    32010,
+    "enum integer conversion may require case capabilities",
+    span { loc = "expr:Expr", message = "integer conversion to capability-restricted enum '~enumDecl:Decl' may introduce a case capability requirement; use a named case when possible" }
+)
+
+err(
+    "enum-cast-specialization-not-constant",
+    32012,
+    "enum conversion is not constant after specialization",
+    span { loc = "location", message = "enum '~enumName:String' conversion must resolve to a compile-time constant after specialization" }
+)
+
+err(
+    "enum-cast-specialization-no-matching-case",
+    32013,
+    "enum conversion has no matching case after specialization",
+    span { loc = "location", message = "no named case of enum '~enumName:String' has this value after specialization" }
+)
+
+err(
+    "enum-cast-specialization-capability-unavailable",
+    32014,
+    "enum conversion selects an unavailable case",
+    span { loc = "location", message = "selected case '~enumCase:String' of enum '~enumName:String' requires capabilities '~capabilities:String' that are unavailable for this target" }
+)
+
 -- 303xx: interfaces and associated types
 
 err(

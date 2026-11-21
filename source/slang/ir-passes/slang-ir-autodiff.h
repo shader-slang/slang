@@ -12,6 +12,13 @@
 
 namespace Slang
 {
+// Return whether an instruction retains an enum source obligation until specialization.
+// These checks are independent of the numerical operations differentiation creates or removes.
+inline bool isEnumRequirementCheck(IRInst* inst)
+{
+    return as<IRCheckEnumCast>(inst) || as<IRCheckEnumRequirements>(inst);
+}
+
 template<typename P, typename D>
 struct DiffInstPair
 {

@@ -541,8 +541,10 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                     // or this reference is ill-formed.
                     ensureDecl(valParamRef, DeclCheckState::DefinitionChecked);
                     ConstantFoldingCircularityInfo newCircularityInfo(valParamRef, nullptr);
+                    auto defaultExpr =
+                        valParamRef.substitute(m_astBuilder, valParamRef.getDecl()->initExpr);
                     auto defaultVal = tryConstantFoldExpr(
-                        valParamRef.substitute(m_astBuilder, valParamRef.getDecl()->initExpr),
+                        defaultExpr,
                         ConstantFoldingKind::CompileTime,
                         &newCircularityInfo);
                     if (!defaultVal)
@@ -1469,9 +1471,7 @@ Expr* SemanticsVisitor::createGenericDeclRef(
     DeclRef<Decl> innerDeclRef =
         m_astBuilder->getGenericAppDeclRef(baseGenericRef, genSubst->getArgs());
 
-    Expr* base = nullptr;
-    if (auto mbrExpr = as<MemberExpr>(baseExpr))
-        base = mbrExpr->baseExpression;
+    auto base = GetBaseExpr(baseExpr);
 
     return ConstructDeclRefExpr(
         innerDeclRef,
@@ -1658,7 +1658,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
         {
         case OverloadCandidate::Flavor::Func:
             {
-                AppExprBase* callExpr = as<InvokeExpr>(context.originalExpr);
+                InvokeExpr* callExpr = as<InvokeExpr>(context.originalExpr);
                 if (!callExpr)
                 {
                     callExpr = m_astBuilder->create<InvokeExpr>();
@@ -3671,6 +3671,20 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 }
                 if (coerceResult)
                     return resultExpr;
+                if (auto enumDeclRef = isDeclRefTypeOf<EnumDecl>(targetType);
+                    enumDeclRef && enumHasCapabilityRestrictedCases(enumDeclRef.getDecl()) &&
+                    collectedErrorsSink.getErrorCount())
+                {
+                    // The enum conversion has explained why this tag cannot identify a case.
+                    // Preserve that diagnostic instead of trying aggregate initialization,
+                    // which cannot supply a case and would hide the actionable error.
+                    ComPtr<ISlangBlob> blob;
+                    collectedErrorsSink.getBlobIfNeeded(blob.writeRef());
+                    getSink()->diagnoseRaw(
+                        Severity::Error,
+                        static_cast<char const*>(blob->getBufferPointer()));
+                    return CreateErrorExpr(expr);
+                }
                 typeOverloadChecked = true;
             }
         }

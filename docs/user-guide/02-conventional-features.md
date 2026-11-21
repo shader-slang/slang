@@ -277,7 +277,7 @@ enum Channel : uint16_t
 }
 ```
 
-By default, the underlying type of an enumeration type is `int`. Enumeration types are implicitly convertible to their underlying type. All enumeration types conform to the builtin `ILogical` interface, which provides operator overloads for bit operations. The following code is allowed:
+By default, the underlying type of an enumeration type is `int`. Enumeration types are implicitly convertible to their underlying type. Enumeration types without explicit [capability requirements on their cases](05-capabilities.md#capabilities-of-enum-cases) conform to the builtin `ILogical` interface, which provides operator overloads for bit operations. Enum types also directly support bitwise operations on their values. The following code is allowed:
 
 ```slang
 void test()

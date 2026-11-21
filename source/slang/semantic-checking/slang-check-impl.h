@@ -2491,7 +2491,7 @@ public:
     /// accepts (one carrying `UnscopedEnumAttribute`, from either `-unscoped-enum`
     /// or an explicit `[UnscopedEnum]` — see that predicate for the exact routes),
     /// in a translation unit using the HLSL-flavored dialect, and never for `bool`
-    /// (which already has its own implicit conversion from any `__EnumType`).
+    /// (which already has its own implicit conversion from any `__RestrictedEnumType`).
     bool isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
@@ -2907,8 +2907,11 @@ public:
         RefPtr<WitnessTable> witnessTable,
         BuiltinRequirementKind requirementKind);
 
-    /// Attempt to synthesize function requirements for enum types to make them conform to
-    /// `ILogical`.
+    /// Determine whether an enum has explicitly capability-restricted cases, checking its
+    /// case modifiers before inspecting them. Such enums require a known case for integer casts.
+    bool enumHasCapabilityRestrictedCases(EnumDecl* enumDecl);
+
+    /// Attempt to synthesize comparison and logical function requirements for enum types.
     bool trySynthesizeEnumTypeMethodRequirementWitness(
         ConformanceCheckingContext* context,
         DeclRef<FunctionDeclBase> requirementDeclRef,
@@ -3189,7 +3192,10 @@ public:
     struct ConstantFoldingCircularityInfo
     {
         ConstantFoldingCircularityInfo(DeclRefBase* declRef, ConstantFoldingCircularityInfo* next)
-            : declRef(declRef), next(next), depth(next ? next->depth + 1 : 1)
+            : declRef(declRef)
+            , next(next)
+            , depth(next ? next->depth + 1 : 1)
+            , requirements(next ? next->requirements : nullptr)
         {
         }
 
@@ -3201,6 +3207,9 @@ public:
 
         /// Current recursion depth of constant folding/evaluation.
         UInt depth = 0;
+
+        // The outer fold owns the source obligations; recursive arithmetic folds only values.
+        List<Val*>* requirements = nullptr;
 
         /// Whether folding the initializer of `declRef` reports fold diagnostics, such as a
         /// division by zero. The innermost link of the chain decides; see
@@ -3231,6 +3240,11 @@ public:
     /// `_validateCircularVarDefinition` performs this fold, and folds of the same initializer
     /// through uses of `varDecl` rely on it to suppress duplicate diagnostics.
     bool isInitializerFoldedByDeclarationCheck(VarDeclBase* varDecl);
+
+    IntVal* tryConstantFoldExprImpl(
+        SubstExpr<Expr> expr,
+        ConstantFoldingKind kind,
+        ConstantFoldingCircularityInfo* circularityInfo);
 
     /// Try to apply front-end constant folding to determine the value of `invokeExpr`.
     IntVal* tryConstantFoldExpr(

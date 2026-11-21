@@ -29,6 +29,7 @@ class DeclRefExpr : public Expr
     // The declaration of the symbol being referenced
 
     FIDDLE() DeclRef<Decl> declRef;
+
     // The name of the symbol being referenced
     Name* name = nullptr;
 
@@ -351,7 +352,7 @@ FIDDLE()
 class StaticMemberExpr : public DeclRefExpr
 {
     FIDDLE(...)
-    Expr* baseExpression = nullptr;
+    FIDDLE() Expr* baseExpression = nullptr;
     SourceLoc memberOperatorLoc;
 };
 
@@ -433,6 +434,11 @@ class BuiltinCastExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() Expr* base = nullptr;
+
+    // A constant cast to an enum with capability-restricted cases identifies the unique
+    // case with that tag. The reference preserves that case's requirements, while base
+    // preserves the checked operand and its own dependencies. Other casts leave this empty.
+    FIDDLE() DeclRef<EnumCaseDecl> targetEnumCase;
 };
 
 FIDDLE()

@@ -677,6 +677,10 @@ void calcRequiredLoweringPassSet(
         result.sumVectorMatrix = true;
         break;
     case kIROp_LateRequireCapability:
+    case kIROp_CheckEnumCast:
+    case kIROp_CheckEnumRequirements:
+    case kIROp_EnumCastRequirementDecoration:
+    case kIROp_EnumRequirementValidatorDecoration:
         result.lateRequireCapability = true;
         break;
     case kIROp_MatrixType:
@@ -1646,6 +1650,13 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // Specialization exposes declaration-owned enum requirements. Move them into their retained
+    // source uses before type legalization and dead-code elimination can erase those type uses.
+    if (requiredLoweringPassSet.lateRequireCapability)
+        SLANG_PASS(
+            materializeEnumRequirements,
+            EnumRequirementMaterializationPhase::AfterSpecialization);
+
     // The linker can resolve an external type to a definition containing resources or an unsized
     // array. We need to validate mutable storage after those fields become available.
     // We check the linked IR at the specialization checkpoint, before resource legalization
@@ -1919,6 +1930,13 @@ Result linkAndOptimizeIR(
         // as the later target pipelines do.
         SLANG_PASS(cleanUpVoidType);
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
+        // This is the VM pipeline's final specialization and dead-code elimination checkpoint.
+        // Validate surviving requirements here so deferred enum casts are checked and their
+        // compiler-only instructions are removed before bytecode emission.
+        if (requiredLoweringPassSet.lateRequireCapability)
+            SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
         return SLANG_OK;
     }
 
@@ -2660,11 +2678,11 @@ Result linkAndOptimizeIR(
     //
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
-    // Check the remaining LateRequireCapability IR insts
+    // Check the remaining capability requirements and deferred enum conversions.
     //
     // #11917: Gated on `lateRequireCapability` to skip this whole-module walk
     // (and its entry-point reference-graph build) when no
-    // `kIROp_LateRequireCapability` IR is present. That opcode is produced only
+    // `kIROp_LateRequireCapability` or `kIROp_CheckEnumCast` IR is present. Both are produced only
     // by the front end (slang-lower-to-ir.cpp), so it is present before the last
     // `calcRequiredLoweringPassSet` scan; the flag cannot be a false-negative.
     // The pass diagnoses only from these insts, so when the flag is false it is a

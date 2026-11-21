@@ -38,7 +38,9 @@ ConstantIntVal* SemanticsVisitor::checkConstantIntVal(Expr* expr)
     if (!intVal)
         return nullptr;
 
-    auto constIntVal = as<ConstantIntVal>(intVal);
+    // This helper extracts the numeric result. The checked expression still carries its
+    // source requirements, including references in an unselected conditional operand.
+    auto constIntVal = as<ConstantIntVal>(intVal->resolve());
     if (!constIntVal)
     {
         getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->loc});
@@ -56,7 +58,7 @@ ConstantIntVal* SemanticsVisitor::checkConstantEnumVal(Expr* expr)
     if (!intVal)
         return nullptr;
 
-    auto constIntVal = as<ConstantIntVal>(intVal);
+    auto constIntVal = as<ConstantIntVal>(intVal->resolve());
     if (!constIntVal)
     {
         getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->loc});
@@ -165,6 +167,16 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope*
 {
     if (!attributeName)
         return nullptr;
+
+    // An enum body declares only cases, so attribute names on those cases come from an
+    // enclosing scope. Consider `enum E { [require(hlsl)] a }`: looking up `require`
+    // through E's inherited members would first need E's complete builtin conformances,
+    // but choosing those conformances needs to know which cases declare requirements.
+    // Start attribute-name lookup outside the enum to keep those dependencies acyclic.
+    // Attribute argument expressions retain their original scopes and can reference cases.
+    while (scope && as<EnumDecl>(scope->containerDecl))
+        scope = scope->parent;
+
     // We start by looking for an existing attribute matching
     // the name `attributeName`.
     //

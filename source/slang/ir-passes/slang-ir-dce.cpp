@@ -157,6 +157,16 @@ struct DeadCodeEliminationContext
                 //
                 markInstAsLive(inst->getParent());
 
+                // A live duplicate can still be used by generic specialization. The builder
+                // redirects it to its canonical replacement, so that replacement must remain
+                // live too. Otherwise, cloning a function with a surviving duplicate function
+                // type could resurrect the removed canonical type with cleared operands.
+                IRInst* replacement = nullptr;
+                if (module->getDeduplicationContext()->getInstReplacementMap().tryGetValue(
+                        inst,
+                        replacement))
+                    markInstAsLive(replacement);
+
                 // Next the type of a live instruction, and all
                 // of its operands must also be live, or else
                 // we won't be able to compute its value.

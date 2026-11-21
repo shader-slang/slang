@@ -1037,7 +1037,14 @@ struct DiffTransposePass
             if (as<IRType>(child))
                 continue;
 
-            if (isDifferentialInst(child))
+            if (isEnumRequirementCheck(child))
+            {
+                // Requirement operands are compile-time source metadata, not gradients.
+                // Preserve the check in this reversed block without differentiating it.
+                IRCloneEnv cloneEnv;
+                cloneInst(&cloneEnv, &builder, child);
+            }
+            else if (isDifferentialInst(child))
                 transposeInst(&builder, child);
         }
 

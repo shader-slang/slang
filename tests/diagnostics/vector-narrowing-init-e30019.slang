@@ -14,6 +14,6 @@ float bad(float4 v)
 {
     float3 t = v;
 //CHECK:       ^ type mismatch in expression
-//CHECK:       ^ expected an expression of type 'vector<float,3>', got 'vector<float,4>'
+//CHECK:       ^ expected an expression of type 'float3', got 'float4'
     return t.x;
 }

@@ -893,5 +893,10 @@ return {
 	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedStructuredBuffer"] = 917,
 	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedRWStructuredBuffer"] = 918,
 	["sizedBufferToUnsizedBuffer"] = 919,
-	["Type.PtrTypeBase.BorrowInParamBase.ByValueBorrowInParam"] = 920
+	["Type.PtrTypeBase.BorrowInParamBase.ByValueBorrowInParam"] = 920,
+	["EnumCaseInfo"] = 921,
+	["CheckEnumCast"] = 922,
+	["Decoration.EnumCastRequirement"] = 923,
+	["CheckEnumRequirements"] = 924,
+	["Decoration.EnumRequirementValidator"] = 925
 }

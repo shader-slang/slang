@@ -33,6 +33,8 @@ public:
 
     /// Get the enum type type
     Type* getEnumTypeType();
+    /// Get the common interface implemented by every enum.
+    Type* getRestrictedEnumType();
     /// Get the __Dynamic type
     Type* getDynamicType();
     /// Get the NullPtr type
@@ -116,6 +118,7 @@ protected:
     Type* m_stringType = nullptr;
     Type* m_nativeStringType = nullptr;
     Type* m_enumTypeType = nullptr;
+    Type* m_restrictedEnumType = nullptr;
     Type* m_dynamicType = nullptr;
     Type* m_nullPtrType = nullptr;
     Type* m_noneType = nullptr;
@@ -451,19 +454,10 @@ public:
     /// Return the interned constant of type `type` with the stored value `value`. The type must
     /// not be null, and the value must already be narrowed to the type (see
     /// `isValueInRangeOfConstantType`), because the constant stores `value` as given.
-    ConstantIntVal* getIntVal(Type* type, IntegerLiteralValue value)
-    {
-        // A constant without a type cannot be lowered to IR, and integer folding cannot know
-        // its width, so every producer must know the type of the value it creates.
-        SLANG_RELEASE_ASSERT(type);
-#if _DEBUG
-        // We check the range only in debug builds. In release builds, `SLANG_ASSERT` may turn
-        // the condition into an optimizer assumption, which would still evaluate this check and
-        // would make an out-of-range value undefined behavior instead of a stored value.
-        SLANG_ASSERT(isValueInRangeOfConstantType(type, value));
-#endif
-        return getOrCreate<ConstantIntVal>(type, value);
-    }
+    ConstantIntVal* getIntVal(Type* type, IntegerLiteralValue value);
+
+    // Retain source obligations without changing the canonical numeric value.
+    IntVal* getIntValWithRequirements(IntVal* value, ConstArrayView<Val*> requirements);
 
     /// Return `value` converted to the canonical form of a constant of type `type`, which
     /// `getIntVal` requires. The conversion wraps `value` modulo 2^width of the type in which
@@ -488,10 +482,9 @@ public:
 
     IntVal* getTypeCastIntVal(Type* type, Val* base)
     {
-        // Unwrap any existing type casts.
-        while (auto baseTypeCast = as<TypeCastIntVal>(base))
-            base = baseTypeCast->getBase();
-
+        // Preserve nested conversions until normal resolution can fold or remove them.
+        // For example, Mode(uint8_t(N)) must narrow N before selecting the enum case;
+        // stripping the inner cast would incorrectly reject N = 256 instead of selecting zero.
         if (auto foldedCast = as<IntVal>(TypeCastIntVal::tryFoldImpl(this, type, base, nullptr)))
             return foldedCast;
 
@@ -655,6 +648,7 @@ public:
     Type* getNullPtrType() { return m_sharedASTBuilder->getNullPtrType(); }
     Type* getNoneType() { return m_sharedASTBuilder->getNoneType(); }
     Type* getEnumTypeType() { return m_sharedASTBuilder->getEnumTypeType(); }
+    Type* getRestrictedEnumType() { return m_sharedASTBuilder->getRestrictedEnumType(); }
     Type* getDiffInterfaceType() { return m_sharedASTBuilder->getDiffInterfaceType(); }
 
     Type* getForwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness);

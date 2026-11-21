@@ -1701,7 +1701,7 @@ ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
 bool SemanticsVisitor::isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType)
 {
     // Only builtin scalars are eligible, and `bool` is excluded: it already has
-    // a dedicated implicit conversion from any `__EnumType` (core.meta.slang),
+    // a dedicated implicit conversion from any `__RestrictedEnumType` (core.meta.slang),
     // so routing it through the enum->tag->bool composite would introduce a
     // second, competing representation of the same conversion.
     auto toBasicType = as<BasicExpressionType>(toType);
@@ -1745,6 +1745,58 @@ static bool isMatrixLayoutConversion(Type* toType, Type* fromType)
             toArrayType->getElementType(),
             fromArrayType->getElementType());
     }
+    return false;
+}
+
+// Check a constant enum conversion and identify its case when the tag is already concrete.
+// Consider `enum Mode { [require(hlsl)] hlslMode = 0, [require(spirv)] spirvMode = 1 }`.
+// `Mode(0)` selects hlslMode immediately. In `Mode(N)` with a generic integer parameter N,
+// the tag is a compile-time expression whose value and case requirements are checked after
+// specialization. A runtime tag cannot identify a case and must be rejected here.
+static bool checkConstantEnumCast(
+    SemanticsVisitor* visitor,
+    DeclRef<EnumDecl> enumDeclRef,
+    Expr* tagExpr,
+    DiagnosticSink* sink,
+    DeclRef<EnumCaseDecl>& outCase)
+{
+    auto foldedTag = visitor->tryConstantFoldExpr(
+        tagExpr,
+        SemanticsVisitor::ConstantFoldingKind::CompileTime,
+        nullptr);
+    if (!foldedTag)
+    {
+        if (sink)
+            sink->diagnose(Diagnostics::EnumCastRequiresConstantCase{
+                .enumDecl = enumDeclRef.getDecl(),
+                .expr = tagExpr});
+        return false;
+    }
+    if (as<ErrorIntVal>(foldedTag))
+        return false;
+
+    IntegerLiteralValue tagValue = 0;
+    if (!tryGetConstantIntVal(foldedTag, tagValue))
+        return true;
+
+    visitor->ensureDecl(enumDeclRef, DeclCheckState::DefinitionChecked);
+    for (auto caseDecl : enumDeclRef.getDecl()->getMembersOfType<EnumCaseDecl>())
+    {
+        IntegerLiteralValue caseValue = 0;
+        // Definition checking has already diagnosed cases without a concrete integer tag.
+        // Skip those recovery values so they cannot become a successful constant conversion.
+        if (!tryGetConstantIntVal(caseDecl->tagVal, caseValue))
+            continue;
+        if (caseValue != tagValue)
+            continue;
+        // Definition checking requires distinct tags for every case of this enum.
+        outCase = visitor->getASTBuilder()->getMemberDeclRef(enumDeclRef, caseDecl);
+        return true;
+    }
+    if (sink)
+        sink->diagnose(Diagnostics::EnumCastHasNoMatchingCase{
+            .enumDecl = enumDeclRef.getDecl(),
+            .expr = tagExpr});
     return false;
 }
 
@@ -2252,7 +2304,7 @@ bool SemanticsVisitor::_coerce(
     if (auto enumDecl = isEnumType(fromType))
     {
         Type* tagType = enumDecl->tagType;
-        if (tagType == toType)
+        if (tagType->equals(toType))
         {
             if (outCost)
             {
@@ -2329,6 +2381,15 @@ bool SemanticsVisitor::_coerce(
     {
         if (auto toEnumDeclRef = isDeclRefTypeOf<EnumDecl>(toType))
         {
+            bool requiresNamedCase = enumHasCapabilityRestrictedCases(toEnumDeclRef.getDecl());
+            // This conversion depends on the argument value, so a type-only probe cannot
+            // establish that an arbitrary value can be converted to the restricted enum.
+            if (requiresNamedCase && !fromExpr)
+                return false;
+
+            // A cast in a declaration's type, such as `Holder<Mode(N)> field`, can be
+            // checked before the enum's bases. Finish that phase before reading its tag type.
+            ensureDecl(toEnumDeclRef, DeclCheckState::ReadyForLookup);
             auto tagType = getTagType(m_astBuilder, toEnumDeclRef);
             if (!tagType)
                 return false;
@@ -2338,13 +2399,19 @@ bool SemanticsVisitor::_coerce(
             if (_coerce(
                     site,
                     tagType,
-                    outToExpr ? &tagExpr : nullptr,
+                    outToExpr || requiresNamedCase ? &tagExpr : nullptr,
                     fromType,
                     fromExpr,
                     sink,
                     &tagCost,
                     nullptr))
             {
+                DeclRef<EnumCaseDecl> targetEnumCase;
+                if (requiresNamedCase)
+                {
+                    if (!checkConstantEnumCast(this, toEnumDeclRef, tagExpr, sink, targetEnumCase))
+                        return false;
+                }
                 if (outCost)
                     *outCost = tagCost + kConversionCost_Explicit;
                 if (outToExpr)
@@ -2354,6 +2421,7 @@ bool SemanticsVisitor::_coerce(
                     if (fromExpr)
                         enumExpr->loc = fromExpr->loc;
                     enumExpr->base = tagExpr;
+                    enumExpr->targetEnumCase = targetEnumCase;
                     *outToExpr = enumExpr;
                 }
                 setWitnessOfConversionToBuiltinConversion();
@@ -2671,7 +2739,7 @@ bool SemanticsVisitor::_coerce(
     // `T` exactly — and no scalar builtin declares an implicit initializer
     // with an opaque generic parameter type (a contingent core-module
     // property, pinned by generic-arithmetic-coerce-diag.slang). The one
-    // exception is `bool` (`__init<T : __EnumType>(T)` in core.meta.slang),
+    // exception is `bool` (`__init<T : __RestrictedEnumType>(T)` in core.meta.slang),
     // so `bool` targets are excluded. Everything else stays on the search
     // path: explicit casts, vector/matrix/aggregate targets, and `DeclRefType`
     // scalars such as `BFloat16`/FP8 (which do declare generic initializers).

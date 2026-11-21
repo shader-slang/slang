@@ -165,8 +165,54 @@ class ConstantIntVal : public IntVal
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
 
+    // Constants retain their source type until canonicalization. For example, `uint(0)`
+    // and `uint32_t(0)` must resolve to the same value when used as generic arguments.
+    Val* _resolveImplOverride() { return defaultResolveImpl(); }
+
     ConstantIntVal(Type* inType, IntegerLiteralValue inValue) { setOperands(inType, inValue); }
     bool _isLinkTimeValOverride() { return false; }
+};
+
+// The canonical constant for a case of an enum with capability-restricted cases.
+// Distinct tags let integer conversion and named-case lookup produce the same value.
+FIDDLE()
+class EnumCaseIntVal : public ConstantIntVal
+{
+    FIDDLE(...)
+    EnumCaseIntVal(Type* type, IntegerLiteralValue value, DeclRef<EnumCaseDecl> declRef)
+        : ConstantIntVal(type, value)
+    {
+        m_operands.add(ValNodeOperand(declRef));
+    }
+    DeclRef<EnumCaseDecl> getDeclRef() { return as<DeclRefBase>(getOperand(2)); }
+};
+
+// Keep the requirements of a constant expression separately from its numeric value.
+// Consider `read<(int(Mode.hlslMode) + N) * 0>()`. Polynomial folding correctly produces
+// zero, but the use of hlslMode must still be checked. This source-level wrapper retains
+// that obligation while resolve() supplies the ordinary canonical value for equality,
+// substitution solving, and code generation. It is never a second canonical integer.
+FIDDLE()
+class IntValWithRequirements : public IntVal
+{
+    FIDDLE(...)
+    IntValWithRequirements(Type* type, IntVal* value, ConstArrayView<Val*> requirements)
+    {
+        setOperands(type, value);
+        for (auto requirement : requirements)
+            m_operands.add(ValNodeOperand(requirement));
+    }
+    IntVal* getValue() { return as<IntVal>(getOperand(1)); }
+    // Requirements are source declaration references, checked types erased by layout queries,
+    // or deferred TypeCastIntVals targeting a restricted enum. A reference can name an alias
+    // or constant with an inferred case requirement; a type can contain deferred field checks.
+    // Substitution can fold a deferred cast into an EnumCaseIntVal. Declaration-reference
+    // analysis uses these operands, while lowering retains checks that need specialization.
+    OperandView<Val> getRequirements() { return OperandView<Val>(this, 2, getOperandCount() - 2); }
+    Val* _resolveImplOverride() { return getValue()->resolve(); }
+    void _toTextOverride(StringBuilder& out) { getValue()->toText(out); }
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    bool _isLinkTimeValOverride() { return getValue()->isLinkTimeVal(); }
 };
 
 // The logical "value" of a reference to a generic value parameter
@@ -179,6 +225,11 @@ class DeclRefIntVal : public IntVal
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+    // Resolve the parameter's type and reference together. A `uint32_t` parameter can
+    // retain its source type alias, while substitution produces the same parameter with
+    // canonical type `uint`; both references must have the same canonical integer value.
+    Val* _resolveImplOverride() { return defaultResolveImpl(); }
 
     DeclRefIntVal(Type* inType, DeclRef<VarDeclBase> inDeclRef) { setOperands(inType, inDeclRef); }
 

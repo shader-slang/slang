@@ -11,13 +11,13 @@ struct Test {}
 float overloaded(float2 x, float y) { return 0; }
 /*CHECK:
       ^^^^^^^^^^ candidate: func overloaded(float2, float) -> float
-      ^^^^^^^^^^ argument 0 does not match: expected 'vector<float,2>', got 'Test'
+      ^^^^^^^^^^ argument 0 does not match: expected 'float2', got 'Test'
 */
 
 float overloaded(float3 x, float y) { return 0; }
 /*CHECK:
       ^^^^^^^^^^ candidate: func overloaded(float3, float) -> float
-      ^^^^^^^^^^ argument 0 does not match: expected 'vector<float,3>', got 'Test'
+      ^^^^^^^^^^ argument 0 does not match: expected 'float3', got 'Test'
 */
 
 float test()

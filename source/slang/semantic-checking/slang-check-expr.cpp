@@ -2567,6 +2567,22 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
                 !getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DisableShortCircuit);
             const Index resultArgIndex =
                 getShortCircuitResultArgIndex(opKind, constFirstArg, logicalOpsShortCircuit);
+            if (resultArgIndex >= 0)
+            {
+                // Numeric short-circuiting skips evaluation, not source capability uses.
+                // Collect named cases in the skipped arms without folding their operations.
+                for (Index skipped = 1; skipped < argCount; ++skipped)
+                {
+                    if (skipped == resultArgIndex)
+                        continue;
+                    auto skippedArg = getArg(invokeExpr, skipped);
+                    collectFoldedOperandRequirements(
+                        this,
+                        skippedArg.getExpr(),
+                        skippedArg.getSubsts(),
+                        *circularityInfo->requirements);
+                }
+            }
             if (resultArgIndex == 0)
                 return m_astBuilder->getIntVal(
                     invokeExpr.getExpr()->type.type,
@@ -2901,6 +2917,40 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     ConstantFoldingKind kind,
     ConstantFoldingCircularityInfo* circularityInfo)
 {
+    // Collect obligations while walking the checked expression, before numeric folding can
+    // cancel terms. Nested folds share this collector, so `(int(Mode.a) + N) * 0` keeps
+    // Mode.a's requirement even though its canonical result is the ordinary integer zero.
+    List<Val*> requirements;
+    ConstantFoldingCircularityInfo frame(nullptr, circularityInfo);
+    bool ownsRequirements = !frame.requirements;
+    if (ownsRequirements)
+    {
+        frame.requirements = &requirements;
+        // Owning a collector does not introduce a recursive declaration reference.
+        frame.depth = circularityInfo ? circularityInfo->depth : 0;
+        frame.reportsFoldDiagnostics =
+            circularityInfo ? circularityInfo->reportsFoldDiagnostics : true;
+        circularityInfo = &frame;
+    }
+    auto result = tryConstantFoldExprImpl(expr, kind, circularityInfo);
+    if (auto wrapped = as<IntValWithRequirements>(result))
+    {
+        for (auto requirement : wrapped->getRequirements())
+            circularityInfo->requirements->add(requirement);
+        result = wrapped->getValue();
+    }
+    if (auto enumCase = as<EnumCaseIntVal>(result))
+        circularityInfo->requirements->add(enumCase->getDeclRef().declRefBase);
+    return ownsRequirements
+               ? m_astBuilder->getIntValWithRequirements(result, requirements.getArrayView())
+               : result;
+}
+
+IntVal* SemanticsVisitor::tryConstantFoldExprImpl(
+    SubstExpr<Expr> expr,
+    ConstantFoldingKind kind,
+    ConstantFoldingCircularityInfo* circularityInfo)
+{
 
     // Unwrap any "identity" expressions
     while (auto parenExpr = expr.as<ParenExpr>())
@@ -2927,6 +2977,9 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             auto type = arrayLengthExpr.getExpr()->arrayExpr->type.type->substitute(
                 m_astBuilder,
                 expr.getSubsts());
+            // Keep the checked type itself: it can acquire deferred field requirements
+            // after specialization even when its numeric size is already known.
+            circularityInfo->requirements->add(type);
             if (auto arrayType = as<ArrayExpressionType>(type))
             {
                 if (!arrayType->isUnsized())
@@ -2951,6 +3004,10 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
         auto type = as<Type>(
             sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
+
+        // A layout query can erase the entire source type. Keep that semantic operand
+        // so capability analysis and later specialization see the same type use.
+        circularityInfo->requirements->add(type);
 
         if (sizeOfLikeExpr.getExpr()->dataLayoutType)
         {
@@ -3209,6 +3266,21 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
                 auto intVal = as<IntVal>(tryConstantFoldExpr(tagExpr, kind, &newCircularityInfo));
                 if (!intVal)
                     return nullptr;
+                if (auto enumDecl = as<EnumDecl>(enumTypeDecl);
+                    enumDecl && enumDecl->hasCapabilityRestrictedCases)
+                {
+                    // A preceding case can be referenced while this enum's tags are still
+                    // being checked. Use the folded tag here instead of reading tagVal,
+                    // which the declaration visitor has not necessarily published yet.
+                    auto tag = m_astBuilder->getTypeCastIntVal(enumDecl->tagType, intVal);
+                    IntegerLiteralValue value;
+                    if (!tryGetConstantIntVal(tag, value))
+                        return nullptr;
+                    return m_astBuilder->getOrCreate<EnumCaseIntVal>(
+                        enumCaseDecl->getType(),
+                        value,
+                        enumRef);
+                }
                 return as<IntVal>(
                     m_astBuilder->getTypeCastIntVal(enumCaseDecl->getType(), intVal)->resolve());
             }
@@ -3254,6 +3326,9 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             if (foldVal)
                 return foldVal;
             auto result = m_astBuilder->getTypeCastIntVal(substType, val);
+            if (auto enumDecl = isEnumType(substType);
+                enumDecl && enumDecl->hasCapabilityRestrictedCases)
+                circularityInfo->requirements->add(result);
             return result;
         }
     }
@@ -3616,10 +3691,10 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
             // Validate that the array size is non-negative and fits in `int`, the type in which
             // `ArrayExpressionType` stores it. The size keeps the type of its expression here,
             // so an unsigned size such as `0xFFFFFFFFu` is too large rather than negative.
-            if (auto constElementCount = as<ConstantIntVal>(elementCount))
+            IntegerLiteralValue size;
+            if (tryGetConstantIntVal(elementCount, size))
             {
-                const IntegerLiteralValue size = constElementCount->getValue();
-                if (size < 0 && !_isUnsignedIntegerType(m_astBuilder, constElementCount->getType()))
+                if (size < 0 && !_isUnsignedIntegerType(m_astBuilder, elementCount->getType()))
                 {
                     getSink()->diagnose(Diagnostics::InvalidArraySize{
                         .location = subscriptExpr->indexExprs[0]->loc});
@@ -4341,6 +4416,23 @@ void SemanticsVisitor::settlePendingTryCoverage(
 
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
+    if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
+        isScalarIntegerType(expr->arguments[0]->type))
+    {
+        if (auto typeType = as<TypeType>(expr->functionExpr->type))
+        {
+            if (auto enumDeclRef = isDeclRefTypeOf<EnumDecl>(typeType->getType());
+                enumDeclRef && enumHasCapabilityRestrictedCases(enumDeclRef.getDecl()))
+            {
+                // This is an explicit integer conversion, including attempts that will fail.
+                // Warn at the source invocation so speculative coercions cannot duplicate the
+                // warning. An enum-to-itself cast does not enter this integer-only path.
+                getSink()->diagnose(Diagnostics::EnumCastRequiresCaseCapability{
+                    .enumDecl = enumDeclRef.getDecl(),
+                    .expr = expr});
+            }
+        }
+    }
     auto rs = ResolveInvoke(expr);
     if (auto invoke = as<InvokeExpr>(rs))
     {

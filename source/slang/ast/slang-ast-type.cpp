@@ -189,9 +189,10 @@ Val* DeclRefType::_substituteImplOverride(
     // the outer interface, then try to replace the type with the
     // actual value of the associated type for the given implementation.
     //
-    if (auto satisfyingVal = substDeclRef.declRefBase->resolve())
+    if (as<AssocTypeDecl>(substDeclRef.getDecl()))
     {
-        if (satisfyingVal != substDeclRef.declRefBase)
+        auto satisfyingVal = substDeclRef.declRefBase->resolve();
+        if (satisfyingVal && satisfyingVal != substDeclRef.declRefBase)
         {
             *ioDiff += 1;
             if (auto satisfyingType = as<Type>(satisfyingVal))

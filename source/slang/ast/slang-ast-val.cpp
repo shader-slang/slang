@@ -195,6 +195,22 @@ void ConstantIntVal::_toTextOverride(StringBuilder& out)
     out << getValue();
 }
 
+Val* IntValWithRequirements::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto value = as<IntVal>(getValue()->substituteImpl(astBuilder, subst, &diff));
+    List<Val*> requirements;
+    for (auto requirement : getRequirements())
+        requirements.add(requirement->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    *ioDiff += diff;
+    return astBuilder->getIntValWithRequirements(value, requirements.getArrayView());
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclRefIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void DeclRefIntVal::_toTextOverride(StringBuilder& out)
@@ -2182,7 +2198,15 @@ Val* TypeCastIntVal::tryFoldImpl(
             if (!baseType || !convertValue(baseType, resultValue))
                 return nullptr;
         }
-        return astBuilder->getIntVal(resultType, resultValue);
+        auto result = astBuilder->getIntVal(resultType, resultValue);
+        if (auto enumDecl = isEnumType(resultType);
+            enumDecl && enumDecl->hasCapabilityRestrictedCases && !as<EnumCaseIntVal>(result))
+        {
+            // An invalid specialized conversion still needs its late diagnostic. Keep the
+            // conversion until IR validation instead of replacing it with an unnamed tag.
+            return nullptr;
+        }
+        return result;
     }
     return nullptr;
 }
@@ -2226,9 +2250,19 @@ Val* TypeCastIntVal::_substituteImplOverride(
 
 Val* TypeCastIntVal::_resolveImplOverride()
 {
-    if (auto resolved = tryFoldImpl(getCurrentASTBuilder(), getType(), getBase(), nullptr))
+    auto astBuilder = getCurrentASTBuilder();
+    auto type = getType()->getCanonicalType();
+    auto base = getBase()->resolve();
+    if (auto resolved = tryFoldImpl(astBuilder, type, base, nullptr))
         return resolved;
-    return this;
+
+    // For `let N : uint32_t`, substitution can construct `uint32_t(N)` with a
+    // canonical `uint` parameter. Resolving the cast must recover that same integer
+    // value. A cast to a different integer type still matters: `int(uint8_t(N))`
+    // must retain the inner narrowing conversion even when N is not known yet.
+    if (auto intVal = as<IntVal>(base); intVal && intVal->getType()->equals(type))
+        return intVal;
+    return astBuilder->getOrCreate<TypeCastIntVal>(type, base);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinOperationIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

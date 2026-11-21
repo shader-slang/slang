@@ -9800,6 +9800,7 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_GetTagOfElementInSet:
     case kIROp_MakeDifferentialPtrPair:
     case kIROp_MakeStorageTypeLoweringConfig:
+    case kIROp_EnumCaseInfo:
     case kIROp_WeakUse:
     case kIROp_SPIRVLoadTexelPointerFromHeap:
         return false;
