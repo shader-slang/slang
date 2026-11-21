@@ -61,10 +61,20 @@ static bool isUndefinedOpaqueHandle(IRInst* inst)
     return as<IRUndefined>(inst) && isImageSamplerOrAccelerationStructureType(inst->getDataType());
 }
 
-/// Call `f` on every undefined opaque handle in `module`. The handles are collected first, so `f`
-/// may remove the handle it is given.
-template<typename F>
-static void forEachUndefinedOpaqueHandle(IRModule* module, F const& f)
+/// Return whether `inst` is an undefined value whose type is an opaque handle, or an aggregate
+/// that contains one, such as an array of textures. The rewrite machinery recognizes only leaf
+/// handles; this wider predicate is for the diagnosis, which reports any undefined value that
+/// still holds an opaque handle after dead-code elimination, since a value that survived has a
+/// use.
+static bool isUndefinedValueContainingOpaqueHandle(IRInst* inst)
+{
+    return as<IRUndefined>(inst) && isOpaqueType(inst->getDataType(), nullptr);
+}
+
+/// Call `f` on every undefined value in `module` that `isUndefined` selects. The values are
+/// collected first, so `f` may remove the value it is given.
+template<typename IsUndefined, typename F>
+static void forEachUndefinedValue(IRModule* module, IsUndefined const& isUndefined, F const& f)
 {
     List<IRInst*> handles;
 
@@ -73,7 +83,7 @@ static void forEachUndefinedOpaqueHandle(IRModule* module, F const& f)
     // look.
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (isUndefinedOpaqueHandle(globalInst))
+        if (isUndefined(globalInst))
             handles.add(globalInst);
     }
 
@@ -84,13 +94,19 @@ static void forEachUndefinedOpaqueHandle(IRModule* module, F const& f)
         {
             for (auto inst : block->getChildren())
             {
-                if (isUndefinedOpaqueHandle(inst))
+                if (isUndefined(inst))
                     handles.add(inst);
             }
         });
 
     for (auto handle : handles)
         f(handle);
+}
+
+/// Call `f` on every undefined opaque handle in `module`.
+static void forEachUndefinedOpaqueHandle(IRModule* module, auto const& f)
+{
+    forEachUndefinedValue(module, isUndefinedOpaqueHandle, f);
 }
 
 /// Return the image that `inst` reads or writes if `inst` is a dedicated image operation, or null
@@ -350,9 +366,9 @@ void eliminateUndefinedOpaqueHandles(IRModule* module, CodeGenContext* codeGenCo
     //
     // Specialization ends, because each clone has fewer image, sampler or acceleration-structure
     // parameters than the function it was cloned from: specializing a call removes at least one
-    // and adds none. The number of clones can still grow with each distinct set of arguments, as it
-    // can for global resources: a call tree in which each function calls the next twice, passing a
-    // different subset of undefined handles, can need a clone for every subset.
+    // and adds none. The number of clones can still grow with each distinct set of arguments, as
+    // it can for global resources: a call tree in which each function calls the next twice,
+    // passing a different subset of undefined handles, can need a clone for every subset.
     while (specializeFunctionCalls(codeGenContext, module, &condition))
     {
     }
@@ -366,13 +382,23 @@ void eliminateUndefinedOpaqueHandles(IRModule* module, CodeGenContext* codeGenCo
 
 void diagnoseUndefinedOpaqueHandles(IRModule* module, DiagnosticSink* sink)
 {
-    forEachUndefinedOpaqueHandle(
+    forEachUndefinedValue(
         module,
+        isUndefinedValueContainingOpaqueHandle,
         [&](IRInst* handle)
         {
+            // The message names the contained handle type rather than the value's own type, so
+            // an undefined `array<Texture2D,2>` reports the array and an undefined value of a
+            // resource-carrying shape names the innermost resource type. A leaf handle names
+            // itself.
+            IRType* handleType = nullptr;
+            isOpaqueType(handle->getDataType(), &handleType);
+            auto loc = findBestSourceLocFromUses(handle);
+            if (!loc.isValid())
+                loc = getDiagnosticPos(handleType);
             sink->diagnose(Diagnostics::UseOfUninitializedOpaqueHandle{
-                .handleType = handle->getDataType(),
-                .location = findBestSourceLocFromUses(handle)});
+                .handleType = handleType,
+                .location = loc});
         });
 }
 } // namespace Slang

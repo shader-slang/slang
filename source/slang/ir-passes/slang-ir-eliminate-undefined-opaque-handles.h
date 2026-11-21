@@ -25,7 +25,10 @@ class DiagnosticSink;
 /// `SPIRVAsm` blocks, so that the accesses it must find are visible in the caller.
 void eliminateUndefinedOpaqueHandles(IRModule* module, CodeGenContext* codeGenContext);
 
-/// Reports each undefined opaque handle that remains in `module` as a use of an uninitialized
-/// opaque handle, because SPIR-V for Vulkan has no valid `OpUndef` of such a type.
+/// Reports each undefined value that remains in `module` and holds an opaque handle — a
+/// `LoadFromUninitializedMemory` or `Poison` whose type is an image, sampler, acceleration
+/// structure, or an aggregate that contains one, such as an array of textures — as a use of
+/// an uninitialized opaque handle, because SPIR-V for Vulkan has no valid `OpUndef` of such a
+/// type (VUID-StandaloneSpirv-OpUndef-12464).
 void diagnoseUndefinedOpaqueHandles(IRModule* module, DiagnosticSink* sink);
 } // namespace Slang
