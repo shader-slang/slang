@@ -13,6 +13,7 @@ struct IRFunc;
 struct IRFuncType;
 struct IRCall;
 struct IRInst;
+struct IRVar;
 
 class NativeCallMarshallingContext
 {
@@ -39,17 +40,35 @@ public:
         Int argCount,
         IRInst* const* originalArgs);
 
+    /// Describes a by-reference argument whose native representation differs from its managed
+    /// representation. The call passes the address of `nativeVar`, and `marshalNativeCall`
+    /// converts the temporary back into `*managedPtr` after the native call returns.
+    struct NativeArgWriteBack
+    {
+        IRInst* managedPtr = nullptr;
+        IRVar* nativeVar = nullptr;
+    };
+
+    /// Marshals the pointer argument of an `out`, `inout`, `ref`, or `__constref` parameter.
+    ///
+    /// When the pointee already has its native representation, the caller's own storage is passed
+    /// through. Otherwise the argument becomes a native temporary, initialized from the managed
+    /// value unless the parameter is `out`, and recorded in `outWriteBacks` unless the parameter is
+    /// read-only, so the callee's result reaches the caller's storage.
     void marshalRefManagedValueToNativeValue(
         IRBuilder& builder,
+        IRType* originalParamType,
         IRInst* originalArg,
-        List<IRInst*>& args);
+        List<IRInst*>& args,
+        List<NativeArgWriteBack>& outWriteBacks);
 
     // Marshal a managed value to a native value for input into a native functions.
     void marshalManagedValueToNativeValue(
         IRBuilder& builder,
         IRType* originalParamType,
         IRInst* originalArg,
-        List<IRInst*>& args);
+        List<IRInst*>& args,
+        List<NativeArgWriteBack>& outWriteBacks);
 
     // Marshal a managed value to a native value for the return value of a native function.
     void marshalManagedValueToNativeResultValue(
