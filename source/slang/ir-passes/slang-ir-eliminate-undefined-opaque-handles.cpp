@@ -61,11 +61,13 @@ static bool isUndefinedOpaqueHandle(IRInst* inst)
     return as<IRUndefined>(inst) && isImageSamplerOrAccelerationStructureType(inst->getDataType());
 }
 
-/// Return whether `inst` is an undefined value whose type is an opaque handle, or an aggregate
-/// that contains one, such as an array of textures. The rewrite machinery recognizes only leaf
-/// handles; this wider predicate is for the diagnosis, which reports any undefined value that
-/// still holds an opaque handle after dead-code elimination, since a value that survived has a
-/// use.
+/// Return whether `inst` is an undefined value whose type is opaque — it passes
+/// `isOpaqueType`, which matches every resource type, not only the image, sampler and
+/// acceleration-structure types Vulkan's `OpUndef` forbids — or an aggregate that contains an
+/// opaque type, such as an array of textures. The rewrite machinery recognizes only leaf
+/// handles; this wider predicate is for the diagnosis. The diagnosis runs after the final
+/// dead-code elimination in the SPIR-V pipeline, so every value it sees has a use that kept
+/// it alive.
 static bool isUndefinedValueContainingOpaqueHandle(IRInst* inst)
 {
     return as<IRUndefined>(inst) && isOpaqueType(inst->getDataType(), nullptr);
@@ -76,7 +78,7 @@ static bool isUndefinedValueContainingOpaqueHandle(IRInst* inst)
 template<typename IsUndefined, typename F>
 static void forEachUndefinedValue(IRModule* module, IsUndefined const& isUndefined, F const& f)
 {
-    List<IRInst*> handles;
+    List<IRInst*> values;
 
     // `IRUndefined` has two kinds, `LoadFromUninitializedMemory` and `Poison`, and we look for
     // both. A `Poison` is hoistable, so it lives at module scope, where `overAllBlocks` does not
@@ -84,7 +86,7 @@ static void forEachUndefinedValue(IRModule* module, IsUndefined const& isUndefin
     for (auto globalInst : module->getGlobalInsts())
     {
         if (isUndefined(globalInst))
-            handles.add(globalInst);
+            values.add(globalInst);
     }
 
     // A `LoadFromUninitializedMemory` lives in the function that reads the uninitialized memory.
@@ -95,16 +97,17 @@ static void forEachUndefinedValue(IRModule* module, IsUndefined const& isUndefin
             for (auto inst : block->getChildren())
             {
                 if (isUndefined(inst))
-                    handles.add(inst);
+                    values.add(inst);
             }
         });
 
-    for (auto handle : handles)
-        f(handle);
+    for (auto value : values)
+        f(value);
 }
 
 /// Call `f` on every undefined opaque handle in `module`.
-static void forEachUndefinedOpaqueHandle(IRModule* module, auto const& f)
+template<typename F>
+static void forEachUndefinedOpaqueHandle(IRModule* module, F const& f)
 {
     forEachUndefinedValue(module, isUndefinedOpaqueHandle, f);
 }
@@ -385,20 +388,19 @@ void diagnoseUndefinedOpaqueHandles(IRModule* module, DiagnosticSink* sink)
     forEachUndefinedValue(
         module,
         isUndefinedValueContainingOpaqueHandle,
-        [&](IRInst* handle)
+        [&](IRInst* value)
         {
-            // The message names the contained handle type rather than the value's own type, so
-            // an undefined `array<Texture2D,2>` reports the array and an undefined value of a
-            // resource-carrying shape names the innermost resource type. A leaf handle names
+            // The message names the type `isOpaqueType` reports: an outermost resource type
+            // names itself (an array of resources is itself classified as a resource), and
+            // any other aggregate names the first resource type it contains, so a leaf names
             // itself.
             IRType* handleType = nullptr;
-            isOpaqueType(handle->getDataType(), &handleType);
-            auto loc = findBestSourceLocFromUses(handle);
+            SLANG_ASSERT(isOpaqueType(value->getDataType(), &handleType));
+            auto loc = findBestSourceLocFromUses(value);
             if (!loc.isValid())
                 loc = getDiagnosticPos(handleType);
-            sink->diagnose(Diagnostics::UseOfUninitializedOpaqueHandle{
-                .handleType = handleType,
-                .location = loc});
+            sink->diagnose(
+                Diagnostics::UseOfUninitializedOpaqueHandle{.handleType = handleType, .location = loc});
         });
 }
 } // namespace Slang

@@ -3480,8 +3480,11 @@ void legalizeIRForSPIRV(
     // Run DCE to clean up any values that became unused after removing unreachable code
     eliminateDeadCode(module);
 
-    // An undefined opaque handle that is still present would be emitted as an `OpUndef` that
-    // Vulkan forbids (VUID-StandaloneSpirv-OpUndef-12464), so we report it instead.
+    // An undefined value that still holds an opaque handle is reported: for the image, sampler
+    // and acceleration-structure members Vulkan has no valid `OpUndef` of the type
+    // (VUID-StandaloneSpirv-OpUndef-12464), and the other resource members, such as buffers,
+    // keep the classification the legalization-side diagnosis always used. This runs after the
+    // DCE above, so every value it sees has a surviving use.
     diagnoseUndefinedOpaqueHandles(module, codeGenContext->getSink());
 
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);

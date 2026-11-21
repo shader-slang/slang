@@ -26,9 +26,12 @@ class DiagnosticSink;
 void eliminateUndefinedOpaqueHandles(IRModule* module, CodeGenContext* codeGenContext);
 
 /// Reports each undefined value that remains in `module` and holds an opaque handle — a
-/// `LoadFromUninitializedMemory` or `Poison` whose type is an image, sampler, acceleration
-/// structure, or an aggregate that contains one, such as an array of textures — as a use of
-/// an uninitialized opaque handle, because SPIR-V for Vulkan has no valid `OpUndef` of such a
-/// type (VUID-StandaloneSpirv-OpUndef-12464).
+/// `LoadFromUninitializedMemory` or `Poison` whose type passes `isOpaqueType` — as a use of
+/// an uninitialized opaque handle. `isOpaqueType` matches every resource type, not only the
+/// image, sampler and acceleration-structure types that Vulkan has no valid `OpUndef` of
+/// (VUID-StandaloneSpirv-OpUndef-12464), but also buffer-backed resources and pointer-like
+/// parameter groups: those members keep the classification the legalization-side diagnosis
+/// always used, so an undefined value that still holds any resource after dead-code
+/// elimination is reported rather than emitted.
 void diagnoseUndefinedOpaqueHandles(IRModule* module, DiagnosticSink* sink);
 } // namespace Slang

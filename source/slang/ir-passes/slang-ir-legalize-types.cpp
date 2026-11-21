@@ -2069,9 +2069,41 @@ static LegalVal legalizeDefaultConstruct(IRTypeLegalizationContext* context, Leg
     }
 }
 
+/// Emit a fresh undefined value of `leafType` that preserves the IRUndefined kind and the
+/// source location of the original `inst`, so a decomposed leaf behaves like the whole and a
+/// later diagnosis can still point at the user's code.
+static IRInst* emitUndefinedLeaf(IRTypeLegalizationContext* context, IRInst* inst, IRType* leafType)
+{
+    auto builder = context->builder;
+
+    // Re-emit with the same IRUndefined kind: a `Poison` of a leaf type is a poison of that
+    // type, and likewise for a `LoadFromUninitializedMemory`.
+    IRInst* undefined = nullptr;
+    if (inst->getOp() == kIROp_Poison)
+    {
+        undefined = builder->getPoison(leafType);
+    }
+    else
+    {
+        SLANG_ASSERT(inst->getOp() == kIROp_LoadFromUninitializedMemory);
+        undefined = builder->emitLoadFromUninitializedMemory(leafType);
+    }
+
+    // Each leaf keeps the original's location, which is what makes the post-DCE diagnosis
+    // point at the user's declaration rather than nowhere.
+    undefined->sourceLoc = inst->sourceLoc;
+    return undefined;
+}
+
 /// Legalize an undefined value (`LoadFromUninitializedMemory` or `Poison`) by recursively
-/// decomposing the structure of its legalized type and placing one fresh undefined value at
-/// each leaf, the same flow `legalizeDefaultConstruct` uses for `{}`.
+/// decomposing the structure of its legalized type: each `simple` leaf, each half of a `pair`
+/// and each element of a `tuple` becomes one fresh undefined value of the same IRUndefined
+/// kind and source location — the same flow `legalizeDefaultConstruct` uses for `{}`. The
+/// remaining flavors also produce a value of their own shape: a `wrappedBuffer` names an
+/// undefined buffer handle with its element wrapping, and an `implicitDeref` names the
+/// undefined pointee it dereferences to. Only a `none` type legalizes to the empty value;
+/// consumers that consume a `LegalVal` by type must tolerate the empty value wherever the
+/// type promises structure, as they did before undefined values were decomposed.
 ///
 /// Consider this example:
 ///
@@ -2091,37 +2123,26 @@ static LegalVal legalizeDefaultConstruct(IRTypeLegalizationContext* context, Leg
 /// the texture field unread compiles with only the front-end uninitialized-variable
 /// warning. A genuinely-used handle keeps its uses and is treated exactly like a handle the
 /// user left undefined on its own: the SPIR-V pipeline rewrites a recognized access and
-/// diagnoses a handle that a surviving use keeps alive, and every other target accepts the
-/// undefined handle in emitted code as an unbound resource, with the warning as the only
-/// diagnostic.
+/// diagnoses a handle that a surviving use keeps alive; HLSL and D3D emit it as an unbound
+/// resource with the warning as the only diagnostic; the GLSL and WGSL emitters compile it
+/// the same way but leave the undefined argument unnamed in the emitted code, as they
+/// already do for a directly-declared undefined handle.
 static LegalVal legalizeUndefined(
     IRTypeLegalizationContext* context,
     IRInst* inst,
-    LegalType const& type)
+    LegalType const& legalType)
 {
-    auto builder = context->builder;
-
-    switch (type.flavor)
+    switch (legalType.flavor)
     {
     case LegalType::Flavor::none:
         return LegalVal();
 
     case LegalType::Flavor::simple:
-        {
-            // Preserve the flavor of the original: a `Poison` of a leaf type is a poison of
-            // that type, and likewise for a `LoadFromUninitializedMemory`.
-            IRInst* undefined = nullptr;
-            if (inst->getOp() == kIROp_Poison)
-                undefined = builder->getPoison(type.getSimple());
-            else
-                undefined = builder->emitLoadFromUninitializedMemory(type.getSimple());
-            undefined->sourceLoc = inst->sourceLoc;
-            return LegalVal::simple(undefined);
-        }
+        return LegalVal::simple(emitUndefinedLeaf(context, inst, legalType.getSimple()));
 
     case LegalType::Flavor::pair:
         {
-            auto pairType = type.getPair();
+            auto pairType = legalType.getPair();
             auto pairInfo = pairType->pairInfo;
             LegalType ordinaryType = pairType->ordinaryType;
             LegalType specialType = pairType->specialType;
@@ -2132,11 +2153,10 @@ static LegalVal legalizeUndefined(
 
             return LegalVal::pair(ordinaryVal, specialVal, pairInfo);
         }
-        break;
 
     case LegalType::Flavor::tuple:
         {
-            auto tupleType = type.getTuple();
+            auto tupleType = legalType.getTuple();
 
             RefPtr<TuplePseudoVal> resTupleInfo = new TuplePseudoVal();
             for (auto typeElem : tupleType->elements)
@@ -2151,17 +2171,22 @@ static LegalVal legalizeUndefined(
         }
 
     case LegalType::Flavor::implicitDeref:
-        // An undefined pointer is one leaf value, not an aggregate of its pointee, and the
-        // legalization of the pointee describes the memory it would refer to rather than the
-        // pointer itself. There is no decomposed representation to build here, so we leave the
-        // empty value that consumers of `LegalVal` are already prepared for.
-        return LegalVal();
+        // The flavor represents the value as the pointee it dereferences to, so an undefined
+        // pointer-like value decomposes into the undefined pointee, wrapped back the same way
+        // consumers unwrap it.
+        return LegalVal::implicitDeref(
+            legalizeUndefined(context, inst, legalType.getImplicitDeref()->valueType));
 
     case LegalType::Flavor::wrappedBuffer:
-        // A wrapped buffer such as `ConstantBuffer<T>` legalizes to a handle plus the legalized
-        // element storage, and an undefined value of that shape has no separate parts to name.
-        // We leave the empty value, as this legalization did before decomposition existed.
-        return LegalVal();
+        {
+            // The flavor names the buffer handle (`simpleType`) plus the wrapping of the
+            // element type it fetches, so the undefined value names an undefined buffer
+            // handle and keeps the element wrapping as metadata, like a declared variable
+            // of this shape does.
+            auto wrappedBuffer = legalType.getWrappedBuffer();
+            auto undefined = emitUndefinedLeaf(context, inst, wrappedBuffer->simpleType);
+            return LegalVal::wrappedBuffer(LegalVal::simple(undefined), wrappedBuffer->elementInfo);
+        }
 
     default:
         SLANG_UNEXPECTED("unhandled");
