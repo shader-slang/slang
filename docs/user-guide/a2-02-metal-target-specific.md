@@ -347,6 +347,21 @@ Metal requires explicit address space qualifiers. Slang automatically assigns ap
 | Group Shared          | `threadgroup`       |
 | Parameter Blocks      | `constant`          |
 
+## Memory Barriers
+
+Metal's `threadgroup_barrier` orders memory only among the threads of one threadgroup. `GroupMemoryBarrier` and `GroupMemoryBarrierWithGroupSync` map to it. The device-scope barriers need a fence instead, which MSL has from version 3.2. For a target of `metallib_3_2` or newer (for example `-capability metallib_3_2`), they lower to:
+
+| Slang                              | Metal                                                                                                          |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `DeviceMemoryBarrier`              | `atomic_thread_fence(mem_device \| mem_texture, memory_order_seq_cst, thread_scope_device)`                    |
+| `AllMemoryBarrier`                 | `atomic_thread_fence(mem_device \| mem_threadgroup \| mem_texture, memory_order_seq_cst, thread_scope_device)` |
+| `DeviceMemoryBarrierWithGroupSync` | the `DeviceMemoryBarrier` fence, then `threadgroup_barrier`                                                    |
+| `AllMemoryBarrierWithGroupSync`    | the `AllMemoryBarrier` fence, then `threadgroup_barrier`                                                       |
+
+Every other Metal target, including `-target metal` and `-target metallib` without a version, keeps `threadgroup_barrier(mem_device | mem_threadgroup | mem_texture | mem_threadgroup_imageblock)` for all four functions. That barrier does not order device memory across threadgroups, so a pattern that publishes data to other threadgroups (write, fence, atomic flag; atomic, fence, read) needs a `metallib_3_2` target. For `-target metallib` with such a target, Slang passes `-std=metal3.2` to the metal compiler, so the compile needs a Metal toolchain that supports MSL 3.2 (Xcode 16 or newer). MSL emitted with `-target metal` for such a target must also be compiled with MSL 3.2 or newer.
+
+`globallycoherent` is not emitted for Metal. MSL 3.2 spells it `coherent(device)`, but that qualifier is part of the pointer type, so every pointer derived from the buffer would need it too. Without that qualifier, MSL makes device memory coherent only within a threadgroup. The device-scope fence orders memory operations, but it does not change the coherence scope of a buffer, so MSL does not guarantee that plain (non-atomic) writes to a `globallycoherent` buffer become visible to other threadgroups. Emitting `coherent(device)` is left as follow-up work.
+
 ## Explicit Parameter Binding
 
 The HLSL `:register()` semantic is respected when emitting Metal code.
