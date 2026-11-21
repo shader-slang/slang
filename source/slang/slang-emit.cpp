@@ -2346,6 +2346,7 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions.treatGetEquivalentStructuredBufferAsGetThis = true;
             byteAddressBufferOptions.translateToStructuredBufferOps = false;
             byteAddressBufferOptions.lowerBasicTypeOps = true;
+            byteAddressBufferOptions.storeSubWordValuesDirectly = true;
             break;
         case CodeGenTarget::WGSL:
         case CodeGenTarget::WGSLSPIRV:
