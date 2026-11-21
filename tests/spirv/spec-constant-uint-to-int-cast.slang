@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-output-using-type
 
 // Test that integer specialization constants cast across signedness and/or width
 // for use in spec constant arithmetic produce valid SPIRV.

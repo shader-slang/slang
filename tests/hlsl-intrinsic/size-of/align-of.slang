@@ -1,10 +1,5 @@
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 
@@ -40,12 +35,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     float g[alignof(a)];
 
-    int f[alignof(Thing) + alignof(float2) + alignof(g)]; 
+    int f[alignof(Thing) + alignof(float2) + alignof(g)];
 
     int size;
 
     switch (idx)
-    {   
+    {
         default:
         case 0:     size = alignof(float); break;
         case 1:     size = alignof(float3); break;

@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECKOUT):-vk -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECKOUT):-hlsl -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECKOUT):-output-using-type
 
 // CHECKOUT:      10
 // CHECKOUT-NEXT: 20

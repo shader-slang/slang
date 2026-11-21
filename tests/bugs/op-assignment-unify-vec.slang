@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -vk
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -cpu
+//TEST:COMPARE_COMPUTE(targets=all):
 
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name outputBuffer
@@ -25,7 +23,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint2 u = uint2(0, 0);
 
     int idx = int(dispatchThreadID.x);
-    
+
     uint2 uidx = uint2(idx, idx * idx);
 
     v += uidx;
@@ -40,7 +38,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Downstream compilers detect this
     //silly(u, undef1);
     silly2(u, undef2);
-    
+
     uint2 added = (u + v + undef2);
 
     outputBuffer[idx] = added.x + added.y;

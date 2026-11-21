@@ -3,7 +3,7 @@
 // Code in every body of a namespace that this module reopens finds the imported members of
 // that namespace, although each `namespace Foo { ... }` body has its own scope.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 import reopen_lib;
 

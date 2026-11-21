@@ -14,7 +14,7 @@
 // the checker reports E30621. CHECK asserts the code so an unrelated error
 // cannot satisfy the test.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl -stage compute -entry main
 
 func f(x) -> int { return 1; }
 

@@ -1,4 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk
+//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=BUF):
 
 struct MyStruct
 {

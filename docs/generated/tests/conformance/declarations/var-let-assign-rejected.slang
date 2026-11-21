@@ -13,7 +13,7 @@
 // `x = 10` after `let x = 5` must produce E30011; CHECK-DAG lines assert both
 // the error severity, the code, and the "l-value" message fragment.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK, exit-code=-1):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK, exit-code=2):
 
 void main()
 {

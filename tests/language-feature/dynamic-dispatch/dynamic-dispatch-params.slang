@@ -1,7 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1" -conformance "BarA:IBar=0" -conformance "BarB:IBar=1" -conformance "MulCombiner:ICombiner=0" -conformance "AddCombiner:ICombiner=1"
 
 // Test for GitHub issue #9838: Dynamic Dispatch with Dynamic Dispatch Parameters
@@ -53,7 +50,7 @@ struct BarB : IBar
 struct MulCombiner : ICombiner
 {
     float dummy;  // Data field for createDynamicObject
-    
+
     float combine(IFoo foo, IBar bar)
     {
         // Nested dynamic dispatch: foo.eval() and bar.weight()
@@ -101,7 +98,7 @@ float testCombine(uint combinerId, uint fooId, float fooData, uint barId, float 
     ICombiner c = createCombiner(combinerId, 0.0);
     IFoo f = createFoo(fooId, fooData);
     IBar b = createBar(barId, barData);
-    
+
     // Triple dynamic dispatch happens here:
     // 1. Dispatch to correct ICombiner implementation
     // 2. Inside combine(), dispatch foo.eval()

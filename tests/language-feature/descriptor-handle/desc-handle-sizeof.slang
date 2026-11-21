@@ -1,7 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-llvm, filecheck-buffer=CHECK): -output-using-type
 
 // LLVM/CPU backend doesn't support DescriptorHandle
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -llvm
 
 // Test that sizeof/alignof of DescriptorHandle works correctly.
 // DescriptorHandle is represented as uint2 (8 bytes) on most targets,

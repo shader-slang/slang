@@ -1,8 +1,8 @@
 // constexpr.slang
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -gcompute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(targets=all-cuda-llvm):-gcompute -shaderobj
 //DISABLED://TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -gcompute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-mtl -gcompute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -gcompute -shaderobj
+//TEST:COMPARE_COMPUTE_EX(targets=metal):-gcompute
+//TEST:COMPARE_COMPUTE_EX(targets=wgpu):-gcompute
 // Not supported in LLVM: textures are not currently available
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-llvm -gcompute -shaderobj
 

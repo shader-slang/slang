@@ -1,12 +1,10 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 enum MyEnum { A, B, C };
 
 [BackwardDerivative(mDiff)]
-float m<let M : MyEnum>(float x) 
-{ 
+float m<let M : MyEnum>(float x)
+{
     switch (M)
     {
         case MyEnum.A:

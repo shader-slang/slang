@@ -3,8 +3,7 @@
 // Check 'zero indexing' bound check feature, supported by CPU and CUDA
 
 // Currently zero index bound checking doesn't appear to be working properly for CUDA.
-//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj -Xslang... -DSLANG_ENABLE_BOUND_ZERO_INDEX -X.
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj -Xslang... -DSLANG_ENABLE_BOUND_ZERO_INDEX -X.
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu):-Xslang... -DSLANG_ENABLE_BOUND_ZERO_INDEX -X.
 
 //TEST_INPUT:ubuffer(data=[1 2 3 4]):name=byteAddressBuffer
 ByteAddressBuffer byteAddressBuffer;
@@ -28,27 +27,27 @@ RWStructuredBuffer<int> outputBuffer2;
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
 	int tid = dispatchThreadID.x;
-    
+
     int fixedArray[3] = { 2, 5, 9};
-    
+
     int total = 0;
     total += byteAddressBuffer.Load<int>(tid * 4);
     total += byteAddressBuffer.Load<int>(-tid * 4);
-    
+
     total += rwByteAddressBuffer.Load<int>(tid * 4);
     total += rwByteAddressBuffer.Load<int>(-tid * 4);
-    
+
     total += structuredBuffer[tid];
     total += structuredBuffer[-tid];
-    
+
     total += rwStructuredBuffer[tid];
     total += rwStructuredBuffer[-tid];
-    
+
     total += fixedArray[tid];
     total += fixedArray[-tid];
-    
+
     outputBuffer[tid] = total;
-    
+
     // NOTE! Different threads could access this if being performed in parallel.
     // So undeterministic if we write to same index (because out of range) when running in parallel
     // By just adding one, all indices should be hit once

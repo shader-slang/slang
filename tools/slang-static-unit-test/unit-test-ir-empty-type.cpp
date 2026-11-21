@@ -2,8 +2,8 @@
 // Hand-built IR exposes void fields, decorated empty types, and opaque wrappers directly,
 // without depending on which of those shapes survive frontend lowering and optimization.
 
-#include "slang/slang-ir-dce.h"
-#include "slang/slang-ir-util.h"
+#include "slang/ir-passes/slang-ir-dce.h"
+#include "slang/ir/slang-ir-util.h"
 #include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"
 

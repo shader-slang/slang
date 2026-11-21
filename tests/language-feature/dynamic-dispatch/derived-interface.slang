@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites -conformance "ConcreteNS.Vector:IFNS.IScalable=0" -conformance "ConcreteNS.Matrix:IFNS.IScalable=1" -conformance "ConcreteNS.Circle:IFNS.IShape=0" -conformance "ConcreteNS.Square:IFNS.IShape=1" -conformance "ConcreteNS.Circle:IFNS.IScalable=2" -conformance "ConcreteNS.Square:IFNS.IScalable=3"
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer

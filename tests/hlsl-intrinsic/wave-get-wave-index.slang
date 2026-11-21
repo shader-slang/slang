@@ -1,8 +1,6 @@
 //TEST_CATEGORY(wave, compute)
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -dx12 -profile cs_6_0 -shaderobj
-//TEST(vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=BUF):-profile cs_6_0
+//TEST:COMPARE_COMPUTE(targets=vk+metal+cuda, filecheck-buffer=BUF):
 
 // 4 slots: one per wave (128 threads / 32 lanes = 4 waves)
 //TEST_INPUT:ubuffer(data=[0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF], stride=4):out,name outputBuffer

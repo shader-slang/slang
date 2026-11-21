@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -shaderobj -cuda
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Confirm that a struct type defined in a generic parent works
 

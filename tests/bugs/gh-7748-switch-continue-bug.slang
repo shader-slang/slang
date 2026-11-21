@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cpu
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Regression test for issue #7748: Dictionary key collision in multi-level break processing
 // This test specifically exercises the case of "continue inside a switch that is inside a for loop"
@@ -28,7 +28,7 @@ int testContinueInSwitchInLoop(int value) {
 int processValues() {
     int sum = 0;
     sum += testContinueInSwitchInLoop(0); // Should be 3 (1+1+1, no +10s due to continue)
-    sum += testContinueInSwitchInLoop(1); // Should be 36 (2+10, 2+10, 2+10)  
+    sum += testContinueInSwitchInLoop(1); // Should be 36 (2+10, 2+10, 2+10)
     sum += testContinueInSwitchInLoop(2); // Should be 39 (3+10, 3+10, 3+10)
     return sum;
 }
@@ -37,7 +37,7 @@ int processValues() {
 RWStructuredBuffer<int> outputBuffer;
 
 [shader("compute")]
-[numthreads(1, 1, 1)]  
+[numthreads(1, 1, 1)]
 void computeMain() {
     int result = processValues();
     outputBuffer[0] = result;

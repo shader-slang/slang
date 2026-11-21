@@ -1,9 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -dx12 -shaderobj -xslang -matrix-layout-row-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -dx12 -shaderobj -xslang -matrix-layout-column-major
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -xslang -matrix-layout-row-major
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -xslang -matrix-layout-column-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-llvm -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk+dx12, filecheck-buffer=BUF):-xslang -matrix-layout-row-major
+//TEST:COMPARE_COMPUTE(targets=vk+dx12, filecheck-buffer=BUF):-xslang -matrix-layout-column-major
+//TEST:COMPARE_COMPUTE(targets=cuda+llvm, filecheck-buffer=BUF):
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

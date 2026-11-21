@@ -1,7 +1,6 @@
 // multi-level-break-switch.slang
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all-cpu):
 
 int test(int t, int r)
 {

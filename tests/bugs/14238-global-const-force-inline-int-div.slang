@@ -15,8 +15,7 @@
 //TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -emit-spirv-via-glsl -entry computeMain -stage compute
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-output-using-type
 
 [__readNone]
 [ForceInline]

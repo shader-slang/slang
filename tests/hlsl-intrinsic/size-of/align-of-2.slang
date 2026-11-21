@@ -1,10 +1,5 @@
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
@@ -13,7 +8,7 @@ RWStructuredBuffer<int> outputBuffer;
 
 // Check Enum without base type
 
-enum Enum 
+enum Enum
 {
     A = 10,
     B = 20,
@@ -37,7 +32,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     int size = 0;
     switch (idx)
-    {   
+    {
         default:
         case 0:     size = alignof(Enum); break;
         case 1:     size = alignof(EnumTypeDef); break;

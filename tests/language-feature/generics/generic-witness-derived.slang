@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 // Test that we can compile a generic function with a generic type constraint that is dependent on an
 // outer generic type parameter.
@@ -14,7 +13,7 @@ namespace ns{
     {
         public static  T call(const in T lhs, const in T rhs)
         {
-            return lhs + rhs; 
+            return lhs + rhs;
         }
     }
     public struct BinaryElementWiseInputData<T : IArithmetic>
@@ -40,7 +39,7 @@ namespace ns{
         //          ...
         //     }
         // }
-        // 
+        //
         public T test<U : IBinaryElementWiseFunction<T>>(U x)
         {
             return x.call(lhs ,rhs);

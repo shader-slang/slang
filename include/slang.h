@@ -1896,6 +1896,11 @@ public:                                                              \
 
         /** Calculate a path combining the 'fromPath' with 'path'
 
+        The result is in simplified form: `.` and `x/..` segments are collapsed and `/` is used
+        as the separator, matching what getPath() returns for PathKind::Simplified. An empty
+        combination yields ".". Implementations of this interface must return the simplified
+        spelling.
+
         The client must ensure the blob be released when no longer used, otherwise memory will leak.
 
         @param fromPathType How to interpret the from path - as a file or a directory.
@@ -1903,7 +1908,8 @@ public:                                                              \
         @param path Path to be determined relative to the fromPath
         @param pathOut Holds the string which is the relative path. The string is held in the blob
         zero terminated.
-        @returns A `SlangResult` to indicate success or failure in loading the file.
+        @returns `SLANG_OK` on success, or `SLANG_E_INVALID_ARG` if `fromPathType` is not a valid
+        `SlangPathType`.
         */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
             SlangPathType fromPathType,
@@ -3144,6 +3150,14 @@ struct TypeLayoutReflection
             index);
     }
 
+    /** Get the index of the descriptor set containing a binding range.
+     *
+     * This is an index into this type layout's descriptor sets, not a Vulkan descriptor-set
+     * number. Pass it to `getDescriptorSetSpaceOffset()` to query the set's space offset.
+     * A binding range without a descriptor set may return an invalid value when the count is
+     * zero; check `getBindingRangeDescriptorRangeCount()` before enumerating its descriptor
+     * ranges.
+     */
     SlangInt getBindingRangeDescriptorSetIndex(SlangInt index)
     {
         return spReflectionTypeLayout_getBindingRangeDescriptorSetIndex(
@@ -3151,6 +3165,12 @@ struct TypeLayoutReflection
             index);
     }
 
+    /** Get the first descriptor-range index for a binding range within its descriptor set.
+     *
+     * This is not a Vulkan binding number. Use it with `getBindingRangeDescriptorSetIndex()`
+     * as the arguments to `getDescriptorSetDescriptorRangeIndexOffset()`. The number of
+     * consecutive descriptor ranges is given by `getBindingRangeDescriptorRangeCount()`.
+     */
     SlangInt getBindingRangeFirstDescriptorRangeIndex(SlangInt index)
     {
         return spReflectionTypeLayout_getBindingRangeFirstDescriptorRangeIndex(
@@ -3170,6 +3190,13 @@ struct TypeLayoutReflection
         return spReflectionTypeLayout_getDescriptorSetCount((SlangReflectionTypeLayout*)this);
     }
 
+    /** Get the register-space offset of the descriptor set at `setIndex`.
+     *
+     * For Vulkan descriptor-backed resources, this is the descriptor-set offset, which can
+     * differ from `setIndex`.
+     * Like other type-layout offsets, it is relative to this layout; account for enclosing
+     * variable-layout offsets when determining a cumulative binding location.
+     */
     SlangInt getDescriptorSetSpaceOffset(SlangInt setIndex)
     {
         return spReflectionTypeLayout_getDescriptorSetSpaceOffset(
@@ -3185,6 +3212,11 @@ struct TypeLayoutReflection
     }
 
     /** Get the index offset for a descriptor range within a descriptor set.
+     *
+     * `setIndex` and `rangeIndex` are indices into this type layout's descriptor sets and
+     * descriptor ranges, respectively. For Vulkan descriptor-backed resources, the result is
+     * the binding offset, not `rangeIndex`. Account for enclosing variable-layout offsets
+     * when determining a cumulative binding location.
      *
      * Returns `SLANG_UNKNOWN_SIZE` when the offset depends on unresolved generic parameters or
      * link-time constants.

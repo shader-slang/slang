@@ -4,8 +4,7 @@
 // matched, and one subtype witness is built per conjunct. Regression test for
 // shader-slang/slang#12987.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 interface IA {}
 interface IB {}

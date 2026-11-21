@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=CHECK):
 //DISABLED_TEST: COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
 //DISABLED_TEST: COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d11
 //DISABLED_TEST: COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d12

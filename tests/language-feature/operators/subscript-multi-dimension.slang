@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all): -output-using-type
 
 struct S
 {

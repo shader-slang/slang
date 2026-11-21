@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 //TEST:SIMPLE(filecheck=CHK):-target glsl -stage compute -entry computeMain -report-checkpoint-intermediates
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
@@ -37,7 +35,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
-        
+
         __bwd_diff(test_single_branch)(dpa, 1.0f);
         outputBuffer[1] = dpa.d; // Expect: 1.0
     }

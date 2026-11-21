@@ -1,8 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -emit-spirv-via-glsl
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_7 -dx12 -shaderobj -render-feature hardware-device
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -profile cs_6_7 -shaderobj -render-feature hardware-device
-//TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj -xslang -DMETAL
+//TEST:COMPARE_COMPUTE(targets=vk+glsl):
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda):-profile cs_6_7 -render-feature hardware-device
+//TEST:COMPARE_COMPUTE(targets=metal):-xslang -DMETAL
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

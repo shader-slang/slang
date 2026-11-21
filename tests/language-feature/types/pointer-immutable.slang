@@ -3,7 +3,7 @@
 // The read-write -> immutable conversion is explicit (Slang does not do it implicitly,
 // the same as for `&buf[i]`).
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck-buffer=CHECK):-output-using-type
 // Note: -cpu only. Converting to `ImmutablePtr` and passing it to a function currently
 // mis-lowers to SPIR-V (invalid OpBitcast on a logical pointer) for both this and `&buf[i]`
 // — a pre-existing codegen limitation unrelated to shader-slang/slang#12581.

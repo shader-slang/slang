@@ -12,7 +12,7 @@
 // Negative: mixing SV_DepthGreaterEqual and SV_DepthLessEqual in one fragment output
 // struct is rejected before any SPIR-V legalization runs. CHECK pins E30705.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv-asm -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target spirv-asm -entry main -stage fragment
 
 struct Out
 {

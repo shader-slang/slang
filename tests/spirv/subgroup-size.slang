@@ -1,7 +1,7 @@
 import "glsl";
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=OUTPUT):-vk -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=OUTPUT):
 //CHECK: OpExecutionMode %computeMain LocalSize 1 2 3
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name outputBuffer

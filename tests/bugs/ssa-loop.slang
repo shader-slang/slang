@@ -2,7 +2,7 @@
 
 // Bug related to SSA form for loops
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 int test(int val)
 {

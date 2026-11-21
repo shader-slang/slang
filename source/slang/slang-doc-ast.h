@@ -4,8 +4,8 @@
 
 #include "compiler-core/slang-doc-extractor.h"
 #include "core/slang-basic.h"
-#include "slang-ast-all.h"
-#include "slang-syntax.h"
+#include "slang/ast/slang-ast-all.h"
+#include "slang/ast/slang-syntax.h"
 
 namespace Slang
 {

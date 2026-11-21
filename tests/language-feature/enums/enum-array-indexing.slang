@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 // Test that enums can be used as array indices without explicit casting
 
@@ -13,18 +11,18 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain()
 {
     int fruits[10];
-    
+
     // Initialize arrays with some values
     for (int i = 0; i < 10; i++)
     {
         fruits[i] = i * 10;
     }
-    
+
     // Test basic enum indexing - this should work with our fix
     int appleCost = fruits[Fruit::Apple];     // Should access fruits[0] = 0
     int orangeCost = fruits[Fruit::Orange];   // Should access fruits[1] = 10
     int bananaCost = fruits[Fruit::Banana];   // Should access fruits[2] = 20
-    
+
     // CHECK: 0
     outputBuffer[0] = appleCost;
     // CHECK: 10

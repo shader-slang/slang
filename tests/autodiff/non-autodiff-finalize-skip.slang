@@ -1,8 +1,7 @@
 // A module with no autodiff constructs must still compile and produce correct
 // results when the autodiff finalization passes (finalizeAutoDiffPass /
 // lowerDiffTypeInfoInsts) are skipped for derivative-free modules.
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // A derivative-free module takes the skip path in linkAndOptimizeIR: the cheap
 // stripAutoDiffDecorations runs (so eliminateDeadCode can drop the core-module

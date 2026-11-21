@@ -174,13 +174,13 @@ does not make.
 - `source/slang/slang-emit-c-like.{h,cpp}`
 - `source/slang/slang-emit-hlsl.{h,cpp}`
 - `source/slang/slang-emit-glsl.{h,cpp}`
-- `source/slang/slang-emit-spirv.cpp`
+- `source/slang/emission/slang-emit-spirv.cpp`
 - `source/slang/slang-emit-metal.{h,cpp}`
 - `source/slang/slang-emit-wgsl.{h,cpp}`
 - `source/slang/slang-emit-cpp.{h,cpp}`
 - `source/slang/slang-emit-cuda.{h,cpp}`
-- `source/slang/slang-emit-source-writer.h`
-- `source/slang/slang-emit-precedence.h`
+- `source/slang/emission/slang-emit-source-writer.h`
+- `source/slang/emission/slang-emit-precedence.h`
 
 ## Test directives
 

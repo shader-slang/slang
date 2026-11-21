@@ -1,11 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_COUNT,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_GETCOUNT
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SUBSCRIPT,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_SUBSCRIPT
-// TODO(#14430): This line is disabled, because the capability check does not report the
-// `[require]` of a static member function that is called through a generic type. `GetLength()`
-// of a `CoopMat` is such a call, so the Metal target accepts it and `slangc` returns 0. The
-// `CHECK_LENGTH` lines below expect `error 36107`. The test passed only because `diag=` did
-// not check the exit code. Enable the line when #14430 is fixed.
-//DISABLE_DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_LENGTH,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_GETLENGTH
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_LENGTH,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_GETLENGTH
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SCALAR_MUL,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_SCALAR_MUL
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_BAD_DIM,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_BAD_DIM
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_BAD_TYPE,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_BAD_TYPE
@@ -13,6 +8,9 @@
 
 // Verify the compiler rejects unsupported CoopMat operations on Metal.
 // Metal's simdgroup_matrix only supports fill, Load, Store, and coopMatMulAdd.
+// The instance-member cases (getCount, operator[]) and the static-member case
+// (GetLength) reach the capability checker through different visitor paths;
+// both must reject Metal here.
 
 using namespace linalg;
 

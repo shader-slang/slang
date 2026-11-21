@@ -15,7 +15,7 @@
 // does-not-conform note (E40022) per interface, so each candidate is
 // listed rather than pruned.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl -entry main -stage compute
 
 interface I0 { int a(); }
 interface I1 { int b(); }

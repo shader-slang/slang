@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -task -output-using-type -dx12 -profile sm_6_6 -render-features mesh-shader
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -task -output-using-type -vk -profile sm_6_5 -render-features mesh-shader
+//TEST:COMPARE_COMPUTE_EX(targets=dx12, filecheck-buffer=CHECK): -task -output-using-type -profile sm_6_6 -render-features mesh-shader
+//TEST:COMPARE_COMPUTE_EX(targets=vk, filecheck-buffer=CHECK): -task -output-using-type -profile sm_6_5 -render-features mesh-shader
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry meshMain -stage mesh
 //TEST:SIMPLE(filecheck=CHECK_SPV):-target spirv -entry taskMain -stage amplification
 

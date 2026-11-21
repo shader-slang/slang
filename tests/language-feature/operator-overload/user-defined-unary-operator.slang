@@ -6,7 +6,7 @@
 // Also checks that a binary `operator-(A, A)` declared alongside the unary
 // `operator-(A)` is not misinterpreted as a prefix operator.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cpu
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 struct A
 {

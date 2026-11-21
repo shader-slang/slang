@@ -19,6 +19,12 @@ struct CustomValue : IScalarAdditive, ITrigonometricFunctions
     typealias Mask = bool;
 
     static This fromScalar(Scalar value) { return value; }
+
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse)
+    {
+        return condition ? ifTrue : ifFalse;
+    }
+
     static This zero() { return {0.0}; }
     This plus(This other) { return {value + other.value}; }
     This minus(This other) { return {value - other.value}; }

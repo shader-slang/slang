@@ -17,7 +17,7 @@
 // CHECK pins the warning code first, then the later error code, so the test
 // cannot pass on an unrelated failure; the directive expects exit code -1.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl -entry main -stage compute
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;

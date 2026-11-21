@@ -13,7 +13,7 @@
 // unknown at compile time, so the type-flow pass collects the witness tables
 // of `IFoo` that survived linking. No type conforms to `IFoo` here, the set
 // is empty, and the pass reports E50100 at the dispatch.
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target spirv-asm -entry main -stage compute
 
 interface IFoo { int run(int x); };
 

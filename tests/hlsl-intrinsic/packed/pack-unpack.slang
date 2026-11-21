@@ -1,23 +1,18 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_6 -dx12 -shaderobj -render-feature hardware-device
-//TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk+metal+cpu):
+//TEST:COMPARE_COMPUTE(targets=dx12):-profile cs_6_6 -render-feature hardware-device
 
 // 16 bit variants are not supported by WGSL.
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DWGSL
+//TEST:COMPARE_COMPUTE(targets=wgpu):-xslang -DWGSL
 // Debug info for inlining errors can be given out, so disable them for this test.
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -g0
+//TEST:COMPARE_COMPUTE(targets=cuda):-g0
 
-//TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -xslang -DUSE_SLANG_SYNTAX
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_6 -dx12 -shaderobj -render-feature hardware-device -xslang -DUSE_SLANG_SYNTAX
-//TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj -xslang -DUSE_SLANG_SYNTAX
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -xslang -DUSE_SLANG_SYNTAX
+//TEST:COMPARE_COMPUTE(targets=vk+metal+cpu+llvm):-xslang -DUSE_SLANG_SYNTAX
+//TEST:COMPARE_COMPUTE(targets=dx12):-profile cs_6_6 -render-feature hardware-device -xslang -DUSE_SLANG_SYNTAX
 
 // 16 bit variants are not supported by WGSL.
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DWGSL -xslang -DUSE_SLANG_SYNTAX
+//TEST:COMPARE_COMPUTE(targets=wgpu):-xslang -DWGSL -xslang -DUSE_SLANG_SYNTAX
 // Debug info for inlining errors can be given out, so disable them for this test.
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -g0 -xslang -DUSE_SLANG_SYNTAX
-//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj -xslang -DUSE_SLANG_SYNTAX
+//TEST:COMPARE_COMPUTE(targets=cuda):-g0 -xslang -DUSE_SLANG_SYNTAX
 
 
 //TEST_INPUT:ubuffer(data=[0xD37A83FF], stride=4):name unpackTestBuffer
@@ -176,7 +171,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[index++] = uint(unpackedU16.z);
     // 0xD3
     outputBuffer[index++] = uint(unpackedU16.w);
-#else 
+#else
     outputBuffer[index++] = 0xFFU;
     outputBuffer[index++] = 0x83U;
     outputBuffer[index++] = 0x7AU;
@@ -225,7 +220,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[index++] = __pack_s8(packS32TestValues);
 
 #if !defined(WGSL)
-    uint16_t4 packU16TestValues = int16_t4(int16_t(packU32TestValues.x), int16_t(packU32TestValues.y), 
+    uint16_t4 packU16TestValues = int16_t4(int16_t(packU32TestValues.x), int16_t(packU32TestValues.y),
                                            int16_t(packU32TestValues.z), int16_t(packU32TestValues.w));
     int16_t4 packS16TestValues = packU16TestValues;
     outputBuffer[index++] = __pack_u8(packU16TestValues);

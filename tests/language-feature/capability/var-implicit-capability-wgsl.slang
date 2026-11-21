@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target wgsl -entry Main -stage compute
-//TEST:SIMPLE(filecheck=CHECK_IGNORE_CAPS,exit-code=-1): -target wgsl -entry Main -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target wgsl -entry Main -stage compute
+//TEST:SIMPLE(filecheck=CHECK_IGNORE_CAPS,exit-code=2): -target wgsl -entry Main -stage compute -ignore-capabilities
 
 
 Buffer<float> InputTyped;

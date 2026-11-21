@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 tests/diagnostics/lexer/unterminated-string-literal.slang(18): error 10005: newline in literal
 

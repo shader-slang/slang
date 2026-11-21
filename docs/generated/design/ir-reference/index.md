@@ -11,7 +11,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 
 This subtree of `docs/generated/design/` is a per-family reference for the
 Slang Intermediate Representation. Every concrete opcode declared in
-[../../../../source/slang/slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
+[../../../../source/slang/ir/slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua)
 appears in a family page below, tabulated with its C++ wrapper
 struct, its operand shape, its op-flags (`H` hoistable, `P` parent,
 `G` global), the producer that constructs it, and a one-line summary.
@@ -84,7 +84,7 @@ with the rest of the alignment/stride family, not with the
 compile-time `sizeOf` / `alignOf` queries on [misc.md](misc.md).
 
 Line numbers in the **Lua entry root** column refer to
-[../../../../source/slang/slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua),
+[../../../../source/slang/ir/slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua),
 which is 3655 lines at this commit; both the counts and the line
 numbers drift as opcodes are added, removed, or moved between
 families.
@@ -94,7 +94,7 @@ families.
 The AST-origin column on every family page names the *producer* that
 constructs a given opcode: where that producer is AST lowering, the
 citation is one of the more than 200 `visit*` member functions in
-[../../../../source/slang/slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+[../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
 (for example, `visitVarDecl` at line 11812 emits `var`), and the AST
 side of that mapping is documented in the
 [../ast-reference/](../ast-reference) subtree — chiefly

@@ -1,8 +1,5 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-d3d12 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4);
 RWStructuredBuffer<Atomic<uint>> outputBuffer;

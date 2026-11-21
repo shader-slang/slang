@@ -1,8 +1,6 @@
 //TEST:SIMPLE(filecheck=SOURCE): -stage compute -entry computeMain -target hlsl
 //TEST:SIMPLE(filecheck=SOURCE): -stage compute -entry computeMain -target glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF): -dx12 -compute -entry computeMain -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -compute -entry computeMain -output-using-type -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF): -entry computeMain -output-using-type
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

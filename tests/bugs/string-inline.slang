@@ -1,11 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 // Disable until GetStringHash has a fallback implementation when the parameter
 // is not a literal.
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 
@@ -29,7 +24,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 	uint tid = dispatchThreadID.x;
 
     int hash = getHash("Hello World!");
-    
+
 	float inVal = float(tid) + hash;
 
 	outputBuffer[tid] = inVal;

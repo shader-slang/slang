@@ -1,15 +1,12 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type -xslang -DNO_INT8=1
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=CHECK):-output-using-type -xslang -DNO_INT8=1
 // Notes:
 // - HLSL does not have 8-bit integer types
 // - HLSL has 16-bit integers when enabled (Slang does it automatically for the default profile)
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -emit-spirv-via-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type -xslang -DNO_DOUBLE=1
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=CHECK):-output-using-type -xslang -DNO_DOUBLE=1
 // Note: Metal does not have the double type
 
 // Note: WGSL does not have 16-bit integer types, so wgsl is not tested here

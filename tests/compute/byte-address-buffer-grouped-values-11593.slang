@@ -7,7 +7,7 @@
 // field at offset 4), plain `Load<T>` at constant locations, `half4` groups, and grouped stores with
 // and without an alignment.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 0x40003c00 0x44004200], stride=4):name=buffer
 RWByteAddressBuffer buffer;

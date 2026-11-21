@@ -1,6 +1,6 @@
 // static-const-in-generic-interface.slang
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // Test that `static const` variable declarations inside of
 // a generic `interface` type correctly translate to interface requirements.

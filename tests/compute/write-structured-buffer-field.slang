@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):
+//TEST:COMPARE_COMPUTE(targets=cuda):-output-using-type
 
 
 struct S

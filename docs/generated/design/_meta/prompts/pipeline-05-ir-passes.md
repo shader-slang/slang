@@ -46,7 +46,7 @@ choosing where to insert a new transformation.
    ```markdown
    | Pass | File | Purpose |
    | --- | --- | --- |
-   | DCE | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | Removes unused instructions |
+   | DCE | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | Removes unused instructions |
    ```
 
    You do not need to list every single file; aim for representative

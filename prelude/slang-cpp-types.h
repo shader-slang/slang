@@ -80,6 +80,27 @@ struct StructuredBuffer
 };
 
 
+// Unsized buffers carry only their data pointer. Their extent is supplied by the caller.
+// Like StructuredBuffer, the read-only wrapper uses mutable pointers and references because
+// generated pointer temporaries omit const. Slang enforces read-only access before emission.
+template<typename T>
+struct UnsizedStructuredBuffer
+{
+    SLANG_FORCE_INLINE T& operator[](size_t index) const { return data[index]; }
+    SLANG_FORCE_INLINE T& Load(size_t index) const { return data[index]; }
+
+    T* data;
+};
+
+template<typename T>
+struct UnsizedRWStructuredBuffer
+{
+    SLANG_FORCE_INLINE T& operator[](size_t index) const { return data[index]; }
+    SLANG_FORCE_INLINE T& Load(size_t index) const { return data[index]; }
+
+    T* data;
+};
+
 template<typename T>
 struct RWBuffer
 {
@@ -231,6 +252,46 @@ struct RWByteAddressBuffer
 
     uint32_t* data;
     size_t sizeInBytes; //< Must be multiple of 4
+};
+
+struct UnsizedByteAddressBuffer
+{
+    template<typename T>
+    T Load(size_t index) const
+    {
+        // Byte offsets may be four-byte aligned even when T needs greater alignment.
+        T value;
+        memcpy(&value, ((const char*)data) + index, sizeof(T));
+        return value;
+    }
+    template<typename T>
+    UnsizedStructuredBuffer<T> asStructuredBuffer() const
+    {
+        return UnsizedStructuredBuffer<T>{(T*)data};
+    }
+
+    const uint32_t* data;
+};
+
+struct UnsizedRWByteAddressBuffer
+{
+    template<typename T>
+    T Load(size_t index) const
+    {
+        return UnsizedByteAddressBuffer{data}.Load<T>(index);
+    }
+    template<typename T>
+    void Store(size_t index, const T& value) const
+    {
+        memcpy(((char*)data) + index, &value, sizeof(T));
+    }
+    template<typename T>
+    UnsizedRWStructuredBuffer<T> asStructuredBuffer() const
+    {
+        return UnsizedRWStructuredBuffer<T>{(T*)data};
+    }
+
+    uint32_t* data;
 };
 
 struct ISamplerState;

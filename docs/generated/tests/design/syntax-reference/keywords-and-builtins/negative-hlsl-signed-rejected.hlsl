@@ -12,7 +12,7 @@
 // Counterpart of `decl-hlsl-unsigned-int.hlsl`: the same HLSL-only branch
 // accepts `unsigned` but diagnoses `signed`.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 

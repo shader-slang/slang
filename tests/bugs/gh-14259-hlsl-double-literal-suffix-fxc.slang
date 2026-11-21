@@ -6,9 +6,8 @@
 // the product would be `A0000000` instead of `9999999A`.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute -profile cs_5_0
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -compute -dx11 -shaderobj -render-feature double
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -compute -dx12 -shaderobj -render-feature double
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=dx11+dx12, filecheck-buffer=BUF):-render-feature double
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=BUF):
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

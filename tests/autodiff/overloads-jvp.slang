@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -23,7 +21,7 @@ float f(float3 a)
 [ForwardDifferentiable]
 float g(float a)
 {
-    // df((2.0, 4.0, 6.0), (1.0, 2.0, 3.0)) 
+    // df((2.0, 4.0, 6.0), (1.0, 2.0, 3.0))
     // 2.0 * 2.0 + 4.0 * 1.0 + 3.0 = 11.0
     return f(float3(a, 2*a, 3*a));
 }

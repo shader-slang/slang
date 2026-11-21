@@ -8,10 +8,7 @@
 
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-output-using-type
 
 // The unrolled loops divide by 4, 3, 2 and 1 (a division by 1 may be folded away), and nothing
 // divides by 0.

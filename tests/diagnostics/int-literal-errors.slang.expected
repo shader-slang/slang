@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 tests/diagnostics/int-literal-errors.slang(10): error 10012: integer literal is too large to be represented in any integer type
     uint64_t tooLargeForAnyType1 = 18446744073709551616; // UINT64_MAX + 1

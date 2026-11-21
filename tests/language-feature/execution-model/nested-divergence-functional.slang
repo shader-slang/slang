@@ -8,8 +8,7 @@
 // Thread 2: outer-even, inner-high → WaveActiveSum({2}) = 2,   then WaveActiveSum({0,2}) = 2
 // Thread 3: outer-odd              → WaveActiveSum({1,3}) = 4
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 
 RWStructuredBuffer<int> outputBuffer;

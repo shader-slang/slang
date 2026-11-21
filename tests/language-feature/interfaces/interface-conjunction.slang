@@ -2,7 +2,7 @@
 
 // Test that we can compose interfaces with `&`
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 interface IFirst
 {

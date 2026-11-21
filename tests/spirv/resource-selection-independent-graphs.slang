@@ -123,52 +123,41 @@ float4 sharedChoices(float2 uv : TEXCOORD) : SV_Target
 
 // We swap `first` and `second` on every iteration and conditionally retain or replace `third`.
 // The samples after the loop observe all three final choices, including the zero-iteration case.
-// We check ordinary selector storage, including the initial values, the conditional update of
-// `third`, and the simultaneous swap. The post-loop dispatches must read all three final slots.
+// We check the selector phis, including their initial values, the conditional update of
+// `third`, and the simultaneous swap on the back edge. Post-loop dispatches use those phis.
 // The update of `third` uses the incoming `second`, which is the value assigned to `first`
-// in the shader. The ordinary selector slots are swapped afterward, at the loop back edge.
-// LOOP0: %first = OpVariable %_ptr_Function_uint Function
-// LOOP0: %second = OpVariable %_ptr_Function_uint Function
-// LOOP0: %third = OpVariable %_ptr_Function_uint Function
-// LOOP0: OpStore %first %uint_0{{( |$)}}
-// LOOP0: OpStore %second %uint_1{{( |$)}}
-// LOOP0: OpStore %third %uint_2{{( |$)}}
-// LOOP0: OpStore %iteration %uint_0{{( |$)}}
+// in the shader. The phi arguments then exchange the incoming `first` and `second` values.
+// LOOP0: %[[ENTRY:[^ ]+]] = OpLabel
 // LOOP0: OpBranch %[[HEADER:[^ ]+]]{{( |$)}}
 // LOOP0: %[[HEADER]] = OpLabel
-// LOOP0: OpLoopMerge %[[AFTER_LOOP:[^ ]+]] %[[BACK_EDGE:[^ ]+]] None
+// LOOP0: %[[FINAL_FIRST:[^ ]+]] = OpPhi %uint %[[FINAL_SECOND:[^ ]+]] %[[BACK_EDGE:[^ ]+]] %uint_0 %[[ENTRY]]{{( |$)}}
+// LOOP0: %[[FINAL_SECOND]] = OpPhi %uint %[[FINAL_FIRST]] %[[BACK_EDGE]] %uint_1 %[[ENTRY]]{{( |$)}}
+// LOOP0: %[[FINAL_THIRD:[^ ]+]] = OpPhi %uint %[[NEXT_THIRD:[^ ]+]] %[[BACK_EDGE]] %uint_2 %[[ENTRY]]{{( |$)}}
+// LOOP0: %[[ITERATION:[^ ]+]] = OpPhi %uint %[[NEXT_ITERATION:[^ ]+]] %[[BACK_EDGE]] %uint_0 %[[ENTRY]]{{( |$)}}
+// LOOP0: OpLoopMerge %[[AFTER_LOOP:[^ ]+]] %[[BACK_EDGE]] None
 // LOOP0: %[[COUNT_PTR:[^ ]+]] = OpAccessChain {{[^ ]+}} %Parameters %int_0{{( |$)}}
 // LOOP0: %[[COUNT:[^ ]+]] = OpLoad %uint %[[COUNT_PTR]]{{( |$)}}
-// LOOP0: %[[ITERATION:[^ ]+]] = OpLoad %uint %iteration{{( |$)}}
 // LOOP0: %[[CONTINUE:[^ ]+]] = OpULessThan %bool %[[ITERATION]] %[[COUNT]]{{( |$)}}
 // LOOP0: OpBranchConditional %[[CONTINUE]] %[[BODY:[^ ]+]] %[[EXIT:[^ ]+]]{{( |$)}}
 // LOOP0: %[[BODY]] = OpLabel
 // LOOP0: %[[UPDATE_THIRD:[^ ]+]] = OpFOrdGreaterThan %bool{{( |$)}}
 // LOOP0: OpSelectionMerge %[[THIRD_MERGE:[^ ]+]] None
-// LOOP0: OpBranchConditional %[[UPDATE_THIRD]] %[[UPDATE:[^ ]+]] %[[THIRD_MERGE]]{{( |$)}}
+// LOOP0: OpBranchConditional %[[UPDATE_THIRD]] %[[UPDATE:[^ ]+]] %[[KEEP:[^ ]+]]{{( |$)}}
 // LOOP0: %[[UPDATE]] = OpLabel
 // LOOP0: %[[USE_SECOND:[^ ]+]] = OpFOrdGreaterThan %bool{{( |$)}}
-// LOOP0: %[[INCOMING_SECOND:[^ ]+]] = OpLoad %uint %second{{( |$)}}
-// LOOP0: %[[INCOMING_THIRD:[^ ]+]] = OpLoad %uint %third{{( |$)}}
-// LOOP0: %[[NEW_THIRD:[^ ]+]] = OpSelect %uint %[[USE_SECOND]] %[[INCOMING_SECOND]] %[[INCOMING_THIRD]]{{( |$)}}
-// LOOP0: OpStore %third %[[NEW_THIRD]]{{( |$)}}
-// LOOP0-NOT: OpLabel
+// LOOP0: %[[NEW_THIRD:[^ ]+]] = OpSelect %uint %[[USE_SECOND]] %[[FINAL_SECOND]] %[[FINAL_THIRD]]{{( |$)}}
+// LOOP0: OpBranch %[[THIRD_MERGE]]{{( |$)}}
+// LOOP0: %[[KEEP]] = OpLabel
 // LOOP0: OpBranch %[[THIRD_MERGE]]{{( |$)}}
 // LOOP0: %[[THIRD_MERGE]] = OpLabel
-// LOOP0: %[[OLD_ITERATION:[^ ]+]] = OpLoad %uint %iteration{{( |$)}}
-// LOOP0: %[[NEXT_ITERATION:[^ ]+]] = OpIAdd %uint %[[OLD_ITERATION]] %uint_1{{( |$)}}
-// LOOP0: OpStore %iteration %[[NEXT_ITERATION]]{{( |$)}}
-// LOOP0: %[[OLD_FIRST:[^ ]+]] = OpLoad %uint %first{{( |$)}}
-// LOOP0: %[[OLD_SECOND:[^ ]+]] = OpLoad %uint %second{{( |$)}}
-// LOOP0: OpStore %first %[[OLD_SECOND]]{{( |$)}}
-// LOOP0: OpStore %second %[[OLD_FIRST]]{{( |$)}}
+// LOOP0: %[[NEXT_THIRD]] = OpPhi %uint %[[NEW_THIRD]] %[[UPDATE]] %[[FINAL_THIRD]] %[[KEEP]]{{( |$)}}
+// LOOP0: %[[NEXT_ITERATION]] = OpIAdd %uint %[[ITERATION]] %uint_1{{( |$)}}
 // LOOP0: OpBranch %[[BACK_EDGE]]{{( |$)}}
 // LOOP0: %[[BACK_EDGE]] = OpLabel
 // LOOP0: OpBranch %[[HEADER]]{{( |$)}}
 // LOOP0: %[[EXIT]] = OpLabel
 // LOOP0: OpBranch %[[AFTER_LOOP]]{{( |$)}}
 // LOOP0: %[[AFTER_LOOP]] = OpLabel
-// LOOP0: %[[FINAL_FIRST:[^ ]+]] = OpLoad %uint %first{{( |$)}}
 // LOOP0: %[[FIRST_IS_B:[^ ]+]] = OpIEqual %bool %[[FINAL_FIRST]] %uint_1{{( |$)}}
 // LOOP0: OpSelectionMerge %[[FIRST_MERGE:[^ ]+]] None
 // LOOP0: OpBranchConditional %[[FIRST_IS_B]] %[[FIRST_B:[^ ]+]] %[[FIRST_A:[^ ]+]]{{( |$)}}
@@ -187,7 +176,6 @@ float4 sharedChoices(float2 uv : TEXCOORD) : SV_Target
 // LOOP0-NOT: OpLabel
 // LOOP0: OpBranch %[[FIRST_MERGE]]{{( |$)}}
 // LOOP0: %[[FIRST_MERGE]] = OpLabel
-// LOOP0: %[[FINAL_SECOND:[^ ]+]] = OpLoad %uint %second{{( |$)}}
 // LOOP0: %[[SECOND_IS_B:[^ ]+]] = OpIEqual %bool %[[FINAL_SECOND]] %uint_1{{( |$)}}
 // LOOP0: OpSelectionMerge %[[SECOND_MERGE:[^ ]+]] None
 // LOOP0: OpBranchConditional %[[SECOND_IS_B]] %[[SECOND_B:[^ ]+]] %[[SECOND_A:[^ ]+]]{{( |$)}}
@@ -206,11 +194,9 @@ float4 sharedChoices(float2 uv : TEXCOORD) : SV_Target
 // LOOP0-NOT: OpLabel
 // LOOP0: OpBranch %[[SECOND_MERGE]]{{( |$)}}
 // LOOP0: %[[SECOND_MERGE]] = OpLabel
-// LOOP0: %[[FINAL_THIRD:[^ ]+]] = OpLoad %uint %third{{( |$)}}
 // LOOP0: %[[THIRD_IS_A:[^ ]+]] = OpIEqual %bool %[[FINAL_THIRD]] %uint_0{{( |$)}}
 // LOOP0: %[[THIRD_A_TAG:[^ ]+]] = OpSelect %uint %[[THIRD_IS_A]] %uint_0 %uint_2{{( |$)}}
-// LOOP0: %[[FINAL_THIRD_B:[^ ]+]] = OpLoad %uint %third{{( |$)}}
-// LOOP0: %[[THIRD_IS_B:[^ ]+]] = OpIEqual %bool %[[FINAL_THIRD_B]] %uint_1{{( |$)}}
+// LOOP0: %[[THIRD_IS_B:[^ ]+]] = OpIEqual %bool %[[FINAL_THIRD]] %uint_1{{( |$)}}
 // LOOP0: %[[THIRD_TAG:[^ ]+]] = OpSelect %uint %[[THIRD_IS_B]] %uint_1 %[[THIRD_A_TAG]]{{( |$)}}
 // LOOP0: OpSelectionMerge %[[THIRD_RESULT_MERGE:[^ ]+]] None
 // LOOP0: OpSwitch %[[THIRD_TAG]] %[[THIRD_B:[^ ]+]] 2 %[[THIRD_C:[^ ]+]] 0 %[[THIRD_A:[^ ]+]]{{( |$)}}
@@ -239,19 +225,16 @@ float4 sharedChoices(float2 uv : TEXCOORD) : SV_Target
 
 // The optimized checks account for the loop exit preceding the body and the sampler arms
 // appearing in a different order. They require the same selector updates and merge edges.
-// LOOP1: %first = OpVariable %_ptr_Function_uint Function
-// LOOP1: %second = OpVariable %_ptr_Function_uint Function
-// LOOP1: %third = OpVariable %_ptr_Function_uint Function
-// LOOP1: OpStore %first %uint_0{{( |$)}}
-// LOOP1: OpStore %second %uint_1{{( |$)}}
-// LOOP1: OpStore %third %uint_2{{( |$)}}
-// LOOP1: OpStore %iteration %uint_0{{( |$)}}
+// LOOP1: %[[ENTRY:[^ ]+]] = OpLabel
 // LOOP1: OpBranch %[[HEADER:[^ ]+]]{{( |$)}}
 // LOOP1: %[[HEADER]] = OpLabel
-// LOOP1: OpLoopMerge %[[AFTER_LOOP:[^ ]+]] %[[BACK_EDGE:[^ ]+]] None
+// LOOP1: %[[FINAL_FIRST:[^ ]+]] = OpPhi %uint %[[FINAL_SECOND:[^ ]+]] %[[BACK_EDGE:[^ ]+]] %uint_0 %[[ENTRY]]{{( |$)}}
+// LOOP1: %[[FINAL_SECOND]] = OpPhi %uint %[[FINAL_FIRST]] %[[BACK_EDGE]] %uint_1 %[[ENTRY]]{{( |$)}}
+// LOOP1: %[[FINAL_THIRD:[^ ]+]] = OpPhi %uint %[[NEXT_THIRD:[^ ]+]] %[[BACK_EDGE]] %uint_2 %[[ENTRY]]{{( |$)}}
+// LOOP1: %[[ITERATION:[^ ]+]] = OpPhi %uint %[[NEXT_ITERATION:[^ ]+]] %[[BACK_EDGE]] %uint_0 %[[ENTRY]]{{( |$)}}
+// LOOP1: OpLoopMerge %[[AFTER_LOOP:[^ ]+]] %[[BACK_EDGE]] None
 // LOOP1: %[[COUNT_PTR:[^ ]+]] = OpAccessChain {{[^ ]+}} %Parameters %int_0{{( |$)}}
 // LOOP1: %[[COUNT:[^ ]+]] = OpLoad %uint %[[COUNT_PTR]]{{( |$)}}
-// LOOP1: %[[ITERATION:[^ ]+]] = OpLoad %uint %iteration{{( |$)}}
 // LOOP1: %[[CONTINUE:[^ ]+]] = OpULessThan %bool %[[ITERATION]] %[[COUNT]]{{( |$)}}
 // LOOP1: OpBranchConditional %[[CONTINUE]] %[[BODY:[^ ]+]] %[[EXIT:[^ ]+]]{{( |$)}}
 // LOOP1: %[[EXIT]] = OpLabel
@@ -259,28 +242,20 @@ float4 sharedChoices(float2 uv : TEXCOORD) : SV_Target
 // LOOP1: %[[BODY]] = OpLabel
 // LOOP1: %[[UPDATE_THIRD:[^ ]+]] = OpFOrdGreaterThan %bool{{( |$)}}
 // LOOP1: OpSelectionMerge %[[THIRD_MERGE:[^ ]+]] None
-// LOOP1: OpBranchConditional %[[UPDATE_THIRD]] %[[UPDATE:[^ ]+]] %[[THIRD_MERGE]]{{( |$)}}
+// LOOP1: OpBranchConditional %[[UPDATE_THIRD]] %[[UPDATE:[^ ]+]] %[[KEEP:[^ ]+]]{{( |$)}}
+// LOOP1: %[[KEEP]] = OpLabel
+// LOOP1: OpBranch %[[THIRD_MERGE]]{{( |$)}}
 // LOOP1: %[[UPDATE]] = OpLabel
 // LOOP1: %[[USE_SECOND:[^ ]+]] = OpFOrdGreaterThan %bool{{( |$)}}
-// LOOP1: %[[INCOMING_SECOND:[^ ]+]] = OpLoad %uint %second{{( |$)}}
-// LOOP1: %[[INCOMING_THIRD:[^ ]+]] = OpLoad %uint %third{{( |$)}}
-// LOOP1: %[[NEW_THIRD:[^ ]+]] = OpSelect %uint %[[USE_SECOND]] %[[INCOMING_SECOND]] %[[INCOMING_THIRD]]{{( |$)}}
-// LOOP1: OpStore %third %[[NEW_THIRD]]{{( |$)}}
-// LOOP1-NOT: OpLabel
+// LOOP1: %[[NEW_THIRD:[^ ]+]] = OpSelect %uint %[[USE_SECOND]] %[[FINAL_SECOND]] %[[FINAL_THIRD]]{{( |$)}}
 // LOOP1: OpBranch %[[THIRD_MERGE]]{{( |$)}}
 // LOOP1: %[[THIRD_MERGE]] = OpLabel
-// LOOP1: %[[OLD_ITERATION:[^ ]+]] = OpLoad %uint %iteration{{( |$)}}
-// LOOP1: %[[NEXT_ITERATION:[^ ]+]] = OpIAdd %uint %[[OLD_ITERATION]] %uint_1{{( |$)}}
-// LOOP1: OpStore %iteration %[[NEXT_ITERATION]]{{( |$)}}
-// LOOP1: %[[OLD_FIRST:[^ ]+]] = OpLoad %uint %first{{( |$)}}
-// LOOP1: %[[OLD_SECOND:[^ ]+]] = OpLoad %uint %second{{( |$)}}
-// LOOP1: OpStore %first %[[OLD_SECOND]]{{( |$)}}
-// LOOP1: OpStore %second %[[OLD_FIRST]]{{( |$)}}
+// LOOP1: %[[NEXT_THIRD]] = OpPhi %uint %[[NEW_THIRD]] %[[UPDATE]] %[[FINAL_THIRD]] %[[KEEP]]{{( |$)}}
+// LOOP1: %[[NEXT_ITERATION]] = OpIAdd %uint %[[ITERATION]] %uint_1{{( |$)}}
 // LOOP1: OpBranch %[[BACK_EDGE]]{{( |$)}}
 // LOOP1: %[[BACK_EDGE]] = OpLabel
 // LOOP1: OpBranch %[[HEADER]]{{( |$)}}
 // LOOP1: %[[AFTER_LOOP]] = OpLabel
-// LOOP1: %[[FINAL_FIRST:[^ ]+]] = OpLoad %uint %first{{( |$)}}
 // LOOP1: %[[FIRST_IS_B:[^ ]+]] = OpIEqual %bool %[[FINAL_FIRST]] %uint_1{{( |$)}}
 // LOOP1: OpSelectionMerge %[[FIRST_MERGE:[^ ]+]] None
 // LOOP1: OpBranchConditional %[[FIRST_IS_B]] %[[FIRST_B:[^ ]+]] %[[FIRST_A:[^ ]+]]{{( |$)}}
@@ -299,7 +274,6 @@ float4 sharedChoices(float2 uv : TEXCOORD) : SV_Target
 // LOOP1-NOT: OpLabel
 // LOOP1: OpBranch %[[FIRST_MERGE]]{{( |$)}}
 // LOOP1: %[[FIRST_MERGE]] = OpLabel
-// LOOP1: %[[FINAL_SECOND:[^ ]+]] = OpLoad %uint %second{{( |$)}}
 // LOOP1: %[[SECOND_IS_B:[^ ]+]] = OpIEqual %bool %[[FINAL_SECOND]] %uint_1{{( |$)}}
 // LOOP1: OpSelectionMerge %[[SECOND_MERGE:[^ ]+]] None
 // LOOP1: OpBranchConditional %[[SECOND_IS_B]] %[[SECOND_B:[^ ]+]] %[[SECOND_A:[^ ]+]]{{( |$)}}
@@ -318,7 +292,6 @@ float4 sharedChoices(float2 uv : TEXCOORD) : SV_Target
 // LOOP1-NOT: OpLabel
 // LOOP1: OpBranch %[[SECOND_MERGE]]{{( |$)}}
 // LOOP1: %[[SECOND_MERGE]] = OpLabel
-// LOOP1: %[[FINAL_THIRD:[^ ]+]] = OpLoad %uint %third{{( |$)}}
 // LOOP1: %[[THIRD_IS_A:[^ ]+]] = OpIEqual %bool %[[FINAL_THIRD]] %uint_0{{( |$)}}
 // LOOP1: %[[THIRD_A_TAG:[^ ]+]] = OpSelect %uint %[[THIRD_IS_A]] %uint_0 %uint_2{{( |$)}}
 // LOOP1: %[[THIRD_IS_B:[^ ]+]] = OpIEqual %bool %[[FINAL_THIRD]] %uint_1{{( |$)}}
