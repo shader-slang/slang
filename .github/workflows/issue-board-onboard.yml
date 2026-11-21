@@ -474,6 +474,8 @@ jobs:
               console.log(`set ${fieldName} = ${optionName}`);
             }
 
+            // iterationId is String, like singleSelectOptionId above: GitHub
+            // iteration ids are opaque hex, not GraphQL global IDs.
             async function setIteration(itemId, fieldName, iteration) {
               if (!itemId || !iteration?.id) return;
               const f = await field(fieldName);
@@ -482,7 +484,7 @@ jobs:
                 return;
               }
               await github.graphql(`
-                mutation($project: ID!, $item: ID!, $field: ID!, $iteration: ID!) {
+                mutation($project: ID!, $item: ID!, $field: ID!, $iteration: String!) {
                   updateProjectV2ItemFieldValue(input: {
                     projectId: $project, itemId: $item, fieldId: $field,
                     value: { iterationId: $iteration }
