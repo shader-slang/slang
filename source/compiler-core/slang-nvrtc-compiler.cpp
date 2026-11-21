@@ -1687,6 +1687,27 @@ static SlangResult _findAndLoadNVRTC(
         }
     }
 
+#elif SLANG_LINUX_FAMILY
+    SLANG_UNUSED_FUNCTION(_getNVRTCBaseName);
+    SLANG_UNUSED_FUNCTION(_findNVRTC);
+
+    // The unversioned `libnvrtc.so` only comes with the CUDA development
+    // packages. Runtime-only installs (the `cuda-nvrtc-X-Y` packages, distro
+    // packages such as `libnvrtc12`, container images built on the CUDA
+    // runtime image) only provide the versioned soname, so try those too,
+    // newest first. CUDA 11.x releases from 11.2 on use the `libnvrtc.so.11.2` soname.
+    static const char* const kNVRTCSonames[] = {
+        "libnvrtc.so.13",
+        "libnvrtc.so.12",
+        "libnvrtc.so.11.2",
+    };
+    for (const char* soname : kNVRTCSonames)
+    {
+        if (SLANG_SUCCEEDED(loader->loadSharedLibrary(soname, outLibrary.writeRef())))
+        {
+            return SLANG_OK;
+        }
+    }
 #else
     SLANG_UNUSED(loader);
     SLANG_UNUSED(outLibrary);
@@ -1700,9 +1721,6 @@ static SlangResult _findAndLoadNVRTC(
 
     // Filenames for NVRTC
     // https://docs.nvidia.com/cuda/nvrtc/index.html
-    //
-    // From this it appears on platforms other than windows the SharedLibrary name
-    // should be nvrtc which is already tried, so we can give up now.
     return SLANG_E_NOT_FOUND;
 }
 
