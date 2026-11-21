@@ -291,7 +291,7 @@ IRInst* emitCalcGroupIndex(IRBuilder& builder, IRInst* groupThreadID, IRInst* gr
     return offset;
 }
 
-IRInst* tryConvertValue(IRBuilder& builder, IRInst* val, IRType* toType)
+IRInst* tryConvertSystemValueType(IRBuilder& builder, IRInst* val, IRType* toType)
 {
     auto fromType = val->getFullType();
     if (auto fromVector = as<IRVectorType>(fromType))
@@ -1095,7 +1095,7 @@ protected:
         IRBuilder builder(m_module);
         builder.setInsertBefore(m_firstOrdinaryInst);
 
-        auto converted = tryConvertValue(builder, id, as<IRType>(paramType));
+        auto converted = tryConvertSystemValueType(builder, id, as<IRType>(paramType));
 
         return LegalizedVaryingVal::makeValue(converted);
     }
@@ -3045,12 +3045,12 @@ protected:
                 builder.setInsertBefore(
                     entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
 
-                // get uses before we `tryConvertValue` since this creates a new use
+                // get uses before we `tryConvertSystemValueType` since this creates a new use
                 List<IRUse*> uses;
                 for (auto use = var->firstUse; use; use = use->nextUse)
                     uses.add(use);
 
-                auto convertedValue = tryConvertValue(builder, var, varType);
+                auto convertedValue = tryConvertSystemValueType(builder, var, varType);
                 if (convertedValue == nullptr)
                     continue;
 
@@ -4769,7 +4769,8 @@ protected:
             if (baseInstance->getFullType() != var->getFullType())
             {
                 // The front end only admits scalar integers for SV_InstanceID, so this converts.
-                baseInstance = tryConvertValue(svBuilder, baseInstance, var->getFullType());
+                baseInstance =
+                    tryConvertSystemValueType(svBuilder, baseInstance, var->getFullType());
                 SLANG_ASSERT(baseInstance);
             }
             // The normal path still legalizes `var` (and a reused base declared after it) and
