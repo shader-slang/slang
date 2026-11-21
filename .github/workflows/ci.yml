@@ -399,7 +399,7 @@ jobs:
       runs-on: '["windows-2022"]'
 
   # Windows builds (self-hosted)
-  build-windows-debug-cl-x86_64-gpu:
+  build-windows-debug-cl-x86_64:
     needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
@@ -413,7 +413,7 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "build"]'
 
-  build-windows-release-cl-x86_64-gpu:
+  build-windows-release-cl-x86_64:
     needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
@@ -506,7 +506,7 @@ jobs:
   # long before a PR sitting in the Falcor approval queue gets looked at.
   # Building again here, only once approved, means the artifact this job
   # produces is always fresh when test-falcor actually needs it. The
-  # other six consumers of build-windows-release-cl-x86_64-gpu's artifact
+  # other six consumers of build-windows-release-cl-x86_64's artifact
   # (dx/vk/cuda/rhi tests, MaterialX, compile-regression, benchmark) are
   # unaffected -- they keep using the eagerly-built, ungated artifact.
   #
@@ -746,7 +746,7 @@ jobs:
   # They use the artifact from the self-hosted build job and run only the
   # (cpu) and (llvm) tests, so the paid T4 jobs below do not need to run them.
   test-windows-debug-cl-x86_64-cpu:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+    needs: [filter, build-windows-debug-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
@@ -758,7 +758,7 @@ jobs:
       gpu-tier: nogpu
 
   test-windows-release-cl-x86_64-cpu:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    needs: [filter, build-windows-release-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
@@ -771,7 +771,7 @@ jobs:
 
   # Windows GPU tests (self-hosted)
   test-windows-debug-cl-x86_64-t4:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+    needs: [filter, build-windows-debug-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
@@ -783,7 +783,7 @@ jobs:
       gpu-tier: t4
 
   test-windows-debug-cl-x86_64-rhi:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+    needs: [filter, build-windows-debug-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-rhi-test.yml
     with:
@@ -794,7 +794,7 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
   test-windows-release-cl-x86_64-t4:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    needs: [filter, build-windows-release-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
@@ -806,7 +806,7 @@ jobs:
       gpu-tier: t4
 
   test-windows-release-cl-x86_64-rhi:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    needs: [filter, build-windows-release-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-rhi-test.yml
     with:
@@ -818,7 +818,7 @@ jobs:
 
   # MaterialX integration test (Windows only for initial validation).
   test-materialx-windows-release:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    needs: [filter, build-windows-release-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-materialx-regression-test.yml
     with:
@@ -939,15 +939,15 @@ jobs:
 
   # Not gated behind falcor-ci approval (runs on an ungated Windows perf
   # runner, not the KVM bridge), so it depends directly on the eagerly-built,
-  # ungated artifact from build-windows-release-cl-x86_64-gpu rather than
+  # ungated artifact from build-windows-release-cl-x86_64 rather than
   # waiting on the approval-gated build-windows-release-cl-x86_64-gpu-falcor.
   # A single `uses:` job can only carry one `needs:` list, so this needed its
   # own caller job separate from test-falcor above, fixing an artifact-not-
   # found failure: test-falcor-perf previously had no needs: at all and
-  # could start before build-windows-release-cl-x86_64-gpu had finished
+  # could start before build-windows-release-cl-x86_64 had finished
   # uploading its artifact.
   test-falcor-perf:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    needs: [filter, build-windows-release-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     permissions:
       contents: read
@@ -957,7 +957,7 @@ jobs:
       slang-artifact-name: slang-tests-windows-x86_64-cl-release
 
   test-compile-regression:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    needs: [filter, build-windows-release-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     permissions:
       contents: read
@@ -965,7 +965,7 @@ jobs:
     uses: ./.github/workflows/ci-slang-regression-test.yml
 
   test-benchmark:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    needs: [filter, build-windows-release-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     permissions:
       contents: read
@@ -983,24 +983,24 @@ jobs:
     needs:
       [
         filter,
-        build-linux-debug-gcc-x86_64,
-        build-linux-release-gcc-x86_64,
-        build-linux-release-gcc-wasm,
         build-linux-debug-gcc-aarch64,
+        build-linux-debug-gcc-x86_64,
         build-linux-release-gcc-aarch64,
+        build-linux-release-gcc-wasm,
+        build-linux-release-gcc-x86_64,
+        build-macos-27-release-clang-aarch64,
         build-macos-debug-clang-aarch64,
         build-macos-release-clang-aarch64,
-        build-macos-27-release-clang-aarch64,
-        build-windows-debug-cl-x86_64-gpu,
-        build-windows-release-cl-x86_64-gpu,
         build-windows-debug-cl-aarch64,
+        build-windows-debug-cl-x86_64,
         build-windows-release-cl-aarch64,
+        build-windows-release-cl-x86_64,
         static-linux-debug-gcc-aarch64,
         static-linux-release-gcc-aarch64,
-        static-macos-release-clang-aarch64,
-        static-windows-release-cl-x86_64,
         static-macos-debug-clang-aarch64,
+        static-macos-release-clang-aarch64,
         static-windows-debug-cl-x86_64,
+        static-windows-release-cl-x86_64,
         test-benchmark,
         test-compile-regression,
         test-falcor-perf,
