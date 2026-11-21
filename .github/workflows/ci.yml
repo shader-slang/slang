@@ -756,9 +756,6 @@ jobs:
       config: debug
       runs-on: '["windows-2022"]'
       gpu-tier: nogpu
-      # The windows-2022 runner has 4 processors, like the runner of the Linux x86_64
-      # -cpu jobs. The unit tests of the test server need one server for each processor.
-      server-count: 4
 
   test-windows-release-cl-x86_64-cpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
@@ -771,9 +768,6 @@ jobs:
       config: release
       runs-on: '["windows-2022"]'
       gpu-tier: nogpu
-      # The windows-2022 runner has 4 processors, like the runner of the Linux x86_64
-      # -cpu jobs. The unit tests of the test server need one server for each processor.
-      server-count: 4
 
   # Windows GPU tests (self-hosted)
   test-windows-debug-cl-x86_64-t4:

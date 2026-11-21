@@ -41,6 +41,12 @@ using namespace SlangUnitTest;
 /// requirement, which is enough of them to trip the consecutive-failure threshold in the
 /// killer case, and it cannot match the tests in THIS file -- slang-test spawning slang-test
 /// spawning slang-test.
+///
+/// The child runs with `-api none`. Some of these tests have a line with `targets=all`, and
+/// without the option the child would also run the variant of each such line for every API that
+/// the machine has. A variant can fail for a reason that has nothing to do with the server, for
+/// example the CUDA variant of line-macro.slang, or a Direct3D variant on a runner that has only a
+/// software device, and the child would then not report "100% of tests passed".
 static const char* kInnerTestPrefix = "tests/preprocessor/";
 
 /// Resolved relative to the working directory, exactly as slang-test resolves its own
@@ -98,6 +104,8 @@ static SlangResult _runSlangTestWithDyingServer(
     cmdLine.addArg("-use-test-server");
     cmdLine.addArg("-server-count");
     cmdLine.addArg("1");
+    cmdLine.addArg("-api");
+    cmdLine.addArg("none");
     cmdLine.addArg(kInnerTestPrefix);
 
     // The child inherits this environment, and test-server reads the variable when it
@@ -131,6 +139,8 @@ static SlangResult _runSlangTestWithGarblingServer(
     cmdLine.addArg("-use-test-server");
     cmdLine.addArg("-server-count");
     cmdLine.addArg("1");
+    cmdLine.addArg("-api");
+    cmdLine.addArg("none");
     cmdLine.addArg(kInnerTestPrefix);
 
     ScopedEnvVar nestedGuard(kNestedGuardEnvVar, "1");
@@ -147,13 +157,19 @@ static String _allOutput(const ExecuteResult& res)
     return builder.produceString();
 }
 
-/// Print the child's exit code and output.
+/// Report the child's exit code and output.
 ///
 /// Called whenever a case is about to fail. Without it a failure says only which assertion
 /// tripped, and the run that actually misbehaved -- a whole slang-test invocation, with its
 /// per-loss diagnostics and its summary -- is discarded. That happened: the first CI failure
 /// of these tests reported "res.resultCode == 0" and nothing else, on a platform that cannot
 /// be reproduced locally, which is the worst possible combination.
+///
+/// The text goes to the test reporter, not to stdout. When slang-test runs a unit test through
+/// a test server, stdout is the JSON-RPC channel of that server. A stray write to it makes
+/// the reply unreadable, and the outer run then reports "the test server returned a malformed
+/// HTTP or JSON response" for these tests, which hides the output that this function exists
+/// to show. The reporter returns the text to the outer run when the test fails.
 static void _dumpChildRun(
     const char* caseName,
     const char* envVar,
@@ -161,15 +177,11 @@ static void _dumpChildRun(
     const ExecuteResult& res)
 {
     const String output = _allOutput(res);
-    printf(
-        "\n--- %s: inner slang-test (%s=%d) exited %d ---\n"
-        "%s\n--- end inner run ---\n",
-        caseName,
-        envVar,
-        ordinal,
-        res.resultCode,
-        output.getBuffer());
-    fflush(stdout);
+    StringBuilder text;
+    text << "\n--- " << caseName << ": inner slang-test (" << envVar << "=" << ordinal
+         << ") exited " << res.resultCode << " ---\n"
+         << output << "\n--- end inner run ---\n";
+    getTestReporter()->message(TestMessageType::TestFailure, text.getBuffer());
 }
 
 /// A healthy server: the control. Whatever the other cases prove, they prove nothing unless
