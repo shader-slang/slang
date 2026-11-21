@@ -1667,6 +1667,15 @@ public:
 
         LetExpr* getOuterMostBinding() const { return m_outerMostBinding; }
 
+        /// Return the expression inside the bindings that wrap `expr`, an expression checked in
+        /// its own scope, or `expr` itself if it has none.
+        static Expr* skipBindings(Expr* expr);
+
+        /// Hoist the bindings that wrap `expr`, an expression checked in its own scope, into this
+        /// scope and return the expression inside them. The bindings are copied rather than moved,
+        /// because a checked expression can be shared.
+        Expr* hoistBindings(ASTBuilder* astBuilder, Expr* expr);
+
     private:
         LetExpr* m_outerMostBinding = nullptr;
         LetExpr* m_innerMostBinding = nullptr;
