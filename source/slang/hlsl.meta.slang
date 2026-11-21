@@ -1871,6 +1871,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case metal:
             return __getTexture().SampleBias(__getSampler(), location, bias, offset, clamp);
         case glsl:
+            // textureOffsetClampARB(sampler, P, offset, lodClamp [, bias]) — the clamp comes
+            // before the optional trailing bias.
             __intrinsic_asm "$ctextureOffsetClampARB($0, $1, $3, $4, $2)$z";
         case spirv:
             return spirv_asm [__assumeValidResourceOperands]
@@ -1932,6 +1934,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case metal:
             return __getTexture().SampleBias(__getSampler(), location, bias, clamp);
         case glsl:
+            // textureClampARB(sampler, P, lodClamp [, bias]) — the clamp comes before the
+            // optional trailing bias.
             __intrinsic_asm "$ctextureClampARB($0, $1, $3, $2)$z";
         case spirv:
             return spirv_asm [__assumeValidResourceOperands]
@@ -4190,6 +4194,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             // supported set.
             __intrinsic_asm "<invalid intrinsic>";
         case glsl:
+            // textureOffsetClampARB(sampler, P, offset, lodClamp [, bias]) — the clamp comes
+            // before the optional trailing bias.
             __intrinsic_asm "$ctextureOffsetClampARB($p, $2, $4, $5, $3)$z";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
@@ -4261,6 +4267,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 __intrinsic_asm "$c$0.sample($1, $2, bias($3), min_lod_clamp($4))$z";
             }
         case glsl:
+            // textureClampARB(sampler, P, lodClamp [, bias]) — the clamp comes before the
+            // optional trailing bias.
             __intrinsic_asm "$ctextureClampARB($p, $2, $4, $3)$z";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
