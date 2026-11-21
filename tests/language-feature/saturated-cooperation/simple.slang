@@ -1,3 +1,4 @@
+//TEST(compute):COMPARE_COMPUTE_EX():-cuda -compute -shaderobj -output-using-type
 //DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX():-vk -compute -shaderobj -output-using-type -render-features wave-ops
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX():-dx12 -profile sm_6_5 -compute -shaderobj -output-using-type -render-features wave-ops
 
