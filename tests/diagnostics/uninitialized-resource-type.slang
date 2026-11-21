@@ -1,6 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK1): -target hlsl -DTEST_1
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2,non-exhaustive): -target hlsl -DTEST_2
-// non-exhaustive due to pre-existing internal error (99999) triggered after diagnostic
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2,exit-code=0): -target hlsl -DTEST_2
 
 SamplerState sampler;
 
@@ -42,6 +41,5 @@ float4 cs_main(uint3 thread_id : SV_DispatchThreadID) {
     const let result = process(foo);
 //CHECK2:                     ^ use of uninitialized variable
 //CHECK2:                     ^ use of uninitialized variable 'foo'
-//CHECK2:                     ^ use of uninitialized opaque handle 'array<Texture2D,2>'.
     return result.color;
 }

@@ -61,20 +61,32 @@ static bool isUndefinedOpaqueHandle(IRInst* inst)
     return as<IRUndefined>(inst) && isImageSamplerOrAccelerationStructureType(inst->getDataType());
 }
 
-/// Call `f` on every undefined opaque handle in `module`. The handles are collected first, so `f`
-/// may remove the handle it is given.
-template<typename F>
-static void forEachUndefinedOpaqueHandle(IRModule* module, F const& f)
+/// Return whether `inst` is an undefined value whose type is opaque — it passes
+/// `isOpaqueType`, which matches every resource type, not only the image, sampler and
+/// acceleration-structure types Vulkan's `OpUndef` forbids — or an aggregate that contains an
+/// opaque type, such as an array of textures. The rewrite machinery recognizes only leaf
+/// handles; this wider predicate is for the diagnosis. The diagnosis runs after the final
+/// dead-code elimination in the SPIR-V pipeline, so every value it sees has a use that kept
+/// it alive.
+static bool isUndefinedValueContainingOpaqueHandle(IRInst* inst)
 {
-    List<IRInst*> handles;
+    return as<IRUndefined>(inst) && isOpaqueType(inst->getDataType(), nullptr);
+}
+
+/// Call `f` on every undefined value in `module` that `isUndefined` selects. The values are
+/// collected first, so `f` may remove the value it is given.
+template<typename IsUndefined, typename F>
+static void forEachUndefinedValue(IRModule* module, IsUndefined const& isUndefined, F const& f)
+{
+    List<IRInst*> values;
 
     // `IRUndefined` has two kinds, `LoadFromUninitializedMemory` and `Poison`, and we look for
     // both. A `Poison` is hoistable, so it lives at module scope, where `overAllBlocks` does not
     // look.
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (isUndefinedOpaqueHandle(globalInst))
-            handles.add(globalInst);
+        if (isUndefined(globalInst))
+            values.add(globalInst);
     }
 
     // A `LoadFromUninitializedMemory` lives in the function that reads the uninitialized memory.
@@ -84,13 +96,20 @@ static void forEachUndefinedOpaqueHandle(IRModule* module, F const& f)
         {
             for (auto inst : block->getChildren())
             {
-                if (isUndefinedOpaqueHandle(inst))
-                    handles.add(inst);
+                if (isUndefined(inst))
+                    values.add(inst);
             }
         });
 
-    for (auto handle : handles)
-        f(handle);
+    for (auto value : values)
+        f(value);
+}
+
+/// Call `f` on every undefined opaque handle in `module`.
+template<typename F>
+static void forEachUndefinedOpaqueHandle(IRModule* module, F const& f)
+{
+    forEachUndefinedValue(module, isUndefinedOpaqueHandle, f);
 }
 
 /// Return the image that `inst` reads or writes if `inst` is a dedicated image operation, or null
@@ -350,9 +369,9 @@ void eliminateUndefinedOpaqueHandles(IRModule* module, CodeGenContext* codeGenCo
     //
     // Specialization ends, because each clone has fewer image, sampler or acceleration-structure
     // parameters than the function it was cloned from: specializing a call removes at least one
-    // and adds none. The number of clones can still grow with each distinct set of arguments, as it
-    // can for global resources: a call tree in which each function calls the next twice, passing a
-    // different subset of undefined handles, can need a clone for every subset.
+    // and adds none. The number of clones can still grow with each distinct set of arguments, as
+    // it can for global resources: a call tree in which each function calls the next twice,
+    // passing a different subset of undefined handles, can need a clone for every subset.
     while (specializeFunctionCalls(codeGenContext, module, &condition))
     {
     }
@@ -366,13 +385,25 @@ void eliminateUndefinedOpaqueHandles(IRModule* module, CodeGenContext* codeGenCo
 
 void diagnoseUndefinedOpaqueHandles(IRModule* module, DiagnosticSink* sink)
 {
-    forEachUndefinedOpaqueHandle(
+    forEachUndefinedValue(
         module,
-        [&](IRInst* handle)
+        isUndefinedValueContainingOpaqueHandle,
+        [&](IRInst* value)
         {
-            sink->diagnose(Diagnostics::UseOfUninitializedOpaqueHandle{
-                .handleType = handle->getDataType(),
-                .location = findBestSourceLocFromUses(handle)});
+            // The message names the type `isOpaqueType` reports: an outermost resource type
+            // names itself (an array of resources is itself classified as a resource), and
+            // any other aggregate names the first resource type it contains, so a leaf names
+            // itself. The selection predicate already established the type is opaque; the
+            // assertion states that link, while the call stays outside it so the out-parameter
+            // is filled in every build.
+            IRType* handleType = nullptr;
+            bool isOpaque = isOpaqueType(value->getDataType(), &handleType);
+            SLANG_ASSERT(isOpaque);
+            auto loc = findBestSourceLocFromUses(value);
+            if (!loc.isValid())
+                loc = getDiagnosticPos(handleType);
+            sink->diagnose(
+                Diagnostics::UseOfUninitializedOpaqueHandle{.handleType = handleType, .location = loc});
         });
 }
 } // namespace Slang
