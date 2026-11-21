@@ -9,11 +9,16 @@
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -profile glsl_460 -stage fragment -entry glslMain
 
 TextureCube<float4> cubeTex;
+Texture1D<float4> tex1D;
 Texture2D<float4> tex2D;
+Texture3D<float4> tex3D;
+Texture2DArray<float4> tex2DArray;
 SamplerState samplerState;
 
 // Depth forms use the SampleCmp family.
 DepthTextureCube depthCube;
+DepthTexture1D depth1D;
+DepthTexture2D depth2D;
 SamplerComparisonState comparisonSampler;
 
 // Combined samplers.
@@ -63,6 +68,22 @@ float4 fragmentMain(float4 p: SV_Position) : SV_Target
     result += tex2D.SampleBias(samplerState, p.xy, 0.25, int2(1, 0), 0.5);
     // SPV: OpImageSparseSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|ConstOffset|MinLod
     result += tex2D.SampleBias(samplerState, p.xy, 0.25, int2(1, 0), 0.5, status);
+
+    // The same (offset, clamp) form across the other noncube shapes: 1D, 3D and 2D array.
+    // SPV: OpImageSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|ConstOffset|MinLod
+    result += tex1D.SampleBias(samplerState, p.x, 0.25, 1, 0.5);
+    // SPV: OpImageSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|ConstOffset|MinLod
+    result += tex3D.SampleBias(samplerState, p.xyz, 0.25, int3(1, 0, 0), 0.5);
+    // SPV: OpImageSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|ConstOffset|MinLod
+    result += tex2DArray.SampleBias(samplerState, float3(p.xy, 0), 0.25, int2(1, 0), 0.5);
+
+    // The comparison (offset, clamp) forms on noncube shapes.
+    // SPV: OpImageSampleDrefImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} ConstOffset|MinLod
+    result += float4(depth2D.SampleCmp(comparisonSampler, p.xy, 0.5, int2(1, 0), 0.25), 0, 0, 1);
+    // SPV: OpImageSampleDrefImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|ConstOffset|MinLod
+    result += float4(depth1D.SampleCmpBias(comparisonSampler, p.x, 0.5, 0.25, 1, 0.5), 0, 0, 1);
+    // SPV: OpImageSampleDrefExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Grad|ConstOffset|MinLod
+    result += float4(depth2D.SampleCmpGrad(comparisonSampler, p.xy, 0.5, ddx(p.xy), ddy(p.xy), int2(1, 0), 0.25), 0, 0, 1);
 
     // Combined samplers exercise the twin wrappers.
     // SPV: %{{[A-Za-z0-9_]+}} = OpImageSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} MinLod
