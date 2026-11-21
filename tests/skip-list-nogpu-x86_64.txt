@@ -1,0 +1,9 @@
+# Skip list for the nogpu jobs on x86_64 (the -cpu jobs on GitHub-hosted runners).
+# Each line is a path prefix. Tests that start with these paths are skipped.
+
+# tests/cpu-program/gfx-smoke.slang creates a gfx device and needs the gfx
+# module, which these runners do not provide. On Linux the test fails. On
+# Windows the program does not end, so the job runs until its timeout. An
+# expected-failure entry cannot help, because it changes a result only after
+# the test returns. The aarch64 runners pass the test.
+tests/cpu-program/gfx-smoke.slang

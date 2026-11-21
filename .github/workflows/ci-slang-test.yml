@@ -150,6 +150,10 @@ jobs:
               # no tier. The GPU tiers use -compile-test false.
               api_expr="cpu+llvm"
               slang_test_args+=("-compile-test" "true")
+              # The x86_64 runners cannot run the tests that need the gfx module.
+              if [[ "${{ inputs.platform }}" == "x86_64" ]]; then
+                slang_test_args+=("-exclude-list" "tests/skip-list-nogpu-x86_64.txt")
+              fi
               ;;
             t4 | sm80plus)
               # The GPU tiers run the same way, and differ only in which tests
