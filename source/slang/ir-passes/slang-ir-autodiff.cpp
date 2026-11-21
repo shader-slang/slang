@@ -549,6 +549,12 @@ IRInst* DifferentiableTypeConformanceContext::buildDifferentiablePairWitness(
         auto addMethod = builder->createFunc();
         auto zeroMethod = builder->createFunc();
 
+        // The pair's add/zero methods are synthesized from a type conformance with no source
+        // function to copy debug info from (the element type's own add/zero witnesses are
+        // synthesized the same way), so they carry a name, not a DebugFunction record.
+        builder->addNameHintDecoration(addMethod, UnownedStringSlice("__diffPair_add"));
+        builder->addNameHintDecoration(zeroMethod, UnownedStringSlice("__diffPair_zero"));
+
         table = builder->createWitnessTable(
             sharedContext->differentiableInterfaceType,
             (IRType*)pairType);
@@ -1355,22 +1361,89 @@ bool isDiffInst(IRInst* inst)
     return false;
 }
 
+// Name `dstInst` after `srcInst`'s name hint, prepending `prefix`. No-op when `srcInst` has no
+// name hint.
+void addPrefixedNameHint(IRBuilder* builder, IRInst* srcInst, IRInst* dstInst, const char* prefix)
+{
+    if (auto nameHint = srcInst->findDecoration<IRNameHintDecoration>())
+    {
+        String name = nameHint->getName();
+        name = prefix + name;
+        builder->addNameHintDecoration(dstInst, name.getUnownedSlice());
+    }
+}
+
+// The debug decorations both debug-info copy helpers copy from a source function onto a
+// derivative. DebugFuncDecoration is the one case they differ on — re-reference the source's
+// record vs build a fresh one — so each helper handles it itself.
+static bool isCopiedDebugDecoration(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugInlinedVariable:
+    case kIROp_DebugLocationDecoration:
+        return true;
+    default:
+        return false;
+    }
+}
+
 void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
 {
     // Copy debug decorations.
     for (auto decor : srcFunc->getDecorations())
     {
+        if (decor->getOp() == kIROp_DebugFuncDecoration || isCopiedDebugDecoration(decor->getOp()))
+            cloneDecoration(decor, destFunc);
+    }
+}
+
+void copyDebugInfoForSynthesizedFunc(IRBuilder* builder, IRInst* srcFunc, IRInst* destFunc)
+{
+    // Copy `srcFunc`'s debug decorations onto a derivative function that a translation op has
+    // just synthesized. Unlike `copyDebugInfo`, which re-references the source's record, this
+    // builds a fresh IRDebugFunction record for the destination: the SPIR-V emitter binds at
+    // most one DebugFunctionDefinition per record, so sharing the source's record would leave
+    // the derivative's body undescribed whenever the source's body claims the record first.
+    // Owning the record is safe here because a synthesized body's instructions carry no debug
+    // scopes of their own — they resolve to the function's own record — whereas a cloned body's
+    // scopes point at the source's record, which is why the clone-based translations keep
+    // sharing it. The record is inserted in the destination's own scope because a synthesized
+    // derivative can still sit inside an IRGeneric at this point, and its type operand may
+    // reference that generic's parameters. No-op when the source carries no debug info.
+    for (auto decor : srcFunc->getDecorations())
+    {
         switch (decor->getOp())
         {
-        case kIROp_DebugInlinedAt:
-        case kIROp_DebugScope:
-        case kIROp_DebugNoScope:
-        case kIROp_DebugInlinedVariable:
         case kIROp_DebugFuncDecoration:
-        case kIROp_DebugLocationDecoration:
-            cloneDecoration(decor, destFunc);
+            {
+                auto srcDebugFunc = as<IRDebugFunction>(decor->getOperand(0));
+                IRInst* nameOperand = srcDebugFunc->getName();
+                // The destination's own name is the point of the record; without a name hint the
+                // record reuses the source record's name.
+                if (auto nameHint = destFunc->findDecoration<IRNameHintDecoration>())
+                    nameOperand = nameHint->getNameOperand();
+                auto debugType = destFunc->getDataType();
+                SLANG_RELEASE_ASSERT(debugType);
+                builder->setInsertBefore(destFunc);
+                auto destDebugFunc = builder->emitDebugFunction(
+                    nameOperand,
+                    srcDebugFunc->getLine(),
+                    srcDebugFunc->getCol(),
+                    srcDebugFunc->getFile(),
+                    debugType,
+                    srcDebugFunc->getParentScope());
+                for (auto recordDecor : srcDebugFunc->getDecorations())
+                    cloneDecoration(recordDecor, destDebugFunc);
+                builder->addDecoration(destFunc, kIROp_DebugFuncDecoration, destDebugFunc);
+            }
             break;
         default:
+            if (isCopiedDebugDecoration(decor->getOp()))
+                cloneDecoration(decor, destFunc);
             break;
         }
     }
