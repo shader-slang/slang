@@ -183,11 +183,6 @@ jobs:
                 # Keep the SM80 cost bounded: run only the tests that T4 cannot.
                 slang_test_args+=("-include-list" "tests/tests-require-sm80.txt")
               fi
-              # tests/expected-failure-linux-gpu.txt lists failures of the Linux
-              # GPU machines, so it applies only to Linux jobs.
-              if [[ "${{ inputs.os }}" == "linux" ]]; then
-                slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
-              fi
               ;;
             metal | "")
               # metal is the GPU of macOS. No tier: by default, run every test.
@@ -210,7 +205,7 @@ jobs:
 
           # Add no-GPU failure list for the jobs that have no GPU
           if [[ "${{ inputs.gpu-tier }}" == "nogpu" ]]; then
-            slang_test_args+=("-expected-failure-list" "tests/expected-failure-no-gpu.txt")
+            slang_test_args+=("-expected-failure-list" "tests/expected-failure-nogpu.txt")
           fi
 
           # Add known failures on Linux regardless GPU presence

@@ -8,3 +8,10 @@ tests/cooperative-vector/matrix-mul-mut.slang.3
 tests/cooperative-vector/matrix-mul-packed-mut.slang.3
 tests/cooperative-vector/matrix-mul-packed.slang.3
 tests/cooperative-vector/matrix-mul.slang.3
+
+# These tests fail due to driver and hardware limitations on the Linux GPU runners.
+# Unit test - RecordReplay fails on a Linux GPU runner
+slang-unit-test-tool/RecordReplay_cpu_hello_world.internal
+
+# Ray tracing tests - CUDA/OptiX issues on T4
+tests/pipeline/ray-tracing/raygen.slang (cuda)
