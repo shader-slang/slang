@@ -73,16 +73,35 @@ IRFuncType* NativeCallMarshallingContext::getNativeFuncType(
 
 void NativeCallMarshallingContext::marshalRefManagedValueToNativeValue(
     IRBuilder& builder,
+    IRType* originalParamType,
     IRInst* originalArg,
-    List<IRInst*>& args)
+    List<IRInst*>& args,
+    List<NativeArgWriteBack>& outWriteBacks)
 {
     auto ptrTypeBase = as<IRPtrTypeBase>(originalArg->getDataType());
     SLANG_RELEASE_ASSERT(ptrTypeBase);
-    switch (ptrTypeBase->getValueType()->getOp())
+    auto valueType = ptrTypeBase->getValueType();
+    switch (valueType->getOp())
     {
     case kIROp_InterfaceType:
     case kIROp_ComPtrType:
         args.add(builder.emitGetManagedPtrWriteRef(originalArg));
+        break;
+    case kIROp_StringType:
+        {
+            // The native callee sees `const char**`, which cannot point at a managed `String`.
+            // We pass a native temporary instead; `marshalNativeCall` copies it back into the
+            // caller's `String` once the callee returns.
+            auto nativeVar = builder.emitVar(getNativeType(builder, valueType));
+            if (originalParamType->getOp() != kIROp_OutParamType)
+            {
+                auto managedValue = builder.emitLoad(originalArg);
+                builder.emitStore(nativeVar, builder.emitGetNativeString(managedValue));
+            }
+            args.add(nativeVar);
+            if (originalParamType->getOp() != kIROp_BorrowInParamType)
+                outWriteBacks.add({originalArg, nativeVar});
+        }
         break;
     default:
         args.add(originalArg);
@@ -94,7 +113,8 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeValue(
     IRBuilder& builder,
     IRType* originalParamType,
     IRInst* originalArg,
-    List<IRInst*>& args)
+    List<IRInst*>& args,
+    List<NativeArgWriteBack>& outWriteBacks)
 {
     switch (originalParamType->getOp())
     {
@@ -102,7 +122,12 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeValue(
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
     case kIROp_OutParamType:
-        return marshalRefManagedValueToNativeValue(builder, originalArg, args);
+        return marshalRefManagedValueToNativeValue(
+            builder,
+            originalParamType,
+            originalArg,
+            args,
+            outWriteBacks);
     case kIROp_StringType:
         {
             auto nativeStr = builder.emitGetNativeString(originalArg);
@@ -312,10 +337,11 @@ IRInst* NativeCallMarshallingContext::marshalNativeCall(
 {
     // Marshal parameters to arguments into native func.
     List<IRInst*> args;
+    List<NativeArgWriteBack> writeBacks;
     for (Int i = 0; i < argCount; i++)
     {
         auto paramType = originalFuncType->getParamType(i);
-        marshalManagedValueToNativeValue(builder, paramType, originalArgs[i], args);
+        marshalManagedValueToNativeValue(builder, paramType, originalArgs[i], args, writeBacks);
     }
     IRType* originalReturnType = originalFuncType->getResultType();
 
@@ -327,13 +353,20 @@ IRInst* NativeCallMarshallingContext::marshalNativeCall(
         resultVar = builder.emitVar(getNativeType(builder, resultType->getValueType()));
         errorVar = builder.emitVar(getNativeType(builder, resultType->getErrorType()));
         args.add(resultVar);
-        args.add(resultVar);
+        args.add(errorVar);
     }
 
     // Insert call.
     IRInst* call = builder.emitCallInst(nativeFuncType->getResultType(), nativeFunc, args);
 
-    // TODO: marshal output/ref args back to original args.
+    // Copy the native temporaries of by-reference arguments back into the caller's storage.
+    for (const auto& writeBack : writeBacks)
+    {
+        auto nativeValue = builder.emitLoad(writeBack.nativeVar);
+        builder.emitStore(
+            writeBack.managedPtr,
+            marshalNativeValueToManagedValue(builder, nativeValue));
+    }
 
     IRInst* returnValue = call;
 
