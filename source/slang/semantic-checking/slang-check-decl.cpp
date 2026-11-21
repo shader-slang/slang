@@ -22611,6 +22611,19 @@ static FunctionDeclBase* _getUserDefinedDerivativeFuncDecl(UserDefinedDerivative
     return _getFuncDeclFromExpr(attr->funcExpr);
 }
 
+// Returns the element type of an opaque handle type, such as `double` for
+// `RWStructuredBuffer<double>` or `float4` for `Texture2D<float4>`, or null if it has none.
+static Type* _getOpaqueHandleElementType(Type* type)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+    if (auto genericType = as<BuiltinGenericType>(type))
+        return genericType->getElementType();
+    if (auto resourceType = as<ResourceType>(type))
+        return resourceType->getElementType();
+    return nullptr;
+}
+
 template<typename ProcessFunc, typename ParentDiagnosticFunc>
 struct CapabilityDeclReferenceVisitor
     : public SemanticsDeclReferenceVisitor<
@@ -22644,6 +22657,137 @@ struct CapabilityDeclReferenceVisitor
             loc = Base::sourceLocStack.getLast();
         handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
     }
+    // Visit a type that names a declaration, and join the requirements of a struct type's fields.
+    //
+    // Consider this example:
+    //
+    //     struct S { float a; double b; }
+    //     RWStructuredBuffer<S> sb;
+    //     void main() { output[0] = sb[0].a; }
+    //
+    // `main` never names `b`, but emitting a value of type `S` declares `b`, so `main` requires
+    // what `double` requires. We join the field requirements wherever the struct type is used,
+    // rather than into the struct's own `inferredCapabilityRequirements`, because
+    // `getDeclaredCapabilitySet` treats that set as the declared set of the struct's member
+    // functions. Walking the specialized type also covers generic structs (`G<double>`), nested
+    // structs (`G<int>.Inner`) and base structs. Every struct type the walk reaches takes part,
+    // including one named only as a generic argument, just as naming `double` there does; a
+    // generic struct that only qualifies a name, as in `G<float>.f()`, is not a type here and adds
+    // nothing.
+    void visitDeclRefType(DeclRefType* type)
+    {
+        if (this->visitedVals.contains(type))
+            return;
+        Base::visitVal(type);
+        if (auto structDeclRef = type->getDeclRef().template as<StructDecl>())
+            joinStructFieldRequirements(structDeclRef);
+    }
+    // Visit a type that an expression names as a type rather than as the type of a value, such
+    // as the base `Outer<float>` of the static call `Outer<float>.one()`. No value of the named
+    // type is declared, so a struct's fields add nothing here; its generic arguments still count,
+    // as everywhere else. The named type is not recorded as visited, so a later use of a value of
+    // that type still joins its fields.
+    void visitTypeType(TypeType* type)
+    {
+        if (!this->visitedVals.add(type))
+            return;
+        auto namedType = as<DeclRefType>(type->getType());
+        if (!namedType)
+        {
+            this->dispatchIfNotNull(type->getType());
+            return;
+        }
+        for (Index i = 0; i < namedType->getOperandCount(); i++)
+        {
+            if (namedType->m_operands[i].kind == ValNodeOperandKind::ValNode)
+                this->dispatchIfNotNull(namedType->getOperand(i));
+        }
+    }
+    // Visit the specialized type of each instance field of `structDeclRef` and of its base struct.
+    //
+    // A field whose type is a resource, sampler or other opaque handle contributes only its
+    // element type. Type legalization moves such fields out of the struct, so declaring the
+    // struct does not declare the handle type itself, and code that reads the field reaches that
+    // type through the member access instead. The element type still counts: Metal keeps the
+    // resource fields of a parameter block in the argument buffer, so an unused
+    // `RWStructuredBuffer<double>` field there is emitted with the struct. A handle type that a
+    // target lacks, such as `Buffer<float>` on WGSL, does not reject the struct.
+    //
+    // Each specialized struct type is walked once, because `visitDeclRefType` records it in
+    // `visitedVals`; two specializations of one generic struct can have different field types, as
+    // in `Box<A>` and `Box<B>` where a field is `T.Assoc`. A recursive generic struct such as
+    // `struct LoopField<each T> { LoopField<T, int> next; }` produces a new specialization at every
+    // level, so we stop at `kMaxTypeNestingDepth`, the depth at which lowering reports that type.
+    void joinStructFieldRequirements(DeclRef<StructDecl> structDeclRef)
+    {
+        if (structFieldNestingDepth >= kMaxTypeNestingDepth)
+            return;
+        ++structFieldNestingDepth;
+        auto astBuilder = this->getASTBuilder();
+        for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+        {
+            auto fieldType = getType(astBuilder, fieldDeclRef);
+            Type* elementType = fieldType;
+            while (auto arrayType = as<ArrayExpressionType>(elementType))
+                elementType = arrayType->getElementType();
+            typename Base::PushSourceLocRAII fieldLoc(
+                this->sourceLocStack,
+                fieldDeclRef.getDecl()->loc);
+            if (isOpaqueHandleType(elementType))
+                this->dispatchIfNotNull(_getOpaqueHandleElementType(elementType));
+            else
+                this->dispatchIfNotNull(fieldType);
+        }
+        if (auto baseStructType = findBaseStructType(astBuilder, structDeclRef))
+            this->dispatchIfNotNull(baseStructType);
+        --structFieldNestingDepth;
+    }
+    UInt structFieldNestingDepth = 0;
+    // Visit the default value of each parameter that a call leaves out, because code generation
+    // evaluates that value at the call site. Consider this example:
+    //
+    //     float scaled(float x = (float)(2.0LF)) { return x; }
+    //     void main() { output[0] = scaled(); }
+    //
+    // The checked call `scaled()` has no argument expression for `x`, but its lowering
+    // (`addDirectCallArgs`) inserts the parameter's default value, so the call uses `double`.
+    void visitInvokeExpr(InvokeExpr* expr)
+    {
+        Base::visitInvokeExpr(expr);
+        visitOmittedDefaultArguments(expr);
+    }
+    // A cast that resolves to a constructor, as in `(Wide)x`, is a call too, and its omitted
+    // arguments are filled in the same way.
+    void visitTypeCastExpr(TypeCastExpr* expr)
+    {
+        Base::visitTypeCastExpr(expr);
+        visitOmittedDefaultArguments(expr);
+    }
+    // Visit the default values of the parameters of `call`'s callee that follow its explicit
+    // arguments.
+    //
+    // Arguments map to parameters by position, as in `addDirectCallArgs`, so the omitted
+    // parameters are those from `arguments.getCount()` on. Joining capability sets is idempotent,
+    // so we visit each default value once per walk. That bound is also what makes the walk end:
+    // the synthesized constructor of `struct LoopField<each T> { LoopField<T, int> next; }` has a
+    // default value for `next` that calls the same constructor with the argument omitted (see
+    // tests/language-feature/generics/recursive-variadic-field-specialization-budget.slang).
+    void visitOmittedDefaultArguments(InvokeExpr* call)
+    {
+        auto funcDecl = _getFuncDeclFromExpr(call->functionExpr);
+        if (!funcDecl)
+            return;
+        Index argCount = call->arguments.getCount();
+        Index paramIndex = 0;
+        for (auto param : funcDecl->getParameters())
+        {
+            if (paramIndex++ < argCount)
+                continue;
+            if (visitedDefaultArgParams.add(param))
+                this->dispatchIfNotNull(param->initExpr);
+        }
+    }
+    HashSet<ParamDecl*> visitedDefaultArgParams;
     virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
     {
         if (decl)
@@ -23068,6 +23212,106 @@ CapabilitySet getDeclRefCapabilityRequirements(
     return requirements;
 }
 
+// Visit the declarations that satisfy the requirements in `witnessTable`, and in the tables of
+// the interfaces it inherits, because linking the conformance for dynamic dispatch emits each
+// of them.
+template<typename VisitDeclRef>
+static void _visitWitnessTableImplementations(
+    WitnessTable* witnessTable,
+    HashSet<WitnessTable*>& visitedTables,
+    const VisitDeclRef& visitDeclRef)
+{
+    if (!witnessTable || !visitedTables.add(witnessTable))
+        return;
+    for (auto& entry : witnessTable->getRequirementDictionary())
+    {
+        auto witness = entry.value;
+        switch (witness.getFlavor())
+        {
+        case RequirementWitness::Flavor::declRef:
+            visitDeclRef(witness.getDeclRef());
+            break;
+        case RequirementWitness::Flavor::witnessTable:
+            _visitWitnessTableImplementations(
+                witness.getWitnessTable(),
+                visitedTables,
+                visitDeclRef);
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+template<typename VisitDeclRef>
+static void _visitSubtypeWitnessImplementations(
+    SubtypeWitness* witness,
+    HashSet<WitnessTable*>& visitedTables,
+    const VisitDeclRef& visitDeclRef)
+{
+    if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
+    {
+        if (auto inheritanceDeclRef = declaredWitness->getDeclRef().as<InheritanceDecl>())
+            _visitWitnessTableImplementations(
+                inheritanceDeclRef.getDecl()->witnessTable,
+                visitedTables,
+                visitDeclRef);
+    }
+    else if (auto transitiveWitness = as<TransitiveSubtypeWitness>(witness))
+    {
+        _visitSubtypeWitnessImplementations(
+            transitiveWitness->getSubToMid(),
+            visitedTables,
+            visitDeclRef);
+        _visitSubtypeWitnessImplementations(
+            transitiveWitness->getMidToSup(),
+            visitedTables,
+            visitDeclRef);
+    }
+}
+
+CapabilitySet getTypeConformanceCapabilityRequirements(
+    SemanticsVisitor* visitor,
+    SubtypeWitness* witness,
+    List<CapabilityRequirementUse>& outUses)
+{
+    // Consider this example, compiled with `-conformance "DoubleValue:IValue=1"`:
+    //
+    //     struct DoubleValue : IValue { float get() { return (float)(2.0LF); } }
+    //
+    // No entry point names `DoubleValue` or its `get`, but linking the conformance emits both,
+    // so their requirements apply to every target of the program. Collect the requirements of
+    // the conforming type, which include its fields, and of each declaration that satisfies a
+    // requirement of the interface.
+    CapabilitySet requirements;
+    auto processFunc = [&](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc loc)
+    {
+        requirements.join(nodeCaps);
+        if (auto decl = as<Decl>(node); decl && nodeCaps && !nodeCaps->isEmpty())
+            outUses.add({decl, loc});
+    };
+    auto parentDiagnosticFunc = [](DiagnosticCategory) {};
+    visitReferencedDecls(
+        *visitor,
+        witness->getSub(),
+        SourceLoc(),
+        nullptr,
+        processFunc,
+        parentDiagnosticFunc);
+
+    HashSet<WitnessTable*> visitedTables;
+    _visitSubtypeWitnessImplementations(
+        witness,
+        visitedTables,
+        [&](DeclRef<Decl> implDeclRef)
+        {
+            auto implDecl = implDeclRef.getDecl();
+            visitor->ensureDecl(implDecl, DeclCheckState::CapabilityChecked);
+            processFunc(implDecl, implDecl->inferredCapabilityRequirements, implDecl->loc);
+        });
+    return requirements;
+}
+
 CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)
 {
     if (stmt == nullptr)
@@ -23085,20 +23329,66 @@ CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)
     return inferredRequirements;
 }
 
+// Returns true if the initializer of `varDecl` is code that runs before the variable is read,
+// and that the body walk of a function does not see. Consider this example:
+//
+//     static const float kScale = (float)twice(1.25LF);
+//     void main() { output[0] = kScale; }
+//
+// `main` reads `kScale`, so the initializer, and the `double` in it, is emitted for `main`'s
+// target. A module-scope variable that is not a shader parameter, and a `static` member of a
+// type, are such variables. A local variable is not: its initializer is part of the function
+// body, which the function's own walk visits. The initializer of a variable whose type holds a
+// resource or other opaque handle does not count either: type legalization replaces such a
+// variable, and moves or folds its initializer, so the code that runs is not the initializer as
+// written.
+static bool _isInitializerRunAtUse(SemanticsVisitor* visitor, VarDeclBase* varDecl)
+{
+    if (!varDecl->initExpr || !as<VarDecl>(varDecl))
+        return false;
+    if (isGlobalDecl(varDecl))
+    {
+        if (isGlobalShaderParameter(varDecl))
+            return false;
+    }
+    else
+    {
+        auto parentDecl = varDecl->parentDecl;
+        while (auto genericDecl = as<GenericDecl>(parentDecl))
+            parentDecl = genericDecl->parentDecl;
+        if (!as<AggTypeDeclBase>(parentDecl) || !varDecl->hasModifier<HLSLStaticModifier>())
+            return false;
+    }
+    return !typeTransitivelyContainsOpaqueHandle(visitor, varDecl->type.type);
+}
+
 void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     CapabilitySet mutableCapSet{varDecl->inferredCapabilityRequirements};
+    auto propagate =
+        [this,
+         varDecl,
+         &mutableCapSet](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
+    { _propagateRequirement(this, mutableCapSet, varDecl, node, nodeCaps, refLoc); };
+    auto seeDefinition = [this, varDecl](DiagnosticCategory category)
+    { _propagateSeeDefinitionOf(this, varDecl, category); };
     visitReferencedDecls(
         *this,
         varDecl->type.type,
         varDecl->loc,
         varDecl->findModifier<RequireCapabilityAttribute>(),
-        [this,
-         varDecl,
-         &mutableCapSet](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
-        { _propagateRequirement(this, mutableCapSet, varDecl, node, nodeCaps, refLoc); },
-        [this, varDecl](DiagnosticCategory category)
-        { _propagateSeeDefinitionOf(this, varDecl, category); });
+        propagate,
+        seeDefinition);
+    // A reference to the variable joins its requirements, so the initializer's requirements reach
+    // every function that reads it.
+    if (_isInitializerRunAtUse(this, varDecl))
+        visitReferencedDecls(
+            *this,
+            varDecl->initExpr,
+            varDecl->initExpr->loc,
+            varDecl->findModifier<RequireCapabilityAttribute>(),
+            propagate,
+            seeDefinition);
     varDecl->inferredCapabilityRequirements = mutableCapSet.freeze(getASTBuilder());
 }
 

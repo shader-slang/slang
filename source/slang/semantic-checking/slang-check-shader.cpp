@@ -2053,6 +2053,60 @@ static void validateEntryPointCapabilities(
     }
 }
 
+bool validateTypeConformanceCapabilities(
+    Linkage* linkage,
+    SemanticsVisitor* visitor,
+    SubtypeWitness* witness,
+    DiagnosticSink* sink)
+{
+    auto typeDecl = isDeclRefTypeOf<Decl>(witness->getSub()).getDecl();
+    if (!typeDecl)
+        return true;
+    List<CapabilityRequirementUse> uses;
+    auto requirements = getTypeConformanceCapabilityRequirements(visitor, witness, uses);
+    auto errorCountBefore = sink->getErrorCount();
+    for (auto target : linkage->targets)
+    {
+        auto& targetOptionSet = target->getOptionSet();
+        auto targetCaps = target->getTargetCaps();
+        if (!targetCaps.isIncompatibleWith(requirements))
+            continue;
+        auto compileTarget = targetCaps.getCompileTarget();
+        maybeDiagnose(
+            sink,
+            targetOptionSet,
+            DiagnosticCategory::Capability,
+            Diagnostics::DeclHasDependenciesNotCompatibleOnTarget{
+                .target = capabilityNameToString((CapabilityName)compileTarget),
+                .decl = typeDecl});
+        // A method's provenance leads to the code in its body. A type that a field or the
+        // conforming type itself names has no use site of its own, so point at the field.
+        CapabilitySet failedSet((CapabilityName)compileTarget);
+        for (auto& use : uses)
+        {
+            if (!targetCaps.isIncompatibleWith(
+                    CapabilitySet{use.decl->inferredCapabilityRequirements}))
+                continue;
+            if (as<FunctionDeclBase>(use.decl) || !use.loc.isValid())
+            {
+                diagnoseMissingCapabilityProvenance(targetOptionSet, sink, use.decl, failedSet);
+                continue;
+            }
+            maybeDiagnose(
+                sink,
+                targetOptionSet,
+                DiagnosticCategory::Capability,
+                Diagnostics::SeeUsingOf{.decl = use.decl, .location = use.loc});
+            maybeDiagnose(
+                sink,
+                targetOptionSet,
+                DiagnosticCategory::Capability,
+                Diagnostics::SeeDefinitionOf{.decl = use.decl});
+        }
+    }
+    return sink->getErrorCount() == errorCountBefore;
+}
+
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
 void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
