@@ -389,7 +389,7 @@ alias cpp_glsl_hlsl_spirv_wgsl = cpp | glsl | hlsl | spirv | wgsl;
 /// [Compound]
 alias cpp_glsl_hlsl_metal_spirv = cpp | glsl | hlsl | metal | spirv;
 
-/// CPP, GLSL, HLSL and Metal code-gen targets
+/// CPP, GLSL, HLSL, and Metal code-gen targets
 /// [Compound]
 alias cpp_glsl_hlsl_metal = cpp | glsl | hlsl | metal;
 
@@ -1267,7 +1267,10 @@ alias GL_ARB_sparse_texture = _GL_ARB_sparse_texture | spvSparseResidency;
 /// [EXT]
 alias GL_ARB_sparse_texture2 = _GL_ARB_sparse_texture2 | spvSparseResidency;
 
-/// Represents the GL_ARB_sparse_texture_clamp extension.
+/// Represents the GL_ARB_sparse_texture_clamp extension. The SPIR-V
+/// companion atom is spvMinLod because a clamp-only lowering emits just the
+/// MinLod image operand; the residency-status forms add spvSparseResidency
+/// explicitly on the overloads that emit OpImageSparseSample*.
 /// [EXT]
 alias GL_ARB_sparse_texture_clamp = _GL_ARB_sparse_texture_clamp | spvMinLod;
 

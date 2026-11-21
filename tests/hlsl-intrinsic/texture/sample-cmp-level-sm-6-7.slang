@@ -1,5 +1,6 @@
 // SampleCmpLevel's HLSL lowering requires SM 6.7 (DXC's minimum for the method), so a lower
 // profile is diagnosed as implicitly upgraded rather than silently emitting a 6.7 instruction.
+// The expected diagnostic reports the sm_6_6 request by its canonical profile name, lib_6_6.
 //DIAGNOSTIC_TEST:SIMPLE(diag=UPGRADE,non-exhaustive,exit-code=0):-target hlsl -profile sm_6_6 -stage fragment -entry fragmentMain
 //DIAGNOSTIC_TEST:SIMPLE(diag=NO_UPGRADE,non-exhaustive,exit-code=0):-target hlsl -profile sm_6_7 -stage fragment -entry fragmentMain
 

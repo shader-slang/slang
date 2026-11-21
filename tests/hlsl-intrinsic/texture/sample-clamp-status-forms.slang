@@ -3,10 +3,14 @@
 // on the explicit-LOD methods, and noncube textures take (offset, clamp) / (offset, clamp, status)
 // on SampleBias and the SampleCmp family. The SPIR-V run checks the image operands (MinLod, the
 // status store) as well as overload selection; the GLSL run covers the clamp forms that lower
-// through GL_ARB_sparse_texture_clamp (GLSL has no residency forms, so those stay out of glslMain).
+// through GL_ARB_sparse_texture_clamp (GLSL has no residency forms, so those stay out of glslMain);
+// the Metal run covers the hand-written MSL clamp bodies.
+// The profile is sm_6_8 so the SampleCmpLevel (SM 6.7 on HLSL) and the comparison clamp forms
+// clear their capability checks without profile-upgrade warnings.
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage fragment -entry fragmentMain -profile sm_6_8
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage fragment -entry fragmentMain
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -profile glsl_460 -stage fragment -entry glslMain
+//TEST:SIMPLE(filecheck=MTL):-target metal -stage fragment -entry metalMain
 
 TextureCube<float4> cubeTex;
 Texture1D<float4> tex1D;
@@ -33,13 +37,12 @@ float4 fragmentMain(float4 p: SV_Position) : SV_Target
     // Cube clamp forms.
     // SPV: %{{[A-Za-z0-9_]+}} = OpImageSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} MinLod
     result += cubeTex.Sample(samplerState, normalize(p.xyz), 0.5);
+    // HLSL: .Sample(samplerState_{{[0-9]*}}, normalize(
     // SPV: OpImageSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|MinLod
     result += cubeTex.SampleBias(samplerState, normalize(p.xyz), 0.25, 0.5);
+    // HLSL: .SampleBias(samplerState_{{[0-9]*}}, normalize(
     // SPV: OpImageSampleExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Grad|MinLod
     result += cubeTex.SampleGrad(samplerState, normalize(p.xyz), ddx(p.xyz), ddy(p.xyz), 0.5);
-
-    // HLSL: .Sample(samplerState_{{[0-9]*}}, normalize(
-    // HLSL: .SampleBias(samplerState_{{[0-9]*}}, normalize(
     // HLSL: .SampleGrad(samplerState_{{[0-9]*}}, normalize(
 
     // Cube status forms.
@@ -47,7 +50,11 @@ float4 fragmentMain(float4 p: SV_Position) : SV_Target
     // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} MinLod
     // SPV: OpStore %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}}
     result += cubeTex.Sample(samplerState, normalize(p.xyz), 0.5, status);
-    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Lod
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|MinLod
+    result += cubeTex.SampleBias(samplerState, normalize(p.xyz), 0.25, 0.5, status);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Grad|MinLod
+    result += cubeTex.SampleGrad(samplerState, normalize(p.xyz), ddx(p.xyz), ddy(p.xyz), 0.5, status);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Lod %{{[A-Za-z0-9_.]+}}
     result += cubeTex.SampleLevel(samplerState, normalize(p.xyz), 0.0, status);
 
     // Cube comparison clamp and status forms.
@@ -62,6 +69,12 @@ float4 fragmentMain(float4 p: SV_Position) : SV_Target
     // SampleCmpLevelZero with status forwards to the LOD form with level 0 on SPIR-V.
     // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleDrefExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Lod %float_0
     result += depthCube.SampleCmpLevelZero(comparisonSampler, normalize(p.xyz), 0.5, status);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleDrefImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} MinLod
+    result += depthCube.SampleCmp(comparisonSampler, normalize(p.xyz), 0.5, 0.25, status);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleDrefImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|MinLod
+    result += depthCube.SampleCmpBias(comparisonSampler, normalize(p.xyz), 0.5, 0.25, 0.5, status);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleDrefExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Grad|MinLod
+    result += depthCube.SampleCmpGrad(comparisonSampler, normalize(p.xyz), 0.5, ddx(p.xyz), ddy(p.xyz), 0.25, status);
 
     // Noncube (offset, clamp) and (offset, clamp, status) forms.
     // SPV: OpImageSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|ConstOffset|MinLod
@@ -90,10 +103,16 @@ float4 fragmentMain(float4 p: SV_Position) : SV_Target
     result += combinedCube.Sample(normalize(p.xyz), 0.5);
     // SPV: OpImageSampleExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Grad|MinLod
     result += combinedCube.SampleGrad(normalize(p.xyz), ddx(p.xyz), ddy(p.xyz), 0.5);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} MinLod
+    result += combinedCube.Sample(normalize(p.xyz), 0.5, status);
     // SPV: OpImageSampleDrefImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} MinLod
     result += combinedCubeShadow.SampleCmp(normalize(p.xyz), 0.5, 0.25);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleDrefImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} MinLod
+    result += combinedCubeShadow.SampleCmp(normalize(p.xyz), 0.5, 0.25, status);
     // SPV: OpImageSampleDrefExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Grad|MinLod
     result += combinedCubeShadow.SampleCmpGrad(normalize(p.xyz), 0.5, ddx(p.xyz), ddy(p.xyz), 0.25);
+    // SPV: %{{[A-Za-z0-9_]+}} = OpImageSparseSampleDrefExplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Grad|MinLod
+    result += combinedCubeShadow.SampleCmpGrad(normalize(p.xyz), 0.5, ddx(p.xyz), ddy(p.xyz), 0.25, status);
     // SPV: OpImageSampleImplicitLod %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Bias|ConstOffset|MinLod
     result += combined2D.SampleBias(p.xy, 0.25, int2(1, 0), 0.5);
 
@@ -114,5 +133,19 @@ float4 glslMain(float4 p: SV_Position) : SV_Target
     result += combinedCube.Sample(normalize(p.xyz), 0.5);
     result += combinedCube.SampleGrad(normalize(p.xyz), ddx(p.xyz), ddy(p.xyz), 0.5);
     result += combined2D.SampleBias(p.xy, 0.25, int2(1, 0), 0.5);
+    return result;
+}
+
+// MTL: min_lod_clamp(
+// MSL documents the cube clamp form for bias and gradient sampling; the plain implicit-LOD
+// clamp form has no MSL spelling, so metalMain exercises the bias and gradient bodies.
+float4 metalMain(float4 p: SV_Position) : SV_Target
+{
+    float4 result = 0;
+    result += cubeTex.SampleBias(samplerState, normalize(p.xyz), 0.25, 0.5);
+    result += cubeTex.SampleGrad(samplerState, normalize(p.xyz), ddx(p.xyz), ddy(p.xyz), 0.5);
+    result += tex2D.SampleBias(samplerState, p.xy, 0.25, int2(1, 0), 0.5);
+    result += combinedCube.SampleBias(normalize(p.xyz), 0.25, 0.5);
+    result += combinedCube.SampleGrad(normalize(p.xyz), ddx(p.xyz), ddy(p.xyz), 0.5);
     return result;
 }

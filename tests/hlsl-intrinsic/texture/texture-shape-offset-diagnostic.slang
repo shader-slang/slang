@@ -9,6 +9,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=D3_CMP,exit-code=2):-target spirv -stage fragment -entry tex3DSampleCmp
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=D3_CMP_LEVEL,exit-code=2):-target spirv -stage fragment -entry tex3DSampleCmpLevel
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=DEPTH3D_CMP,exit-code=2):-target spirv -stage fragment -entry depth3DSampleCmpLevelZero
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=D3_CMP_GRAD,exit-code=2):-target spirv -stage fragment -entry tex3DSampleCmpGrad
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=D3_CMP_BIAS,exit-code=2):-target spirv -stage fragment -entry tex3DSampleCmpBias
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=WGSL_CUBE,exit-code=2):-target wgsl -stage fragment -entry wgslCubeSampleOffset
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=WGSL_1D,exit-code=2):-target wgsl -stage fragment -entry wgsl1DSampleOffset
 // Offset-free cube forms are unaffected by the shape checks.
@@ -71,6 +73,20 @@ float4 tex3DSampleCmpLevel(float4 p: SV_Position) : SV_Target
 float4 depth3DSampleCmpLevelZero(float4 p: SV_Position) : SV_Target
 {
     return float4(depthTex3D.SampleCmpLevelZero(comparisonSampler, p.xyz, 0.5), 0, 0, 1);
+}
+
+// D3_CMP_GRAD: error[E41400]: static assertion failed
+// D3_CMP_GRAD: Comparison sampling is not supported for 3D textures
+float4 tex3DSampleCmpGrad(float4 p: SV_Position) : SV_Target
+{
+    return float4(tex3D.SampleCmpGrad(comparisonSampler, p.xyz, 0.5, ddx(p.xyz), ddy(p.xyz)), 0, 0, 1);
+}
+
+// D3_CMP_BIAS: error[E41400]: static assertion failed
+// D3_CMP_BIAS: Comparison sampling is not supported for 3D textures
+float4 tex3DSampleCmpBias(float4 p: SV_Position) : SV_Target
+{
+    return float4(tex3D.SampleCmpBias(comparisonSampler, p.xyz, 0.5, 0.25), 0, 0, 1);
 }
 
 // WGSL_CUBE: error[E41400]: static assertion failed
