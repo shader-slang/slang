@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUFFER):-output-using-type
 
 interface IV : IDifferentiablePtrType{
 	int get();

@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=SPIRV):-stage compute -entry computeMain -target spirv -capability vk_mem_model
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -capability vk_mem_model
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-capability vk_mem_model
 
 // Tests if we pass-through and handle groupshared address space pointers correctly.
 // Ensure SPIRV emits coherent operations here

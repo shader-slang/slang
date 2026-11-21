@@ -1,13 +1,11 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 // This test just checks that we compile and run successfully.
 // "NDBuffer<float, 2>" & "no_diff NDBuffer<float, 2>" should resolve to the same code-gen type.
-// 
+//
 
 struct NDBuffer<T, let N : int>
 {
@@ -18,9 +16,9 @@ struct NDBuffer<T, let N : int>
     T get(int[N] index) { return buffer[index[0]]; }
 }
 
-float _read_slice(int2 index, NDBuffer<float, 2> texture) 
-{ 
-    return texture.get({index.x, index.y}); 
+float _read_slice(int2 index, NDBuffer<float, 2> texture)
+{
+    return texture.get({index.x, index.y});
 }
 
 [Differentiable]

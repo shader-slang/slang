@@ -1,9 +1,8 @@
 // `abs` of a 16-bit or 8-bit unsigned integer returns its input unchanged (#13983).
 // The CPU and CUDA preludes define no 16-bit or 8-bit integer `abs`, so those targets are not run here.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature int16 -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-via-glsl -render-feature int16 -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-llvm -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK):-render-feature int16 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=llvm, filecheck-buffer=CHECK):-output-using-type
 
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -emit-spirv-via-glsl -entry computeMain -stage compute

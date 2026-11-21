@@ -1,5 +1,5 @@
 //TEST:INTERPRET(filecheck=CHECK):
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECKBUF):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECKBUF):-output-using-type
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0], stride=4)
 
 // Regression test for https://github.com/shader-slang/slang/issues/10639

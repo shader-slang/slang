@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 tests/diagnostics/lexer/unterminated-string-literal-eof.slang(13): error 10004: end of file in literal
 tests/diagnostics/lexer/unterminated-string-literal-eof.slang(13): error 10007: invalid string escape: '\'

@@ -4,8 +4,7 @@
 // (https://github.com/shader-slang/slang/issues/14087).
 
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -emit-spirv-directly -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-glsl-dx11-dx12-wgpu, filecheck-buffer=BUF):-output-using-type
 
 //TEST_INPUT: set q = ubuffer(data=[3 7 11 13], stride=4);
 uniform int* q;

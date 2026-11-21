@@ -12,7 +12,7 @@
 // Nine float fields flatten to nine leaves, one past the documented
 // eight-register OptiX hit-attribute limit.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target cuda -entry isect -stage intersection
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target cuda -entry isect -stage intersection
 
 struct Attr { float a0; float a1; float a2; float a3; float a4; float a5; float a6; float a7; float a8; };
 

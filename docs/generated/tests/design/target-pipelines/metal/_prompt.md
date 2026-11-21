@@ -299,15 +299,15 @@ Use these to confirm a specific Metal emit token. Do **not** mine
 them for claims that the doc does not state.
 
 - `source/slang/slang-emit.cpp`
-- `source/slang/slang-emit-metal.cpp`
-- `source/slang/slang-emit-metal-prelude.cpp`
-- `source/slang/slang-emit-c-like.cpp`
-- `source/slang/slang-ir-metal-legalize.cpp`
-- `source/slang/slang-ir-specialize-address-space.cpp`
-- `source/slang/slang-ir-legalize-binary-operator.cpp`
-- `source/slang/slang-ir-byte-address-legalize.cpp`
-- `source/slang/slang-ir-legalize-image-subscript.cpp`
-- `source/slang/slang-ir-explicit-global-context.cpp`
+- `source/slang/emission/slang-emit-metal.cpp`
+- `source/slang/emission/slang-emit-metal-prelude.cpp`
+- `source/slang/emission/slang-emit-c-like.cpp`
+- `source/slang/ir-passes/slang-ir-metal-legalize.cpp`
+- `source/slang/ir-passes/slang-ir-specialize-address-space.cpp`
+- `source/slang/ir-passes/slang-ir-legalize-binary-operator.cpp`
+- `source/slang/ir-passes/slang-ir-byte-address-legalize.cpp`
+- `source/slang/ir-passes/slang-ir-legalize-image-subscript.cpp`
+- `source/slang/ir-passes/slang-ir-explicit-global-context.cpp`
 
 ## Test directives
 

@@ -1,5 +1,5 @@
 //DIAGNOSTIC_TEST(dxc):SIMPLE(diag=DXIL): -Gec -target dxil -profile cs_6_0 -entry computeMain -O0 -validate-ir
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -source-language hlsl -xslang -Gec -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda+cpu, filecheck-buffer=CHECK): -source-language hlsl -xslang -Gec -output-using-type
 
 // With `-Gec`, the compiler gives `selectedTexture` a writable shadow. Resource-global legalization
 // must replace that shadow with a value initialized separately for each entry-point invocation.

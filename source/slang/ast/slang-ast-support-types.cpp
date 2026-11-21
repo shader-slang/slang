@@ -1,0 +1,183 @@
+// slang-ast-support-types.cpp
+#include "slang-ast-support-types.h"
+
+#include "slang-ast-base.h"
+#include "slang-ast-expr.h"
+#include "slang-ast-print.h"
+#include "slang-ast-stmt.h"
+#include "slang-ast-type.h"
+#include "slang-visitor.h"
+#include "slang/semantic-checking/slang-check-impl.h"
+
+namespace Slang
+{
+Expr* getPredicateExpr(ConditionClause* conditionClause)
+{
+    struct PredicateExprVisitor : ConditionClauseVisitor<PredicateExprVisitor, Expr*>
+    {
+        Expr* visitExprConditionClause(ExprConditionClause* conditionClause)
+        {
+            return conditionClause->expr;
+        }
+        Expr* visitDeclConditionClause(DeclConditionClause* conditionClause)
+        {
+            return conditionClause->predicateExpr;
+        }
+    };
+    auto predicateExpr = PredicateExprVisitor().dispatch(conditionClause);
+    SLANG_RELEASE_ASSERT(predicateExpr);
+    return predicateExpr;
+}
+
+KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name)
+{
+#define SLANG_KNOWN_BUILTIN_DECL(NAME)                  \
+    if (name == UnownedStringSlice::fromLiteral(#NAME)) \
+        return KnownBuiltinDeclName::NAME;
+    SLANG_KNOWN_BUILTIN_DECL(GeometryStreamAppend)
+    SLANG_KNOWN_BUILTIN_DECL(GeometryStreamRestart)
+    SLANG_KNOWN_BUILTIN_DECL(GetAttributeAtVertex)
+    SLANG_KNOWN_BUILTIN_DECL(DispatchMesh)
+    SLANG_KNOWN_BUILTIN_DECL(saturated_cooperation)
+    SLANG_KNOWN_BUILTIN_DECL(saturated_cooperation_using)
+    SLANG_KNOWN_BUILTIN_DECL(IDifferentiable)
+    SLANG_KNOWN_BUILTIN_DECL(IDifferentiablePtr)
+    SLANG_KNOWN_BUILTIN_DECL(IForwardDifferentiable)
+    SLANG_KNOWN_BUILTIN_DECL(IBackwardDifferentiable)
+    SLANG_KNOWN_BUILTIN_DECL(IBwdCallable)
+    SLANG_KNOWN_BUILTIN_DECL(NullDifferential)
+    SLANG_KNOWN_BUILTIN_DECL(OperatorAddressOf)
+    SLANG_KNOWN_BUILTIN_DECL(WaveIsFirstLane)
+    SLANG_KNOWN_BUILTIN_DECL(WaveReadLaneFirst)
+    SLANG_KNOWN_BUILTIN_DECL(CallShader)
+    SLANG_KNOWN_BUILTIN_DECL(ReportHit)
+    SLANG_KNOWN_BUILTIN_DECL(RayTracingClosestHitInput)
+    SLANG_KNOWN_BUILTIN_DECL(RayTracingAnyHitInput)
+    SLANG_KNOWN_BUILTIN_DECL(RayTracingIntersectionInput)
+    SLANG_KNOWN_BUILTIN_DECL(RayTracingMissInput)
+    SLANG_KNOWN_BUILTIN_DECL(RayTracingCallableInput)
+    SLANG_KNOWN_BUILTIN_DECL(RayTracingProgramHitGroups)
+    SLANG_KNOWN_BUILTIN_DECL(RayTracingProgramMissShaders)
+    SLANG_KNOWN_BUILTIN_DECL(RayTracingProgramCallableShaders)
+#undef SLANG_KNOWN_BUILTIN_DECL
+    return KnownBuiltinDeclName::COUNT;
+}
+
+QualType::QualType(Type* type)
+    : type(type), isLeftValue(false)
+{
+    if (auto refType = as<ExplicitRefType>(type))
+    {
+        if (auto optAccessQualifier = refType->tryGetAccessQualifierValue())
+        {
+            auto accessQualifier = *optAccessQualifier;
+            switch (accessQualifier)
+            {
+            case AccessQualifier::ReadWrite:
+                isLeftValue = true;
+                break;
+
+            case AccessQualifier::Read:
+            case AccessQualifier::Immutable:
+                isLeftValue = false;
+                isReadOnlyMemoryLocation = true;
+                break;
+
+            default:
+                SLANG_UNEXPECTED("unhandled access qualifier");
+                break;
+            }
+        }
+    }
+}
+
+void removeModifier(ModifiableSyntaxNode* syntax, Modifier* toRemove)
+{
+    Modifier* prev = nullptr;
+    for (auto modifier = syntax->modifiers.first; modifier; modifier = modifier->next)
+    {
+        if (modifier == toRemove)
+        {
+            if (prev)
+            {
+                prev->next = modifier->next;
+            }
+            else
+            {
+                syntax->modifiers.first = syntax->modifiers.first->next;
+            }
+            break;
+        }
+        prev = modifier;
+    }
+}
+
+Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr, FunctionDifferentiableLevel& outLevel)
+{
+    HashSet<Expr*> workListSet;
+    outLevel = FunctionDifferentiableLevel::None;
+    while (auto higherOrder = as<HigherOrderInvokeExpr>(expr))
+    {
+        if (as<BackwardDifferentiateExpr>(expr))
+            outLevel = FunctionDifferentiableLevel::Backward;
+        else if (
+            as<ForwardDifferentiateExpr>(expr) && outLevel == FunctionDifferentiableLevel::None)
+            outLevel = FunctionDifferentiableLevel::Forward;
+        if (workListSet.add(higherOrder))
+        {
+            expr = higherOrder->baseFunction;
+        }
+        else
+        {
+            // Circularity, return null.
+            return nullptr;
+        }
+    }
+    return expr;
+}
+
+UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr)
+{
+    if (as<ForwardDifferentiateExpr>(expr))
+        return UnownedStringSlice("fwd_diff");
+    else if (as<BackwardDifferentiateExpr>(expr))
+        return UnownedStringSlice("bwd_diff");
+    return UnownedStringSlice();
+}
+
+AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::RefReadWrite:
+        return AccessQualifier::ReadWrite;
+    case ParamPassingMode::RefReadOnly:
+        return AccessQualifier::Read;
+    case ParamPassingMode::RefWriteOnly:
+        return AccessQualifier::WriteOnly;
+    default:
+        SLANG_UNEXPECTED("parameter-passing mode has no reference access qualifier");
+        UNREACHABLE_RETURN(AccessQualifier::ReadWrite);
+    }
+}
+
+void printDiagnosticArg(StringBuilder& sb, ParamPassingMode direction)
+{
+    sb << getParamPassingModeKeyword(direction);
+}
+
+String SpecializationArg::toString()
+{
+    if (val)
+        return val->toString();
+    else if (expr)
+    {
+        ASTPrinter printer(getCurrentASTBuilder());
+        printer.addExpr(expr);
+        return printer.getString();
+    }
+    return String();
+}
+
+
+} // namespace Slang

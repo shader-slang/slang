@@ -4,8 +4,7 @@
 // and `read(const __ref int)` are two functions, and each interface requirement is satisfied by
 // the method with its passing mode.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 int scale(int x);
 int scale(const int x) { return x * 3; }

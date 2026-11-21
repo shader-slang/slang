@@ -4,8 +4,8 @@
 // constrained to `IDifferentiable` takes the argument with no conversion, so it wins over a
 // conversion.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj -xslang -matrix-layout-row-major
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj -xslang -matrix-layout-column-major
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -xslang -matrix-layout-row-major
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -xslang -matrix-layout-column-major
 
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name output
 RWStructuredBuffer<float> output;

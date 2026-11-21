@@ -11,7 +11,7 @@
 
 // Verifies `countof(T) < 3` is diagnosed as requiring `==`; CHECK asserts E30436.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl
 
 void f<each T>(expand each T t) where countof(T) < 3 {}
 

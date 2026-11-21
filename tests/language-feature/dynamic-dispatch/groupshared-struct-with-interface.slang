@@ -6,10 +6,7 @@
 // finalized. This test verifies that dynamic dispatch through a
 // groupshared struct's interface member works correctly at runtime.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-mtl -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=REPORT,exit-code=0,non-exhaustive):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 

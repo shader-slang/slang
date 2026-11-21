@@ -1,7 +1,6 @@
 // Test that we can synthesize requirements for generic methods.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx11 -compute  -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute  -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 interface IBase
 {
@@ -24,13 +23,13 @@ interface ITestInterface<Real : IFloat>
 
     __init<T : IBar>(T t);
 
-    __generic<T : IBar> 
+    __generic<T : IBar>
     __subscript(T t)->Real { get; }
 }
 
 struct TestInterfaceImpl<Real : IFloat> : ITestInterface<Real>
 {
-    // The signature of this sample method is different from the one in the 
+    // The signature of this sample method is different from the one in the
     // interface. However, we should be able to form a call into this method
     // from the synthesized implementation matching the interface definition,
     // so the conformance should hold.
@@ -38,7 +37,7 @@ struct TestInterfaceImpl<Real : IFloat> : ITestInterface<Real>
     {
         return x + Real(T.get());
     }
-    
+
     // Test the same thing for constructors.
     __init<T : IBase>(T t)
     {

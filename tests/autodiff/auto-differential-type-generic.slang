@@ -3,16 +3,14 @@
 // This specifically tests a synthesis path that occurs when the lookup of the Differential type happens before the conformance-check.
 // If this path doesn't construct the generic differential type correctly, it will throw an error when constructing the array
 // in this line: Feature<3>.Differential b = {0.2, 0.3, 0.4};
-// 
+//
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-__generic<let C : int> 
+__generic<let C : int>
 struct Feature: IDifferentiable
 {
     float vals[C];

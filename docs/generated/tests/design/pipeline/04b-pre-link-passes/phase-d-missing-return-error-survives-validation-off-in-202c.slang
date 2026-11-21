@@ -16,7 +16,7 @@
 // (E40025). The paired run at language version 2025 keeps the documented
 // behaviour of the toggle: no diagnostic at all and HLSL still emitted.
 
-//TEST:SIMPLE(filecheck=NEW,exit-code=-1):-target hlsl -stage compute -entry main -disable-non-essential-validations -lang slang -std 202c
+//TEST:SIMPLE(filecheck=NEW,exit-code=2):-target hlsl -stage compute -entry main -disable-non-essential-validations -lang slang -std 202c
 //TEST:SIMPLE(filecheck=OLD):-target hlsl -stage compute -entry main -disable-non-essential-validations -lang slang -std 2025
 
 uniform int a;

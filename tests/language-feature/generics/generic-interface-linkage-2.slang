@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-slang -compute -compile-arg -obfuscate -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -compile-arg -obfuscate -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-compile-arg -obfuscate -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;

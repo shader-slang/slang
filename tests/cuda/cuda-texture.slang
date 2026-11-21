@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu -compute 
-//TEST(compute):COMPARE_COMPUTE:-cuda -compute 
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu-llvm):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer : register(u0);

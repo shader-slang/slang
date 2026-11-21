@@ -1,6 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -render-feature half
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -render-feature half -xslang -DRWBAB
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -render-feature half
+//TEST:COMPARE_COMPUTE(targets=vk+wgpu, filecheck-buffer=BUF):-render-feature half
+//TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=BUF):-render-feature half -xslang -DRWBAB
 
 // Runs the WGSL lowering of byte-address-buffer `half` loads (see
 // byte-address-buffer-load-half.slang), which loads the containing 32-bit word, shifts it and

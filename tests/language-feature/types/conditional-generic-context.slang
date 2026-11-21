@@ -7,7 +7,7 @@
 // distinguishes "conditional lowered correctly" from "conditional was deleted".
 
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 // SPIRV: OpEntryPoint
 

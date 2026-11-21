@@ -1,12 +1,10 @@
 // SPDX-FileCopyrightText: The Khronos Group, Inc.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -cpu -compute -output-using-type -Xslang -O0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -cpu -compute -output-using-type -Xslang -O3
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -cuda -compute -output-using-type -render-features half -Xslang -O0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -cuda -compute -output-using-type -render-features half -Xslang -O3
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -output-using-type -render-features half -Xslang -O0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -output-using-type -render-features half -Xslang -O3
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=CHECK): -output-using-type -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=CHECK): -output-using-type -Xslang -O3
+//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK): -output-using-type -render-features half -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK): -output-using-type -render-features half -Xslang -O3
 
 // Explicit bit patterns force constant conversion through the compiler's FloatToHalf path.
 // Expected encodings are independent of the compiler: ties choose the even Half encoding,

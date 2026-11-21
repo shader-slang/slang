@@ -17,7 +17,7 @@ The Slang IR uses a code generation approach where instruction definitions are c
 
 ### Source of Truth: `slang-ir-insts.lua`
 
-All IR instructions are defined in `source/slang/slang-ir-insts.lua`. This file contains a hierarchical table structure that defines:
+All IR instructions are defined in `source/slang/ir/slang-ir-insts.lua`. This file contains a hierarchical table structure that defines:
 
 - Instruction names and their organization into categories
 - Struct names for the C++ representation (if different from the default)
@@ -101,7 +101,7 @@ To add a new IR instruction:
      ./external/lua/lua extras/check-ir-stable-names.lua update
      ```
 
-   - Or add a new ID to the mapping in `source/slang/slang-ir-insts-stable-names.lua`, this is checked for consistency in CI so it's safe to add manually.
+   - Or add a new ID to the mapping in `source/slang/ir/slang-ir-insts-stable-names.lua`, this is checked for consistency in CI so it's safe to add manually.
 
    This assigns a permanent ID to your new instruction.
 

@@ -4,10 +4,7 @@
 // requires non-trivial legalization can be compiled
 // to work on GLSL-based targets.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-dx12 -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 //NO_TEST:SIMPLE:-target glsl -entry computeMain -stage compute -validate-ir -dump-ir
 

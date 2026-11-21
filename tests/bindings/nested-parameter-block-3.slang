@@ -1,12 +1,10 @@
 // nested-parameter-block-3.slang
-// 
+//
 // Same as nest-parameter-block-2, the only difference is that we added member methods
 // to ParameterBlock element types to exercise the legalization logic of method calls.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d12 -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal -shaderobj -output-using-type -render-features argument-buffer-tier-2
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=CHECK): -output-using-type -render-features argument-buffer-tier-2
 
 
 struct CB

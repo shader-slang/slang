@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu -compile-arg -msvc-style-bitfield-packing
-//TEST(compute):COMPARE_COMPUTE:-cpu -compile-arg -bitfield-packing-rules -compile-arg msvc
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm):-compile-arg -msvc-style-bitfield-packing
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm):-compile-arg -bitfield-packing-rules -compile-arg msvc
 
 // The deprecated option creates separate backing fields for different type sizes,
 // like MSVC, but packs the fields within each backing integer MSB-first.

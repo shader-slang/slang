@@ -98,10 +98,10 @@ backend, that target-specific IR-pass branches exist). You may
 
 - `source/slang/slang-compile-request.cpp`, `.h`
 - `source/slang/slang-emit.cpp`
-- `source/slang/slang-lower-to-ir.cpp`
+- `source/slang/lower-to-ir/slang-lower-to-ir.cpp`
 - `source/slang/slang-check.cpp`
-- `source/slang/slang-parser.cpp`
-- `source/slang/slang-preprocessor.cpp`
+- `source/slang/parser/slang-parser.cpp`
+- `source/slang/preprocessor/slang-preprocessor.cpp`
 - `source/compiler-core/slang-lexer.cpp`
 
 If you find yourself thinking "this would cover the branch at

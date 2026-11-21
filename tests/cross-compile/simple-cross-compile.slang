@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu
-//TEST(compute):COMPARE_COMPUTE:-cuda
+//TEST:COMPARE_COMPUTE(targets=all-dx11):
 
 enum Color
 {
@@ -86,23 +85,23 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     vector<float, 3> vec2 = max(sin(mul(vec, mat)), float3(1, 2, -1));
     vector<float, 3> vec3 = mul(vec, mat);
-    
+
     float3 vec4 = lerp(vec2, vec3, float3(tid * (1.0f / 4), 1, 1));
-    
+
     float3 crossVec = normalize(cross(vec4, vec4) + float3(2, 3, 1));
-    
+
     vec2.x = fmod(crossVec.y, crossVec.x);
-    
+
     vec2 = fmod(vec2, crossVec);
-    
+
     vec2 += (-vec2.zyx) * 2 + crossVec * length(crossVec) + reflect(vec4, normalize(crossVec));
-    
+
     vector<bool, 3> z = vec2 > 0;
 
     int val = (int(tid) + (any(z) ? 1 : 0) + (all(z) ? 2 : 0)) % 100;
-    
+
     val = asint(asfloat(asuint(asfloat(val))));
-    
+
     val = test(val);
 
     outputBuffer[tid] = val + int(dot(vec2, vec4));

@@ -7,7 +7,7 @@ reference family contract**.
 
 Produce `docs/generated/design/ast-reference/modifiers.md` — the per-node
 reference for the `Modifier` family declared in
-[slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h).
+[slang-ast-modifier.h](../../../../source/slang/ast/slang-ast-modifier.h).
 
 ## Family-specific guidance
 

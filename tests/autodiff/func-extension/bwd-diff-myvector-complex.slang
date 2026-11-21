@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -xslang -experimental-feature
 
 // Complex test: A generic MyVector<T> type with arithmetic operations,
 // where IDifferentiable conformance is added via extension only for

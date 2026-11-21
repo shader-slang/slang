@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -entry computeMain -target hlsl -profile cs_6_5
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -entry computeMain -target hlsl -profile cs_6_5
 
 
 RWStructuredBuffer<float> outputBuffer;

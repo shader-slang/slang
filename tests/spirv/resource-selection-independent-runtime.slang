@@ -1,7 +1,7 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly -Xslang -O0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly -Xslang -O1
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly -xslang -DMANUAL -Xslang -O0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly -xslang -DMANUAL -Xslang -O1
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK): -output-using-type -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK): -output-using-type -Xslang -O1
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu-llvm, filecheck-buffer=CHECK): -output-using-type -xslang -DMANUAL -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu-llvm, filecheck-buffer=CHECK): -output-using-type -xslang -DMANUAL -Xslang -O1
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain -validate-ir -validate-ir-detailed
 

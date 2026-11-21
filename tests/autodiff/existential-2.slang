@@ -1,8 +1,6 @@
 // Test calling differentiable function through dynamic dispatch.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -42,7 +40,7 @@ float doThing(IInterface obj, float x)
 {
     return obj.calc(x);
 }
- 
+
 [Differentiable]
 float f(uint id, float x)
 {
@@ -64,7 +62,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     {
         var dpx = diffPair(1.0);
-        bwd_diff(f)(dispatchThreadID.x, dpx, 2.0); 
+        bwd_diff(f)(dispatchThreadID.x, dpx, 2.0);
         outputBuffer[0] = dpx.d; // Expect: 2 * 4 * x^3 * dx = 8 * x^3 * dx = 16
     }
 

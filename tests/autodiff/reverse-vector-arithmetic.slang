@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -34,7 +32,7 @@ float3 test_complex_arith(float3 x, float2 y)
 {
     float2 t = float2(x.x, y.x) + 2.0 * float2(x.z, y.y);
     return float3(
-        (2.0f * x.z + y.y * 4.0f - t.y), 
+        (2.0f * x.z + y.y * 4.0f - t.y),
         (3.0f * t + y).x,
         t.x);
 }

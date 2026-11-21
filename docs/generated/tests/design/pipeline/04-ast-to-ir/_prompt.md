@@ -163,10 +163,10 @@ You may look at these to confirm an opcode spelling (the exact name
 as it appears in `-dump-ir`). You may **not** mine them for
 behavioral claims the doc does not make.
 
-- `source/slang/slang-lower-to-ir.h`
-- `source/slang/slang-lower-to-ir.cpp`
-- `source/slang/slang-ir.h`
-- `source/slang/slang-ir.cpp`
+- `source/slang/lower-to-ir/slang-lower-to-ir.h`
+- `source/slang/lower-to-ir/slang-lower-to-ir.cpp`
+- `source/slang/ir/slang-ir.h`
+- `source/slang/ir/slang-ir.cpp`
 
 ## Test directives
 

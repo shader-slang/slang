@@ -8,7 +8,7 @@
 // covered too.
 
 //TEST:SIMPLE(filecheck=SPV):-target spirv -entry computeMain -stage compute
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-metal-wgpu, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[1 0 1 1 0 1 0 1 0 0 0 0 0 0 0 0], stride=4):name=buffer
 RWByteAddressBuffer buffer;

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Test SCCP constant folding of signed right shift when shift count >= bit width.
 // Arithmetic right shift of negative values should return -1 (sign-extended).

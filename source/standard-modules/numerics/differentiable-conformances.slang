@@ -101,6 +101,11 @@ interface __IScalarDifferentiableFloatingPointDotProduct
     {                                                                            \
         [Differentiable] [ForceInline]                                           \
         static This fromScalar(Scalar value) { return value; }                   \
+        [Differentiable] [ForceInline]                                           \
+        static This selectComponents(no_diff Mask condition, This ifTrue, This ifFalse) \
+        {                                                                        \
+            return __differentiableNumericsSelect(condition, ifTrue, ifFalse);   \
+        }                                                                        \
                                                                                  \
         [Differentiable] [ForceInline]                                           \
         __init<TSource : __BuiltinFloatingPointType>(TSource value)              \
@@ -181,6 +186,12 @@ public extension<
     static This fromScalar(Scalar value)
     {
         return __differentiableNumericsConstructVectorFromFloatingPoint<T, T, N>(value);
+    }
+
+    [Differentiable] [ForceInline]
+    static This selectComponents(no_diff Mask condition, This ifTrue, This ifFalse)
+    {
+        return __differentiableNumericsSelect(condition, ifTrue, ifFalse);
     }
 
     [Differentiable] [ForceInline]
@@ -373,6 +384,17 @@ public extension<
     }
 
     [Differentiable] [ForceInline]
+    static This selectComponents(no_diff Mask condition, This ifTrue, This ifFalse)
+    {
+        // We select each logical row so the result keeps the matrix's layout parameter `L`.
+        This result;
+        [ForceUnroll]
+        for (int row = 0; row < R; ++row)
+            result[row] = __differentiableNumericsSelect(condition[row], ifTrue[row], ifFalse[row]);
+        return result;
+    }
+
+    [Differentiable] [ForceInline]
     __init<TSource : __BuiltinFloatingPointType>(TSource value)
     {
         this = __differentiableNumericsConstructMatrixFromFloatingPoint<
@@ -552,8 +574,8 @@ public extension<
     SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(                        \
         maximum, __differentiableNumericsMaximum)
 
-// Keep this conformance separate so it owns the differentiated `fromScalar` witness. Reusing the
-// inherited `INumericShapedType` conformance would select the base, non-differentiable witness.
+// This separate conformance owns the differentiable shape operations. Reusing the inherited
+// `INumericShapedType` conformance would use the base operations without derivative witnesses.
 public extension<T : __BuiltinFloatingPointType & IScalarDifferentiableFractional, let N : int>
     CoopVec<T, N> : IDifferentiableNumericShapedType
 {
@@ -567,6 +589,19 @@ public extension<T : __BuiltinFloatingPointType & IScalarDifferentiableFractiona
         [ForceUnroll]
         for (int index = 0; index < N; ++index)
             result[index] = value;
+        return result;
+    }
+
+    [Differentiable] [ForceInline] [require(cooperative_vector)]
+    static This selectComponents(no_diff Mask condition, This ifTrue, This ifFalse)
+    {
+        // The mask is an ordinary Boolean vector, so we select cooperative-vector components
+        // individually instead of requiring a native selection with these two different shapes.
+        This result;
+        [ForceUnroll]
+        for (int index = 0; index < N; ++index)
+            result[index] = __differentiableNumericsSelect(
+                condition[index], ifTrue[index], ifFalse[index]);
         return result;
     }
 }

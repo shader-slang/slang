@@ -1,5 +1,4 @@
-//DISABLED_TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -shaderobj -cuda
+//TEST:COMPARE_COMPUTE(targets=all):
 
 //TEST_INPUT:type Material<1,2>
 
@@ -22,7 +21,7 @@ struct BRDF<let A:int, let B:int> : IBRDF
     int c;
     int compute()
     {
-        return A+B;        
+        return A+B;
     }
 };
 

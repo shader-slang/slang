@@ -8,7 +8,7 @@
 // tagged-union info. If `makeInfoForConcreteType` wrapped the rewritten type as a payload, the
 // merge would fail with `Incompatible propagation infos during union`.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute -conformance Light:ILight=0 -conformance SurfaceLight:ILight=1 -conformance A:IGeometry=0 -conformance B:IGeometry=1 -conformance F1:IFactory=0 -conformance F2:IFactory=1
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry computeMain -stage compute -conformance Light:ILight=0 -conformance SurfaceLight:ILight=1 -conformance A:IGeometry=0 -conformance B:IGeometry=1 -conformance F1:IFactory=0 -conformance F2:IFactory=1
 //TEST:SIMPLE(filecheck=DXIL): -target dxil-assembly -entry computeMain -stage compute -conformance Light:ILight=0 -conformance SurfaceLight:ILight=1 -conformance A:IGeometry=0 -conformance B:IGeometry=1 -conformance F1:IFactory=0 -conformance F2:IFactory=1

@@ -2,7 +2,7 @@
 
 Slang has support for Wave intrinsics introduced to HLSL in [SM6.0](https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12) and [SM6.5](https://github.com/microsoft/DirectX-Specs/blob/master/d3d/HLSL_ShaderModel6_5.md). All intrinsics are available on D3D12 and Vulkan.
 
-On GLSL targets such as Vulkan wave intrinsics map to ['subgroup' extension] (https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt). Vulkan supports a number of masked wave operations through `SPV_NV_shader_subgroup_partitioned` that are not supported by HLSL.
+On GLSL targets such as Vulkan wave intrinsics map to ['subgroup' extension] (https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt). Vulkan supports a number of masked wave operations through `SPV_EXT_shader_subgroup_partitioned` (and its NVIDIA predecessor `SPV_NV_shader_subgroup_partitioned`) that are not supported by HLSL.
 
 There is no subgroup support for Matrix types, and currently this means that Matrix is not a supported type for Wave intrinsics on Vulkan, but may be in the future.
 
@@ -34,7 +34,7 @@ Using WaveMask intrinsics is generally more verbose and prone to error than the 
 
 For this to work across targets including CUDA, the mask must be calculated such that it exactly matches that of HLSL defined 'active' lanes, else the behavior is undefined.
 
-On D3D12 and Vulkan the WaveMask intrinsics can be used, but the mask may be ignored depending on target's support for partitioned/masked wave intrinsics. SPIRV provides support for a wide variety of operations through the `SPV_NV_shader_subgroup_partitioned` extension while HLSL only provides a small subset of operations through `WaveMultiPrefix*` intrinsics. The difference between Slang's `WaveMask` and these targets' partitioned wave intrinsics is that they accept a `uint4` mask instead of a `uint` mask. `WaveMask*` intrinsics effectively gets translated to `WaveMulti*` intrinsics when targeting SPIRV/GLSL and HLSL. Please consult [Wave Multi Intrinsics](#wave-multi-intrinsics) for more details, including what masked operations are supported by each target.
+On D3D12 and Vulkan the WaveMask intrinsics can be used, but the mask may be ignored depending on target's support for partitioned/masked wave intrinsics. SPIRV provides support for a wide variety of operations through the `SPV_EXT_shader_subgroup_partitioned` extension while HLSL only provides a small subset of operations through `WaveMultiPrefix*` intrinsics. The difference between Slang's `WaveMask` and these targets' partitioned wave intrinsics is that they accept a `uint4` mask instead of a `uint` mask. `WaveMask*` intrinsics effectively gets translated to `WaveMulti*` intrinsics when targeting SPIRV/GLSL and HLSL. Please consult [Wave Multi Intrinsics](#wave-multi-intrinsics) for more details, including what masked operations are supported by each target.
 
 The WaveMask intrinsics are a non standard Slang feature, and may change in the future.
 
@@ -109,7 +109,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
 ## WaveMulti
 
-The standard 'Multi' intrinsics were added to HLSL is SM 6.5 and are available in SPIRV through `SPV_NV_shader_subgroup_partitioned`, they can specify a mask of lanes via uint4. SPIRV provide non-prefix (reduction) and prefix (scan) intrinsics for arithmetic and min/max operations, while HLSL only provides a subset of these, namely exclusive prefix arithmetic operations.
+The standard 'Multi' intrinsics were added to HLSL is SM 6.5 and are available in SPIRV through `SPV_EXT_shader_subgroup_partitioned`, they can specify a mask of lanes via uint4. SPIRV provide non-prefix (reduction) and prefix (scan) intrinsics for arithmetic and min/max operations, while HLSL only provides a subset of these, namely exclusive prefix arithmetic operations.
+
+The NVIDIA-specific `SPV_NV_shader_subgroup_partitioned` extension defines the same operations as the EXT one. By default, every partitioned intrinsic with a SPIR-V implementation (`WaveMatch`, `WaveMaskMatch` and the `WaveMulti*` reductions and scans other than `WaveMultiPrefixCountBits`) declares the EXT extension. When the target includes the `spvGroupNonUniformPartitionedNV` capability (for example `-capability spvGroupNonUniformPartitionedNV`), these intrinsics declare the NV extension instead, which is useful for a Vulkan device that exposes only `VK_NV_shader_subgroup_partitioned`. This applies only when Slang emits SPIR-V directly: GLSL output, and so `-emit-spirv-via-glsl`, still requires `GL_NV_shader_subgroup_partitioned`.
 
 # Standard Wave intrinsics
 
@@ -268,7 +270,7 @@ T WaveClusteredRotate(T value, uint delta, constexpr uint clusterSize);
 
 # Wave Multi Intrinsics
 
-`WaveMulti` intrinsics take an explicit `uint4` mask of lanes to operate on. They correspond to the subgroup partitioned intrinsics provided by `SPV_NV_shader_subgroup_partitioned` and the `WaveMultiPrefix*` intrinsics provided by HLSL SM 6.5. HLSL's `WaveMulti*` intrinsics only provide operations for exclusive prefix arithmetic operations, while Vulkan's `SPV_NV_shader_subgroup_partitioned` provides operations for both inclusive/exclusive prefix (scan) and non-prefix (reduction) arithmetic and min/max operations.
+`WaveMulti` intrinsics take an explicit `uint4` mask of lanes to operate on. They correspond to the subgroup partitioned intrinsics provided by `SPV_EXT_shader_subgroup_partitioned` and the `WaveMultiPrefix*` intrinsics provided by HLSL SM 6.5. HLSL's `WaveMulti*` intrinsics only provide operations for exclusive prefix arithmetic operations, while Vulkan's `SPV_EXT_shader_subgroup_partitioned` provides operations for both inclusive/exclusive prefix (scan) and non-prefix (reduction) arithmetic and min/max operations.
 
 Slang adds new `WaveMulti*` intrinsics in addition to HLSL's `WaveMultiPrefix*` to allow generating all partitioned intrinsics supported in SPIRV. The new, non-standard HLSL, `WaveMulti*` intrinsics are only supported when targeting SPIRV, GLSL and CUDA. The inclusive variants of HLSL's `WaveMultiPrefix*` intrinsics are emulated by Slang by performing an additional operation in the current invocation. Metal and WGSL targets do not support `WaveMulti` intrinsics.
 

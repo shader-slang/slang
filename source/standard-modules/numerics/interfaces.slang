@@ -73,19 +73,29 @@ public interface IBooleanMask
     bool all();
 }
 
-/// Describes the scalar and comparison-result types of a numeric value.
+/// Describes the logical shape and component-wise selection of a numeric value.
 public interface INumericShapedType
 {
     /// The logical scalar repeated by this type. A logical scalar uses `Scalar == This`.
     associatedtype Scalar;
 
-    /// The result type of component-wise comparison and classification operations.
+    /// A Boolean shape with one decision per logical component of this type.
+    ///
+    /// Component-wise comparisons and classifications produce masks, and `selectComponents`
+    /// consumes one.
     associatedtype Mask : IBooleanMask;
 
     /// Constructs a value whose every logical component is `value`.
     ///
     /// For a logical scalar, this operation returns `value` unchanged.
     static This fromScalar(Scalar value);
+
+    /// Returns each logical component from `ifTrue` where `condition` is true, and from `ifFalse`
+    /// otherwise.
+    ///
+    /// Each component of `condition` controls the corresponding component of the result.
+    /// Each selected component is returned unchanged.
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse);
 }
 
 /// Refines `INumericShapedType` for a logical scalar.

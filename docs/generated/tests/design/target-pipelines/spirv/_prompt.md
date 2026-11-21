@@ -296,13 +296,13 @@ Use these to confirm a specific SPIR-V emit token. Do **not**
 mine them for claims that the doc does not state.
 
 - `source/slang/slang-emit.cpp`
-- `source/slang/slang-emit-spirv.cpp`
-- `source/slang/slang-ir-spirv-legalize.cpp`
-- `source/slang/slang-ir-glsl-legalize.cpp`
-- `source/slang/slang-ir-legalize-binary-operator.cpp`
-- `source/slang/slang-ir-byte-address-legalize.cpp`
-- `source/slang/slang-ir-eliminate-phis.cpp`
-- `source/slang/slang-ir-explicit-global-init.cpp`
+- `source/slang/emission/slang-emit-spirv.cpp`
+- `source/slang/ir-passes/slang-ir-spirv-legalize.cpp`
+- `source/slang/ir-passes/slang-ir-glsl-legalize.cpp`
+- `source/slang/ir-passes/slang-ir-legalize-binary-operator.cpp`
+- `source/slang/ir-passes/slang-ir-byte-address-legalize.cpp`
+- `source/slang/ir-passes/slang-ir-eliminate-phis.cpp`
+- `source/slang/ir-passes/slang-ir-explicit-global-init.cpp`
 
 ## Test directives
 

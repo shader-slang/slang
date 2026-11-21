@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 error[E30201]: function 'foo' already has a body
   ╭╼ tests/diagnostics/already-has-a-body.slang:8:5

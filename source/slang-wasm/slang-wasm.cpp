@@ -2,8 +2,8 @@
 
 #include "core/slang-blob.h"
 #include "core/slang-exception.h"
+#include "slang/language-server/slang-language-server.h"
 #include "slang/slang-capability.h"
-#include "slang/slang-language-server.h"
 
 #include <deque>
 #include <slang.h>
