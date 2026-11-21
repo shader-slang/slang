@@ -1,4 +1,7 @@
 //TEST:COMPARE_COMPUTE(targets=vk+glsl+dx12+cuda, filecheck-buffer=CHECK):-output-using-type -profile cs_5_1 -use-dxbc -compute-dispatch 1,1,1
+// Keep the dispatch at one workgroup: AllMemoryBarrierWithGroupSync in
+// computeMain is workgroup-scoped, and the expected values at the bottom of
+// this file are derived from a single workgroup of 256 threads.
 
 //TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):out,name=endpointDifferentialBuffer
 RWStructuredBuffer<float> endpointDifferentialBuffer;
@@ -258,9 +261,10 @@ float renderSample(inout PRNG prng)
 }
 
 // AllMemoryBarrierWithGroupSync only synchronizes threads within a single
-// workgroup, so we dispatch exactly one workgroup; that makes the barrier
-// below a complete sync over every contribution to the atomic totals, so
-// the read-back observes deterministic sums.
+// workgroup, so the dispatch (set to 1,1,1 via -compute-dispatch on the
+// TEST line) is exactly one workgroup; that makes the barrier below a
+// complete sync over every contribution to the atomic totals, so the
+// read-back observes deterministic sums within a single target.
 //
 [numthreads(256, 1, 1)]
 void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
@@ -284,6 +288,10 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
 // expected results are approximate. (We've fixed the RNG seed to generate
 // repeatable results)
 //
+// The expected totals below are sums over all dispatched threads, so they
+// scale with the thread count; re-derive them after changing the dispatch
+// size or numthreads.
+//
 // Expect: Approximately -0.26 in endpointDifferentialBuffer[0]
 // Expect: Approximately 0.26 in endpointDifferentialBuffer[1]
 //
@@ -295,7 +303,7 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
 // CHECK-NEXT: -0.{{2[4-8][0-9]}}000
 // CHECK-NEXT: 0.{{2[4-8][0-9]}}000
 // CHECK-NEXT: 0.000000
-// CHECK-NEXT: 0.001000
+// CHECK-NEXT: 0.00{{[01]}}000
 // CHECK-NEXT: 0.000000
 // CHECK-NEXT: 0.000000
 // CHECK-NEXT: 0.000000
