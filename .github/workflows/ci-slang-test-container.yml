@@ -197,6 +197,18 @@ jobs:
             slang_test_args+=("-server-count" "${{ inputs.server-count }}")
           fi
 
+          # The validation layers run in the release jobs only. The results are the
+          # same, and the debug jobs are slower, so this spreads the work.
+          # A debug build of slang-test turns them on by default, so the debug
+          # jobs turn them off.
+          if [[ "${{ inputs.config }}" == "release" ]]; then
+            slang_test_args+=("-enable-debug-layers" "true")
+            # Skip the tests that fail with the validation layers.
+            slang_test_args+=("-exclude-list" "tests/skip-list-validation-layers.txt")
+          else
+            slang_test_args+=("-enable-debug-layers" "false")
+          fi
+
           # Skip most neural tests in debug builds to reduce CI time. This
           # applies to the sm80plus tier too: a debug sm80plus job runs all
           # cooperative-matrix tests and the neural tests that

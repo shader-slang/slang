@@ -41,11 +41,3 @@ tests/neural/tiled-mma-load-test-unAligned-width-height-A.slang
 slang-unit-test-tool/testServer
 slang-unit-test-tool/Slangc
 slang-unit-test-tool/DepfileOutput
-
-# Skip tests that fail with the validation layers. A debug build of slang-test
-# turns them on, and a release build does not, so only the debug jobs fail.
-# VUID-RuntimeSpirv-cooperativeMatrixFlexibleDimensions-10165: line 3 of reduce.slang
-# uses an 8x8 half matrix, and the L4 GPU does not list this shape in
-# VkCooperativeMatrixPropertiesKHR. Only the Vulkan target fails, and the release
-# SM80 job still runs it.
-tests/cooperative-matrix/reduce.slang.3 (vk)

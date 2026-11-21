@@ -119,7 +119,14 @@ jobs:
           # SPIR-V emission / validation don't need a GPU — keep on all tiers.
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-          export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
+          # The validation layers run in the release jobs only. The results are the
+          # same, and the debug jobs are slower, so this spreads the work.
+          if [[ "${{ inputs.config }}" == "release" ]]; then
+            enable_debug_layers=true
+            export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
+          else
+            enable_debug_layers=false
+          fi
           # Force AVX-512 off in slang-llvm's JIT TargetMachine. We have observed
           # intermittent illegal-instruction failures on both GitHub-hosted and
           # GCP VMs, indicating that LLVM's host-detection path can mis-report
@@ -135,7 +142,7 @@ jobs:
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
-            "-enable-debug-layers" "true"
+            "-enable-debug-layers" "$enable_debug_layers"
           )
 
           # slang-test accepts only a single -api option (a later one silently
@@ -212,6 +219,10 @@ jobs:
             slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux.txt")
           fi
 
+          # Skip the tests that fail with the validation layers.
+          if [[ "$enable_debug_layers" == "true" ]]; then
+            slang_test_args+=("-exclude-list" "tests/skip-list-validation-layers.txt")
+          fi
 
           # Skip most neural tests in debug builds to reduce CI time
           if [[ "${{ inputs.config }}" == "debug" ]]; then

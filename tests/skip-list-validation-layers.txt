@@ -1,0 +1,10 @@
+# Skip list for the jobs that turn on the validation layers. Each line is a
+# path prefix, or the name of a test. The release jobs turn the layers on, and
+# the debug jobs do not.
+#
+# These tests fail with the layers.
+
+# VUID-RuntimeSpirv-cooperativeMatrixFlexibleDimensions-10165: line 3 of reduce.slang
+# uses an 8x8 half matrix, and the L4 GPU does not list this shape in
+# VkCooperativeMatrixPropertiesKHR. Only the Vulkan target fails.
+tests/cooperative-matrix/reduce.slang.3 (vk)
