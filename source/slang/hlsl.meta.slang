@@ -30482,8 +30482,11 @@ struct CoopMat
     }
 
     // The groupshared overloads of `dx::linalg::Matrix::Load` and `Store` take the array
-    // directly, plus an element index and an element stride (both in units of the array's
-    // element type), unlike the byte-addressed `(RW)ByteAddressBuffer` overloads above.
+    // directly, plus an element index and an element stride, unlike the byte-addressed
+    // `(RW)ByteAddressBuffer` overloads above. The HLSL linalg specification (proposal 0035)
+    // defines the index and the stride in elements of the matrix element type T, not of the
+    // array element type, so callers with an array of another type convert them with
+    // `__hlslMatrixElementsOf`.
     [ForceInline]
     [require(sm_6_10)]
     [__NoSideEffect]
@@ -30511,6 +30514,19 @@ struct CoopMat
             __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::RowMajor)";
         else
             __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::ColMajor)";
+    }
+
+    // Returns a number of elements of the groupshared array element type U, such as an element
+    // index or a stride, as a number of elements of the matrix element type T. The groupshared
+    // `Load` and `Store` overloads take the index and the stride in elements of the array, but
+    // those of `dx::linalg::Matrix` take them in elements of the matrix. For example, element 8
+    // of a `groupshared uint` array is element 32 of a `CoopMat<uint8_t, ...>`. We multiply
+    // before we divide, so the conversion is exact whenever the count is a whole number of
+    // matrix elements, which `dx::linalg::Matrix` requires of the index and the stride.
+    [ForceInline]
+    internal static uint __hlslMatrixElementsOf<U>(uint count)
+    {
+        return count * __naturalStrideOf<U>() / __naturalStrideOf<T>();
     }
 
 
@@ -31028,7 +31044,10 @@ struct CoopMat
         __target_switch
         {
         case hlsl:
-            __hlslStoreGroupshared<matrixLayout>(data, element, stride);
+            __hlslStoreGroupshared<matrixLayout>(
+                data,
+                __hlslMatrixElementsOf<U>(element),
+                __hlslMatrixElementsOf<U>(stride));
         case spirv:
             let pointer = __getAddress(data[element]);
             let alignment = 16U;
@@ -31318,7 +31337,10 @@ $}
         __target_switch
         {
         case hlsl:
-            return __hlslLoadGroupshared<matrixLayout>(data, element, stride);
+            return __hlslLoadGroupshared<matrixLayout>(
+                data,
+                __hlslMatrixElementsOf<U>(element),
+                __hlslMatrixElementsOf<U>(stride));
         case spirv:
             let pointer = __getAddress(data[element]);
             let alignment = 16U;
