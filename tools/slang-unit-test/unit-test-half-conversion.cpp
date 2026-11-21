@@ -53,11 +53,26 @@ SLANG_UNIT_TEST(mathHalfPreservesSpecialValueClassification, NoRenderApi)
             SLANG_CHECK(FloatToHalf(IntAsFloat(bits | sign)) == halfSign);
         for (unsigned int bits : {0x47800000u, 0x7f7fffffu, 0x7f800000u})
             SLANG_CHECK(FloatToHalf(IntAsFloat(bits | sign)) == (halfSign | 0x7c00u));
-        for (unsigned int bits : {0x7f800001u, 0x7fa12345u, 0x7fc12345u, 0x7fffffffu})
+        // The narrowed encoding is exactly sign | 0x7c00 | 0x0200 | (fraction >> 13): the
+        // half quiet bit (0x0200) is forced on, the top payload bits carry over, and the low
+        // 13 fraction bits are discarded. Pin the exact encodings — including the carried
+        // payload bits — so a wrong shift or a dropped payload cannot pass silently.
+        struct NarrowedNaNCase
         {
-            const unsigned short result = FloatToHalf(IntAsFloat(bits | sign));
-            SLANG_CHECK((result & 0xfc00u) == (halfSign | 0x7c00u));
-            SLANG_CHECK((result & 0x03ffu) != 0);
+            unsigned int bits;
+            unsigned short expected;
+        };
+        const NarrowedNaNCase cases[] = {
+            {0x7f800001u, 0x7e00u},
+            {0x7fa12345u, 0x7f09u},
+            {0x7fc12345u, 0x7e09u},
+            {0x7fc00000u, 0x7e00u},
+            {0x7fffffffu, 0x7fffu},
+        };
+        for (const auto& nanCase : cases)
+        {
+            SLANG_CHECK(
+                FloatToHalf(IntAsFloat(nanCase.bits | sign)) == (halfSign | nanCase.expected));
         }
     }
 }
