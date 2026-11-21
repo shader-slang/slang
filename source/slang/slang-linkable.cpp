@@ -337,7 +337,11 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     // more bytes can only turn a cache hit into a miss, never a miss into a false hit.
     getOptionSet().buildHash(builder);
 
-    // Add the name and name override for the specified entry point to the hash.
+    // Add the name and name override for the specified entry point to the hash. When
+    // the requested entry point is a child of this composite, its own buildHash has
+    // already folded these in; the tail is kept deliberately because it hashes the
+    // *specialized* mangled name (getEntryPointMangledName on a specialized component
+    // differs from the unspecialized EntryPoint mangled name the child fold hashes).
     auto entryPoint = getEntryPoint(entryPointIndex);
     if (entryPoint)
     {
