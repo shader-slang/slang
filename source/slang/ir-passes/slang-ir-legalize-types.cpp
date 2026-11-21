@@ -2101,9 +2101,9 @@ static IRInst* emitUndefinedLeaf(IRTypeLegalizationContext* context, IRInst* ins
 /// kind and source location — the same flow `legalizeDefaultConstruct` uses for `{}`. The
 /// remaining flavors also produce a value of their own shape: a `wrappedBuffer` names an
 /// undefined buffer handle with its element wrapping, and an `implicitDeref` names the
-/// undefined pointee it dereferences to. Only a `none` type legalizes to the empty value;
-/// consumers that consume a `LegalVal` by type must tolerate the empty value wherever the
-/// type promises structure, as they did before undefined values were decomposed.
+/// undefined pointee it dereferences to. Only a `none` type legalizes to the empty value here.
+/// More generally, a consumer that consumes a `LegalVal` by type must tolerate an empty value
+/// wherever the type promises structure — other legalization paths still produce them.
 ///
 /// Consider this example:
 ///

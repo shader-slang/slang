@@ -393,9 +393,12 @@ void diagnoseUndefinedOpaqueHandles(IRModule* module, DiagnosticSink* sink)
             // The message names the type `isOpaqueType` reports: an outermost resource type
             // names itself (an array of resources is itself classified as a resource), and
             // any other aggregate names the first resource type it contains, so a leaf names
-            // itself.
+            // itself. The selection predicate already established the type is opaque; the
+            // assertion states that link, while the call stays outside it so the out-parameter
+            // is filled in every build.
             IRType* handleType = nullptr;
-            SLANG_ASSERT(isOpaqueType(value->getDataType(), &handleType));
+            bool isOpaque = isOpaqueType(value->getDataType(), &handleType);
+            SLANG_ASSERT(isOpaque);
             auto loc = findBestSourceLocFromUses(value);
             if (!loc.isValid())
                 loc = getDiagnosticPos(handleType);
