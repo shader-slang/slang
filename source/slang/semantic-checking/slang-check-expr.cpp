@@ -3561,6 +3561,63 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
     }
 }
 
+// Re-nest a chain of type-position brackets the way GLSL reads it: the first
+// source bracket is the outermost dimension, so `int[2][4]` denotes
+// `Array<Array<int,4>,2>`, the same type the declaration `int x[2][4]` gives
+// its variable. The links below this node were each checked through this same
+// re-nesting, so `baseType` carries one array level per counted link: strip
+// exactly `bracketCount` levels off it, then re-fold with this node's own count
+// innermost and the stripped counts from inner to outer. Counts are reused
+// verbatim, so generic and unsized sizes ride through unchanged. Returns
+// nullptr when the base type does not strip down that way; the strip asserts
+// in debug builds, and a release build falls back to the caller's plain wrap.
+static Type* tryGetBracketChainArrayType(
+    ASTBuilder* astBuilder,
+    Type* baseType,
+    IntVal* elementCount,
+    UInt bracketCount)
+{
+    List<IntVal*> outerCounts;
+    auto elementType = baseType;
+    for (UInt ii = 0; ii < bracketCount; ++ii)
+    {
+        auto arrayType = as<ArrayExpressionType>(elementType);
+        SLANG_ASSERT(arrayType);
+        if (!arrayType)
+            return nullptr;
+        outerCounts.add(arrayType->getElementCount());
+        elementType = arrayType->getElementType();
+    }
+    auto resultType = getArrayType(astBuilder, elementType, elementCount);
+    for (Index jj = outerCounts.getCount() - 1; jj >= 0; --jj)
+        resultType = getArrayType(astBuilder, resultType, outerCounts[jj]);
+    return resultType;
+}
+
+// A plain bracket chain is a run of single-argument bracket links (each
+// carrying at most one size expression, including the unsized `[]`), each
+// sitting on the next. Count how many such links sit below `chainLink`; set
+// `outIsPlainBracketChain` to false if any link carries more than one index
+// expression (a multi-argument bracket like the `2,3` in `int[2,3][4]`), whose
+// checked prefix cannot be stripped reliably.
+static UInt getBracketChainLinkCount(Expr* chainLink, bool& outIsPlainBracketChain)
+{
+    UInt bracketCount = 0;
+    for (;;)
+    {
+        auto linkIndexExpr = as<IndexExpr>(chainLink);
+        if (!linkIndexExpr)
+            return bracketCount;
+        if (linkIndexExpr->indexExprs.getCount() > 1)
+        {
+            outIsPlainBracketChain = false;
+            return bracketCount;
+        }
+        bracketCount++;
+        chainLink = linkIndexExpr->baseExpression;
+    }
+}
+
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
     bool needDeref = false;
@@ -3640,7 +3697,31 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         }
 
         auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()), nullptr);
-        auto arrayType = getArrayType(m_astBuilder, elementType, elementCount);
+
+        Type* arrayType = nullptr;
+        if (getShared()->isGLSLSourceLanguage())
+        {
+            // GLSL reads a type-expression bracket chain left to right, with the
+            // first bracket as the outermost dimension, like a C declaration:
+            // `int[2][4]` is an array of 2 `int[4]`s. Slang and HLSL instead bind
+            // the last bracket outermost (`specification/types-array.md`, group
+            // (2): `ElementType[M][N]` equals the trailing `varName[N][M]`), which
+            // the plain wrap below already implements, so only GLSL re-nests.
+            bool isPlainBracketChain = true;
+            UInt bracketCount = getBracketChainLinkCount(
+                subscriptExpr->baseExpression,
+                isPlainBracketChain);
+            if (isPlainBracketChain && bracketCount > 0)
+            {
+                arrayType = tryGetBracketChainArrayType(
+                    m_astBuilder,
+                    elementType,
+                    elementCount,
+                    bracketCount);
+            }
+        }
+        if (!arrayType)
+            arrayType = getArrayType(m_astBuilder, elementType, elementCount);
 
         subscriptExpr->type = QualType(m_astBuilder->getTypeType(arrayType));
         return subscriptExpr;
