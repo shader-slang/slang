@@ -5685,6 +5685,13 @@ warning(
     span { loc = "location", message = "left shift amount exceeds the number of bits and the result will be always zero, (`~lhsType:IRInst' << `~shiftAmount:Int`)." }
 )
 
+err(
+    "type-not-supported-in-native-signature",
+    41037,
+    "type is not supported in a native function signature",
+    span { loc = "location", message = "'~func:IRInst' cannot use '~type:IRInst' as a ~position; only plain-old-data types and [COM] interfaces can cross a [DllImport] or [DllExport] boundary, and a String only as an input parameter" }
+)
+
 warning(
     "operator-shift-on-narrow-type",
     41034,

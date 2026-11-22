@@ -18,6 +18,8 @@ struct DllExportContext
     {
         NativeCallMarshallingContext marshalContext;
         marshalContext.diagnosticSink = diagnosticSink;
+        if (!marshalContext.checkNativeSignature(func))
+            return;
         IRBuilder builder(module);
         auto wrapper = marshalContext.generateDLLExportWrapperFunc(builder, func);
         dllExportDecoration->removeFromParent();

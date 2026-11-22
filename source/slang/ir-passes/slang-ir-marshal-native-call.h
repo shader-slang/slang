@@ -13,7 +13,7 @@ struct IRFunc;
 struct IRFuncType;
 struct IRCall;
 struct IRInst;
-struct IRVar;
+struct IRFunc;
 
 class NativeCallMarshallingContext
 {
@@ -26,6 +26,18 @@ public:
 
     // Get a native function type of `func`.
     IRFuncType* getNativeFuncType(IRBuilder& builder, IRFuncType* declaredFuncType);
+
+    /// Diagnoses every parameter and result of `func` whose type cannot cross a native
+    /// `[DllImport]` or `[DllExport]` boundary, and returns whether the signature is supported.
+    ///
+    /// Only types without managed elements have a lifetime that native code can honor, so a
+    /// signature may use plain-old-data types (scalars, vectors, matrices, `NativeString`, raw
+    /// pointers to such types, and structs and fixed-size arrays of them) and `[COM]` interfaces,
+    /// whose ownership follows `AddRef`/`Release`. A `String` is additionally accepted as a
+    /// by-value input parameter, because the call only borrows its bytes (an import passes
+    /// `const char*`) or copies them (an export builds a new `String`). Any other `String`, and
+    /// any class, resource, or aggregate containing one, is rejected.
+    bool checkNativeSignature(IRFunc* func);
 
     // Insert a call at builder's current position into a native func with original arguments.
     // `originalArgs` will be marshalled to native args before the actual call.
@@ -40,35 +52,17 @@ public:
         Int argCount,
         IRInst* const* originalArgs);
 
-    /// Describes a by-reference argument whose native representation differs from its managed
-    /// representation. The call passes the address of `nativeVar`, and `marshalNativeCall`
-    /// converts the temporary back into `*managedPtr` after the native call returns.
-    struct NativeArgWriteBack
-    {
-        IRInst* managedPtr = nullptr;
-        IRVar* nativeVar = nullptr;
-    };
-
-    /// Marshals the pointer argument of an `out`, `inout`, `ref`, or `__constref` parameter.
-    ///
-    /// When the pointee already has its native representation, the caller's own storage is passed
-    /// through. Otherwise the argument becomes a native temporary, initialized from the managed
-    /// value unless the parameter is `out`, and recorded in `outWriteBacks` unless the parameter is
-    /// read-only, so the callee's result reaches the caller's storage.
     void marshalRefManagedValueToNativeValue(
         IRBuilder& builder,
-        IRType* originalParamType,
         IRInst* originalArg,
-        List<IRInst*>& args,
-        List<NativeArgWriteBack>& outWriteBacks);
+        List<IRInst*>& args);
 
     // Marshal a managed value to a native value for input into a native functions.
     void marshalManagedValueToNativeValue(
         IRBuilder& builder,
         IRType* originalParamType,
         IRInst* originalArg,
-        List<IRInst*>& args,
-        List<NativeArgWriteBack>& outWriteBacks);
+        List<IRInst*>& args);
 
     // Marshal a managed value to a native value for the return value of a native function.
     void marshalManagedValueToNativeResultValue(

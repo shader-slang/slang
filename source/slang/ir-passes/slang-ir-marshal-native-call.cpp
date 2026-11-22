@@ -39,6 +39,90 @@ IRType* NativeCallMarshallingContext::getNativeType(IRBuilder& builder, IRType* 
     }
 }
 
+/// Returns whether a value of `type` is plain old data for a native call: its bytes mean the
+/// same thing to native code, and copying them neither creates nor ends any ownership.
+///
+/// For example, `float3`, `NativeString`, `int*`, and `struct { int a; float b[4]; }` qualify,
+/// while `String`, a class, a resource, a COM pointer, and any struct or array containing one of
+/// them do not.
+static bool isPlainOldDataForNativeCall(IRType* type)
+{
+    if (as<IRBasicType>(type))
+        return true;
+    switch (type->getOp())
+    {
+    case kIROp_NativeStringType:
+        return true;
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+        return isPlainOldDataForNativeCall((IRType*)type->getOperand(0));
+    case kIROp_PtrType:
+        {
+            // A raw pointer is plain data only if native code can use what it points to.
+            auto valueType = as<IRPtrTypeBase>(type)->getValueType();
+            return as<IRVoidType>(valueType) || isPlainOldDataForNativeCall(valueType);
+        }
+    case kIROp_ArrayType:
+        return isPlainOldDataForNativeCall(as<IRArrayType>(type)->getElementType());
+    case kIROp_StructType:
+        for (auto field : as<IRStructType>(type)->getFields())
+        {
+            if (!isPlainOldDataForNativeCall(field->getFieldType()))
+                return false;
+        }
+        return true;
+    default:
+        return false;
+    }
+}
+
+/// Returns whether `type` is a `[COM]` interface or a `ComPtr` to one, which a native signature
+/// accepts because COM reference counting defines its ownership.
+static bool isComInterfaceForNativeCall(IRType* type)
+{
+    return type->getOp() == kIROp_InterfaceType || type->getOp() == kIROp_ComPtrType;
+}
+
+bool NativeCallMarshallingContext::checkNativeSignature(IRFunc* func)
+{
+    bool isSupported = true;
+    auto funcType = func->getDataType();
+    auto diagnose = [&](IRType* type, const char* position)
+    {
+        diagnosticSink->diagnose(Diagnostics::TypeNotSupportedInNativeSignature{
+            .func = func,
+            .type = type,
+            .position = position,
+            .location = func->sourceLoc});
+        isSupported = false;
+    };
+
+    for (UInt i = 0; i < funcType->getParamCount(); ++i)
+    {
+        auto paramType = funcType->getParamType(i);
+        if (auto ptrType = as<IRPtrTypeBase>(paramType);
+            ptrType && paramType->getOp() != kIROp_PtrType)
+        {
+            // `out`, `inout`, `ref`, and `__constref` pass the address of the caller's storage,
+            // so native code reads and writes the pointee directly.
+            auto valueType = ptrType->getValueType();
+            if (!isPlainOldDataForNativeCall(valueType) && !isComInterfaceForNativeCall(valueType))
+                diagnose(valueType, "by-reference parameter");
+        }
+        else if (
+            !isPlainOldDataForNativeCall(paramType) && !isComInterfaceForNativeCall(paramType) &&
+            paramType->getOp() != kIROp_StringType)
+        {
+            diagnose(paramType, "parameter");
+        }
+    }
+
+    auto resultType = funcType->getResultType();
+    if (!isPlainOldDataForNativeCall(resultType) && !isComInterfaceForNativeCall(resultType))
+        diagnose(resultType, "result");
+    return isSupported;
+}
+
 IRFuncType* NativeCallMarshallingContext::getNativeFuncType(
     IRBuilder& builder,
     IRFuncType* declaredFuncType)
@@ -73,35 +157,16 @@ IRFuncType* NativeCallMarshallingContext::getNativeFuncType(
 
 void NativeCallMarshallingContext::marshalRefManagedValueToNativeValue(
     IRBuilder& builder,
-    IRType* originalParamType,
     IRInst* originalArg,
-    List<IRInst*>& args,
-    List<NativeArgWriteBack>& outWriteBacks)
+    List<IRInst*>& args)
 {
     auto ptrTypeBase = as<IRPtrTypeBase>(originalArg->getDataType());
     SLANG_RELEASE_ASSERT(ptrTypeBase);
-    auto valueType = ptrTypeBase->getValueType();
-    switch (valueType->getOp())
+    switch (ptrTypeBase->getValueType()->getOp())
     {
     case kIROp_InterfaceType:
     case kIROp_ComPtrType:
         args.add(builder.emitGetManagedPtrWriteRef(originalArg));
-        break;
-    case kIROp_StringType:
-        {
-            // The native callee sees `const char**`, which cannot point at a managed `String`.
-            // We pass a native temporary instead; `marshalNativeCall` copies it back into the
-            // caller's `String` once the callee returns.
-            auto nativeVar = builder.emitVar(getNativeType(builder, valueType));
-            if (originalParamType->getOp() != kIROp_OutParamType)
-            {
-                auto managedValue = builder.emitLoad(originalArg);
-                builder.emitStore(nativeVar, builder.emitGetNativeString(managedValue));
-            }
-            args.add(nativeVar);
-            if (originalParamType->getOp() != kIROp_BorrowInParamType)
-                outWriteBacks.add({originalArg, nativeVar});
-        }
         break;
     default:
         args.add(originalArg);
@@ -113,8 +178,7 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeValue(
     IRBuilder& builder,
     IRType* originalParamType,
     IRInst* originalArg,
-    List<IRInst*>& args,
-    List<NativeArgWriteBack>& outWriteBacks)
+    List<IRInst*>& args)
 {
     switch (originalParamType->getOp())
     {
@@ -122,12 +186,7 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeValue(
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
     case kIROp_OutParamType:
-        return marshalRefManagedValueToNativeValue(
-            builder,
-            originalParamType,
-            originalArg,
-            args,
-            outWriteBacks);
+        return marshalRefManagedValueToNativeValue(builder, originalArg, args);
     case kIROp_StringType:
         {
             auto nativeStr = builder.emitGetNativeString(originalArg);
@@ -193,18 +252,8 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeResultValue(
         SLANG_UNREACHABLE("out and ref types should be handled before reaching here.");
         break;
     case kIROp_StringType:
-        {
-            diagnosticSink->diagnose(Diagnostics::Unimplemented{
-                .feature = "marshal string to native return value",
-                .location = originalArg->sourceLoc});
-        }
-        break;
     case kIROp_ClassType:
-        {
-            diagnosticSink->diagnose(Diagnostics::Unimplemented{
-                .feature = "marshal class to native return value",
-                .location = originalArg->sourceLoc});
-        }
+        SLANG_UNREACHABLE("checkNativeSignature rejects managed native results.");
         break;
     case kIROp_InterfaceType:
         {
@@ -337,11 +386,10 @@ IRInst* NativeCallMarshallingContext::marshalNativeCall(
 {
     // Marshal parameters to arguments into native func.
     List<IRInst*> args;
-    List<NativeArgWriteBack> writeBacks;
     for (Int i = 0; i < argCount; i++)
     {
         auto paramType = originalFuncType->getParamType(i);
-        marshalManagedValueToNativeValue(builder, paramType, originalArgs[i], args, writeBacks);
+        marshalManagedValueToNativeValue(builder, paramType, originalArgs[i], args);
     }
     IRType* originalReturnType = originalFuncType->getResultType();
 
@@ -359,14 +407,7 @@ IRInst* NativeCallMarshallingContext::marshalNativeCall(
     // Insert call.
     IRInst* call = builder.emitCallInst(nativeFuncType->getResultType(), nativeFunc, args);
 
-    // Copy the native temporaries of by-reference arguments back into the caller's storage.
-    for (const auto& writeBack : writeBacks)
-    {
-        auto nativeValue = builder.emitLoad(writeBack.nativeVar);
-        builder.emitStore(
-            writeBack.managedPtr,
-            marshalNativeValueToManagedValue(builder, nativeValue));
-    }
+    // TODO: marshal output/ref args back to original args.
 
     IRInst* returnValue = call;
 
