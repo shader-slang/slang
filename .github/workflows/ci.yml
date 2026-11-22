@@ -979,6 +979,11 @@ jobs:
   # Actions marks the dependent jobs "skipped" (not "failed"). Once the
   # filter says CI should run, requiring every needed job to succeed
   # ensures skipped jobs cannot hide a failed dependency (see #11553).
+  # The SM80 jobs (test-linux-{debug,release}-gcc-x86_64-sm80) are not in this
+  # list on purpose. The SM80Plus runners are often not available for hours (see
+  # issue 14252), and a required job that waits for a runner removes the pull
+  # request from the merge queue. The SM80 jobs still run and report their own
+  # result, but they do not block a merge.
   check-ci:
     needs:
       [
@@ -1007,12 +1012,10 @@ jobs:
         test-linux-debug-gcc-aarch64-cpu,
         test-linux-debug-gcc-x86_64-cpu,
         test-linux-debug-gcc-x86_64-rhi,
-        test-linux-debug-gcc-x86_64-sm80,
         test-linux-debug-gcc-x86_64-t4,
         test-linux-release-gcc-aarch64-cpu,
         test-linux-release-gcc-x86_64-cpu,
         test-linux-release-gcc-x86_64-rhi,
-        test-linux-release-gcc-x86_64-sm80,
         test-linux-release-gcc-x86_64-t4,
         test-macos-debug-clang-aarch64,
         test-macos-debug-clang-aarch64-rhi,
