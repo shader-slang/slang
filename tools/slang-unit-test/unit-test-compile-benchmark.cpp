@@ -14,7 +14,7 @@ using namespace Slang;
 
 // Test the compilation API for cross-compiling glsl source to SPIRV.
 
-SLANG_UNIT_TEST(compileBenchmark)
+SLANG_UNIT_TEST(compileBenchmark, NoRenderApi)
 {
     const char* userSourceBody = R"(
 // shader.slang

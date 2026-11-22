@@ -23,7 +23,7 @@ using namespace Slang;
 // 3. Make sure internal exceptions does not leak through
 //    IComponentType::getEntryPointCode/getTargetCode.
 //
-SLANG_UNIT_TEST(gh8184)
+SLANG_UNIT_TEST(gh8184, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     {

@@ -41,7 +41,7 @@ using namespace Slang;
 // Property 2: a straight-line run coalesces onto one counter with the single
 // probe on the *last* marker (see the file header for why only a direct
 // `outEmitsProbe` assertion observes this).
-SLANG_UNIT_TEST(coverageCoalescingPlacesProbeAtLastMarkerOfRegion)
+SLANG_UNIT_TEST(coverageCoalescingPlacesProbeAtLastMarkerOfRegion, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -65,7 +65,7 @@ SLANG_UNIT_TEST(coverageCoalescingPlacesProbeAtLastMarkerOfRegion)
 // Property 1: a `GenericAsm` terminator carries return semantics, so the exit
 // analysis must classify a function that ends in one as returning normally, and
 // a call to it must not split the surrounding region.
-SLANG_UNIT_TEST(coverageCoalescingTreatsGenericAsmExitAsReturning)
+SLANG_UNIT_TEST(coverageCoalescingTreatsGenericAsmExitAsReturning, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -87,7 +87,7 @@ SLANG_UNIT_TEST(coverageCoalescingTreatsGenericAsmExitAsReturning)
 
 // Property 3: an `Abort` between two markers abandons the invocation, so the
 // markers must not coalesce — each takes its own counter and its own probe.
-SLANG_UNIT_TEST(coverageCoalescingSplitsRegionAtAbort)
+SLANG_UNIT_TEST(coverageCoalescingSplitsRegionAtAbort, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -113,7 +113,7 @@ SLANG_UNIT_TEST(coverageCoalescingSplitsRegionAtAbort)
 // Requiring both regions to split in both orders is what pins order-independence:
 // an unsound optimistic cycle-break coalesces the `b` region only when `a` is
 // resolved first.
-SLANG_UNIT_TEST(coverageCoalescingSplitsAtMutuallyRecursiveCallEitherOrder)
+SLANG_UNIT_TEST(coverageCoalescingSplitsAtMutuallyRecursiveCallEitherOrder, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -154,7 +154,9 @@ SLANG_UNIT_TEST(coverageCoalescingSplitsAtMutuallyRecursiveCallEitherOrder)
 // breaks a line run — the two line markers around it still coalesce across it.
 // One fixture pins both halves. (A branch marker takes the identical
 // non-`IncrementCoverageCounter` path; only the function-marker case is built.)
-SLANG_UNIT_TEST(coverageCoalescingGivesFunctionMarkerADedicatedSlotWithoutBreakingTheRun)
+SLANG_UNIT_TEST(
+    coverageCoalescingGivesFunctionMarkerADedicatedSlotWithoutBreakingTheRun,
+    NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());

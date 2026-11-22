@@ -21,7 +21,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(loadModuleFromSourceNameCollision)
+SLANG_UNIT_TEST(loadModuleFromSourceNameCollision, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(

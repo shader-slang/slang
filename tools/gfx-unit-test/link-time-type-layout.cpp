@@ -249,7 +249,7 @@ void linkTimeTypeLayoutImpl(rhi::IDevice* device, UnitTestContext* context)
 // failed before when layout information was required during code generation)
 //
 
-SLANG_UNIT_TEST(linkTimeTypeLayout)
+SLANG_UNIT_TEST(linkTimeTypeLayout, Vulkan)
 {
     runTestImpl(linkTimeTypeLayoutImpl, unitTestContext, DeviceType::Vulkan);
 }

@@ -67,7 +67,7 @@ struct ISlangUnknownProbe : ISlangUnknown
     }
 };
 
-SLANG_UNIT_TEST(vtableISlangUnknown)
+SLANG_UNIT_TEST(vtableISlangUnknown, NoRenderApi)
 {
     ISlangUnknownProbe p;
     callSlot(&p, 0);
@@ -116,7 +116,7 @@ struct IShaderProgramD3D12Probe : gfx::IShaderProgramD3D12
     }
 };
 
-SLANG_UNIT_TEST(vtableIShaderProgramD3D12)
+SLANG_UNIT_TEST(vtableIShaderProgramD3D12, NoRenderApi)
 {
     IShaderProgramD3D12Probe p;
 
@@ -167,7 +167,7 @@ struct IComputeCommandEncoderD3D12Probe : gfx::IComputeCommandEncoderD3D12
     }
 };
 
-SLANG_UNIT_TEST(vtableIComputeCommandEncoderD3D12)
+SLANG_UNIT_TEST(vtableIComputeCommandEncoderD3D12, NoRenderApi)
 {
     IComputeCommandEncoderD3D12Probe p;
 
@@ -207,7 +207,7 @@ struct ISlangCastableProbe : ISlangCastable
     }
 };
 
-SLANG_UNIT_TEST(vtableISlangCastable)
+SLANG_UNIT_TEST(vtableISlangCastable, NoRenderApi)
 {
     ISlangCastableProbe p;
     callSlot(&p, 0);
@@ -249,7 +249,7 @@ struct ISlangClonableProbe : ISlangClonable
     }
 };
 
-SLANG_UNIT_TEST(vtableISlangClonable)
+SLANG_UNIT_TEST(vtableISlangClonable, NoRenderApi)
 {
     ISlangClonableProbe p;
     callSlot(&p, 3);
@@ -291,7 +291,7 @@ struct ISlangBlobProbe : ISlangBlob
     }
 };
 
-SLANG_UNIT_TEST(vtableISlangBlob)
+SLANG_UNIT_TEST(vtableISlangBlob, NoRenderApi)
 {
     ISlangBlobProbe p;
     callSlot(&p, 3);
@@ -333,7 +333,7 @@ struct ISlangFileSystemProbe : ISlangFileSystem
     }
 };
 
-SLANG_UNIT_TEST(vtableISlangFileSystem)
+SLANG_UNIT_TEST(vtableISlangFileSystem, NoRenderApi)
 {
     ISlangFileSystemProbe p;
     callSlot(&p, 3);
@@ -370,7 +370,7 @@ struct ISlangSharedLibraryDep1Probe : ISlangSharedLibrary_Dep1
     }
 };
 
-SLANG_UNIT_TEST(vtableISlangSharedLibraryDep1)
+SLANG_UNIT_TEST(vtableISlangSharedLibraryDep1, NoRenderApi)
 {
     ISlangSharedLibraryDep1Probe p;
     callSlot(&p, 2);
@@ -412,7 +412,7 @@ struct ISlangSharedLibraryProbe : ISlangSharedLibrary
     }
 };
 
-SLANG_UNIT_TEST(vtableISlangSharedLibrary)
+SLANG_UNIT_TEST(vtableISlangSharedLibrary, NoRenderApi)
 {
     ISlangSharedLibraryProbe p;
     callSlot(&p, 3);
@@ -450,7 +450,7 @@ struct ISlangSharedLibraryLoaderProbe : ISlangSharedLibraryLoader
     }
 };
 
-SLANG_UNIT_TEST(vtableISlangSharedLibraryLoader)
+SLANG_UNIT_TEST(vtableISlangSharedLibraryLoader, NoRenderApi)
 {
     ISlangSharedLibraryLoaderProbe p;
     callSlot(&p, 2);
@@ -527,7 +527,7 @@ struct ISlangFileSystemExtProbe : ISlangFileSystemExt
     }
 };
 
-SLANG_UNIT_TEST(vtableISlangFileSystemExt)
+SLANG_UNIT_TEST(vtableISlangFileSystemExt, NoRenderApi)
 {
     ISlangFileSystemExtProbe p;
     callSlot(&p, 4);
@@ -636,7 +636,7 @@ struct ISlangMutableFileSystemProbe : ISlangMutableFileSystem
     }
 };
 
-SLANG_UNIT_TEST(vtableISlangMutableFileSystem)
+SLANG_UNIT_TEST(vtableISlangMutableFileSystem, NoRenderApi)
 {
     ISlangMutableFileSystemProbe p;
     callSlot(&p, 11);
@@ -700,7 +700,7 @@ struct ISlangWriterProbe : ISlangWriter
     }
 };
 
-SLANG_UNIT_TEST(vtableISlangWriter)
+SLANG_UNIT_TEST(vtableISlangWriter, NoRenderApi)
 {
     ISlangWriterProbe p;
     callSlot(&p, 3);
@@ -760,7 +760,7 @@ struct ISlangProfilerProbe : ISlangProfiler
     }
 };
 
-SLANG_UNIT_TEST(vtableISlangProfiler)
+SLANG_UNIT_TEST(vtableISlangProfiler, NoRenderApi)
 {
     ISlangProfilerProbe p;
     callSlot(&p, 3);
@@ -958,7 +958,7 @@ struct IGlobalSessionProbe : IGlobalSession
     }
 };
 
-SLANG_UNIT_TEST(vtableIGlobalSession)
+SLANG_UNIT_TEST(vtableIGlobalSession, NoRenderApi)
 {
     IGlobalSessionProbe p;
     callSlot(&p, 3);
@@ -1020,7 +1020,7 @@ struct IMetadataProbe : IMetadata
     }
 };
 
-SLANG_UNIT_TEST(vtableIMetadata)
+SLANG_UNIT_TEST(vtableIMetadata, NoRenderApi)
 {
     IMetadataProbe p;
     callSlot(&p, 3);
@@ -1064,7 +1064,7 @@ struct IBindlessResourceMetadataProbe : IBindlessResourceMetadata
     }
 };
 
-SLANG_UNIT_TEST(vtableIBindlessResourceMetadata)
+SLANG_UNIT_TEST(vtableIBindlessResourceMetadata, NoRenderApi)
 {
     IBindlessResourceMetadataProbe p;
     callSlot(&p, 3);
@@ -1121,7 +1121,7 @@ struct ICoverageTracingMetadataProbe : ICoverageTracingMetadata
     }
 };
 
-SLANG_UNIT_TEST(vtableICoverageTracingMetadata)
+SLANG_UNIT_TEST(vtableICoverageTracingMetadata, NoRenderApi)
 {
     ICoverageTracingMetadataProbe p;
     callSlot(&p, 3);
@@ -1180,7 +1180,7 @@ struct ISyntheticResourceMetadataProbe : ISyntheticResourceMetadata
     }
 };
 
-SLANG_UNIT_TEST(vtableISyntheticResourceMetadata)
+SLANG_UNIT_TEST(vtableISyntheticResourceMetadata, NoRenderApi)
 {
     ISyntheticResourceMetadataProbe p;
     callSlot(&p, 3);
@@ -1236,7 +1236,7 @@ struct ICompileResultProbe : ICompileResult
     }
 };
 
-SLANG_UNIT_TEST(vtableICompileResult)
+SLANG_UNIT_TEST(vtableICompileResult, NoRenderApi)
 {
     ICompileResultProbe p;
     callSlot(&p, 3);
@@ -1350,7 +1350,7 @@ struct IComponentTypeProbe : IComponentType
     }
 };
 
-SLANG_UNIT_TEST(vtableIComponentType)
+SLANG_UNIT_TEST(vtableIComponentType, NoRenderApi)
 {
     IComponentTypeProbe p;
     callSlot(&p, 3);
@@ -1473,7 +1473,7 @@ struct IEntryPointProbe : IEntryPoint
     }
 };
 
-SLANG_UNIT_TEST(vtableIEntryPoint)
+SLANG_UNIT_TEST(vtableIEntryPoint, NoRenderApi)
 {
     IEntryPointProbe p;
     callSlot(&p, 16);
@@ -1523,7 +1523,7 @@ struct IComponentType2Probe : IComponentType2
     }
 };
 
-SLANG_UNIT_TEST(vtableIComponentType2)
+SLANG_UNIT_TEST(vtableIComponentType2, NoRenderApi)
 {
     IComponentType2Probe p;
     callSlot(&p, 3);
@@ -1686,7 +1686,7 @@ struct ISessionProbe : ISession
     }
 };
 
-SLANG_UNIT_TEST(vtableISession)
+SLANG_UNIT_TEST(vtableISession, NoRenderApi)
 {
     ISessionProbe p;
     callSlot(&p, 3);
@@ -1870,7 +1870,7 @@ struct IModuleProbe : IModule
     }
 };
 
-SLANG_UNIT_TEST(vtableIModule)
+SLANG_UNIT_TEST(vtableIModule, NoRenderApi)
 {
     IModuleProbe p;
     callSlot(&p, 3);
@@ -1964,7 +1964,7 @@ struct IByteCodeRunnerProbe : IByteCodeRunner
     }
 };
 
-SLANG_UNIT_TEST(vtableIByteCodeRunner)
+SLANG_UNIT_TEST(vtableIByteCodeRunner, NoRenderApi)
 {
     IByteCodeRunnerProbe p;
     callSlot(&p, 3);

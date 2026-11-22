@@ -90,12 +90,12 @@ void getTextureResourceHandleTestAPI(UnitTestContext* context, Slang::RenderApiF
     getTextureResourceHandleTestImpl(device, context);
 }
 
-SLANG_UNIT_TEST(getTextureResourceHandleD3D12)
+SLANG_UNIT_TEST(getTextureResourceHandleD3D12, D3D12)
 {
     return getTextureResourceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(getTextureResourceHandleVulkan)
+SLANG_UNIT_TEST(getTextureResourceHandleVulkan, Vulkan)
 {
     return getTextureResourceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
 }

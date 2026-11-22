@@ -13,7 +13,7 @@ using namespace Slang;
 
 // Test metal argument buffer tier2 layout rules.
 
-SLANG_UNIT_TEST(metalArgumentBufferTier2Reflection)
+SLANG_UNIT_TEST(metalArgumentBufferTier2Reflection, NoRenderApi)
 {
     const char* userSourceBody = R"(
         struct A

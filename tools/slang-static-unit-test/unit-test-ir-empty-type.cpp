@@ -9,7 +9,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(irStructEmptyPreservesDceSemantics)
+SLANG_UNIT_TEST(irStructEmptyPreservesDceSemantics, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder fixture(env.getSessionImpl());
@@ -41,7 +41,7 @@ SLANG_UNIT_TEST(irStructEmptyPreservesDceSemantics)
     SLANG_CHECK(!isEmptyType(nested));
 }
 
-SLANG_UNIT_TEST(irEmptyTypeRecursesThroughEmptyAggregates)
+SLANG_UNIT_TEST(irEmptyTypeRecursesThroughEmptyAggregates, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder fixture(env.getSessionImpl());
@@ -76,7 +76,7 @@ SLANG_UNIT_TEST(irEmptyTypeRecursesThroughEmptyAggregates)
         builder.getArrayType(builder.getIntType(), builder.getIntValue(builder.getIntType(), 0))));
 }
 
-SLANG_UNIT_TEST(irEmptyTypePreservesOpaqueRepresentations)
+SLANG_UNIT_TEST(irEmptyTypePreservesOpaqueRepresentations, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder fixture(env.getSessionImpl());
@@ -107,7 +107,7 @@ SLANG_UNIT_TEST(irEmptyTypePreservesOpaqueRepresentations)
     }
 }
 
-SLANG_UNIT_TEST(irTrimOptimizableTypesKeepsHistoricalEmptyFields)
+SLANG_UNIT_TEST(irTrimOptimizableTypesKeepsHistoricalEmptyFields, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder fixture(env.getSessionImpl());

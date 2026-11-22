@@ -103,7 +103,7 @@ static bool hasValue(const uint8_t* data, size_t size, uint8_t value)
     return hasValueShort(data + sizeof(size_t) * numWords, size & alignMask, value);
 }
 
-SLANG_UNIT_TEST(memoryArena)
+SLANG_UNIT_TEST(memoryArena, NoRenderApi)
 {
     DefaultRandomGenerator randGen(0x5346536a);
 

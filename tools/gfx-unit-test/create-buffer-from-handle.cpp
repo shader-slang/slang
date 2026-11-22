@@ -71,12 +71,12 @@ void createBufferFromHandleTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, numbersBuffer, std::array{1.0f, 2.0f, 3.0f, 4.0f});
 }
 
-SLANG_UNIT_TEST(createBufferFromHandleD3D12)
+SLANG_UNIT_TEST(createBufferFromHandleD3D12, D3D12)
 {
     runTestImpl(createBufferFromHandleTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(createBufferFromHandleVulkan)
+SLANG_UNIT_TEST(createBufferFromHandleVulkan, Vulkan)
 {
     runTestImpl(createBufferFromHandleTestImpl, unitTestContext, DeviceType::Vulkan);
 }

@@ -99,7 +99,7 @@ static SlangResult _runSlangc(
     return ProcessUtil::execute(cmdLine, outResult);
 }
 
-SLANG_UNIT_TEST(DepfileOutput)
+SLANG_UNIT_TEST(DepfileOutput, NoRenderApi)
 {
     // --- Test 1: depfile with -o ---
     {

@@ -63,7 +63,7 @@ bool checkEquals(const MathIntResult& a, const MathIntResult& b)
 } // namespace
 
 // Casts
-SLANG_UNIT_TEST(mathIntOpsCast)
+SLANG_UNIT_TEST(mathIntOpsCast, NoRenderApi)
 {
     SLANG_CHECK(checkEquals(
         MathIntOps::constructResult(MathIntType::UInt8Type, 0xFEU, 0),
@@ -147,7 +147,7 @@ SLANG_UNIT_TEST(mathIntOpsCast)
             MathIntValue::constructFromValue(MathIntType::UInt8Type, 255))));
 }
 
-SLANG_UNIT_TEST(mathIntOpsCastToBool)
+SLANG_UNIT_TEST(mathIntOpsCastToBool, NoRenderApi)
 {
     SLANG_CHECK(checkEquals(
         MathIntOps::constructResult(MathIntType::BoolType, 0, 0),
@@ -180,7 +180,7 @@ SLANG_UNIT_TEST(mathIntOpsCastToBool)
 
 // Conversions from floating-point values. In-range values truncate toward zero. A value whose
 // truncation is out of range, and NaN or infinity, is target-defined.
-SLANG_UNIT_TEST(mathIntOpsConvertFloatValue)
+SLANG_UNIT_TEST(mathIntOpsConvertFloatValue, NoRenderApi)
 {
     const double inf = std::numeric_limits<double>::infinity();
     const double nan = std::numeric_limits<double>::quiet_NaN();
@@ -432,39 +432,39 @@ void checkComparisonPattern(
 
 } // namespace
 
-SLANG_UNIT_TEST(mathIntOpsCompEql)
+SLANG_UNIT_TEST(mathIntOpsCompEql, NoRenderApi)
 {
     checkComparisonPattern(MathIntOps::compEql, ComparisonType::Equal);
 }
 
-SLANG_UNIT_TEST(mathIntOpsCompNeq)
+SLANG_UNIT_TEST(mathIntOpsCompNeq, NoRenderApi)
 {
     checkComparisonPattern(MathIntOps::compNeq, ComparisonType::NotEqual);
 }
 
-SLANG_UNIT_TEST(mathIntOpsCompGeq)
+SLANG_UNIT_TEST(mathIntOpsCompGeq, NoRenderApi)
 {
     checkComparisonPattern(MathIntOps::compGeq, ComparisonType::GreaterEqual);
 }
 
-SLANG_UNIT_TEST(mathIntOpsCompLeq)
+SLANG_UNIT_TEST(mathIntOpsCompLeq, NoRenderApi)
 {
     checkComparisonPattern(MathIntOps::compLeq, ComparisonType::LessEqual);
 }
 
-SLANG_UNIT_TEST(mathIntOpsCompGreater)
+SLANG_UNIT_TEST(mathIntOpsCompGreater, NoRenderApi)
 {
     checkComparisonPattern(MathIntOps::compGreater, ComparisonType::Greater);
 }
 
-SLANG_UNIT_TEST(mathIntOpsCompLess)
+SLANG_UNIT_TEST(mathIntOpsCompLess, NoRenderApi)
 {
     checkComparisonPattern(MathIntOps::compLess, ComparisonType::Less);
 }
 
 // Arithmetic
 
-SLANG_UNIT_TEST(mathIntOpsAdd)
+SLANG_UNIT_TEST(mathIntOpsAdd, NoRenderApi)
 {
     SLANG_CHECK(checkEquals(
         MathIntOps::constructResult(MathIntType::Int16Type, 0, 0),
@@ -558,7 +558,7 @@ SLANG_UNIT_TEST(mathIntOpsAdd)
             MathIntValue::constructFromValue(MathIntType::UInt64Type, 1))));
 }
 
-SLANG_UNIT_TEST(mathIntOpsSub)
+SLANG_UNIT_TEST(mathIntOpsSub, NoRenderApi)
 {
     SLANG_CHECK(checkEquals(
         MathIntOps::constructResult(MathIntType::Int16Type, 0, 0),
@@ -666,7 +666,7 @@ SLANG_UNIT_TEST(mathIntOpsSub)
             MathIntValue::constructFromValue(MathIntType::UInt64Type, 1))));
 }
 
-SLANG_UNIT_TEST(mathIntOpsMul)
+SLANG_UNIT_TEST(mathIntOpsMul, NoRenderApi)
 {
     SLANG_CHECK(checkEquals(
         MathIntOps::constructResult(MathIntType::Int8Type, 24, 0),
@@ -805,7 +805,7 @@ SLANG_UNIT_TEST(mathIntOpsMul)
 }
 
 
-SLANG_UNIT_TEST(mathIntOpsDiv)
+SLANG_UNIT_TEST(mathIntOpsDiv, NoRenderApi)
 {
     // basics
     SLANG_CHECK(checkEquals(
@@ -968,7 +968,7 @@ SLANG_UNIT_TEST(mathIntOpsDiv)
             MathIntValue::constructFromValue(MathIntType::Int32Type, -1))));
 }
 
-SLANG_UNIT_TEST(mathIntOpsRem)
+SLANG_UNIT_TEST(mathIntOpsRem, NoRenderApi)
 {
     // From the spec:
     //
@@ -1092,7 +1092,7 @@ SLANG_UNIT_TEST(mathIntOpsRem)
             MathIntValue::constructFromValue(MathIntType::Int64Type, 257))));
 }
 
-SLANG_UNIT_TEST(mathIntOpsNeg)
+SLANG_UNIT_TEST(mathIntOpsNeg, NoRenderApi)
 {
     SLANG_CHECK(checkEquals(
         MathIntOps::constructResult(MathIntType::Int16Type, -123, 0),
@@ -1220,7 +1220,7 @@ SLANG_UNIT_TEST(mathIntOpsNeg)
 }
 
 // Bitwise operations
-SLANG_UNIT_TEST(mathIntOpsBitwiseAnd)
+SLANG_UNIT_TEST(mathIntOpsBitwiseAnd, NoRenderApi)
 {
     // Note: zero/sign extension, then OP, then store. No overflow checks.
     SLANG_CHECK(checkEquals(
@@ -1238,7 +1238,7 @@ SLANG_UNIT_TEST(mathIntOpsBitwiseAnd)
             MathIntValue::constructFromValue(MathIntType::Int32Type, 0x88888888))));
 }
 
-SLANG_UNIT_TEST(mathIntOpsBitwiseOr)
+SLANG_UNIT_TEST(mathIntOpsBitwiseOr, NoRenderApi)
 {
     // Note: zero/sign extension, then OP, then store. No overflow checks.
     SLANG_CHECK(checkEquals(
@@ -1256,7 +1256,7 @@ SLANG_UNIT_TEST(mathIntOpsBitwiseOr)
             MathIntValue::constructFromValue(MathIntType::UInt32Type, 0x88888888))));
 }
 
-SLANG_UNIT_TEST(mathIntOpsBitwiseXor)
+SLANG_UNIT_TEST(mathIntOpsBitwiseXor, NoRenderApi)
 {
     // Note: zero/sign extension, then OP, then store. No overflow checks.
     SLANG_CHECK(checkEquals(
@@ -1274,7 +1274,7 @@ SLANG_UNIT_TEST(mathIntOpsBitwiseXor)
             MathIntValue::constructFromValue(MathIntType::UInt32Type, 0x88888888))));
 }
 
-SLANG_UNIT_TEST(mathIntOpsBitwiseNot)
+SLANG_UNIT_TEST(mathIntOpsBitwiseNot, NoRenderApi)
 {
     // Note: zero/sign extension, then OP, then store. No overflow checks.
     SLANG_CHECK(checkEquals(
@@ -1296,7 +1296,7 @@ SLANG_UNIT_TEST(mathIntOpsBitwiseNot)
 
 // Shifts
 
-SLANG_UNIT_TEST(mathIntOpsLsh)
+SLANG_UNIT_TEST(mathIntOpsLsh, NoRenderApi)
 {
     // basics
     SLANG_CHECK(checkEquals(
@@ -1358,7 +1358,7 @@ SLANG_UNIT_TEST(mathIntOpsLsh)
             MathIntValue::constructFromValue(MathIntType::Int8Type, 32))));
 }
 
-SLANG_UNIT_TEST(mathIntOpsRsh)
+SLANG_UNIT_TEST(mathIntOpsRsh, NoRenderApi)
 {
     // basics
     SLANG_CHECK(checkEquals(

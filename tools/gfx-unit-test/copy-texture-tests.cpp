@@ -835,7 +835,7 @@ void copyTextureTestImpl(IDevice* device, UnitTestContext* context)
     }
 }
 
-SLANG_UNIT_TEST(copyTextureSimple)
+SLANG_UNIT_TEST(copyTextureSimple, D3D12 | Vulkan)
 {
     runTestImpl(
         copyTextureTestImpl<SimpleCopyTexture>,
@@ -847,7 +847,7 @@ SLANG_UNIT_TEST(copyTextureSimple)
         Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(copyTextureSection)
+SLANG_UNIT_TEST(copyTextureSection, D3D12 | Vulkan)
 {
     runTestImpl(
         copyTextureTestImpl<CopyTextureSection>,
@@ -859,7 +859,7 @@ SLANG_UNIT_TEST(copyTextureSection)
         Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(copyLargeToSmallTexture)
+SLANG_UNIT_TEST(copyLargeToSmallTexture, D3D12 | Vulkan)
 {
     runTestImpl(
         copyTextureTestImpl<LargeSrcToSmallDst>,
@@ -871,7 +871,7 @@ SLANG_UNIT_TEST(copyLargeToSmallTexture)
         Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(copySmallToLargeTexture)
+SLANG_UNIT_TEST(copySmallToLargeTexture, D3D12 | Vulkan)
 {
     runTestImpl(
         copyTextureTestImpl<SmallSrcToLargeDst>,
@@ -883,7 +883,7 @@ SLANG_UNIT_TEST(copySmallToLargeTexture)
         Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(copyBetweenMips)
+SLANG_UNIT_TEST(copyBetweenMips, D3D12 | Vulkan)
 {
     runTestImpl(copyTextureTestImpl<CopyBetweenMips>, unitTestContext, Slang::RenderApiFlag::D3D12);
     runTestImpl(
@@ -892,7 +892,7 @@ SLANG_UNIT_TEST(copyBetweenMips)
         Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(copyBetweenLayers)
+SLANG_UNIT_TEST(copyBetweenLayers, D3D12 | Vulkan)
 {
     runTestImpl(
         copyTextureTestImpl<CopyBetweenLayers>,
@@ -904,7 +904,7 @@ SLANG_UNIT_TEST(copyBetweenLayers)
         Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(copyWithOffsets)
+SLANG_UNIT_TEST(copyWithOffsets, D3D12 | Vulkan)
 {
     runTestImpl(copyTextureTestImpl<CopyWithOffsets>, unitTestContext, Slang::RenderApiFlag::D3D12);
     runTestImpl(
@@ -913,7 +913,7 @@ SLANG_UNIT_TEST(copyWithOffsets)
         Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(copySectionWithSetExtent)
+SLANG_UNIT_TEST(copySectionWithSetExtent, D3D12 | Vulkan)
 {
     runTestImpl(
         copyTextureTestImpl<CopySectionWithSetExtent>,

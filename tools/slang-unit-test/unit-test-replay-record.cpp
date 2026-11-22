@@ -294,43 +294,43 @@ static SlangResult runTest(
 // These hashes include machine-specific paths, so they may need to be updated
 // when running on a different machine or after significant code changes.
 
-SLANG_UNIT_TEST(replayRecord_cpu_hello_world)
+SLANG_UNIT_TEST(replayRecord_cpu_hello_world, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "cpu-hello-world", 0xc115139df62d9136)));
 }
 
-SLANG_UNIT_TEST(replayRecord_triangle)
+SLANG_UNIT_TEST(replayRecord_triangle, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "triangle", 0x30101d8d245453ee)));
 }
 
-SLANG_UNIT_TEST(replayRecord_ray_tracing)
+SLANG_UNIT_TEST(replayRecord_ray_tracing, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing", 0x50ffba598c9172ff)));
 }
 
-SLANG_UNIT_TEST(replayRecord_ray_tracing_pipeline)
+SLANG_UNIT_TEST(replayRecord_ray_tracing_pipeline, NoRenderApi)
 {
     SLANG_CHECK(
         SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing-pipeline", 0x2f89e696d4ef4e0e)));
 }
 
-SLANG_UNIT_TEST(replayRecord_autodiff_texture)
+SLANG_UNIT_TEST(replayRecord_autodiff_texture, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "autodiff-texture", 0x0f2c6d16b5c2b6f4)));
 }
 
-SLANG_UNIT_TEST(replayRecord_gpu_printing)
+SLANG_UNIT_TEST(replayRecord_gpu_printing, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "gpu-printing", 0xc5a5a43a560e6ba5)));
 }
 
-SLANG_UNIT_TEST(replayRecord_shader_object)
+SLANG_UNIT_TEST(replayRecord_shader_object, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "shader-object", 0xcb578eb9257426e1)));
 }
 
-SLANG_UNIT_TEST(replayRecord_model_viewer)
+SLANG_UNIT_TEST(replayRecord_model_viewer, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "model-viewer", 0xa1806b15253af66d)));
 }

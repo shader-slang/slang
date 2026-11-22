@@ -12,7 +12,7 @@
 
 #include <cstring>
 
-SLANG_UNIT_TEST(recordReplayDisabledStubContract)
+SLANG_UNIT_TEST(recordReplayDisabledStubContract, NoRenderApi)
 {
     (void)unitTestContext;
 

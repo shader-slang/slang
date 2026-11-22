@@ -233,12 +233,12 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     compareComputeResult(device, numbersBuffer, std::array{4, 8, 12, 16});
 }
 
-SLANG_UNIT_TEST(linkTimeConstantArraySizeD3D12)
+SLANG_UNIT_TEST(linkTimeConstantArraySizeD3D12, D3D12)
 {
     runTestImpl(linkTimeConstantArraySizeTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(linkTimeConstantArraySizeVulkan)
+SLANG_UNIT_TEST(linkTimeConstantArraySizeVulkan, Vulkan)
 {
     runTestImpl(linkTimeConstantArraySizeTestImpl, unitTestContext, DeviceType::Vulkan);
 }

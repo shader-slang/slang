@@ -21,7 +21,7 @@ static String getTypeFullName(slang::TypeReflection* type)
 
 // Test that the reflection API provides correct info about modules with link-time types.
 
-SLANG_UNIT_TEST(linkTimeTypeReflection)
+SLANG_UNIT_TEST(linkTimeTypeReflection, NoRenderApi)
 {
     // Source for a module that contains can be specialized with a link-time type.
     const char* userSourceBody = R"(
@@ -149,7 +149,7 @@ SLANG_UNIT_TEST(linkTimeTypeReflection)
 
 // Test that `getDefaultValueInt` can resolve static const values under a specialized generic type.
 
-SLANG_UNIT_TEST(linkTimeStaticConstIntReflection)
+SLANG_UNIT_TEST(linkTimeStaticConstIntReflection, NoRenderApi)
 {
     const char* userSourceBody = R"(
         module LinkTimeStaticConstInt;
@@ -230,7 +230,7 @@ SLANG_UNIT_TEST(linkTimeStaticConstIntReflection)
 // `spReflectionVariable_GetDefaultValueInt` reported 300 for `int8_t Narrowed = 300` instead of
 // the value 44 that the variable holds.
 
-SLANG_UNIT_TEST(staticConstLiteralInitializerReflection)
+SLANG_UNIT_TEST(staticConstLiteralInitializerReflection, NoRenderApi)
 {
     const char* userSourceBody = R"(
         module StaticConstLiteralInitializer;
@@ -286,7 +286,7 @@ SLANG_UNIT_TEST(staticConstLiteralInitializerReflection)
     SLANG_CHECK(getDefaultValueInt("Plain") == 23);
 }
 
-SLANG_UNIT_TEST(defaultValueBlobReflection)
+SLANG_UNIT_TEST(defaultValueBlobReflection, NoRenderApi)
 {
     const char* userSourceBody = R"(
         module DefaultValueBlobReflection;
@@ -723,7 +723,7 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
 // Test that the reflection API provides correct info about modules using link-time constants in a
 // `Conditional` field.
 
-SLANG_UNIT_TEST(linkTimeConditionalReflection)
+SLANG_UNIT_TEST(linkTimeConditionalReflection, NoRenderApi)
 {
     // Source for a module that contains can be specialized with a link-time constant.
     const char* userSourceBody = R"(
@@ -829,7 +829,7 @@ SLANG_UNIT_TEST(linkTimeConditionalReflection)
 // Test that loading a module that defines an `export` type, but not linking with the module should
 // not affect the type layout.
 
-SLANG_UNIT_TEST(linkTimeTypeReflectionWithLoadedButNotLinkedModule)
+SLANG_UNIT_TEST(linkTimeTypeReflectionWithLoadedButNotLinkedModule, NoRenderApi)
 {
     // Source for a module that contains can be specialized with a link-time type.
     const char* userSourceBody = R"(

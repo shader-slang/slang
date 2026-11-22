@@ -540,12 +540,12 @@ void drawTestImpl(IDevice* device, UnitTestContext* context)
     test.run();
 }
 
-SLANG_UNIT_TEST(drawInstancedD3D11)
+SLANG_UNIT_TEST(drawInstancedD3D11, D3D11)
 {
     runTestImpl(drawTestImpl<DrawInstancedTest>, unitTestContext, Slang::RenderApiFlag::D3D11);
 }
 
-SLANG_UNIT_TEST(drawIndexedInstancedD3D11)
+SLANG_UNIT_TEST(drawIndexedInstancedD3D11, D3D11)
 {
     runTestImpl(
         drawTestImpl<DrawIndexedInstancedTest>,
@@ -553,12 +553,12 @@ SLANG_UNIT_TEST(drawIndexedInstancedD3D11)
         Slang::RenderApiFlag::D3D11);
 }
 
-SLANG_UNIT_TEST(drawInstancedD3D12)
+SLANG_UNIT_TEST(drawInstancedD3D12, D3D12)
 {
     runTestImpl(drawTestImpl<DrawInstancedTest>, unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(drawIndexedInstancedD3D12)
+SLANG_UNIT_TEST(drawIndexedInstancedD3D12, D3D12)
 {
     runTestImpl(
         drawTestImpl<DrawIndexedInstancedTest>,
@@ -566,12 +566,12 @@ SLANG_UNIT_TEST(drawIndexedInstancedD3D12)
         Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(drawIndirectD3D12)
+SLANG_UNIT_TEST(drawIndirectD3D12, D3D12)
 {
     runTestImpl(drawTestImpl<DrawIndirectTest>, unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(drawIndexedIndirectD3D12)
+SLANG_UNIT_TEST(drawIndexedIndirectD3D12, D3D12)
 {
     runTestImpl(
         drawTestImpl<DrawIndexedIndirectTest>,
@@ -579,12 +579,12 @@ SLANG_UNIT_TEST(drawIndexedIndirectD3D12)
         Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(drawInstancedVulkan)
+SLANG_UNIT_TEST(drawInstancedVulkan, Vulkan)
 {
     runTestImpl(drawTestImpl<DrawInstancedTest>, unitTestContext, Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(drawIndexedInstancedVulkan)
+SLANG_UNIT_TEST(drawIndexedInstancedVulkan, Vulkan)
 {
     runTestImpl(
         drawTestImpl<DrawIndexedInstancedTest>,
@@ -592,12 +592,12 @@ SLANG_UNIT_TEST(drawIndexedInstancedVulkan)
         Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(drawIndirectVulkan)
+SLANG_UNIT_TEST(drawIndirectVulkan, Vulkan)
 {
     runTestImpl(drawTestImpl<DrawIndirectTest>, unitTestContext, Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(drawIndexedIndirectVulkan)
+SLANG_UNIT_TEST(drawIndexedIndirectVulkan, Vulkan)
 {
     runTestImpl(
         drawTestImpl<DrawIndexedIndirectTest>,

@@ -79,7 +79,7 @@ String loadDiagnostics(
 // IgnoreCapabilities set in a TargetDesc's compilerOptionEntries must silence the warning that the
 // entry point's stage does not match that target's profile, as the same option does when set for
 // the whole session, and must not silence it for the session's other targets.
-SLANG_UNIT_TEST(targetProfileStageIgnoreCapabilities)
+SLANG_UNIT_TEST(targetProfileStageIgnoreCapabilities, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(

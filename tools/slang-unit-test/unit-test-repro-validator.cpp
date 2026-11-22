@@ -198,7 +198,7 @@ static Offset32Ptr<ReproUtil::SourceFileState> addSourceFileState(
     return sourceFile;
 }
 
-SLANG_UNIT_TEST(reproStateValidator)
+SLANG_UNIT_TEST(reproStateValidator, NoRenderApi)
 {
     // 1. Minimal valid RequestState (all empty) passes.
     {
@@ -1079,7 +1079,7 @@ SLANG_UNIT_TEST(reproStateValidator)
     }
 }
 
-SLANG_UNIT_TEST(reproStateLoadStateRejectsInvalidPayload)
+SLANG_UNIT_TEST(reproStateLoadStateRejectsInvalidPayload, NoRenderApi)
 {
     List<uint8_t> invalidPayload;
     buildMinimalValid(invalidPayload);
@@ -1102,7 +1102,7 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsInvalidPayload)
     SLANG_CHECK(outputContainsDiagnosticId(sink, Severity::Error, kInvalidReproStateDiagnosticId));
 }
 
-SLANG_UNIT_TEST(reproStateLoadStateRejectsEmptyPayload)
+SLANG_UNIT_TEST(reproStateLoadStateRejectsEmptyPayload, NoRenderApi)
 {
     List<uint8_t> emptyPayload;
     List<uint8_t> riffData;
@@ -1121,7 +1121,7 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsEmptyPayload)
     SLANG_CHECK(outputContainsDiagnosticId(sink, Severity::Error, kInvalidReproStateDiagnosticId));
 }
 
-SLANG_UNIT_TEST(reproStateLoadStateRejectsNullBlobOutParam)
+SLANG_UNIT_TEST(reproStateLoadStateRejectsNullBlobOutParam, NoRenderApi)
 {
     List<uint8_t> payload;
     buildMinimalValid(payload);
@@ -1136,7 +1136,7 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsNullBlobOutParam)
     SLANG_CHECK(sink.getErrorCount() == 0);
 }
 
-SLANG_UNIT_TEST(reproStateValidatorAcceptsSavedState)
+SLANG_UNIT_TEST(reproStateValidatorAcceptsSavedState, NoRenderApi)
 {
     auto session = spCreateSession();
     auto request = spCreateCompileRequest(session);
@@ -1177,7 +1177,7 @@ SLANG_UNIT_TEST(reproStateValidatorAcceptsSavedState)
     spDestroySession(session);
 }
 
-SLANG_UNIT_TEST(reproExtractFilesToDirectoryRejectsInvalidPayload)
+SLANG_UNIT_TEST(reproExtractFilesToDirectoryRejectsInvalidPayload, NoRenderApi)
 {
     List<uint8_t> invalidPayload;
     buildMinimalValid(invalidPayload);
@@ -1208,7 +1208,7 @@ SLANG_UNIT_TEST(reproExtractFilesToDirectoryRejectsInvalidPayload)
     SLANG_CHECK(SLANG_SUCCEEDED(Path::removeNonEmpty(outputDir)));
 }
 
-SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex)
+SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex, NoRenderApi)
 {
     typedef ReproUtil::RequestState RequestState;
     typedef ReproUtil::SourceFileState SourceFileState;
@@ -1256,7 +1256,7 @@ SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex)
     SLANG_CHECK(tu1AIndex < tu1BIndex);
 }
 
-SLANG_UNIT_TEST(reproExtractFilesPreservesExplicitSourceLanguage)
+SLANG_UNIT_TEST(reproExtractFilesPreservesExplicitSourceLanguage, NoRenderApi)
 {
     typedef ReproUtil::RequestState RequestState;
     typedef ReproUtil::SourceFileState SourceFileState;
@@ -1299,7 +1299,7 @@ SLANG_UNIT_TEST(reproExtractFilesPreservesExplicitSourceLanguage)
             "-lang glsl explicit-language.slang -lang slang inferred-language.slang")) >= 0);
 }
 
-SLANG_UNIT_TEST(reproExtractFilesPreservesLegacyAllowGLSLInput)
+SLANG_UNIT_TEST(reproExtractFilesPreservesLegacyAllowGLSLInput, NoRenderApi)
 {
     typedef ReproUtil::RequestState RequestState;
     typedef ReproUtil::SourceFileState SourceFileState;
@@ -1333,7 +1333,7 @@ SLANG_UNIT_TEST(reproExtractFilesPreservesLegacyAllowGLSLInput)
     SLANG_CHECK(manifest.indexOf(UnownedStringSlice("-allow-glsl legacy-glsl-input.slang")) >= 0);
 }
 
-SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
+SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex, NoRenderApi)
 {
     typedef ReproUtil::RequestState RequestState;
     typedef ReproUtil::SourceFileState SourceFileState;
@@ -1415,7 +1415,7 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
     spDestroySession(session);
 }
 
-SLANG_UNIT_TEST(reproLoadRejectsFileWithoutContents)
+SLANG_UNIT_TEST(reproLoadRejectsFileWithoutContents, NoRenderApi)
 {
     typedef ReproUtil::RequestState RequestState;
     typedef ReproUtil::SourceFileState SourceFileState;

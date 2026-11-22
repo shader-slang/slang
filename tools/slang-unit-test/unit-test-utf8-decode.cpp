@@ -23,7 +23,7 @@ Char32 decodeUtf8(const unsigned char* bytes, size_t count, bool& outInvalid)
 }
 } // namespace
 
-SLANG_UNIT_TEST(utf8Decode)
+SLANG_UNIT_TEST(utf8Decode, NoRenderApi)
 {
     bool invalid = false;
 

@@ -9,7 +9,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(pointerTypeLayout)
+SLANG_UNIT_TEST(pointerTypeLayout, NoRenderApi)
 {
     const char* testSource = "struct TestStruct {"
                              "   int3 member0;"

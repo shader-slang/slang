@@ -161,12 +161,12 @@ void linkTimeTypeTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, numbersBuffer, std::array{11.0f});
 }
 
-SLANG_UNIT_TEST(linkTimeTypeD3D12)
+SLANG_UNIT_TEST(linkTimeTypeD3D12, D3D12)
 {
     runTestImpl(linkTimeTypeTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(linkTimeTypeVulkan)
+SLANG_UNIT_TEST(linkTimeTypeVulkan, Vulkan)
 {
     runTestImpl(linkTimeTypeTestImpl, unitTestContext, DeviceType::Vulkan);
 }

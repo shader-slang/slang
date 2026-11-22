@@ -772,37 +772,37 @@ struct StressTest : public PersistentCacheTest
     }
 };
 
-SLANG_UNIT_TEST(persistentCacheBasic)
+SLANG_UNIT_TEST(persistentCacheBasic, NoRenderApi)
 {
     BasicTest test;
     test.run();
 }
 
-SLANG_UNIT_TEST(persistentCacheEviction)
+SLANG_UNIT_TEST(persistentCacheEviction, NoRenderApi)
 {
     EvictionTest test;
     test.run();
 }
 
-SLANG_UNIT_TEST(persistentCacheRewrite)
+SLANG_UNIT_TEST(persistentCacheRewrite, NoRenderApi)
 {
     RewriteTest test;
     test.run();
 }
 
-SLANG_UNIT_TEST(persistentCacheIndexWriteFailure)
+SLANG_UNIT_TEST(persistentCacheIndexWriteFailure, NoRenderApi)
 {
     IndexWriteFailureTest test;
     test.run();
 }
 
-SLANG_UNIT_TEST(persistentCacheCorruption)
+SLANG_UNIT_TEST(persistentCacheCorruption, NoRenderApi)
 {
     CorruptionTest test;
     test.run();
 }
 
-SLANG_UNIT_TEST(persistentCacheStress)
+SLANG_UNIT_TEST(persistentCacheStress, NoRenderApi)
 {
     // aarch64 builds currently fail to run multi-threaded tests within the test-server.
     // Tests work fine without the test-server, which is puzzling. For now we disable them.

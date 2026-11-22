@@ -249,7 +249,7 @@ void linkTimeTypeLayoutNestedImpl(rhi::IDevice* device, UnitTestContext* context
 // 3. The complete type layout information is available in the reflection data
 //
 
-SLANG_UNIT_TEST(linkTimeTypeLayoutNested)
+SLANG_UNIT_TEST(linkTimeTypeLayoutNested, Vulkan)
 {
     runTestImpl(linkTimeTypeLayoutNestedImpl, unitTestContext, DeviceType::Vulkan);
 }

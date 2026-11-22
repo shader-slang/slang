@@ -15,7 +15,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(typeConformanceBinaryModule)
+SLANG_UNIT_TEST(typeConformanceBinaryModule, NoRenderApi)
 {
     const char* fooSource = R"(
         module foo;
@@ -182,7 +182,7 @@ SLANG_UNIT_TEST(typeConformanceBinaryModule)
 
 // Verify that types from transitively imported modules are discoverable.
 // Module chain: a imports b, b imports c, c defines the interface and types.
-SLANG_UNIT_TEST(typeConformanceBinaryModuleTransitive)
+SLANG_UNIT_TEST(typeConformanceBinaryModuleTransitive, NoRenderApi)
 {
     const char* cSource = R"(
         module c;
@@ -358,7 +358,7 @@ SLANG_UNIT_TEST(typeConformanceBinaryModuleTransitive)
 // Module a's source doesn't reference IFoo, so source compilation succeeds.
 // After loading from binary, findTypeByName should still discover IFoo
 // transitively through the module dependency graph.
-SLANG_UNIT_TEST(typeConformanceBinaryModuleTransitiveNonExported)
+SLANG_UNIT_TEST(typeConformanceBinaryModuleTransitiveNonExported, NoRenderApi)
 {
     const char* cSource = R"(
         module c;

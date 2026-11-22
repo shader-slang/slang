@@ -8,7 +8,7 @@ using namespace Slang;
 
 // Verify that getExeDirectoryPath falls back to Path::getExecutablePath() for
 // bare names (no separators), matching the fix in PR #11212.
-SLANG_UNIT_TEST(testToolUtilBareArgv0)
+SLANG_UNIT_TEST(testToolUtilBareArgv0, NoRenderApi)
 {
     // A bare name with no path separator should use the OS-provided exe path.
     String bareResult;
@@ -57,7 +57,7 @@ SLANG_UNIT_TEST(testToolUtilBareArgv0)
 // Verify the mapping from a tool's `SlangResult` to its process return code. In particular, an
 // ordinary compilation failure (2) must stay distinguishable from an internal compiler error (3).
 // Every value must be non-negative, because a negative value is not a valid exit status on Linux.
-SLANG_UNIT_TEST(testToolUtilReturnCode)
+SLANG_UNIT_TEST(testToolUtilReturnCode, NoRenderApi)
 {
     SLANG_CHECK(TestToolUtil::getReturnCode(SLANG_OK) == ToolReturnCode::Success);
     SLANG_CHECK(TestToolUtil::getReturnCode(SLANG_FAIL) == ToolReturnCode::Failed);

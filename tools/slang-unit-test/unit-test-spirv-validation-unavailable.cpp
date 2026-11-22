@@ -205,7 +205,7 @@ const uint32_t kSpirvHeader[] = {0x07230203, 0x00010000, 0x00080001, 1, 0};
 
 // When the validator entry point is absent, `validate` must say "not available" rather than
 // "failed", so its caller can tell the two apart.
-SLANG_UNIT_TEST(spirvValidateReportsUnavailableWhenSymbolMissing)
+SLANG_UNIT_TEST(spirvValidateReportsUnavailableWhenSymbolMissing, NoRenderApi)
 {
     ComPtr<ISlangSharedLibraryLoader> loader(new FakeLoader(FakeValidatorState::Absent));
     RefPtr<DownstreamCompilerSet> set;
@@ -230,7 +230,7 @@ SLANG_UNIT_TEST(spirvValidateReportsUnavailableWhenSymbolMissing)
 
 // The control for the test above: a validator that is present and rejects the module must keep
 // returning `SLANG_FAIL`, so an unconditional `SLANG_E_NOT_AVAILABLE` cannot satisfy both tests.
-SLANG_UNIT_TEST(spirvValidateReportsFailWhenValidatorRejects)
+SLANG_UNIT_TEST(spirvValidateReportsFailWhenValidatorRejects, NoRenderApi)
 {
     ComPtr<ISlangSharedLibraryLoader> loader(new FakeLoader(FakeValidatorState::PresentRejecting));
     RefPtr<DownstreamCompilerSet> set;
@@ -348,7 +348,7 @@ FakeGlslangCompileOutcome compileWithFakeGlslang(FakeValidatorState validatorSta
 
 // The consumer half: compiling a valid shader with the validator absent must report the missing
 // capability rather than accuse the shader, and must do so as an error.
-SLANG_UNIT_TEST(spirvValidationUnavailableDiagnosesMissingValidator)
+SLANG_UNIT_TEST(spirvValidationUnavailableDiagnosesMissingValidator, NoRenderApi)
 {
     const FakeGlslangCompileOutcome outcome = compileWithFakeGlslang(FakeValidatorState::Absent);
     const UnownedStringSlice diagnosticSlice = outcome.diagnostics.getUnownedSlice();
@@ -376,7 +376,7 @@ SLANG_UNIT_TEST(spirvValidationUnavailableDiagnosesMissingValidator)
 // The other side of the caller's branch: when the validator is present and rejects the module, the
 // validation-failure diagnostic must still be what the user sees, so routing every failure to the
 // "unavailable" message cannot satisfy both this test and the one above.
-SLANG_UNIT_TEST(spirvValidationRejectionStillDiagnosesValidationFailure)
+SLANG_UNIT_TEST(spirvValidationRejectionStillDiagnosesValidationFailure, NoRenderApi)
 {
     const FakeGlslangCompileOutcome outcome =
         compileWithFakeGlslang(FakeValidatorState::PresentRejecting);
@@ -392,7 +392,7 @@ SLANG_UNIT_TEST(spirvValidationRejectionStillDiagnosesValidationFailure)
 
 // The success path, which the two failure tests above cannot cover: a validator that is present and
 // accepts must compile cleanly, return SPIR-V, and say nothing.
-SLANG_UNIT_TEST(spirvValidationAcceptingValidatorReportsNothing)
+SLANG_UNIT_TEST(spirvValidationAcceptingValidatorReportsNothing, NoRenderApi)
 {
     gFakeValidatorWasCalled = false;
     const FakeGlslangCompileOutcome outcome =

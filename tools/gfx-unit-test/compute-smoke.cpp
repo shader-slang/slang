@@ -75,17 +75,17 @@ void computeSmokeTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, numbersBuffer, std::array{11.0f, 12.0f, 13.0f, 14.0f});
 }
 
-SLANG_UNIT_TEST(computeSmokeD3D12)
+SLANG_UNIT_TEST(computeSmokeD3D12, D3D12)
 {
     runTestImpl(computeSmokeTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(computeSmokeD3D11)
+SLANG_UNIT_TEST(computeSmokeD3D11, D3D11)
 {
     runTestImpl(computeSmokeTestImpl, unitTestContext, DeviceType::D3D11);
 }
 
-SLANG_UNIT_TEST(computeSmokeVulkan)
+SLANG_UNIT_TEST(computeSmokeVulkan, Vulkan)
 {
     runTestImpl(computeSmokeTestImpl, unitTestContext, DeviceType::Vulkan);
 }

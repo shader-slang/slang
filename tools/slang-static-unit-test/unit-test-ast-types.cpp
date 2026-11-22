@@ -19,7 +19,7 @@ using namespace Slang;
 
 // Requesting the same vector type twice yields the same object, and `equals`
 // agrees with pointer identity.
-SLANG_UNIT_TEST(astVectorTypesAreDeduplicated)
+SLANG_UNIT_TEST(astVectorTypesAreDeduplicated, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     ASTBuilder* astBuilder = env.getASTBuilder();
@@ -44,7 +44,7 @@ SLANG_UNIT_TEST(astVectorTypesAreDeduplicated)
 // would hand back the same object both times. The assertion would then hold whether
 // or not the canonicalization existed. Two different *types* are what produce two
 // genuinely distinct `ConstantIntVal`s of equal value.
-SLANG_UNIT_TEST(astVectorDeduplicationCanonicalizesElementCountType)
+SLANG_UNIT_TEST(astVectorDeduplicationCanonicalizesElementCountType, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     ASTBuilder* astBuilder = env.getASTBuilder();
@@ -66,7 +66,7 @@ SLANG_UNIT_TEST(astVectorDeduplicationCanonicalizesElementCountType)
 // Types that genuinely differ — in element count or element type — are distinct
 // and compare unequal. Without this, a deduplication scheme that collapsed too
 // much would pass the tests above.
-SLANG_UNIT_TEST(astDistinctVectorTypesAreNotEqual)
+SLANG_UNIT_TEST(astDistinctVectorTypesAreNotEqual, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     ASTBuilder* astBuilder = env.getASTBuilder();
@@ -88,7 +88,7 @@ SLANG_UNIT_TEST(astDistinctVectorTypesAreNotEqual)
 // Mangled type names distinguish types that are not equal. Mangled names are how
 // separately-compiled modules agree on symbols, so two different types sharing a
 // mangled name would let one definition silently satisfy a reference to another.
-SLANG_UNIT_TEST(astMangledTypeNamesDistinguishDistinctTypes)
+SLANG_UNIT_TEST(astMangledTypeNamesDistinguishDistinctTypes, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     ASTBuilder* astBuilder = env.getASTBuilder();

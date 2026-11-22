@@ -57,7 +57,7 @@ bool slicesEqual(
 
 // -- split ------------------------------------------------------------
 
-SLANG_UNIT_TEST(stringUtilSplitBasic)
+SLANG_UNIT_TEST(stringUtilSplitBasic, NoRenderApi)
 {
     List<UnownedStringSlice> out;
     StringUtil::split(toSlice("a,b,c"), ',', out);
@@ -68,7 +68,7 @@ SLANG_UNIT_TEST(stringUtilSplitBasic)
     SLANG_CHECK(slicesEqual(out, {"hello"}));
 }
 
-SLANG_UNIT_TEST(stringUtilSplitEmpty)
+SLANG_UNIT_TEST(stringUtilSplitEmpty, NoRenderApi)
 {
     // Empty input — call mustn't crash. Documenting observed
     // behaviour: out is left empty.
@@ -77,7 +77,7 @@ SLANG_UNIT_TEST(stringUtilSplitEmpty)
     SLANG_CHECK(out.getCount() == 0);
 }
 
-SLANG_UNIT_TEST(stringUtilSplitAdjacentSeparators)
+SLANG_UNIT_TEST(stringUtilSplitAdjacentSeparators, NoRenderApi)
 {
     List<UnownedStringSlice> out;
     StringUtil::split(toSlice("a,,b"), ',', out);
@@ -85,7 +85,7 @@ SLANG_UNIT_TEST(stringUtilSplitAdjacentSeparators)
     SLANG_CHECK(slicesEqual(out, {"a", "", "b"}));
 }
 
-SLANG_UNIT_TEST(stringUtilSplitMaxSlicesReturnsFailWhenExceeded)
+SLANG_UNIT_TEST(stringUtilSplitMaxSlicesReturnsFailWhenExceeded, NoRenderApi)
 {
     UnownedStringSlice slices[3];
     Index count;
@@ -95,7 +95,7 @@ SLANG_UNIT_TEST(stringUtilSplitMaxSlicesReturnsFailWhenExceeded)
     SLANG_CHECK(SLANG_FAILED(r));
 }
 
-SLANG_UNIT_TEST(stringUtilSplitMaxSlicesExactFit)
+SLANG_UNIT_TEST(stringUtilSplitMaxSlicesExactFit, NoRenderApi)
 {
     UnownedStringSlice slices[3];
     Index count;
@@ -107,7 +107,7 @@ SLANG_UNIT_TEST(stringUtilSplitMaxSlicesExactFit)
     SLANG_CHECK(slices[2] == "c");
 }
 
-SLANG_UNIT_TEST(stringUtilSplitOnWhitespace)
+SLANG_UNIT_TEST(stringUtilSplitOnWhitespace, NoRenderApi)
 {
     List<UnownedStringSlice> out;
     StringUtil::splitOnWhitespace(toSlice("  hello\tworld\n  foo  "), out);
@@ -117,7 +117,7 @@ SLANG_UNIT_TEST(stringUtilSplitOnWhitespace)
 
 // -- join -------------------------------------------------------------
 
-SLANG_UNIT_TEST(stringUtilJoinBasic)
+SLANG_UNIT_TEST(stringUtilJoinBasic, NoRenderApi)
 {
     List<String> in;
     in.add("alpha");
@@ -128,7 +128,7 @@ SLANG_UNIT_TEST(stringUtilJoinBasic)
     SLANG_CHECK(out.produceString() == "alpha,beta,gamma");
 }
 
-SLANG_UNIT_TEST(stringUtilJoinIsInverseOfSplit)
+SLANG_UNIT_TEST(stringUtilJoinIsInverseOfSplit, NoRenderApi)
 {
     // For inputs without leading/trailing separators, join(split())
     // round-trips. Edge cases like leading/trailing commas may be
@@ -155,7 +155,7 @@ SLANG_UNIT_TEST(stringUtilJoinIsInverseOfSplit)
 
 // -- indexOfInSplit / getAtInSplit -----------------------------------
 
-SLANG_UNIT_TEST(stringUtilIndexOfInSplit)
+SLANG_UNIT_TEST(stringUtilIndexOfInSplit, NoRenderApi)
 {
     Index idx = StringUtil::indexOfInSplit(toSlice("apple,banana,cherry"), ',', toSlice("banana"));
     SLANG_CHECK(idx == 1);
@@ -170,7 +170,7 @@ SLANG_UNIT_TEST(stringUtilIndexOfInSplit)
     SLANG_CHECK(idx == -1);
 }
 
-SLANG_UNIT_TEST(stringUtilGetAtInSplit)
+SLANG_UNIT_TEST(stringUtilGetAtInSplit, NoRenderApi)
 {
     auto s = StringUtil::getAtInSplit(toSlice("apple,banana,cherry"), ',', 0);
     SLANG_CHECK(s == "apple");
@@ -181,7 +181,7 @@ SLANG_UNIT_TEST(stringUtilGetAtInSplit)
 
 // -- character / string replacement -----------------------------------
 
-SLANG_UNIT_TEST(stringUtilCalcCharReplaced)
+SLANG_UNIT_TEST(stringUtilCalcCharReplaced, NoRenderApi)
 {
     String r = StringUtil::calcCharReplaced(toSlice("a/b/c"), '/', '_');
     SLANG_CHECK(r == "a_b_c");
@@ -195,7 +195,7 @@ SLANG_UNIT_TEST(stringUtilCalcCharReplaced)
     SLANG_CHECK(r == "");
 }
 
-SLANG_UNIT_TEST(stringUtilReplaceAll)
+SLANG_UNIT_TEST(stringUtilReplaceAll, NoRenderApi)
 {
     String r = StringUtil::replaceAll(toSlice("foo bar foo"), toSlice("foo"), toSlice("baz"));
     SLANG_CHECK(r == "baz bar baz");
@@ -221,21 +221,21 @@ SLANG_UNIT_TEST(stringUtilReplaceAll)
 
 // -- line extraction --------------------------------------------------
 
-SLANG_UNIT_TEST(stringUtilCalcLinesLF)
+SLANG_UNIT_TEST(stringUtilCalcLinesLF, NoRenderApi)
 {
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(toSlice("a\nb\nc"), lines);
     SLANG_CHECK(slicesEqual(lines, {"a", "b", "c"}));
 }
 
-SLANG_UNIT_TEST(stringUtilCalcLinesCRLF)
+SLANG_UNIT_TEST(stringUtilCalcLinesCRLF, NoRenderApi)
 {
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(toSlice("a\r\nb\r\nc"), lines);
     SLANG_CHECK(slicesEqual(lines, {"a", "b", "c"}));
 }
 
-SLANG_UNIT_TEST(stringUtilCalcLinesTrailingNewline)
+SLANG_UNIT_TEST(stringUtilCalcLinesTrailingNewline, NoRenderApi)
 {
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(toSlice("a\nb\n"), lines);
@@ -243,7 +243,7 @@ SLANG_UNIT_TEST(stringUtilCalcLinesTrailingNewline)
     SLANG_CHECK(slicesEqual(lines, {"a", "b", ""}));
 }
 
-SLANG_UNIT_TEST(stringUtilExtractLine)
+SLANG_UNIT_TEST(stringUtilExtractLine, NoRenderApi)
 {
     UnownedStringSlice text = toSlice("first\nsecond\nthird");
     UnownedStringSlice line;
@@ -261,7 +261,7 @@ SLANG_UNIT_TEST(stringUtilExtractLine)
     SLANG_CHECK(!StringUtil::extractLine(text, line));
 }
 
-SLANG_UNIT_TEST(stringUtilExtractLineCrlf)
+SLANG_UNIT_TEST(stringUtilExtractLineCrlf, NoRenderApi)
 {
     // CRLF and bare-CR terminators are both consumed correctly.
     UnownedStringSlice text = toSlice("a\r\nb\rc\n");
@@ -280,7 +280,7 @@ SLANG_UNIT_TEST(stringUtilExtractLineCrlf)
 
 // -- printf-style formatting ------------------------------------------
 
-SLANG_UNIT_TEST(stringUtilMakeStringWithFormat)
+SLANG_UNIT_TEST(stringUtilMakeStringWithFormat, NoRenderApi)
 {
     String s = StringUtil::makeStringWithFormat("hello %s, %d", "world", 42);
     SLANG_CHECK(s == "hello world, 42");
@@ -289,7 +289,7 @@ SLANG_UNIT_TEST(stringUtilMakeStringWithFormat)
     SLANG_CHECK(s == "1.2.3");
 }
 
-SLANG_UNIT_TEST(stringUtilAppendFormat)
+SLANG_UNIT_TEST(stringUtilAppendFormat, NoRenderApi)
 {
     StringBuilder buf;
     buf << "prefix:";
@@ -299,7 +299,7 @@ SLANG_UNIT_TEST(stringUtilAppendFormat)
 
 // -- Levenshtein edit distance ----------------------------------------
 
-SLANG_UNIT_TEST(stringUtilLevenshteinDistance)
+SLANG_UNIT_TEST(stringUtilLevenshteinDistance, NoRenderApi)
 {
     // Identical strings have distance 0.
     SLANG_CHECK(StringUtil::calcLevenshteinDistance(toSlice("length"), toSlice("length")) == 0);

@@ -1,0 +1,14 @@
+# Tests that need a machine with a GPU, although they select only the cpu API.
+# Each line is a path prefix.
+#
+# The -cpu jobs leave these tests out, with `-exclude-list`. The -t4 jobs run
+# them in a second run of slang-test, with `-include-list`. The first run of a
+# -t4 job uses `-api all-cpu-llvm`, so it does not run a test that selects only
+# the cpu API.
+
+# tests/cpu-program/gfx-smoke.slang creates a gfx device and needs the gfx
+# module, which the GitHub-hosted x86_64 runners do not provide. On Linux the
+# test fails. On Windows the program does not end, so the job runs until its
+# timeout. An expected-failure entry cannot help, because it changes a result
+# only after the test returns.
+tests/cpu-program/gfx-smoke.slang

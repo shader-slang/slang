@@ -11,7 +11,7 @@
 // File System Proxy Tests - ISlangFileSystem interface
 // =============================================================================
 
-SLANG_UNIT_TEST(replayFileSystemProxyLoadFile)
+SLANG_UNIT_TEST(replayFileSystemProxyLoadFile, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -69,7 +69,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyLoadFile)
 // File System Proxy Tests - ISlangFileSystemExt interface
 // =============================================================================
 
-SLANG_UNIT_TEST(replayFileSystemProxyGetFileUniqueIdentity)
+SLANG_UNIT_TEST(replayFileSystemProxyGetFileUniqueIdentity, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -124,7 +124,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetFileUniqueIdentity)
     ctx().reset();
 }
 
-SLANG_UNIT_TEST(replayFileSystemProxyCalcCombinedPath)
+SLANG_UNIT_TEST(replayFileSystemProxyCalcCombinedPath, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -178,7 +178,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyCalcCombinedPath)
     ctx().reset();
 }
 
-SLANG_UNIT_TEST(replayFileSystemProxyGetPathType)
+SLANG_UNIT_TEST(replayFileSystemProxyGetPathType, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -220,7 +220,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetPathType)
     ctx().reset();
 }
 
-SLANG_UNIT_TEST(replayFileSystemProxyGetPath)
+SLANG_UNIT_TEST(replayFileSystemProxyGetPath, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -268,7 +268,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetPath)
     ctx().reset();
 }
 
-SLANG_UNIT_TEST(replayFileSystemProxyClearCache)
+SLANG_UNIT_TEST(replayFileSystemProxyClearCache, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_CHECK(true); // this test only fails through exceptions, so record a check
@@ -317,7 +317,7 @@ static void testEnumerateCallback(SlangPathType pathType, const char* name, void
     results->entries.add(entry);
 }
 
-SLANG_UNIT_TEST(replayFileSystemProxyEnumeratePathContents)
+SLANG_UNIT_TEST(replayFileSystemProxyEnumeratePathContents, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -388,7 +388,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyEnumeratePathContents)
     ctx().reset();
 }
 
-SLANG_UNIT_TEST(replayFileSystemProxyGetOSPathKind)
+SLANG_UNIT_TEST(replayFileSystemProxyGetOSPathKind, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -422,7 +422,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetOSPathKind)
 // File System Proxy Tests - ISlangMutableFileSystem interface
 // =============================================================================
 
-SLANG_UNIT_TEST(replayFileSystemProxySaveFile)
+SLANG_UNIT_TEST(replayFileSystemProxySaveFile, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -465,7 +465,7 @@ SLANG_UNIT_TEST(replayFileSystemProxySaveFile)
     ctx().reset();
 }
 
-SLANG_UNIT_TEST(replayFileSystemProxySaveFileBlob)
+SLANG_UNIT_TEST(replayFileSystemProxySaveFileBlob, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -517,7 +517,7 @@ SLANG_UNIT_TEST(replayFileSystemProxySaveFileBlob)
     ctx().reset();
 }
 
-SLANG_UNIT_TEST(replayFileSystemProxyRemove)
+SLANG_UNIT_TEST(replayFileSystemProxyRemove, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -565,7 +565,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyRemove)
     ctx().reset();
 }
 
-SLANG_UNIT_TEST(replayFileSystemProxyCreateDirectory)
+SLANG_UNIT_TEST(replayFileSystemProxyCreateDirectory, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -616,7 +616,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyCreateDirectory)
 // Edge Cases and Error Handling
 // =============================================================================
 
-SLANG_UNIT_TEST(replayFileSystemProxyLoadFileNotFound)
+SLANG_UNIT_TEST(replayFileSystemProxyLoadFileNotFound, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -652,7 +652,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyLoadFileNotFound)
     ctx().reset();
 }
 
-SLANG_UNIT_TEST(replayFileSystemProxyEmptyFile)
+SLANG_UNIT_TEST(replayFileSystemProxyEmptyFile, NoRenderApi)
 {
     REPLAY_TEST;
 
@@ -696,7 +696,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyEmptyFile)
     ctx().reset();
 }
 
-SLANG_UNIT_TEST(replayFileSystemProxyLargeFile)
+SLANG_UNIT_TEST(replayFileSystemProxyLargeFile, NoRenderApi)
 {
     REPLAY_TEST;
 

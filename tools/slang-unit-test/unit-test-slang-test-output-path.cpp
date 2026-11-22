@@ -18,7 +18,7 @@ static void checkArgs(const List<String>& args, const char* const* expected, Ind
         SLANG_CHECK(args[i] == expected[i]);
 }
 
-SLANG_UNIT_TEST(slangTestOutputPathNormalization)
+SLANG_UNIT_TEST(slangTestOutputPathNormalization, NoRenderApi)
 {
     const String testPath = "tests/diagnostics/path-normalization.slang";
 

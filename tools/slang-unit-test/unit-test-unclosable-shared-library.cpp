@@ -17,7 +17,7 @@ using namespace Slang;
 /// `SharedLibrary::loadWithPlatformPath` keeps every library that `SharedLibrary::isUnclosable`
 /// reports resident, so this checks that predicate. The teardown crash itself only reproduces in
 /// a build that links slang-llvm against a system LLVM, whereas this holds in every build flavour.
-SLANG_UNIT_TEST(unclosableSharedLibrary)
+SLANG_UNIT_TEST(unclosableSharedLibrary, NoRenderApi)
 {
     // slang-llvm is unclosable under each platform's decoration of the name, and whether it is
     // named on its own or at the end of a path.

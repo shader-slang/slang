@@ -19,7 +19,7 @@ static float getHalfRoundingGridValue(unsigned int code)
                          : ldexpf(float(1024 + fraction), int(exponent) - 25);
 }
 
-SLANG_UNIT_TEST(mathHalfRoundsEveryFiniteBoundaryToNearestEven)
+SLANG_UNIT_TEST(mathHalfRoundsEveryFiniteBoundaryToNearestEven, NoRenderApi)
 {
     // Test all adjacent finite Half pairs, plus the overflow endpoint at 65536. Their
     // midpoint and its Float32 neighbors are exact dyadic values, independent of the
@@ -44,7 +44,7 @@ SLANG_UNIT_TEST(mathHalfRoundsEveryFiniteBoundaryToNearestEven)
     }
 }
 
-SLANG_UNIT_TEST(mathHalfPreservesSpecialValueClassification)
+SLANG_UNIT_TEST(mathHalfPreservesSpecialValueClassification, NoRenderApi)
 {
     for (unsigned int sign : {0u, 0x80000000u})
     {
