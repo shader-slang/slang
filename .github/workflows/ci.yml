@@ -592,20 +592,9 @@ jobs:
       gpu-tier: sm80plus
       server-count: 8
 
-  # Linux x86_64 debug SM80+ capability tests. The T4 jobs skip
-  # tests/cooperative-matrix/ and tests/neural/, so without this job no debug
-  # build runs them on a GPU. ci-slang-test-container.yml still applies
-  # tests/skip-list-debug.txt to this tier, so the slow neural tests stay
-  # skipped in debug builds.
-  test-linux-debug-gcc-x86_64-sm80:
-    needs: [filter, build-linux-debug-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test-container.yml
-    with:
-      config: debug
-      runs-on: '["Linux", "self-hosted", "SM80Plus"]'
-      gpu-tier: sm80plus
-      server-count: 8
+  # There is no debug SM80+ job. The SM80Plus runner pool is small, and a second
+  # job in every run adds load to it (see issue 14252). The
+  # release job above runs the SM80+ tests.
 
   # Linux x86_64 debug CPU-only tests (GitHub-hosted; no GPU).
   # Same as the release CPU job below, but with a debug build, so that
@@ -1007,7 +996,6 @@ jobs:
         test-linux-debug-gcc-aarch64-cpu,
         test-linux-debug-gcc-x86_64-cpu,
         test-linux-debug-gcc-x86_64-rhi,
-        test-linux-debug-gcc-x86_64-sm80,
         test-linux-debug-gcc-x86_64-t4,
         test-linux-release-gcc-aarch64-cpu,
         test-linux-release-gcc-x86_64-cpu,
