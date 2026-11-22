@@ -1,9 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -stage compute -entry computeMain -allow-glsl -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -stage compute -entry computeMain -target hlsl -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK_CUDA): -stage compute -entry computeMain -target cuda -allow-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target hlsl
+//TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target cuda
+//TEST:COMPARE_COMPUTE(targets=all-wgpu, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 
 #version 450
 
@@ -74,9 +73,9 @@ void computeMain()
     // CHECK_SPV: OpTypeFloat 16
 
     // CHECK_HLSL: vector<half,4>
-    // CHECK_HLSL: matrix<half,int(4),int(4)>
-    // CHECK_HLSL: matrix<half,int(3),int(4)>
-    // CHECK_HLSL: matrix<half,int(2),int(3)>
+    // CHECK_HLSL: matrix<half,4L,4L>
+    // CHECK_HLSL: matrix<half,3L,4L>
+    // CHECK_HLSL: matrix<half,2L,3L>
 
     // CHECK_CUDA: __half4
     // CHECK_CUDA: makeMatrix<__half, 4, 4>

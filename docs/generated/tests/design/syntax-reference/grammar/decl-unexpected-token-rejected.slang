@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#declarations
-//META: doc_section_digest=a88bf585646851c5c1ec7bf3f522a14fa7eac81cbd6d44a78459254f35d08383
+//META: doc_section_digest=048ba404f572f02131ad1a58698364473ede65862ab25d2e8a4449e9f45a441d
 //META: purpose=A token that cannot begin a `Decl` triggers a parse-stage diagnostic.
 //META: intent=negative
 //META: pipeline_stage=parse

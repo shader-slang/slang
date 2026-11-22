@@ -1,6 +1,6 @@
 // overlapping-bindings.slang
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl
 // CHECK: warning[E39001]
 // CHECK: note:
 

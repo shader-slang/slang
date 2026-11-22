@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/values.md#swizzle-swizzleset-swizzledstore
-//META: doc_section_digest=4d65a5f477addb92a25c5896b6cb496d8436da7a5ccfb3b367db94c8861a7ee9
+//META: doc_section_digest=fdc744db2750ee85a974decc3e160bc9964d00c13ec39e93f41062c5f651f980
 //META: purpose=Assigning to a swizzle whose base is a `property` with `get`/`set` but no `ref` accessor produces `swizzleSet` (a get, a functional update, then a set) instead of `swizzledStore`.
 //META: intent=functional
 //META: pipeline_stage=lower

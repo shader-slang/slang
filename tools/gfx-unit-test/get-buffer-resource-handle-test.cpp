@@ -90,12 +90,12 @@ void getBufferResourceHandleTestAPI(UnitTestContext* context, Slang::RenderApiFl
     getBufferResourceHandleTestImpl(device, context);
 }
 
-SLANG_UNIT_TEST(getBufferResourceHandleD3D12)
+SLANG_UNIT_TEST(getBufferResourceHandleD3D12, D3D12)
 {
     return getBufferResourceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(getBufferResourceHandleVulkan)
+SLANG_UNIT_TEST(getBufferResourceHandleVulkan, Vulkan)
 {
     return getBufferResourceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
 }

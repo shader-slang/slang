@@ -119,7 +119,7 @@ For a focused description of exactly where line, function, and branch
 counters are inserted, with examples, see
 [`shader-coverage-counter-placement.md`](shader-coverage-counter-placement.md).
 
-1. **AST lowering** (`source/slang/slang-lower-to-ir.cpp`). Before
+1. **AST lowering** (`source/slang/lower-to-ir/slang-lower-to-ir.cpp`). Before
    source code is lowered to IR, the front-end emits semantic marker
    ops:
    - `-trace-coverage` emits `IncrementCoverageCounter` before each
@@ -133,16 +133,17 @@ counters are inserted, with examples, see
      `IncrementBranchCoverageCounter` for `if` / `else` arms and
      loop-condition true/false arms (`for`, `while`, `do while`) and
      source `switch` case/default dispatch arms, including the
-     implicit no-match default path when no `default` label exists.
-     Expression-level short-circuit and ternary branches are not
-     instrumented yet.
+     implicit no-match default path when no `default` label exists,
+     and for the true/false arms of the expression-level branches:
+     the condition of a scalar `?:` and the left operand of a
+     short-circuiting `&&` / `||`.
    - Marker ops are opaque void IR instructions. They do not reference
      a buffer at this point; the IR coverage pass rewrites them later.
    - The marker source position rides on the standard per-instruction
      `sourceLoc` field, so it survives `stripDebugInfo` and every IR
      transform that preserves operands (inline, clone, link).
 
-2. **IR pass** (`source/slang/slang-ir-coverage-instrument.cpp`).
+2. **IR pass** (`source/slang/ir-passes/slang-ir-coverage-instrument.cpp`).
    Runs after `linkIR` has produced the linked-program IR, and
    before `collectGlobalUniformParameters` packs globals into the
    `GlobalParams` struct. The pass:
@@ -277,19 +278,20 @@ them.
 
 | Path                                                                                  | Role                                                                                                                             |
 | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `source/slang/slang-ir-coverage-instrument.{h,cpp}`                                   | IR pass — synthesizes the buffer, extends program-scope layout, rewrites marker ops, writes metadata                             |
-| `source/slang/slang-ir-insts.lua`                                                     | Declares the line/function/branch coverage marker IR ops                                                                         |
-| `source/slang/slang-lower-to-ir.cpp`                                                  | Emits marker ops during AST lowering; filters structural statements for line coverage                                            |
+| `source/slang/ir-passes/slang-ir-coverage-instrument.{h,cpp}`                                   | IR pass — synthesizes the buffer, extends program-scope layout, rewrites marker ops, writes metadata                             |
+| `source/slang/ir/slang-ir-insts.lua`                                                     | Declares the line/function/branch coverage marker IR ops                                                                         |
+| `source/slang/lower-to-ir/slang-lower-to-ir.cpp`                                                  | Emits marker ops during AST lowering; filters structural statements for line coverage                                            |
 | `source/slang/slang-emit.cpp`                                                         | Integrates the pass into the pipeline + allocates metadata + plumbs `-trace-coverage-binding` / `-trace-coverage-reserved-space` |
 | `source/slang/slang-options.cpp`                                                      | Registers the coverage tracing CLI flags                                                                                         |
 | `source/slang/slang-end-to-end-request.cpp`                                           | Writes the `.coverage-manifest.json` sidecar from slangc                                                                         |
 | `include/slang.h`                                                                     | `slang::ICoverageTracingMetadata` public interface                                                                               |
 | `source/compiler-core/slang-artifact-associated-impl.{h,cpp}`                         | `ArtifactPostEmitMetadata` implements the interface                                                                              |
 | `prelude/slang-cpp-prelude.h`                                                         | CPU-target atomic helpers (`_slang_atomic_add_u32/u64`)                                                                          |
-| `source/slang/slang-emit-cpp.cpp`                                                     | CPU emitter's `kIROp_AtomicAdd` handling                                                                                         |
-| `source/slang/slang-emit-metal.cpp`                                                   | Metal emitter's atomic handling (`atomic_fetch_add_explicit`, 32-bit `atomic_uint` only)                                         |
+| `source/slang/emission/slang-emit-cpp.cpp`                                                     | CPU emitter's `kIROp_AtomicAdd` handling                                                                                         |
+| `source/slang/emission/slang-emit-metal.cpp`                                                   | Metal emitter's atomic handling (`atomic_fetch_add_explicit`, 32-bit `atomic_uint` only)                                         |
 | `tests/language-feature/coverage/`                                                    | End-to-end tests                                                                                                                 |
 | `tools/slang-unit-test/unit-test-coverage-metal-runtime.cpp`                          | GPU execution test — validates the Metal binding contract and exact line/function/branch counter values on a real dispatch       |
+| `tools/slang-static-unit-test/unit-test-coverage-coalescing.cpp`                      | Static unit test — drives `assignCoverageCounterSlots` on hand-built IR to pin the counter-coalescing properties                 |
 | `examples/shader-coverage-image-pipeline/`, `examples/shader-coverage-bvh-traversal/` | Runnable raw-Vulkan reference hosts — compile with coverage, bind via metadata, dispatch, read back, render LCOV reports         |
 | `tools/slang-unit-test/unit-test-descriptor-set-space-offset-reflection.cpp`          | Reflection unit test for `DescriptorSetInfo::spaceOffset` (regression-watch for the non-zero space mis-binding bug)              |
 
@@ -458,19 +460,15 @@ not what gets counted:
   attribution for codebases with heavy generic / template use —
   matters most for neural-slang.
 
-### Cross-repo follow-ups
+### Runtime integration
 
-Tracked outside this repository:
-
-- **slang-rhi synthetic-resource binding.** Lets hosts that dispatch
-  via slang-rhi bind the hidden coverage buffer through
-  `bindSyntheticResource(...)` instead of their own pipeline-layout
-  code.
-  [shader-slang/slang-rhi#739](https://github.com/shader-slang/slang-rhi/pull/739).
-- **slang-rhi Metal backend binding quirk.** The slang-rhi Metal
-  backend returns garbage counter values; direct Metal hosts are
-  unaffected.
-  [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724).
+- **slang-rhi synthetic-resource binding.** Available for global resources on
+  Vulkan and CUDA through `ShaderProgramSyntheticResourcesDesc` and
+  `bindSyntheticResource(...)`; other RHI backends do not yet support it.
+  See the [host integration guide](shader-coverage-host-interface.md#slang-rhi-consumption-model)
+  and the image-pipeline and BVH examples.
+- **Metal.** Use the native Metal path in `shader-coverage-backends` until
+  RHI implements synthetic-resource binding for Metal.
 
 ### Possible extensions
 

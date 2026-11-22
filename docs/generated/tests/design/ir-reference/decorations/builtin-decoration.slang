@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#naming-and-provenance
-//META: doc_section_digest=c55006c0bcfdbf481cbed2ad87133c84b45c1a360af8f94519a6b15522ec2953
+//META: doc_section_digest=6831ab52a37fd97537e855fa7a9e66d014490da47978c08179ccda7326652d30
 //META: purpose=Core-module-builtin interfaces such as IBufferDataLayout carry a BuiltinDecoration in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower

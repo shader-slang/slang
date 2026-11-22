@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#edge-cases-and-failure-modes
-//META: doc_section_digest=b57e81781278bd6752bd817f50c238aae4f56d4fda646e22befd826b34d6cab4
+//META: doc_section_digest=6f56ac76aaddef7a4076217c6b9406ddfe1d14ddd4d122a991eba3c769b781e4
 //META: purpose=A `__constraint` whose subject is an associated type reached through `This` (e.g. `This.A : IBar`) is permitted, unlike a bare-This subject.
 //META: intent=functional
 //META: pipeline_stage=check

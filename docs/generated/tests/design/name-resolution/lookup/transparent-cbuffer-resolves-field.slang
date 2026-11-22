@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#transparent-members
-//META: doc_section_digest=32382a9ebef19c50b9e06793af48bd9784fb821c105edada1ca8660859a10b64
+//META: doc_section_digest=0241c2b2d6b5982b38fcab65827ac1661c13c0ef631b7184ea3b202026236a30
 //META: purpose=An HLSL cbuffer lowers to a transparent ConstantBuffer of an anonymous struct, so an unqualified reference to its inner field resolves through the transparent-member plus dereference navigation chain.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#legalizeentrypointsforglsl-fragdepth-and-geometry-primitive-refinements
-//META: doc_section_digest=4c30a2e01cf671a363d0d4d98611aa7f1473fd59645671c6daccc686a8a6dc41
+//META: doc_section_digest=101470099f314769a6fe398920091b45f975c62ef00a261100bcd790353ab103
 //META: purpose=A conservative-depth output carries `OpExecutionMode ... DepthReplacing` alongside the `DepthGreater` mode, because Vulkan demands DepthReplacing for any write to `FragDepth`.
 //META: intent=functional
 //META: pipeline_stage=emit

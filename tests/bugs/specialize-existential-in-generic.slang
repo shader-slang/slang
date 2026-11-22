@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 [Specialize]
 interface IAssoc

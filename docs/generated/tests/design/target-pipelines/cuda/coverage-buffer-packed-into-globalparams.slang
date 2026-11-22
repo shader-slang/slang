@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-a-link-and-entry-point-prep
-//META: doc_section_digest=dc8998821e048cc2136a09100dd12b179d65f855a316bc0f1a8c26f8eaf6337d
+//META: doc_section_digest=a686eed39925656955d4318509d87550eaf868b727c1a59e5c7d1736bd470024
 //META: purpose=slangc -trace-coverage turns on instrumentCoverage, and on CUDA the synthesized coverage buffer is packed into the GlobalParams struct alongside the user's own buffers, with each coverage entry incremented by an atomicAdd.
 //META: intent=functional
 //META: pipeline_stage=emit

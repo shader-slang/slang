@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-05T00:00:00+00:00
-source_commit: 5634a0ea1b
-watched_paths_digest: b6659b833f864303089712cf3ac328ce498f4412e693617dae58416e5c50162c
+model: claude-sonnet-5-5
+generated_at: 2026-11-08T21:31:43+00:00
+source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
+watched_paths_digest: bbdeece4cf7b9350b858f0568781283dae09a21deed47f76845a393962897598
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -11,7 +11,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 
 ## Intent
 
-White-box characterization tests for `source/slang/slang-lower-to-ir.cpp`
+White-box characterization tests for `source/slang/lower-to-ir/slang-lower-to-ir.cpp`
 (AST -> Slang IR lowering; ~66% covered). They pin the **current observed
 behaviour** of CLI-reachable statement- and expression-lowering branches,
 not a spec. Strategy: target the under-tested control-flow and aggregate
@@ -60,25 +60,25 @@ and `_meta/findings/intrinsic-asm-out-of-range-value-slot-assert.yaml`.
 
 | Test                                                                                                   | What it pins (current behaviour)                                                                                                                   | covers=                            |
 | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| [`as-operator-same-type-optional.slang`](as-operator-same-type-optional.slang)                         | `v as T` where `T` is already `v`'s static type builds an always-present `Optional<T>` and folds away to the value itself (no type test survives). | source/slang/slang-lower-to-ir.cpp |
-| [`compound-assignment-chain.slang`](compound-assignment-chain.slang)                                   | A chain `x += 5; x *= 2; x -= 3; x /= 2;` from 10 read-modify-writes the same local in source order to 13 (integer division).                      | source/slang/slang-lower-to-ir.cpp |
-| [`defer-lifo-and-scope-end.slang`](defer-lifo-and-scope-end.slang)                                     | Two `defer` blocks in one block run at scope end in LIFO order: "body" then "second" then "first".                                                 | source/slang/slang-lower-to-ir.cpp |
-| [`defer-runs-on-early-return.slang`](defer-runs-on-early-return.slang)                                 | A function-scope `defer` fires before an early `return` and before the fall-through return — on both exit edges.                                   | source/slang/slang-lower-to-ir.cpp |
-| [`defer-scope-end-hlsl-emit.slang`](defer-scope-end-hlsl-emit.slang)                                   | A block `defer { outputBuffer[1]=x; }` lowers so the deferred store emits at block close (after x is mutated) and before code following the block. | source/slang/slang-lower-to-ir.cpp |
-| [`derivative-group-linear-layout-decl.slang`](derivative-group-linear-layout-decl.slang)               | A file-scope `layout(derivative_group_linearNV) in;` decorates every entry point in the module and re-emits as the same GLSL layout qualifier.     | source/slang/slang-lower-to-ir.cpp |
-| [`generic-value-param-bitwise-array-size.slang`](generic-value-param-bitwise-array-size.slang)         | `N ^ 1` and `~N` over a generic value parameter lower to constexpr bit-xor / bit-not IR ops and fold to 7 and 1 for N = 6.                         | source/slang/slang-lower-to-ir.cpp |
-| [`intrinsic-asm-stmt-type-arg.slang`](intrinsic-asm-stmt-type-arg.slang)                               | `__intrinsic_asm "...", T;` lowers a type argument as an IR type and substitutes the target's spelling of that type into the `$[0]` slot.          | source/slang/slang-lower-to-ir.cpp |
-| [`intrinsic-asm-stmt-value-arg.slang`](intrinsic-asm-stmt-value-arg.slang)                             | `__intrinsic_asm "...", expr;` lowers its value argument as an r-value and substitutes it for the `$0` slot in the emitted target text.            | source/slang/slang-lower-to-ir.cpp |
-| [`packoffset-component-mask.slang`](packoffset-component-mask.slang)                                   | Every `packoffset` component mask (x/y/z/w) lowers to a PackOffsetDecoration and re-emits, with the `.x` mask elided.                              | source/slang/slang-lower-to-ir.cpp |
-| [`require-capability-stmt.slang`](require-capability-stmt.slang)                                       | A `__requireCapability(...)` statement lowers into the entry point's capability set (upgrading the profile) without adding an OpCapability.        | source/slang/slang-lower-to-ir.cpp |
-| [`scalar-ternary-lowers-to-ifelse.slang`](scalar-ternary-lowers-to-ifelse.slang)                       | A scalar `(a<b)?a:b` inside a function lowers to a temporary plus an `if/else` (short-circuit form), not a single select.                          | source/slang/slang-lower-to-ir.cpp |
-| [`spirv-asm-builtin-var-operand.slang`](spirv-asm-builtin-var-operand.slang)                           | A `builtin(Name:Type)` operand inside `spirv_asm` lowers to a synthesized Input variable decorated with that SPIR-V BuiltIn.                       | source/slang/slang-lower-to-ir.cpp |
-| [`spirv-asm-immediate-value-operand.slang`](spirv-asm-immediate-value-operand.slang)                   | A `!expr` immediate operand inside `spirv_asm` lowers the Slang constant as a literal enum operand rather than as an id.                           | source/slang/slang-lower-to-ir.cpp |
-| [`struct-and-array-aggregate-init.slang`](struct-and-array-aggregate-init.slang)                       | `P p = {3,4}` maps positionally to x=3,y=4 and `int arr[3]={10,20,30}` maps by index.                                                              | source/slang/slang-lower-to-ir.cpp |
-| [`switch-fallthrough-and-shared-case.slang`](switch-fallthrough-and-shared-case.slang)                 | Adjacent empty cases share one label, and a non-`break` case (`case 2`) falls through into the `default` body.                                     | source/slang/slang-lower-to-ir.cpp |
-| [`switch-no-cases-evaluates-condition.slang`](switch-no-cases-evaluates-condition.slang)               | A `switch` with no case/default still lowers (and keeps the side effects of) its condition but emits no switch instruction.                        | source/slang/slang-lower-to-ir.cpp |
-| [`vector-select-lowers-to-select-inst.slang`](vector-select-lowers-to-select-inst.slang)               | A vector `select(c,a,b)` (non-basic condition) lowers to a single `OpSelect` in SPIR-V, not an if/else.                                            | source/slang/slang-lower-to-ir.cpp |
-| [`while-loop-branch-coverage-instrumentation.slang`](while-loop-branch-coverage-instrumentation.slang) | `-trace-branch-coverage` makes a `while` condition lower with a marker on each arm, backed by a synthesized `_slang_coverage` buffer.              | source/slang/slang-lower-to-ir.cpp |
+| [`as-operator-same-type-optional.slang`](as-operator-same-type-optional.slang)                         | `v as T` where `T` is already `v`'s static type builds an always-present `Optional<T>` and folds away to the value itself (no type test survives). | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`compound-assignment-chain.slang`](compound-assignment-chain.slang)                                   | A chain `x += 5; x *= 2; x -= 3; x /= 2;` from 10 read-modify-writes the same local in source order to 13 (integer division).                      | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`defer-lifo-and-scope-end.slang`](defer-lifo-and-scope-end.slang)                                     | Two `defer` blocks in one block run at scope end in LIFO order: "body" then "second" then "first".                                                 | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`defer-runs-on-early-return.slang`](defer-runs-on-early-return.slang)                                 | A function-scope `defer` fires before an early `return` and before the fall-through return — on both exit edges.                                   | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`defer-scope-end-hlsl-emit.slang`](defer-scope-end-hlsl-emit.slang)                                   | A block `defer { outputBuffer[1]=x; }` lowers so the deferred store emits at block close (after x is mutated) and before code following the block. | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`derivative-group-linear-layout-decl.slang`](derivative-group-linear-layout-decl.slang)               | A file-scope `layout(derivative_group_linearNV) in;` decorates every entry point in the module and re-emits as the same GLSL layout qualifier.     | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`generic-value-param-bitwise-array-size.slang`](generic-value-param-bitwise-array-size.slang)         | `N ^ 1` and `~N` over a generic value parameter lower to constexpr bit-xor / bit-not IR ops and fold to 7 and 1 for N = 6.                         | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`intrinsic-asm-stmt-type-arg.slang`](intrinsic-asm-stmt-type-arg.slang)                               | `__intrinsic_asm "...", T;` lowers a type argument as an IR type and substitutes the target's spelling of that type into the `$[0]` slot.          | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`intrinsic-asm-stmt-value-arg.slang`](intrinsic-asm-stmt-value-arg.slang)                             | `__intrinsic_asm "...", expr;` lowers its value argument as an r-value and substitutes it for the `$0` slot in the emitted target text.            | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`packoffset-component-mask.slang`](packoffset-component-mask.slang)                                   | Every `packoffset` component mask (x/y/z/w) lowers to a PackOffsetDecoration and re-emits, with the `.x` mask elided.                              | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`require-capability-stmt.slang`](require-capability-stmt.slang)                                       | A `__requireCapability(...)` statement lowers into the entry point's capability set (upgrading the profile) without adding an OpCapability.        | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`scalar-ternary-lowers-to-ifelse.slang`](scalar-ternary-lowers-to-ifelse.slang)                       | A scalar `(a<b)?a:b` inside a function lowers to a temporary plus an `if/else` (short-circuit form), not a single select.                          | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`spirv-asm-builtin-var-operand.slang`](spirv-asm-builtin-var-operand.slang)                           | A `builtin(Name:Type)` operand inside `spirv_asm` lowers to a synthesized Input variable decorated with that SPIR-V BuiltIn.                       | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`spirv-asm-immediate-value-operand.slang`](spirv-asm-immediate-value-operand.slang)                   | A `!expr` immediate operand inside `spirv_asm` lowers the Slang constant as a literal enum operand rather than as an id.                           | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`struct-and-array-aggregate-init.slang`](struct-and-array-aggregate-init.slang)                       | `P p = {3,4}` maps positionally to x=3,y=4 and `int arr[3]={10,20,30}` maps by index.                                                              | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`switch-fallthrough-and-shared-case.slang`](switch-fallthrough-and-shared-case.slang)                 | Adjacent empty cases share one label, and a non-`break` case (`case 2`) falls through into the `default` body.                                     | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`switch-no-cases-evaluates-condition.slang`](switch-no-cases-evaluates-condition.slang)               | A `switch` with no case/default still lowers (and keeps the side effects of) its condition but emits no switch instruction.                        | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`vector-select-lowers-to-select-inst.slang`](vector-select-lowers-to-select-inst.slang)               | A vector `select(c,a,b)` (non-basic condition) lowers to a single `OpSelect` in SPIR-V, not an if/else.                                            | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
+| [`while-loop-branch-coverage-instrumentation.slang`](while-loop-branch-coverage-instrumentation.slang) | `-trace-branch-coverage` makes a `while` condition lower with a marker on each arm, backed by a synthesized `_slang_coverage` buffer.              | source/slang/lower-to-ir/slang-lower-to-ir.cpp |
 
 ## Unreachable gaps
 
@@ -162,12 +162,17 @@ the reason.
   `visitRenamedEntryPoint`, `visitExistentialSpecializedType`** — driven by
   the `IComponentType` specialization / type-conformance API, not by any
   `slangc` command line. Needs a C++ unit test, not a `.slang` file.
-- **`visitGLSLInterfaceBlockDecl` non-`buffer` arm and the
-  `SynthesizedStructDecl` operand arms of `visitAggTypeDecl`** — probed with
-  `-allow-glsl` `buffer` / `uniform` blocks; the decl is resolved to an alias
-  earlier in `visitAggTypeDecl` and never reaches the else-if chain. The
-  synthesized-struct arms are fed by internal (autodiff intermediate-context)
-  decls with no user spelling.
+- **Both arms of the `GLSLInterfaceBlockDecl` branch of `visitAggTypeDecl`
+  (`:12752`) and the `SynthesizedStructDecl` operand arms of the same
+  function** — probed with `-allow-glsl` `buffer` / `uniform` blocks and never
+  reached. The reason is upstream of lowering: the only code that constructs a
+  `GLSLInterfaceBlockDecl` is `Parser::ParseGLSLInterfaceBlock`
+  (`slang-parser.cpp:6463-6479`), and that function has no caller anywhere in
+  `source/`. GLSL interface blocks are parsed by `ParseBufferBlockDecl`
+  instead, so no user spelling produces the decl this branch switches on — see
+  the matching row in [`coverage/parser`](../parser/README.md), which flags the
+  parser function as dead code. The synthesized-struct arms are fed by internal
+  (autodiff intermediate-context) decls, which likewise have no user spelling.
 - **`visitNamedExpressionType`** — `typealias` / `typedef` sugar is
   canonicalized before lowering; probed with both spellings in variable,
   parameter, and generic-argument positions and never reached.
@@ -187,3 +192,23 @@ the reason.
 ## Doc gaps observed
 
 NA
+
+## Drift review
+
+Reviewed at `d592afa9b9` against `ef1068b548`, the commit this bundle was
+generated from. 33 commits touched its watched paths in between; all
+19 existing tests still pass.
+
+No diagnostic new since the base commit is raised from
+`slang-lower-to-ir.cpp`, and the 33 commits in the window are refactors
+(`SLANG_UNUSED` to if-init, include-traversal removal, `Val` memoization) or
+fixes whose observable surface is owned by other bundles. No test was added.
+
+One entry in `Unreachable gaps` named a function that does not exist. There is
+no `visitGLSLInterfaceBlockDecl`; GLSL interface blocks are handled by an
+`as<GLSLInterfaceBlockDecl>` arm of `visitAggTypeDecl` (`:12752`). The stated
+reason was wrong too -- the arm is not reached because the decl is "resolved to
+an alias earlier", but because the only function that constructs the decl,
+`Parser::ParseGLSLInterfaceBlock`, has no caller anywhere in `source/`. The
+entry has been rewritten against the real code and now cross-references the
+matching dead-code row in `coverage/parser`.

@@ -3,8 +3,8 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#unqualified-lookup
-//META: doc_section_digest=32b5d6cdc50501bef4e7ef2a5cc9d61e93145ad0a37a1049859831fc766c24f1
-//META: purpose=When the scope walk reaches an enclosing aggregate type it rewrites the request into member lookup with an implicit This breadcrumb, and that rewrite still fires from several block scopes deep inside a method body.
+//META: doc_section_digest=d1c02da07b357c8b41134fbb13a153c9451e991db3087032b3d340a5ddfdfa75
+//META: purpose=When the scope walk reaches an enclosing aggregate type it rewrites the request into member lookup with an implicit this breadcrumb, and that rewrite still fires from several block scopes deep inside a method body.
 //META: intent=boundary
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.

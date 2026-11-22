@@ -254,7 +254,7 @@ enum Channel
 
 Unlike C/C++, named `enum` types in Slang are always scoped by default (like `enum class` in C++), whereas anonymous `enum` types are unscoped. You can also write `enum class` explicitly in Slang for clarity, but it isn't required. If you want an `enum` type to be unscoped, you can use the `[UnscopedEnum]` attribute:
 
-```csharp
+```slang
 [UnscopedEnum]
 enum Channel
 {
@@ -270,7 +270,7 @@ You can also use the `-unscoped-enum` command-line option to make all named `enu
 
 You can specify an explicit underlying integer type for `enum` types:
 
-```csharp
+```slang
 enum Channel : uint16_t
 {
     Red, Green, Blue
@@ -279,7 +279,7 @@ enum Channel : uint16_t
 
 By default, the underlying type of an enumeration type is `int`. Enumeration types are implicitly convertible to their underlying type. All enumeration types conform to the builtin `ILogical` interface, which provides operator overloads for bit operations. The following code is allowed:
 
-```csharp
+```slang
 void test()
 {
     Channel c = Channel.Red | Channel.Green;
@@ -287,7 +287,7 @@ void test()
 ```
 
 You can explicitly assign values to each enum case:
-```csharp
+```slang
 enum Channel
 {
     Red = 5,
@@ -299,7 +299,7 @@ Slang automatically assigns integer values to enum cases without an explicit val
 enum case.
 
 You can override the implicit value assignment behavior with the `[Flags]` attribute, which will make value assignment start from 1 and increment by power of 2, making it suitable for enums that represent bit flags. For example:
-```csharp
+```slang
 [Flags]
 enum Channel
 {
@@ -373,6 +373,66 @@ Structured buffer types like `StructuredBuffer<T>` include an explicit element t
 Byte-addressed buffer types like `ByteAddressBuffer` do not specify any particular element type, and instead allow for values to be loaded or stored from any (suitably aligned) byte offset in the buffer.
 Both structured and byte-addressed buffers can use an _access_ to distinguish between read-only and read-write usage.
 
+##### Provisional Unsized Buffers
+
+Slang provides provisional unsized views of structured and byte-addressed buffers. Their names and API may change:
+
+| Unsized type                        | Matching sized type        |
+| ----------------------------------- | -------------------------- |
+| `__UnsizedStructuredBuffer<T, L>`   | `StructuredBuffer<T, L>`   |
+| `__UnsizedRWStructuredBuffer<T, L>` | `RWStructuredBuffer<T, L>` |
+| `__UnsizedByteAddressBuffer`        | `ByteAddressBuffer`        |
+| `__UnsizedRWByteAddressBuffer`      | `RWByteAddressBuffer`      |
+
+For structured buffers, `L` is optional and defaults to `DefaultDataLayout`, as it does for the sized types.
+Unsized buffers support loads, and their read-write variants support stores and atomics.
+Structured buffers also support indexing.
+Unsized buffers have no `GetDimensions` or `getCount` methods on any target and do not implement `IArray` or `IRWArray`.
+Pass a length separately when the algorithm needs one; the caller must ensure that accesses stay within the allocated storage.
+
+In generated C++ and CUDA code, an unsized buffer uses a prelude struct containing only a data pointer, with the same size and alignment as that pointer.
+The prelude types are `UnsizedStructuredBuffer<T>`, `UnsizedRWStructuredBuffer<T>`, `UnsizedByteAddressBuffer`, and `UnsizedRWByteAddressBuffer`.
+These structs have no count field. The direct LLVM backend also represents an unsized buffer with one pointer.
+On HLSL, SPIR-V, GLSL, and WGSL targets, it uses the same native resource representation as the matching sized buffer.
+On Metal, it uses the existing device-pointer representation.
+Sized and unsized buffers remain distinct types on every target, including in generic `T is U` comparisons.
+The absence of length-query methods is the same on every target, even where the underlying native resource can report a length.
+
+A sized buffer converts implicitly to its matching unsized type. Explicit construction is also supported:
+
+```slang
+void copyValues(
+    __UnsizedStructuredBuffer<float> source,
+    __UnsizedRWStructuredBuffer<float> destination,
+    uint count)
+{
+    for (uint i = 0; i < count; ++i)
+        destination[i] = source[i];
+}
+
+void copySizedValues(
+    StructuredBuffer<float> source,
+    RWStructuredBuffer<float> destination,
+    uint count)
+{
+    // Explicit construction discards the destination's length.
+    let unsizedDestination = __UnsizedRWStructuredBuffer<float>(destination);
+    // The source converts implicitly at the call boundary.
+    copyValues(source, unsizedDestination, count);
+}
+```
+
+Conversion refers to the same storage and discards length information where it is stored separately.
+For structured buffers, the element type `T` and layout `L` must match.
+There is no reverse conversion from unsized to sized, and conversion does not change access rights: a read-only buffer cannot become read-write.
+The existing public names remain the canonical sized types, preserving their existing behavior and names in diagnostics.
+The provisional `__SizedStructuredBuffer`, `__SizedRWStructuredBuffer`, `__SizedByteAddressBuffer`, and `__SizedRWByteAddressBuffer` names are aliases for those public types, respectively.
+
+The bundled Slang RHI CPU and CUDA resource binders currently assume that structured and byte-addressed buffers include a count.
+Do not bind these unsized types through that resource-binding path: it writes an extra count and can overwrite the following parameter.
+Bind a sized resource and convert it inside the shader, or supply the single data pointer as ordinary parameter data at the reflected offset.
+When supplying a pointer directly, keep the allocation alive and use an address accessible to the target device.
+
 ##### Constant Buffers
 
 Constant buffers (sometimes also called "uniform buffers") are typically used to pass immutable parameter data from a host application to GPU code.
@@ -443,8 +503,10 @@ Swizzles can reorder elements (`v.yx`) or include duplicate elements (`v.yyy`).
 > Unlike GLSL, Slang only supports `xyzw` and `rgba` as swizzle elements, and not the seldom-used `stpq`.
 
 Matrix values also support HLSL-style matrix swizzles such as `m._m00_m01` and
-`m._41_32`. Matrix swizzle l-values may be assigned, and constant-indexed
-subscripts of matrix swizzles may be used where an l-value is required.
+`m._41_32`. A matrix swizzle without duplicate elements is an l-value when the
+matrix itself is an l-value: it may be assigned, and its constant-indexed
+subscripts may be used where an l-value is required. As with vector swizzles,
+a swizzle of a `let` or `const` matrix cannot be assigned.
 
 Statements
 ----------
@@ -525,9 +587,57 @@ Function parameters may be marked with a _direction_ qualifier:
 * `out` indicates an output parameter
 * `inout` or `in out` indicates an input/output parameter
 
+An `out` or `inout` parameter has exclusive access to its argument for the duration of the call.
+An `inout` parameter is an _exclusive mutable borrow_ of its argument.
+An `out` parameter receives uninitialized storage, to which the function writes a value; when the function returns, ownership of that value moves out of the function to the caller.
+While the call is in progress, nothing else should read or write the argument's memory, whether through another parameter, a global variable, or another invocation.
+
 > #### Note ####
 > The `out` and `inout` directions are superficially similar to non-`const` reference parameters in C++.
 > In cases that do not involve aliasing of mutable memory, the semantics should be equivalent.
+> Slang does not check that a program gives an `out` or `inout` parameter exclusive access to its argument; if other code accesses the argument's memory during the call, the program has undefined behavior.
+
+#### Borrow and Reference Parameters ####
+
+Slang has additional parameter modifiers for borrows and references:
+
+* `__borrow` (also spelled `__constref`) indicates an _immutable borrow_: the function may read the argument but not modify it, and nothing should modify the argument while the call is in progress
+* `__ref` indicates a _reference_: the parameter does not have exclusive access to its argument, so other code may read or write the argument's memory while the call is in progress, and the function reads and writes that memory directly
+
+> #### Note ####
+> These modifiers exist mainly to support the Slang core module. Their spelling and their implementation are subject to change, so we recommend that user code avoid them, with the exception of `groupshared` described below.
+> As with `out` and `inout`, Slang does not check that a program respects the access rules of a borrow (there is no borrow checker); a program that violates them has undefined behavior.
+
+A parameter marked `groupshared` is a reference to thread-group-shared memory, and is the one kind of reference parameter we expect user code to use.
+Its argument must be a `groupshared` variable, a part of one, or another `groupshared` parameter, and the function accesses that memory while other invocations in the thread group can access it too.
+A `const groupshared` parameter is a read-only reference.
+A `groupshared` parameter cannot also be marked `in`, `out`, `inout`, or `__borrow`.
+
+```hlsl
+groupshared float tile[64];
+
+void fill(groupshared float values[64], uint i)
+{
+    values[i] = float(i);
+}
+
+float neighbor(const groupshared float values[64], uint i)
+{
+    return values[(i + 1) % 64];
+}
+
+[numthreads(64, 1, 1)]
+void computeMain(uint i : SV_GroupIndex)
+{
+    fill(tile, i);
+    GroupMemoryBarrierWithGroupSync();
+    float n = neighbor(tile, i);
+    // ...
+}
+```
+
+HLSL does not allow a function with a `groupshared` parameter to be `export` (see [HLSL proposal 0043](https://github.com/microsoft/hlsl-specs/blob/main/proposals/0043-groupshared-arguments.md)), and neither does Slang when targeting HLSL.
+If such a function must be `export`, have it access a global `groupshared` variable directly instead of taking the memory as a parameter.
 
 Preprocessor
 ------------
@@ -600,6 +710,30 @@ A global-scope `static const` variable defines a compile-time constant for use i
 
 A non-`const` global-scope `static` variable is conceptually similar to a global variable in C/C++, with the key difference that it has distinct storage per *thread* rather than being truly global.
 Each logical thread of shader execution initiated by the GPU will be allocated fresh storage for these `static` variables, and values written to those variables will be lost when a shader thread terminates.
+
+#### Resource-Valued Static Variables
+
+A mutable file- or namespace-scope `static` variable may hold one non-combined texture or typed-buffer resource, one sampler state, one structured buffer other than an append or consume buffer, or one byte-address buffer.
+A fixed-size homogeneous array of any of these resource types is also supported.
+
+The variable stores a resource binding separately for each shader invocation.
+Assigning the variable changes which bound resource later operations use during that invocation; it does not rebind the shader parameter that supplied the value or copy the resource's contents.
+An operation through the variable accesses the selected resource normally.
+
+Slang must be able to represent the variable as per-invocation state in the entry point and every helper function that uses it.
+The declaration therefore cannot use `groupshared` or a memory-access qualifier such as `globallycoherent`.
+Slang also reports an error when the program requires persistent or externally visible storage, observes the storage identity through an address, or accesses the variable from a function that cannot receive the per-invocation state.
+Some targets cannot represent resource-valued local variables or function parameters.
+Slang accepts those targets only when it can eliminate the unsupported forms during compilation.
+
+The supported forms do not include explicit parameter groups such as `ConstantBuffer<T>` and `ParameterBlock<T>`, unbounded arrays, structs containing resources, combined texture-sampler types, append and consume buffers, acceleration structures, or `__DynamicResource`.
+When code assigns individual elements of a resource array, Slang must be able to prove that no read can occur before a whole-array assignment; otherwise it reports that complete initialization has not been established.
+
+An initializer for a supported resource-valued `static` variable must be safe to evaluate at the start of each entry point.
+Slang must prove that the initializer and every function it can call return normally for all possible inputs.
+The current analysis cannot establish that proof across a loop or recursive call cycle that remains after optimization, even when the programmer knows that it terminates.
+Slang also reports an error when the initializer may have externally observable side effects or may read preexisting mutable storage, resource contents, or non-resource data from an explicit parameter group.
+When Slang cannot prove the initializer safe to move, initialize the variable explicitly in an entry point instead.
 
 > #### Note ####
 > Some target platforms do not support `static` global variables in all use cases.
@@ -854,154 +988,132 @@ Auto-Generated Constructors
 
 ### Auto-Generated Constructors - Struct
 
-Slang has the following rules:
-1. Auto-generate a `__init()` if not already defined.
+Slang generates a constructor for a struct if it does not have a user-defined constructor. The constructor has
+the same visibility as the struct. The constructor parameters are the struct member fields (in order) that
+have at least the same visibility as the struct. Member fields that have lower visibility are initialized by
+the constructor if they have default initializer expressions. Otherwise, a warning is diagnosed when the
+constructor is invoked.
 
-   Assume:
-   ```csharp
-   struct DontGenerateCtor
-   {
-       int a;
-       int b = 5;
+The parameters of the generated constructor have default values when the compiler can assign them. That is,
+when both the following conditions are met:
 
-       // Since the user has explicitly defined a constructor
-       // here, Slang will not synthesize a conflicting 
-       // constructor.
-       __init()
-       {
-           // b = 5;
-           a = 5;
-           b = 6;
-       }
-   };
+- The corresponding field has a default initializer expression or the type has a default constructor. The
+  default initializer expression takes precedence when both are present.
+- All subsequent parameters have default values, as default parameter values make sense only at the end of the
+  parameter list.
 
-   struct GenerateCtor
-   {
-       int a;
-       int b = 5;
-   
-       // Slang will automatically generate an implicit constructor:
-       // __init()
-       // {
-       //     b = 5;
-       // }
-   };
-   ```
+Examples:
 
-2. If all members have equal visibility, auto-generate a 'member-wise constructor' if it does not conflict with a user-defined constructor.
-   ```csharp
-   struct GenerateCtorInner
-   {
-       int a;
+```slang
+struct StructWithUserDefinedConstructor
+{
+    int a;
+    int b;
 
-       // Slang will automatically generate an implicit
-       // __init(int in_a)
-       // {
-       //     a = in_a;
-       // }
-   };
-   struct GenerateCtor : GenerateCtorInner
-   {
-       int b;
-       int c = 5;
+    // Slang does not generate a constructor for this struct,
+    // since it already has a user-defined constructor.
 
-       // Slang will automatically generate an implicit
-       // __init(int in_a, int in_b, int in_c)
-       // {
-       //     c = 5;
-       //
-       //     this = GenerateCtorInner(in_a);
-       //
-       //     b = in_b;
-       //     c = in_c;
-       // }
-   };
-   ```
+    __init()
+    {
+        a = 1;
+        b = 2;
+    }
+}
 
-3. If not all members have equal visibility, auto-generate a 'member-wise constructor' based on member visibility if it does not conflict with a user-defined constructor.
+struct StructWithGenConstructor
+{
+    int a;
+    int b;
 
-   We generate 3 different visibilities of 'member-wise constructors' in order:
-      1. `public` 'member-wise constructor'
-         - Contains members of visibility: `public`
-         - Do not generate if `internal` or `private` member lacks an init expression
-      2. `internal` 'member-wise constructor'
-         - Contains members of visibility: `internal`, `public`
-         - Do not generate if `private` member lacks an init expression
-      3. `private` 'member-wise constructor'
-         - Contains members of visibility: `private`, `internal`, `public`
+    // Slang generates the following constructor for this struct:
+    //
+    // __init(int _a = 0, int _b = 0)
+    // {
+    //     a = _a;
+    //     b = _b;
+    // }
+}
 
-   ```csharp
-   struct GenerateCtorInner1
-   {
-       internal int a = 0;
-    
-       // Slang will automatically generate an implicit
-       // internal __init(int in_a)
-       // {
-       //     a = 0;
-       //
-       //     a = in_a;
-       // }
-   };
-   struct GenerateCtor1 : GenerateCtorInner1
-   {
-       internal int b = 0;
-       public int c;
+public struct PublicStructWithGenConstructor1
+{
+    internal int a = 3;
+    public int b;
 
-       // Slang will automatically generate an implicit
-       // internal __init(int in_a, int in_b, int in_c)
-       // {
-       //     b = 0;
-       //
-       //     this = GenerateCtorInner1(in_a);
-       //
-       //     b = in_b;
-       //     c = in_c;
-       // }
-       //
-       // public __init(int in_c)
-       // {
-       //     b = 0;
-       //
-       //     this = GenerateCtorInner1();
-       //
-       //     c = in_c;
-       // }
-   };
+    // Slang generates the following constructor for this struct:
+    //
+    // __init(int _b = 0)
+    // {
+    //     a = 3;
+    //     b = _b;
+    // }
+}
 
-   struct GenerateCtorInner2
-   {
-       internal int a;
-       // Slang will automatically generate an implicit
-       // internal __init(int in_a)
-       // {
-       //     a = in_a;
-       // }
-   };
-   struct GenerateCtor2 : GenerateCtorInner2
-   {
-       internal int b;
-       public int c;
+public struct PublicStructWithGenConstructor2
+{
+    internal int a;
+    public int b;
 
-       /// Note: `internal b` is missing init expression,
-       // Do not generate a `public` 'member-wise' constructor.
+    // Slang generates the following constructor for this struct:
+    //
+    // __init(int _b = 0)
+    // {
+    //     b = _b;
+    // }
+    //
+    // A warning is diagnosed, since field 'a' is not initialized
+    // by this constructor.
+}
 
-       // Slang will automatically generate an implicit
-       // internal __init(int in_a, int in_b, int in_c)
-       // {
-       //     this = GenerateCtorInner2(in_a);
-       //
-       //     b = in_b;
-       //     c = in_c;
-       // }
-   };
-   ```
+struct NonDefaultConstructible
+{
+    int x;
+
+    __init(int _x)
+    {
+        x = _x;
+    }
+}
+
+struct DefaultConstructorParameterValues
+{
+    int a;
+    NonDefaultConstructible b;
+    NonDefaultConstructible c = NonDefaultConstructible(42);
+    int d;
+
+    // Slang generates the following constructor for this struct:
+    //
+    // __init(
+    //     int _a,
+    //     NonDefaultConstructible _b,
+    //     NonDefaultConstructible _c = NonDefaultConstructible(42),
+    //     int _d = 0)
+    // {
+    //     a = _a;
+    //     b = _b;
+    //     c = _c;
+    //     d = _d;
+    // }
+}
+```
+
+**Slang 2025 and previous language versions only:** If the struct inherits from a base struct, the base struct
+members are initialized by the generated constructor if the base struct has at least the same visibility as
+the derived struct. The parameters for the base struct constructor invocation are included in the derived
+struct constructor, and they come before the parameters for the derived member fields. However, a constructor
+is not generated if the base struct has a user-defined constructor. See GitHub issue
+[#13064](https://github.com/shader-slang/slang/issues/13064) for details.
+
+> ⚠️ **Warning:** Struct-from-struct inheritance is unstable in Slang 2025 and earlier language versions, and
+> has been removed in Slang 2026. Use composition (a struct as a member) instead. In those earlier versions, a
+> struct that inherits from another struct also cannot be used as an entry-point varying input or output when
+> targeting SPIR-V or GLSL, or as a varying input when targeting Metal or WGSL.
 
 Initializer Lists
 ----------
 Initializer Lists are an expression of the form `{...}`.
 
-```csharp
+```slang
 int myFunc()
 {
     int a = {}; // Initializer List
@@ -1010,14 +1122,14 @@ int myFunc()
 
 ### Initializer Lists - Scalar
 
-```csharp
+```slang
 // Equivalent to `int a = 1`
 int a = {1};
 ```
 
 ### Initializer Lists - Vectors
 
-```csharp
+```slang
 // Equivalent to `float3 a = float3(1,2,3)`
 float3 a = {1, 2, 3};
 ```
@@ -1026,87 +1138,77 @@ float3 a = {1, 2, 3};
 
 #### Array Of Scalars
 
-```csharp
+```slang
 // Equivalent to `int[2] a; a[0] = 1; a[1] = 2;`
 int a[2] = {1, 2};
 ```
 
 #### Array Of Aggregates
 
-```csharp
+```slang
 // Equivalent to `float3 a[2]; a[0] = {1,2,3}; a[1] = {4,5,6};`
 float3 a[2] = { {1,2,3}, {4,5,6} };
 ```
 
 #### Flattened Array Initializer
 
-```csharp
+```slang
 // Equivalent to `float3 a[2] = { {1,2,3}, {4,5,6} };`
 float3 a[2] = {1,2,3, 4,5,6};
 ```
 
 ### Initializer Lists - Struct
 
-In most scenarios, using an initializer list to create a struct typed value is equivalent to calling the struct's constructor using the elements in the initializer list as arguments for the constructor, for example:
-```csharp
-struct GenerateCtorInner1
+In most scenarios, using an initializer list to create a struct typed value is equivalent to calling the
+struct's constructor using the elements in the initializer list as arguments for the constructor. For example:
+
+```slang
+struct InnerStruct
 {
-    internal int a = 0;
-    
-    // Slang will automatically generate an implicit
-    // internal __init(int in_a)
-    // {
-    //     a = 0;
-    //
-    //     a = in_a;
-    // }
+    int a;
+    int b;
 
-    static GenerateCtorInner1 callGenerateCtorInner1()
+    __init(int _a, int _b)
     {
-        // Calls `GenerateCtorInner1::__init(1);`
-        return {1};
+        a = _a;
+        b = _b;
     }
-};
-struct GenerateCtor1 : GenerateCtorInner1
+
+    static InnerStruct construct(int _a, int _b)
+    {
+        return { _a, _b };
+
+        // the above is same as:
+        //
+        // return InnerStruct(_a, _b);
+    }
+}
+
+struct CompositeStruct
 {
-    internal int b = 0;
-    public int c;
+    InnerStruct a;
+    int c;
+    int d;
 
-    // Slang will automatically generate an implicit
-    // internal __init(int in_a, int in_b, int in_c)
-    // {
-    //     this = GenerateCtorInner1(in_a);
-    //
-    //     b = 0;
-    //
-    //     b = in_b;
-    //     c = in_c;
-    // }
-    //
-    // public __init(int in_c)
-    // {
-    //     this = GenerateCtorInner1();
-    //
-    //     b = 0;
-    //
-    //     c = in_c;
-    // }
-    static GenerateCtorInner1 callInternalGenerateCtor()
+    __init(InnerStruct _a, int _c, int _d = 0)
     {
-        // Calls `GenerateCtor1::__init(1, 2, 3);`
-        return {1, 2, 3};
+        a = _a;
+        c = _c;
+        d = _d;
     }
-    static GenerateCtorInner1 callPublicGenerateCtor()
-    {
-        // Calls `GenerateCtor1::__init(1);`
-        return {1};
-    }
-};
+}
 
-...
+void someFunction()
+{
+    CompositeStruct s1 = { { 1, 2 }, 3, 4 };
 
-// Calls `{ GenerateCtor1::__init(3), GenerateCtor1::__init(2) }`
-GenerateCtor1 val[2] = { { 3 }, { 2 } };
+    // the above is same as:
+    // CompositeStruct s1 = CompositeStruct(InnerStruct(1, 2), 3, 4);
+
+    // since the last parameter of CompositeStruct constructor is optional,
+    // the following is also valid:
+    CompositeStruct s2 = { { 5, 6 }, 7 };
+}
 ```
 
 In addition, Slang also provides compatibility support for C-style initializer lists with `struct`s. C-style initializer lists can use [Partial Initializer Lists](#Partial-Initializer-Lists) and [Flattened Array Initializer With Structs](#Flattened-Array-Initializer-With-Structs).
@@ -1117,7 +1219,7 @@ A struct is considered a C-style struct if:
 
 #### Partial Initializer Lists
 
-```csharp
+```slang
 struct Foo
 {
     int a;
@@ -1136,7 +1238,7 @@ Foo val = {2, 3};
 
 #### Flattened Array Initializer With Structs
 
-```csharp
+```slang
 struct Foo
 {
     int a;
@@ -1158,7 +1260,7 @@ Foo val[2] = {0,1,2, 3,4,5};
 #### Non-Struct Type
 
 Value will zero-initialize
-```csharp
+```slang
 // Equivalent to `int val1 = 0;`
 int val1 = {};
 
@@ -1170,7 +1272,7 @@ float3 val2 = {};
 
 1. Attempt to call default constructor (`__init()`) of a `struct`
 
-   ```csharp
+   ```slang
    struct Foo
    {
        int a;
@@ -1190,7 +1292,7 @@ float3 val2 = {};
 
 2. As a fallback, zero-initialize the struct
 
-   ```csharp
+   ```slang
    struct Foo
    {
        int a;

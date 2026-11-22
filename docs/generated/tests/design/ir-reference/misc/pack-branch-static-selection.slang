@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#packbranch
-//META: doc_section_digest=64305dc5798875e516872edb40432c593b099dd7219dbb653d2016c5a0eabb98
+//META: doc_section_digest=c10f10bfbb477837660274b8f59eaaaa242044d268742b892c0e93a981cc5014
 //META: purpose=`PackBranch` resolves statically, so a zero-length pack yields the `emptyValue` arm and a pack of length one or more yields the `nonEmptyValue` arm.
 //META: intent=boundary
 //META: pipeline_stage=runtime

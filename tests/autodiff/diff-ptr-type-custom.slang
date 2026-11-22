@@ -1,5 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUFFER): -vk -shaderobj -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu-llvm, filecheck-buffer=BUFFER): -output-using-type
 
 struct MyAddress : IDifferentiablePtrType
 {

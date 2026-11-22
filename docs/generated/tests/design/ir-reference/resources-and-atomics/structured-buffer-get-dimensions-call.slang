@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#buffer-load-and-store
-//META: doc_section_digest=26d469b87d05f8d3b2e0539d080d7839ae84df294d66110dd1541682d63c62d1
+//META: doc_section_digest=539f4d826195c55c809a7bdee601b791ce9a4d320d577f17983cfe774c4e7973
 //META: purpose=`StructuredBuffer::GetDimensions(count, stride)` does not reach `func %main` as the `StructuredBufferGetDimensions` opcode — lowering leaves a call whose two `out` parameters are passed as `var` pointers, and the opcode appears only inside the library body.
 //META: intent=functional
 //META: pipeline_stage=lower

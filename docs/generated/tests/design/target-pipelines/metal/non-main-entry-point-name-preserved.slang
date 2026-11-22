@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#entry-point-shape
-//META: doc_section_digest=6840c04e5449d96826b3b300b825e82111aff2cddc60c36c5c9944110ef35fdf
+//META: doc_section_digest=8d998c07009a972c35da67bd6e5664754c9f9202d1f0594877545852dbd8b327
 //META: purpose=An entry point whose name is not exactly `main` is left alone: it keeps its Slang spelling in the emitted Metal and no rename warning is reported.
 //META: intent=boundary
 //META: pipeline_stage=emit

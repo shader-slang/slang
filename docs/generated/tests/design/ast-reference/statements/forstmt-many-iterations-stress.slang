@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#loop-family
-//META: doc_section_digest=96f5a93c2d3b7b0c3cfafeba9cc0e6087ddd11d34203934cd833e35b847de3f5
+//META: doc_section_digest=62d41f734409e853620e442a2938448e5d7be850d748cdbabc3e948d9882271a
 //META: purpose=A ForStmt iterated 100 times accumulates the documented count; the loop variable advances monotonically and the side-effect expression runs once per iteration.
 //META: intent=stress
 //META: pipeline_stage=check

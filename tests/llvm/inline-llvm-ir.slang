@@ -1,9 +1,9 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-llvm -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=llvm, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-// Demonstrate manual return 
+// Demonstrate manual return
 // Demonstrate %resut
 
 T reduceAdd<T : __BuiltinFloatingPointType>(vector<T, 4> x)

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#where-visibility-is-filtered
-//META: doc_section_digest=bd2e5c9c313f8eee04427c042995baa864cc9e2068805e81fdd68950019c18ec
+//META: doc_section_digest=fc9ab91b7ced964782bf81020c2af74307d7749065e306eedc59bc8283c59ebd
 //META: purpose=`isDeclVisibleFromScope` treats an extension on the same type as inside the aggregate; a private member is reachable from that extension.
 //META: intent=functional
 //META: pipeline_stage=check

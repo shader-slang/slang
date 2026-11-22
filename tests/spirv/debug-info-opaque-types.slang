@@ -4,6 +4,16 @@
 Texture2D texture;
 SamplerState sampler;
 
+// Bindless descriptor handles, so the `DescriptorHandle<T>` wrapper types appear in the emitted
+// debug information; each wraps a distinct opaque resource kind.
+struct Bindless
+{
+    DescriptorHandle<Texture2D> textureHandle;
+    DescriptorHandle<SamplerState> samplerHandle;
+}
+
+StructuredBuffer<Bindless> bindless;
+
 struct Empty
 {}
 
@@ -18,7 +28,9 @@ float4 preserveEmptyType(Empty value, float4 result)
 float4 main(float2 uv : TEXCOORD0) : SV_Target
 {
     Empty ordinary;
-    return preserveEmptyType(ordinary, texture.Sample(sampler, uv));
+    Bindless handles = bindless[0];
+    float4 bindlessSample = handles.textureHandle.Sample(handles.samplerHandle, uv);
+    return preserveEmptyType(ordinary, texture.Sample(sampler, uv) + bindlessSample);
 }
 
 // CHECK-DAG: %[[DEBUG_INFO_NONE:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugInfoNone
@@ -30,6 +42,16 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
 // CHECK-DAG: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugTypeComposite %[[SAMPLER_NAME]] %uint_0 %{{[0-9]+}} %uint_0 %uint_0 %{{[0-9]+}} %[[SAMPLER_LINKAGE_NAME]] %[[DEBUG_INFO_NONE]] %uint_131072{{$}}
 // CHECK-DAG: %[[EMPTY_NAME:[0-9]+]] = OpString "Empty"
 // CHECK-DAG: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugTypeComposite %[[EMPTY_NAME]] %uint_1 %{{[a-zA-Z0-9_]+}} %{{[a-zA-Z0-9_]+}} %{{[a-zA-Z0-9_]+}} %{{[a-zA-Z0-9_]+}} %[[EMPTY_NAME]] %uint_0 %uint_131072{{$}}
+
+// Each DescriptorHandle<T> wrapper must get its own name/linkage OpString: the two descriptor
+// kinds would otherwise have identical unnamed DebugTypeComposite metadata, indistinguishable
+// in a debugger.
+// CHECK-DAG: %[[TEX_HANDLE_NAME:[0-9]+]] = OpString "DescriptorHandle<Texture2D>"
+// CHECK-DAG: %[[TEX_HANDLE_LINKAGE:[0-9]+]] = OpString "@DescriptorHandle<Texture2D>"
+// CHECK-DAG: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugTypeComposite %[[TEX_HANDLE_NAME]] %uint_0 %{{[0-9]+}} %uint_0 %uint_0 %{{[0-9]+}} %[[TEX_HANDLE_LINKAGE]] %[[DEBUG_INFO_NONE]] %uint_131072{{$}}
+// CHECK-DAG: %[[SAMP_HANDLE_NAME:[0-9]+]] = OpString "DescriptorHandle<SamplerState>"
+// CHECK-DAG: %[[SAMP_HANDLE_LINKAGE:[0-9]+]] = OpString "@DescriptorHandle<SamplerState>"
+// CHECK-DAG: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugTypeComposite %[[SAMP_HANDLE_NAME]] %uint_0 %{{[0-9]+}} %uint_0 %uint_0 %{{[0-9]+}} %[[SAMP_HANDLE_LINKAGE]] %[[DEBUG_INFO_NONE]] %uint_131072{{$}}
 
 // SEPARATE-NOT: DebugInfoNone
 // SEPARATE-NOT: DebugTypeComposite

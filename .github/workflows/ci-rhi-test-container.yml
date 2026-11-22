@@ -24,7 +24,7 @@ jobs:
       packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0
       options: >-
         --gpus all
         --user root
@@ -55,7 +55,13 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
-          submodules: "recursive"
+          submodules: "false"
+          fetch-depth: "1"
+
+      - name: Update submodules
+        uses: ./.github/actions/submodule-update-retry
+        timeout-minutes: 15
+        with:
           fetch-depth: "1"
 
       - name: Setup Vulkan ICD

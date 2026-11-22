@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#result--optional--conditional-helpers
-//META: doc_section_digest=2070b804ffe429adfe07337c383110c2410beb4263e104117d5308624fabdfed
+//META: doc_section_digest=b3ddfcf6633a61b27422d8bc64aaf60fdf964f353e9c9daf4a37f1c4514a9235
 //META: purpose=Boundary: `Optional<int> o = none;` (bare `none` literal at the construction site) lowers to `makeOptionalNone` — the empty-side edge of the Optional value space.
 //META: intent=boundary
 //META: pipeline_stage=lower

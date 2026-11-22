@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#detachderivative
-//META: doc_section_digest=01132bdcdbc1c50944722b06abe5d963b03cd1175d44d81a16fc40d947d9c916
+//META: doc_section_digest=a5f429e50a404aa0a4ddb2be899ebf5ee6430f639bfac92c88add9f4cdae7ee3
 //META: purpose=no_diff applied to an expression wraps the materialized load in detachDerivative, so a local-array element read is detached the same way a resource read is.
 //META: intent=functional
 //META: pipeline_stage=lower

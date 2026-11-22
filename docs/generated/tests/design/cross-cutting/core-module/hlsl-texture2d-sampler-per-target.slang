@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#core-module
-//META: doc_section_digest=261236714a826217dc94815d8118cf46f225066afa1514d96e19894b7a9f81e2
+//META: doc_section_digest=82572fa8cfc4198a91aaf75f7925752f68b3734907dd005fa81952563631b345
 //META: purpose=Texture2D, RWTexture2D and SamplerState from the HLSL meta-module lower to each target's own texture and sampler vocabulary.
 //META: intent=functional
 //META: pipeline_stage=layout

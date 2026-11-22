@@ -43,7 +43,7 @@ VM_PREFIX = "gpu-stress"
 # cleanup_orphan_vms() to this run only — prevents Ctrl-C in one run from
 # deleting another concurrent operator's VMs in the shared GCP project.
 RUN_ID = f"{os.getpid()}-{int(time.time())}"
-CONTAINER_IMAGE = "ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1"
+CONTAINER_IMAGE = "ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0"
 def run_cmd(cmd, *, timeout=600, capture=True):
     """Run a command, return (returncode, stdout, stderr)."""
     try:
@@ -177,7 +177,6 @@ def generate_test_script(cmake_config, gfx_only, config):
             " -category full"
             " -expected-failure-list tests/expected-failure-github.txt"
             " -expected-failure-list tests/expected-failure-linux.txt"
-            " -expected-failure-list tests/expected-failure-linux-gpu.txt"
             " -skip-reference-image-generation"
             " -show-adapter-info"
             " -use-test-server"

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#instrumentation
-//META: doc_section_digest=138b9939ba5bbb4e52a45b224e1ac3fdd87ee9defa3e1c0614c72903418b616e
+//META: doc_section_digest=371849956d0b8eb3538253c2691f9c31a3721e74a7635f908f0458807aee9ced
 //META: purpose=Boundary: the caller can opt the coverage counters down to uint, and the command-line surface that selects the width is -trace-coverage-counter-width spelled in bits.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

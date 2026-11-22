@@ -1,7 +1,7 @@
 // https://github.com/shader-slang/slang/issues/12265
 // A 64-bit atomic through a helper on a `RWByteAddressBuffer` must not change the width or offset of
 // an unrelated 32-bit atomic on that same buffer.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=buffer
 RWByteAddressBuffer buffer;

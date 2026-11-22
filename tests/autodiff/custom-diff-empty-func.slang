@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type -g0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -g0
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -g0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -28,7 +27,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     float a = 10.0;
     DifferentialPair<float> dpx = DifferentialPair<float>(4.f, 1.f);
     bwd_diff(outerFunc)(a, dpx, 1.0);
-    
+
     // CHECK: type: float
     // CHECK: 0.0
     // CHECK: 0.0

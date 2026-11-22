@@ -1,6 +1,6 @@
 // struct-inheritance-import.slang
 
-//TEST(compute):COMPARE_COMPUTE:
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // This test confirms that the synthesized code for struct type inheritance
 // includes proper linkage decorations so that it can work across modules.

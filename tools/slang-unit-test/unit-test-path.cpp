@@ -5,7 +5,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(path)
+SLANG_UNIT_TEST(path, NoRenderApi)
 {
 #if SLANG_WINDOWS_FAMILY
     // Disable for now on non windows has some problems on *some* Linux based CI.

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#loop-and-branch-hints
-//META: doc_section_digest=647327ee76a1bc33d8bcf7d2abc19a2f16ee4e63d10bad4d1d5d48c120029d9d
+//META: doc_section_digest=dc9cebc6b1ccfabf37d9ddb054319d9e5160d3b17890ab2828db7671ae5490a0
 //META: purpose=Negative - [ForceUnroll] on a function declaration is rejected with E31002 because the attribute is valid only on a loop statement.
 //META: intent=negative
 //META: pipeline_stage=check

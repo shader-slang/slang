@@ -1,11 +1,10 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 struct Test
 {
 	float4 	a;
 	uint 	b;
-	float 	c;	
+	float 	c;
 };
 
 

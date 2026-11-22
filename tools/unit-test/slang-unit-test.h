@@ -81,12 +81,21 @@ public:
     /// Releases the registered tests. Valid only at process teardown: it empties a registry that
     /// nothing can refill, so the module is unusable afterwards.
     virtual SLANG_NO_THROW void SLANG_MCALL destroy() = 0;
+
+    /// Returns the render APIs that the test uses, as a combination of RenderApiFlag bits, or 0
+    /// when the test uses no render API. slang-test runs a test that uses APIs only if at least one
+    /// of them is enabled, and `-compile-test false` skips the tests that return 0, so a test that
+    /// needs a GPU API declares it with SLANG_UNIT_TEST.
+    virtual SLANG_NO_THROW Slang::RenderApiFlags SLANG_MCALL getTestUsedApis(SlangInt index) = 0;
 };
 
 class UnitTestRegisterHelper
 {
 public:
-    UnitTestRegisterHelper(const char* name, UnitTestFunc testFunc);
+    UnitTestRegisterHelper(
+        const char* name,
+        UnitTestFunc testFunc,
+        Slang::RenderApiFlags usedApis = 0);
 };
 
 class AbortTestException
@@ -95,19 +104,36 @@ class AbortTestException
 
 typedef IUnitTestModule* (*UnitTestGetModuleFunc)();
 
-#define SLANG_UNIT_TEST(name)                                    \
-    void _##name##_impl(UnitTestContext* unitTestContext);       \
-    void name(UnitTestContext* unitTestContext)                  \
-    {                                                            \
-        try                                                      \
-        {                                                        \
-            _##name##_impl(unitTestContext);                     \
-        }                                                        \
-        catch (AbortTestException&)                              \
-        {                                                        \
-        }                                                        \
-    }                                                            \
-    UnitTestRegisterHelper _##name##RegisterHelper(#name, name); \
+// Defines a unit test that uses the render APIs in `usedApis`. The test runs when at least one of
+// these APIs is enabled with `-api`. The test still has to skip the APIs that are enabled but not
+// available, and the APIs that it cannot use together, as in a test that shares a buffer between
+// Vulkan and CUDA.
+//
+// This lets slang-test keep a GPU test out of the jobs that have no GPU, and keep a test that
+// uses no GPU out of the jobs that run `-compile-test false`, so that each test runs in one kind of
+// job. A test that uses no render API is a compile test, and it passes `NoRenderApi`.
+//
+// `usedApis` is an expression of the names in Slang::RenderApiFlag, written without the prefix,
+// for example `SLANG_UNIT_TEST(nvrtcPrecompiledHeader, CUDA)`, or `NoRenderApi`. The macro
+// evaluates the expression in a struct that derives from Slang::RenderApiFlag, so the names find
+// the enumerators there.
+#define SLANG_UNIT_TEST(name, usedApis)                                                    \
+    struct _##name##UsedApis : Slang::RenderApiFlag                                        \
+    {                                                                                      \
+        static constexpr Slang::RenderApiFlags value = (usedApis);                         \
+    };                                                                                     \
+    void _##name##_impl(UnitTestContext* unitTestContext);                                 \
+    void name(UnitTestContext* unitTestContext)                                            \
+    {                                                                                      \
+        try                                                                                \
+        {                                                                                  \
+            _##name##_impl(unitTestContext);                                               \
+        }                                                                                  \
+        catch (AbortTestException&)                                                        \
+        {                                                                                  \
+        }                                                                                  \
+    }                                                                                      \
+    UnitTestRegisterHelper _##name##RegisterHelper(#name, name, _##name##UsedApis::value); \
     void _##name##_impl(UnitTestContext* unitTestContext)
 
 #define SLANG_CHECK(x) getTestReporter()->addResultWithLocation((x), #x, __FILE__, __LINE__);

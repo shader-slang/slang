@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#type-defining-declarations
-//META: doc_section_digest=fb21c47d3ae888177f02abe81a3052f9206d46318a09404685183a1509335f2b
+//META: doc_section_digest=db395f82daf94bfd107c87ddfcfd165342225cb79f4c373eaa6c86772d42cffb
 //META: purpose=`AssocTypeDecl` accepts a trailing `WhereClause` before `';'`, equivalent to the `':' TypeList` bound.
 //META: intent=functional
 //META: pipeline_stage=parse

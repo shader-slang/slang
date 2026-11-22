@@ -2,8 +2,8 @@
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
-//META: doc_ref=docs/generated/design/ir-reference/metadata.md#debugscope
-//META: doc_section_digest=74f15b021c9b1a1fc35f0749401acce4c72e39d8f31ca869b4e8328ed16cdc37
+//META: doc_ref=docs/generated/design/ir-reference/metadata.md#debugscope-and-debugnoscope
+//META: doc_section_digest=8849ab9e5ff9cbb66329b5cf029a66c4b8bf64c0c450f4968378a12e13634ef1
 //META: purpose=A DebugScope opens a lexical scope whose operand 0 references the enclosing scope, a DebugFunction for a function-level scope, and whose operand 1 records the inlining context.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

@@ -1,7 +1,7 @@
 // Test calling differentiable function through dynamic dispatch.
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -compile-arg -skip-spirv-validation -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -compile-arg -skip-spirv-validation
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[2 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -52,7 +52,7 @@ void load_bwd(uint id, float.Differential dOut)
 }
 
 struct FooImpl1: IFoo<8>
-{   
+{
     typealias Params = GetterImpl;
 
     __init()

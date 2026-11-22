@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#the-builtin-operator-fast-path
-//META: doc_section_digest=1c3af19385b1b45e53fc2911de4a5495ab14067ddf0d2925bb4569db9c7887aa
+//META: doc_section_digest=9ff302fe090bb783b80fc43fa698c8bb501ddcb429e303b69ba88b9724eafaf1
 //META: purpose=A mixed-type shift is declined by the fast path and resolved by the general path, which keeps the type of the left operand rather than a common type.
 //META: intent=boundary
 //META: pipeline_stage=check

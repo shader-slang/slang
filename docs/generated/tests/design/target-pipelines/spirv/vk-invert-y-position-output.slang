@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#option-set-toggles
-//META: doc_section_digest=51a3cfba2e9b446866969702a281584b197e5b4c38e04278312f866f3a25794f
+//META: doc_section_digest=7b73796b1513f898e87604b7436f2c6892de119e5b53805d355755089b918219
 //META: purpose=invertYOfPositionOutput fires under -fvk-invert-y for a vertex entry point — the SV_Position output's Y component is negated before being written to gl_Position, observable as an OpFNegate / OpFSub on the y lane in the emitted SPIR-V.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

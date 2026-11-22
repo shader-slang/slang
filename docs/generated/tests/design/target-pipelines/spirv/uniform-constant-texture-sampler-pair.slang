@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination
-//META: doc_section_digest=61b9f1fa9e25e0a1a331e30835332c142e930cea0b3de2b952f901beda9edd64
+//META: doc_section_digest=e492693f38638cb18557561f76c53c2ecd1552856a03aba9bd6c16c0bff73bd8
 //META: purpose=A separate Texture2D and SamplerState pair both lower to UniformConstant-storage variables (the SPIR-V mapping for opaque texture and sampler handles).
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

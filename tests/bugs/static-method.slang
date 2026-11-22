@@ -1,6 +1,6 @@
 // static-method.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 struct S
 {

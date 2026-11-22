@@ -3,22 +3,19 @@
 // Test "trivial fall-through" where multiple case labels share the same block.
 // This is currently supported in Slang.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // Verify HLSL output preserves case grouping structure for SM 6.0
 //TEST:SIMPLE(filecheck=CHECK-HLSL): -target hlsl -profile cs_6_0 -entry computeMain -stage compute
 
 // CHECK-HLSL: case int(0):
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case int(1):
-// CHECK-HLSL: case int(2):
+// CHECK-HLSL: case 1L:
+// CHECK-HLSL: case 2L:
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case int(3):
+// CHECK-HLSL: case 3L:
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case int(4):
+// CHECK-HLSL: case 4L:
 
 // CHECK:      64
 // CHECK-NEXT: 65

@@ -223,10 +223,10 @@ You may look at these to confirm an opcode spelling (the exact name
 as it appears in `-dump-ir` output). You may **not** mine them for
 behavioral claims the doc does not make.
 
-- `source/slang/slang-ir-insts.lua` — canonical opcode list.
-- `source/slang/slang-ir-insts.h` — C++ wrapper structs.
-- `source/slang/slang-ir.h`, `slang-ir.cpp` — `IRInst` + builder.
-- `source/slang/slang-lower-to-ir.cpp` — AST-to-IR lowering.
+- `source/slang/ir/slang-ir-insts.lua` — canonical opcode list.
+- `source/slang/ir/slang-ir-insts.h` — C++ wrapper structs.
+- `source/slang/ir/slang-ir.h`, `slang-ir.cpp` — `IRInst` + builder.
+- `source/slang/lower-to-ir/slang-lower-to-ir.cpp` — AST-to-IR lowering.
 
 The opcode spelling in the IR dump is the **lowercase Lua entry
 key** for most value/control-flow opcodes: `add`, `sub`, `mul`,
@@ -327,10 +327,10 @@ value-opcode observation tests:
   block-parameter, **not** to the `select` opcode. The doc says
   `select` "lowers from `SelectExpr` and ternary `?:`" but the
   observed lowering of `?:` uses `ifElse`; record as a doc gap.
-- CUDA factors `__ldg(&uniform)` reads into temporaries, splitting
-  compound expressions on uniform operands. To observe a binary
-  expression on CUDA, derive operands from `SV_DispatchThreadID`
-  rather than from `uniform` globals.
+- CUDA emits top-level `uniform` values in the `__constant__`
+  `SLANG_globalParams` object, so those reads must not use `__ldg`.
+  Positive `__ldg` checks need an eligible global-memory source such
+  as `StructuredBuffer<T>` or `ConstantBuffer<T>`.
 - Trivial scalar locals are eliminated during lowering. The `var`
   opcode survives in IR when the local is a struct accessed by
   field address (or an array indexed elementwise).

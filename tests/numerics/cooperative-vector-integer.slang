@@ -1,6 +1,6 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type -Xslang -experimental-feature
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-feature cooperative-vector -dx12-experimental -output-using-type -profile cs_6_9 -Xdxc -Vd -Xslang -experimental-feature
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-render-feature cooperative-vector -output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=CHECK):-render-feature cooperative-vector -dx12-experimental -output-using-type -profile cs_6_9 -Xdxc -Vd -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 3
@@ -13,11 +13,24 @@
 // CHECK-NEXT: 0
 // CHECK-NEXT: 14
 // CHECK-NEXT: 20
+// CHECK-NEXT: 6
+// CHECK-NEXT: 9
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+// The last four entries are the selected signed components followed by the unsigned components.
+// CHECK-NEXT: {{^}}7{{$}}
+// CHECK-NEXT: {{^}}4{{$}}
+// CHECK-NEXT: {{^}}3{{$}}
+// CHECK-NEXT: {{^}}8{{$}}
+
+//TEST_INPUT:ubuffer(count=16, stride=4):out,name=outputBuffer
 import slang.numerics;
 
 RWStructuredBuffer<int> outputBuffer;
+
+T chooseComponents<T : INumericShapedType>(T.Mask condition, T ifTrue, T ifFalse)
+{
+    return select(condition, ifTrue, ifFalse);
+}
 
 T integerArithmetic<T : IIntegerType>(T left, T right)
 {
@@ -55,6 +68,11 @@ T constructFromBuiltinInteger<T : INumeric, TSource : IBuiltinScalarIntegerType>
     return T(value);
 }
 
+T clampInteger<T : INumericExtrema>(T value, T lower, T upper)
+{
+    return clamp(value, lower, upper);
+}
+
 void storeMask<T : IIntegerType>(T left, T right, uint offset)
 {
     T.Mask equalMask = left == right;
@@ -86,4 +104,16 @@ void computeMain()
     outputBuffer[7] = int(integerLessThan(left, right)[0]);
     outputBuffer[8] = shifted[0];
     outputBuffer[9] = shifted[1];
+    let bounded = clampInteger(left, CoopVec<int, 2>(4, 4), CoopVec<int, 2>(6, 9));
+    outputBuffer[10] = bounded[0];
+    outputBuffer[11] = bounded[1];
+
+    // Each cooperative-vector representation uses an ordinary Boolean vector as its mask.
+    let selectedSigned = chooseComponents(bool2(true, false), left, right);
+    let selectedUnsigned = chooseComponents(
+        bool2(false, true), unsignedValue, CoopVec<uint, 2>(3, 1));
+    outputBuffer[12] = selectedSigned[0];
+    outputBuffer[13] = selectedSigned[1];
+    outputBuffer[14] = int(selectedUnsigned[0]);
+    outputBuffer[15] = int(selectedUnsigned[1]);
 }

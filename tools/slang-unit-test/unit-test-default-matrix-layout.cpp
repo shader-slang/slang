@@ -76,7 +76,7 @@ struct DefaultMatrixLayoutTestContext
 
 } // namespace
 
-SLANG_UNIT_TEST(defaultMatrixLayout)
+SLANG_UNIT_TEST(defaultMatrixLayout, NoRenderApi)
 {
     DefaultMatrixLayoutTestContext context(unitTestContext);
 

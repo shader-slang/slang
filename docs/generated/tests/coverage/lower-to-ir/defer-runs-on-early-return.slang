@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T13:43:23Z
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=1195a752790819415908e083ce9656a353d4764f2fab38cc5aa27d92f184c486
+//META: doc_section_digest=73a8b7d64d9596c97c899fba163502910f89289de9adea3eac1da3e0599596e6
 //META: purpose=Verifies a `defer` block fires before an early `return` on every path that leaves the function scope.
 //META: intent=characterization
 //META: covers=source/slang/slang-lower-to-ir.cpp

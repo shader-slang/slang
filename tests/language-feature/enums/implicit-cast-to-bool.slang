@@ -1,6 +1,6 @@
-// Test enums can be implicitly casted to bool. 
+// Test enums can be implicitly casted to bool.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 [Flags]
 enum BitFlags

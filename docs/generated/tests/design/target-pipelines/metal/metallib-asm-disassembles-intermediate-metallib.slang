@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#downstream-apple-metal-compiler
-//META: doc_section_digest=65e900d0cbf2c6b34b856edc81e93bce49e3fc22fad6946b0d7bc5d0b4974910
+//META: doc_section_digest=493f392639c5a17ee3f1baf8a77a2222a0f4ff648b2f59628575efc1dd1a87c3
 //META: purpose=`-target metallib-asm` produces an intermediate `.metallib` with Apple's `metal` compiler and then disassembles it with `metal-objdump --disassemble`.
 //META: intent=expansion
 //META: pipeline_stage=runtime

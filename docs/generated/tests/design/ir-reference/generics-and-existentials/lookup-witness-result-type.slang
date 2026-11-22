@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-lookup
-//META: doc_section_digest=4508b8b8f3e8d47f0f2bbf47badad9a2eb49539f2f7232d58154356ce8e2226a
+//META: doc_section_digest=f99193617631e9b8b8132ba9fd11f7c8270ccf1bb6c05d3758d64114bcc04701
 //META: purpose=The result type of lookupWitness is the requirement's function type, including the receiver as the second parameter.
 //META: intent=functional
 //META: pipeline_stage=lower

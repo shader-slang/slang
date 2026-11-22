@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#core-module-syntax-declarations
-//META: doc_section_digest=61eae4cb09aaf55ca13e1b5adcdbe1bcd8d876e194e57de10e1861ffeb9396c7
+//META: doc_section_digest=3494215a2f3d95c66bfc5b7610ef9debb7242679109426ec4c710efa9fe7fa6c
 //META: purpose=`SV_WaveIndex` is one of the wave builtins `hlsl.meta.slang` layers in; it is accepted as a compute entry-point parameter semantic and survives into the emitted HLSL signature.
 //META: intent=functional
 //META: pipeline_stage=emit

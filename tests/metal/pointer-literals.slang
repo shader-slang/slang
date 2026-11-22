@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
-//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -emit-spirv-directly -compute -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -20,7 +20,7 @@ void computeMain()
     void* ptr1 = nullptr;
     outputBuffer[0] = (ptr1 == nullptr) ? 1 : 0;
     // BUF: 1
-    
+
     // Test 2: Pointer literal in struct
     struct TestStruct
     {

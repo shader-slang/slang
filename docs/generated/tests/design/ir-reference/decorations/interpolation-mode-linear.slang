@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#interpolation-and-shader-io
-//META: doc_section_digest=9dcc3971ffe320daffa3155aa97909cc164f7f1f53867e82746329293f4841f5
+//META: doc_section_digest=cab069de9f491d651e18ca65a976f70486f9bac662a529f4565a5ed9fa18a2a4
 //META: purpose=Boundary - a `linear` modifier produces interpolationMode with mode operand 0, the lowest interpolation-mode value observed in the dump.
 //META: intent=boundary
 //META: pipeline_stage=lower

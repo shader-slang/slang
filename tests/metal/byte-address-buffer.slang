@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib
-//TEST(compute, metal):COMPARE_COMPUTE_EX:-metal -compute -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal+cuda+cpu+llvm):-output-using-type
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
 
 // VK test disabled due to unhandled global inst
@@ -24,12 +24,10 @@ struct TestStruct
 [shader("compute")]
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
-    // METAL: uint [[WORD0:[a-zA-Z0-9_]+]] = as_type<uint>({{.*}}[(0U)>>2]);
-    // METAL: uchar [[A:[a-zA-Z0-9_]+]] = uchar(([[WORD0]] >> 0U) & 255U);
-    // METAL: uint [[WORD1:[a-zA-Z0-9_]+]] = as_type<uint>({{.*}}[(0U)>>2]);
-    // METAL: half [[H:[a-zA-Z0-9_]+]] = as_type<half>(ushort(([[WORD1]] >> 16U) & 65535U));
+    // A load with one use is written inside that use.
+    // METAL: half [[H:[a-zA-Z0-9_]+]] = as_type<half>(ushort((as_type<uint>({{.*}}[(0U)>>2]) >> 16U) & 65535U));
 
-    // METAL: {{.*}}[(128U)>>2] = as_type<uint32_t>(({{.*}} & 4294967040U) | (uint([[A]]) << 0U));
+    // METAL: {{.*}}[(128U)>>2] = as_type<uint32_t>(({{.*}} & 4294967040U) | (uint(uchar((as_type<uint>({{.*}}[(0U)>>2]) >> 0U) & 255U)) << 0U));
     // METAL: {{.*}}[(128U)>>2] = as_type<uint32_t>(({{.*}} & 65535U) | (uint(as_type<ushort>([[H]])) << 16U));
     buffer.Store(128, buffer.Load<TestStruct>(0));
 

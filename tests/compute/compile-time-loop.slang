@@ -1,7 +1,5 @@
-//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_RENDER_COMPUTE: -mtl -shaderobj
+//TEST(compute):COMPARE_RENDER_COMPUTE(targets=all-cuda-llvm): -shaderobj -xslang -Wno-30525
 // Not supported in LLVM: textures are not currently available
-//DISABLE_TEST(compute):COMPARE_RENDER_COMPUTE: -llvm -shaderobj
 
 //TEST_INPUT: Texture2D(size=4, content = one):name t
 //TEST_INPUT: Sampler:name s

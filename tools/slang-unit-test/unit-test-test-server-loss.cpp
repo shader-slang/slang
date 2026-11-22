@@ -41,6 +41,12 @@ using namespace SlangUnitTest;
 /// requirement, which is enough of them to trip the consecutive-failure threshold in the
 /// killer case, and it cannot match the tests in THIS file -- slang-test spawning slang-test
 /// spawning slang-test.
+///
+/// The child runs with `-api none`. Some of these tests have a line with `targets=all`, and
+/// without the option the child would also run the variant of each such line for every API that
+/// the machine has. A variant can fail for a reason that has nothing to do with the server, for
+/// example the CUDA variant of line-macro.slang, or a Direct3D variant on a runner that has only a
+/// software device, and the child would then not report "100% of tests passed".
 static const char* kInnerTestPrefix = "tests/preprocessor/";
 
 /// Resolved relative to the working directory, exactly as slang-test resolves its own
@@ -98,6 +104,8 @@ static SlangResult _runSlangTestWithDyingServer(
     cmdLine.addArg("-use-test-server");
     cmdLine.addArg("-server-count");
     cmdLine.addArg("1");
+    cmdLine.addArg("-api");
+    cmdLine.addArg("none");
     cmdLine.addArg(kInnerTestPrefix);
 
     // The child inherits this environment, and test-server reads the variable when it
@@ -131,6 +139,8 @@ static SlangResult _runSlangTestWithGarblingServer(
     cmdLine.addArg("-use-test-server");
     cmdLine.addArg("-server-count");
     cmdLine.addArg("1");
+    cmdLine.addArg("-api");
+    cmdLine.addArg("none");
     cmdLine.addArg(kInnerTestPrefix);
 
     ScopedEnvVar nestedGuard(kNestedGuardEnvVar, "1");
@@ -147,13 +157,19 @@ static String _allOutput(const ExecuteResult& res)
     return builder.produceString();
 }
 
-/// Print the child's exit code and output.
+/// Report the child's exit code and output.
 ///
 /// Called whenever a case is about to fail. Without it a failure says only which assertion
 /// tripped, and the run that actually misbehaved -- a whole slang-test invocation, with its
 /// per-loss diagnostics and its summary -- is discarded. That happened: the first CI failure
 /// of these tests reported "res.resultCode == 0" and nothing else, on a platform that cannot
 /// be reproduced locally, which is the worst possible combination.
+///
+/// The text goes to the test reporter, not to stdout. When slang-test runs a unit test through
+/// a test server, stdout is the JSON-RPC channel of that server. A stray write to it makes
+/// the reply unreadable, and the outer run then reports "the test server returned a malformed
+/// HTTP or JSON response" for these tests, which hides the output that this function exists
+/// to show. The reporter returns the text to the outer run when the test fails.
 static void _dumpChildRun(
     const char* caseName,
     const char* envVar,
@@ -161,20 +177,16 @@ static void _dumpChildRun(
     const ExecuteResult& res)
 {
     const String output = _allOutput(res);
-    printf(
-        "\n--- %s: inner slang-test (%s=%d) exited %d ---\n"
-        "%s\n--- end inner run ---\n",
-        caseName,
-        envVar,
-        ordinal,
-        res.resultCode,
-        output.getBuffer());
-    fflush(stdout);
+    StringBuilder text;
+    text << "\n--- " << caseName << ": inner slang-test (" << envVar << "=" << ordinal
+         << ") exited " << res.resultCode << " ---\n"
+         << output << "\n--- end inner run ---\n";
+    getTestReporter()->message(TestMessageType::TestFailure, text.getBuffer());
 }
 
 /// A healthy server: the control. Whatever the other cases prove, they prove nothing unless
 /// the untouched path is unchanged -- no losses reported, every test passing, exit 0.
-SLANG_UNIT_TEST(testServerLossHealthyRunIsUnaffected)
+SLANG_UNIT_TEST(testServerLossHealthyRunIsUnaffected, NoRenderApi)
 {
     if (_cannotRunHere())
     {
@@ -201,7 +213,7 @@ SLANG_UNIT_TEST(testServerLossHealthyRunIsUnaffected)
 /// The tests are demonstrably fine -- they pass in the control above -- so charging them
 /// with the server's death is a false verdict. Before this handling existed, this exact
 /// scenario reported 26 failures out of 80 on a suite where all 80 pass.
-SLANG_UNIT_TEST(testServerLossInnocentTestIsNotBlamed)
+SLANG_UNIT_TEST(testServerLossInnocentTestIsNotBlamed, NoRenderApi)
 {
     if (_cannotRunHere())
     {
@@ -237,7 +249,7 @@ SLANG_UNIT_TEST(testServerLossInnocentTestIsNotBlamed)
 ///
 /// Counterpart of the innocent-loss case. A malformed reply used not to be retried at all, so
 /// whichever test was in flight failed -- and one unreadable reply reds a whole suite.
-SLANG_UNIT_TEST(testServerProtocolErrorInnocentTestIsNotBlamed)
+SLANG_UNIT_TEST(testServerProtocolErrorInnocentTestIsNotBlamed, NoRenderApi)
 {
     if (_cannotRunHere())
     {
@@ -271,7 +283,7 @@ SLANG_UNIT_TEST(testServerProtocolErrorInnocentTestIsNotBlamed)
 ///
 /// The guard on the retry: a genuinely broken channel -- the version-mismatch case the old
 /// no-retry rule assumed -- must still fail the run rather than be ground until it looks green.
-SLANG_UNIT_TEST(testServerProtocolErrorPersistentGarbleFailsTheRun)
+SLANG_UNIT_TEST(testServerProtocolErrorPersistentGarbleFailsTheRun, NoRenderApi)
 {
     if (_cannotRunHere())
     {
@@ -295,7 +307,7 @@ SLANG_UNIT_TEST(testServerProtocolErrorPersistentGarbleFailsTheRun)
 /// This stands in for an input that genuinely kills the compiler. It must fail the run: the
 /// whole risk of retrying is that a real crash gets retried until it looks green, and this
 /// is the assertion that says it does not.
-SLANG_UNIT_TEST(testServerLossPersistentKillerFailsTheRun)
+SLANG_UNIT_TEST(testServerLossPersistentKillerFailsTheRun, NoRenderApi)
 {
     if (_cannotRunHere())
     {
@@ -337,7 +349,7 @@ SLANG_UNIT_TEST(testServerLossPersistentKillerFailsTheRun)
 ///
 /// Unix only. Windows reports every termination as an exit code, so there is no signal for
 /// the client to report and nothing here to assert.
-SLANG_UNIT_TEST(testServerLossReportsTheKillingSignal)
+SLANG_UNIT_TEST(testServerLossReportsTheKillingSignal, NoRenderApi)
 {
     if (_cannotRunHere())
     {
@@ -380,7 +392,7 @@ SLANG_UNIT_TEST(testServerLossReportsTheKillingSignal)
 /// Nothing else here reaches it: every child run above uses -server-count 1, so all the
 /// losses land in one reporter and the merge is never exercised. Production CI runs
 /// -server-count 4. Deleting the two merge lines leaves every other case in this file green.
-SLANG_UNIT_TEST(testServerLossConsolidatesAcrossReporters)
+SLANG_UNIT_TEST(testServerLossConsolidatesAcrossReporters, NoRenderApi)
 {
     TestReporter parent;
     TestReporter worker;

@@ -1,0 +1,9 @@
+# Tests that require a GPU with SM 8.0 or newer.
+# These directories contain cooperative-matrix / neural MMA coverage that a
+# Tesla T4 cannot execute safely once CUDA coopmat uses mma.sync PTX.
+#
+# The T4 jobs leave these tests out with `-exclude-list`, and the SM80Plus jobs
+# run only these tests, with `-include-list`. Each line is a path prefix.
+
+tests/cooperative-matrix/
+tests/neural/

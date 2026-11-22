@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#per-keyword-semantics
-//META: doc_section_digest=7d96ab9817d6f6251e2148b7d4d9959fb9ec73041354e919db537f46458d416e
+//META: doc_section_digest=8d823e104ba9d88a156c5a46bd34a740e29503d4d3d4e19dfe53018f179c9822
 //META: purpose=Under Slang 2025 the aggregate-inheritance rule does not apply, so an unmodified member of an `internal` aggregate takes the module default and is rejected as more visible than its parent.
 //META: intent=boundary
 //META: pipeline_stage=check

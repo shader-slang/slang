@@ -50,7 +50,7 @@ static void printRefl(slang::ISession* session, slang::DeclReflection* refl, uns
 
 // Test that the reflection API provides correct info about entry point and ordinary functions.
 
-SLANG_UNIT_TEST(declTreeReflection)
+SLANG_UNIT_TEST(declTreeReflection, NoRenderApi)
 {
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(

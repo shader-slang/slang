@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-13T00:00:00+00:00
-//META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-a-link-and-entry-point-prep
-//META: doc_section_digest=d0dd806e881cf8d0bf251730509f805647fcb23a653f4914d05a97f630cbc3c6
+//META: doc_section_digest=fde5a99d6ef4d3bbf5691751fda87d002ea44868460a76d22f4dd71e37c1b65c
 //META: purpose=Negative: the coverage counter width is spelled `-trace-coverage-counter-width` and takes bits, and the CLI parser rejects any bit count other than 32 or 64 with E45113 before the value can reach the instrumentation pass.
 //META: intent=negative
 //META: pipeline_stage=parse

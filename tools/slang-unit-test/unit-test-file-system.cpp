@@ -8,6 +8,7 @@
 #include "core/slang-lz4-compression-system.h"
 #include "core/slang-memory-file-system.h"
 #include "core/slang-riff-file-system.h"
+#include "core/slang-string-util.h"
 #include "core/slang-zip-file-system.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -782,7 +783,7 @@ static SlangResult _test(FileSystemType type)
     return SLANG_OK;
 }
 
-SLANG_UNIT_TEST(fileSystem)
+SLANG_UNIT_TEST(fileSystem, NoRenderApi)
 {
     for (Index i = 0; i < Count(FileSystemType::CountOf); ++i)
     {
@@ -803,6 +804,59 @@ SLANG_UNIT_TEST(fileSystem)
         {
             SLANG_CHECK(SLANG_SUCCEEDED(_testImplicitDirectory(type)));
         }
+    }
+}
+
+// The ISlangFileSystemExt contract for calcCombinedPath promises the simplified combined path
+// (the spelling every later file operation sees: `.` and `x/..` segments collapse, `/` is the
+// separator, leading `..` segments are kept) and an SLANG_E_INVALID_ARG failure for an invalid
+// path type, from every implementation. Pin both across the OS, memory and zip file systems on
+// every platform — including Windows, where an inflated spelling can exceed the legacy
+// ~260-character path limit — so the contract cannot drift between implementations.
+SLANG_UNIT_TEST(calcCombinedPathProducesSimplifiedPaths, NoRenderApi)
+{
+    List<ISlangFileSystemExt*> fileSystems;
+    {
+        ComPtr<ISlangMutableFileSystem> memoryFileSystem;
+        SLANG_CHECK(SLANG_SUCCEEDED(_createFileSystem(FileSystemType::Memory, memoryFileSystem)));
+        fileSystems.add(memoryFileSystem.get());
+        memoryFileSystem.detach();
+    }
+    {
+        ComPtr<ISlangMutableFileSystem> zipFileSystem;
+        SLANG_CHECK(SLANG_SUCCEEDED(_createFileSystem(FileSystemType::Zip, zipFileSystem)));
+        fileSystems.add(zipFileSystem.get());
+        zipFileSystem.detach();
+    }
+    fileSystems.add(OSFileSystem::getExtSingleton());
+
+    for (auto fileSystem : fileSystems)
+    {
+        auto checkCombined = [&](SlangPathType fromPathType,
+                                 const char* fromPath,
+                                 const char* path,
+                                 const char* expected)
+        {
+            ComPtr<ISlangBlob> combinedBlob;
+            SLANG_CHECK(SLANG_SUCCEEDED(
+                fileSystem
+                    ->calcCombinedPath(fromPathType, fromPath, path, combinedBlob.writeRef())));
+            const String combined(StringUtil::getString(combinedBlob));
+            SLANG_CHECK(combined == expected);
+        };
+
+        checkCombined(SLANG_PATH_TYPE_FILE, "a/b/c.slang", "../x.slang", "a/x.slang");
+        checkCombined(SLANG_PATH_TYPE_FILE, "a/b/c.slang", "./x.slang", "a/b/x.slang");
+        checkCombined(SLANG_PATH_TYPE_FILE, "a/b/c.slang", "../../x.slang", "x.slang");
+        checkCombined(SLANG_PATH_TYPE_FILE, "c.slang", "../x.slang", "../x.slang");
+        checkCombined(SLANG_PATH_TYPE_DIRECTORY, "a/b/../b", "f.slang", "a/b/f.slang");
+        checkCombined(SLANG_PATH_TYPE_DIRECTORY, "", "x.slang", "x.slang");
+        // Both delimiters split a path and the simplified form always joins with `/`.
+        checkCombined(SLANG_PATH_TYPE_FILE, "a\\b\\c.slang", "..\\x.slang", "a/x.slang");
+
+        ComPtr<ISlangBlob> combinedBlob;
+        SLANG_CHECK(SLANG_FAILED(
+            fileSystem->calcCombinedPath((SlangPathType)999, "a", "b", combinedBlob.writeRef())));
     }
 }
 
@@ -838,12 +892,12 @@ static SlangResult _testZipReadWriteTransition()
     return _checkFile(mutableFileSystem, "after.txt", "after");
 }
 
-SLANG_UNIT_TEST(zipReadWriteTransitionPreservesAllocatorOwnership)
+SLANG_UNIT_TEST(zipReadWriteTransitionPreservesAllocatorOwnership, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testZipReadWriteTransition()));
 }
 
-SLANG_UNIT_TEST(zipRejectsOversizedUncompressedEntry)
+SLANG_UNIT_TEST(zipRejectsOversizedUncompressedEntry, NoRenderApi)
 {
 #if SLANG_CAN_PATCH_ARCHIVE_BOMB_SIZE
     SLANG_CHECK(SLANG_SUCCEEDED(_testZipRejectsOversizedUncompressedEntry()));
@@ -852,7 +906,7 @@ SLANG_UNIT_TEST(zipRejectsOversizedUncompressedEntry)
 #endif
 }
 
-SLANG_UNIT_TEST(riffRejectsOversizedUncompressedEntry)
+SLANG_UNIT_TEST(riffRejectsOversizedUncompressedEntry, NoRenderApi)
 {
 #if SLANG_CAN_PATCH_ARCHIVE_BOMB_SIZE
     SLANG_CHECK(SLANG_SUCCEEDED(_testRiffRejectsOversizedUncompressedEntry()));
@@ -861,17 +915,17 @@ SLANG_UNIT_TEST(riffRejectsOversizedUncompressedEntry)
 #endif
 }
 
-SLANG_UNIT_TEST(archiveUncompressedSizeBounds)
+SLANG_UNIT_TEST(archiveUncompressedSizeBounds, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testArchiveUncompressedSizeBounds()));
 }
 
-SLANG_UNIT_TEST(scopedAllocationRejectsMaxTerminatedSize)
+SLANG_UNIT_TEST(scopedAllocationRejectsMaxTerminatedSize, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testScopedAllocationRejectsMaxTerminatedSize()));
 }
 
-SLANG_UNIT_TEST(memoryFileSystemRejectsNullNonEmptySave)
+SLANG_UNIT_TEST(memoryFileSystemRejectsNullNonEmptySave, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testMemoryFileSystemRejectsNullNonEmptySave()));
 }

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#targetswitchstmt-stageswitchstmt-targetcasestmt
-//META: doc_section_digest=cd98281cc967041ce075594e739c4a374f2cf6163574c3a2a95a8571934a11b0
+//META: doc_section_digest=f69af12d2291a28f0733806246d3cce0dc667ca73a7d8e4d5dfa0167dab37f95
 //META: purpose=The capability named by a `__target_switch` case label is resolved while the statement is parsed, so a name that is not a known capability is diagnosed as an unknown target name.
 //META: intent=negative
 //META: pipeline_stage=parse

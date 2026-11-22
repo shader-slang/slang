@@ -1,14 +1,10 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj -render-feature double
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj -render-feature double
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -output-using-type -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -output-using-type -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+//TEST:COMPARE_COMPUTE(targets=all-dx12-metal-wgpu):-output-using-type -render-feature double
+//TEST:COMPARE_COMPUTE(targets=vk):-output-using-type -render-feature double
+//TEST:COMPARE_COMPUTE(targets=dx12+cpu):-output-using-type
 // Not supported in WGSL: Double and other unsupported scalar types
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // The problem this test shows is around handling of double with dxbc on D3D12. In that combination
-// this code does not write the correct value into the first element - it appears as 0, where 
+// this code does not write the correct value into the first element - it appears as 0, where
 // clearly w * pi_180 where w = 1 means the answer is not zero.
 //
 // To demonstrate the problem, renable the -dx12 -compute -output-using-type test. It will output 0 for the first item.
@@ -24,8 +20,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     double pi = 3.14159274101257324L;
 
     double pi_180 = pi/180;
-    double rad = w * pi_180;            
-            
+    double rad = w * pi_180;
+
     outputBuffer[0] = rad;
     outputBuffer[1] = pi;
     outputBuffer[2] = pi_180;

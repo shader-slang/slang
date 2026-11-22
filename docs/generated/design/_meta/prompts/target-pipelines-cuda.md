@@ -131,7 +131,7 @@ Cover at least:
 
 - `collectOptiXEntryPointUniformParams` — OptiX SBT-aware uniform
   handling; cite
-  [slang-ir-optix-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-optix-entry-point-uniforms.cpp).
+  [slang-ir-optix-entry-point-uniforms.cpp](../../../../source/slang/ir-passes/slang-ir-optix-entry-point-uniforms.cpp).
 - `synthesizeActiveMask` — CUDA wavefront active-mask synthesis
   for sub-group operations.
 - `legalizeEntryPointVaryingParamsForCUDA` — varying-param
@@ -142,12 +142,18 @@ Cover at least:
   false` — explain which Phase-B passes skip and why (CUDA's C++
   type system handles existentials and resources directly).
 - The CUDA-immutable-load pass
-  ([slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp))
+  ([slang-ir-cuda-immutable-load.cpp](../../../../source/slang/ir-passes/slang-ir-cuda-immutable-load.cpp))
   if it appears in the pipeline; verify whether it is invoked
-  from `linkAndOptimizeIR`.
+  from `linkAndOptimizeIR`. Explain both eligibility checks for an
+  ordinary load: the address must be immutable, and it must not root
+  at the CUDA `__constant__` global parameter group. Contrast a
+  direct top-level `uniform` read, which stays plain because `__ldg`
+  lowers to global-memory-only `ld.global.nc`, with a pointer-backed
+  `StructuredBuffer<T>` or `ConstantBuffer<T>` read that remains
+  eligible.
 - `eliminatePhis` with default options. Do **not** write that this
   contrasts with SPIR-V: the defaults in
-  [slang-ir-eliminate-phis.h](../../../../source/slang/slang-ir-eliminate-phis.h)
+  [slang-ir-eliminate-phis.h](../../../../source/slang/ir-passes/slang-ir-eliminate-phis.h)
   (lines 13-14) are `eliminateCompositeTypedPhiOnly = false` and
   `useRegisterAllocation = true`, and the direct-SPIR-V branch assigns
   those same two values, so there is no difference to contrast.

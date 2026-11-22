@@ -1,13 +1,13 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cpu
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 //
 // Test inter-procedural analysis with arrays of interface types
-// 
+//
 
-public interface IOperation 
+public interface IOperation
 {
     float apply(float x);
 }

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#size-and-offset
-//META: doc_section_digest=4c5526c573a01002c5664c82dafecd90b68ec6487726865d6f3eb388eabf2bf3
+//META: doc_section_digest=80aec4150b8f6b992009e053942ad9fdafb333290a6cb7055ecbc07f0d7637d8
 //META: purpose=A read-only texture parameter uses LayoutResourceKind 3, shader resource, in operand 0 of its size and offset attributes.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

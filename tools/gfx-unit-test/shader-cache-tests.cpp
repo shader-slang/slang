@@ -1053,82 +1053,82 @@ void runTest(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
     test.run(context, api);
 }
 
-SLANG_UNIT_TEST(shaderCacheSourceFileD3D12)
+SLANG_UNIT_TEST(shaderCacheSourceFileD3D12, D3D12)
 {
     runTest<ShaderCacheSourceFile>(unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(shaderCacheSourceFileVulkan)
+SLANG_UNIT_TEST(shaderCacheSourceFileVulkan, Vulkan)
 {
     runTest<ShaderCacheSourceFile>(unitTestContext, Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(shaderCacheSourceStringD3D12)
+SLANG_UNIT_TEST(shaderCacheSourceStringD3D12, D3D12)
 {
     runTest<ShaderCacheTestSourceString>(unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(shaderCacheSourceStringVulkan)
+SLANG_UNIT_TEST(shaderCacheSourceStringVulkan, Vulkan)
 {
     runTest<ShaderCacheTestSourceString>(unitTestContext, Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(shaderCacheEntryPointD3D12)
+SLANG_UNIT_TEST(shaderCacheEntryPointD3D12, D3D12)
 {
     runTest<ShaderCacheTestEntryPoint>(unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(shaderCacheEntryPointVulkan)
+SLANG_UNIT_TEST(shaderCacheEntryPointVulkan, Vulkan)
 {
     runTest<ShaderCacheTestEntryPoint>(unitTestContext, Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(shaderCacheImportIncludeD3D12)
+SLANG_UNIT_TEST(shaderCacheImportIncludeD3D12, D3D12)
 {
     runTest<ShaderCacheTestImportInclude>(unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(shaderCacheImportIncludeVulkan)
+SLANG_UNIT_TEST(shaderCacheImportIncludeVulkan, Vulkan)
 {
     runTest<ShaderCacheTestImportInclude>(unitTestContext, Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(shaderCacheSpecializationD3D12)
+SLANG_UNIT_TEST(shaderCacheSpecializationD3D12, D3D12)
 {
     runTest<ShaderCacheTestSpecialization>(unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(shaderCacheSpecializationVulkan)
+SLANG_UNIT_TEST(shaderCacheSpecializationVulkan, Vulkan)
 {
     runTest<ShaderCacheTestSpecialization>(unitTestContext, Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(shaderCacheEvictionD3D12)
+SLANG_UNIT_TEST(shaderCacheEvictionD3D12, D3D12)
 {
     runTest<ShaderCacheTestEviction>(unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(shaderCacheEvictionVulkan)
+SLANG_UNIT_TEST(shaderCacheEvictionVulkan, Vulkan)
 {
     runTest<ShaderCacheTestEviction>(unitTestContext, Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(shaderCacheGraphicsD3D12)
+SLANG_UNIT_TEST(shaderCacheGraphicsD3D12, D3D12)
 {
     runTest<ShaderCacheTestGraphics>(unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(shaderCacheGraphicsVulkan)
+SLANG_UNIT_TEST(shaderCacheGraphicsVulkan, Vulkan)
 {
     runTest<ShaderCacheTestGraphics>(unitTestContext, Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(shaderCacheGraphicsSplitD3D12)
+SLANG_UNIT_TEST(shaderCacheGraphicsSplitD3D12, D3D12)
 {
     runTest<ShaderCacheTestGraphicsSplit>(unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(shaderCacheGraphicsSplitVulkan)
+SLANG_UNIT_TEST(shaderCacheGraphicsSplitVulkan, Vulkan)
 {
     runTest<ShaderCacheTestGraphicsSplit>(unitTestContext, Slang::RenderApiFlag::Vulkan);
 }

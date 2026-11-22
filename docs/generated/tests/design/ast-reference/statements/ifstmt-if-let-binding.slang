@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#ifstmt
-//META: doc_section_digest=a6c1740eeba3eb150d93ff559a355c4b73decc79a2b471fc7f1203bf5d838824
+//META: doc_section_digest=fbe47d469abf3c95cf8c48afe15fbe2baf34948f4ad96baa0cbbda74f8daedab
 //META: purpose=There is no dedicated statement form for `if let`; it desugars at parse time into an ordinary IfStmt whose positive branch is prefixed with a binding of the unwrapped value, so the bound name is readable only on the positive path.
 //META: intent=functional
 //META: pipeline_stage=parse

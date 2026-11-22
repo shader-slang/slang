@@ -6,7 +6,8 @@ RWStructuredBuffer<uint> mutable_uint_buffer;
 StructuredBuffer<float> constant_float_buffer;
 StructuredBuffer<uint> constant_uint_buffer;
 
-// We do not allow taking a pointer from a StructuredBuffer/RWStructuredBuffer.
+// Taking a pointer to a *mutable* structured-buffer element (via `&` or `__getAddress`)
+// is allowed; taking one from a read-only `StructuredBuffer` is not (shader-slang/slang#12581).
 [shader("compute")]
 [numthreads(1,1,1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
@@ -14,8 +15,6 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     float* mutablePtr1 = &mutable_float_buffer[threadId.x];
 
     float* mutablePtr2 = __getAddress(mutable_float_buffer[threadId.x]);
-//diag:                  ^^^^^^^^^^^^ invalid __getAddress usage
-//diag:                  ^^^^^^^^^^^^ '__getAddress' cannot take the address of a function-local variable on this target.
 
     InterlockedAdd(mutable_uint_buffer[threadId.x], 1);
 

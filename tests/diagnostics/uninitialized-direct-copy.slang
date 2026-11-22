@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHK): -target spirv -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHK,exit-code=0): -target spirv -entry computeMain
 
 RWStructuredBuffer<float> output;
 RWStructuredBuffer<Atomic<uint> > atomicOut;
@@ -133,7 +133,7 @@ void copy_aggregate_to_out_param(out Agg o)
 // Case 9 (second classifier consumer): a constructor that copies an
 // uninitialized aggregate into a field exercises the constructor field-init
 // analysis (`checkConstructor` -> `checkFieldsFromExit` -> `isDirectlyWrittenTo`),
-// which shares `getInstructionUsageType` with the direct-copy checker above. The
+// which shares `classifyModuleWideOperandUse` with the direct-copy checker above. The
 // uninitialized source `u` is diagnosed; the field `inner` is written (with the
 // undefined value) so it is *not* reported as an uninitialized field. This pins
 // the non-pointer undef-aggregate-as-store-value path in the second consumer,

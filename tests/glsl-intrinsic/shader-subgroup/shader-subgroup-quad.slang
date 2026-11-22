@@ -1,21 +1,20 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-quad.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-quad.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-quad.slang -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 
 // not testing cuda due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
+//DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-quad.slang -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 // not testing cpp due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DTARGET_CPP
+//DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CPP): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-quad.slang -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU -render-feature half
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF):-entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=BUF):-entry computeMain -source-language glsl -xslang -DWGPU -render-feature half
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUF):-entry computeMain -source-language glsl -xslang -DMETAL
 
 #version 430
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
-buffer MyBlockName2 
+buffer MyBlockName2
 {
     uint data[];
 } outputBuffer;
@@ -81,7 +80,7 @@ bool testQuadSwapX() {
         & testVQuadX<float, 2>()
         & testVQuadX<float, 3>()
         & testVQuadX<float, 4>()
-        & test1QuadX<half>() 
+        & test1QuadX<half>()
         & testVQuadX<half, 2>()
         & testVQuadX<half, 3>()
         & testVQuadX<half, 4>()
@@ -100,23 +99,23 @@ bool testQuadSwapX() {
         & testVQuadX<double, 2>()
         & testVQuadX<double, 3>()
         & testVQuadX<double, 4>()
-        & test1QuadX<int8_t>() 
+        & test1QuadX<int8_t>()
         & testVQuadX<int8_t, 2>()
         & testVQuadX<int8_t, 3>()
         & testVQuadX<int8_t, 4>()
-        & test1QuadX<int16_t>() 
+        & test1QuadX<int16_t>()
         & testVQuadX<int16_t, 2>()
         & testVQuadX<int16_t, 3>()
         & testVQuadX<int16_t, 4>()
-        & test1QuadX<int64_t>() 
+        & test1QuadX<int64_t>()
         & testVQuadX<int64_t, 2>()
         & testVQuadX<int64_t, 3>()
         & testVQuadX<int64_t, 4>()
-        & test1QuadX<uint8_t>() 
+        & test1QuadX<uint8_t>()
         & testVQuadX<uint8_t, 2>()
         & testVQuadX<uint8_t, 3>()
         & testVQuadX<uint8_t, 4>()
-        & test1QuadX<uint64_t>() 
+        & test1QuadX<uint64_t>()
         & testVQuadX<uint64_t, 2>()
         & testVQuadX<uint64_t, 3>()
         & testVQuadX<uint64_t, 4>() & test1QuadX<bool>() & testVQuadX<bool, 2>()
@@ -126,11 +125,11 @@ bool testQuadSwapX() {
 
 
 #if !defined(WGPU)
-        & test1QuadX<int16_t>() 
+        & test1QuadX<int16_t>()
         & testVQuadX<int16_t, 2>()
         & testVQuadX<int16_t, 3>()
         & testVQuadX<int16_t, 4>()
-        & test1QuadX<uint16_t>() 
+        & test1QuadX<uint16_t>()
         & testVQuadX<uint16_t, 2>()
         & testVQuadX<uint16_t, 3>()
         & testVQuadX<uint16_t, 4>()

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#block-local-shadowing
-//META: doc_section_digest=fff04d2b441a5ad2e4ef387152ddc76216942a0668864eb5cdfb1c9b98e7e532
+//META: doc_section_digest=24b2e37706dffd5a2f6286a13b0271a96dc30366c33fe244deca52d7be73e0e4
 //META: purpose=Block-local hiding reaches into nested inner blocks, so a use of the name from a nested block textually before the declaration is undefined (E30015).
 //META: intent=negative
 //META: pipeline_stage=check

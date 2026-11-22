@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-a-link-and-entry-point-prep
-//META: doc_section_digest=a070776046b78ae88c4449b095d1d0e5fe4aab3b00228002fc1b2b19d4bdde8d
+//META: doc_section_digest=4f783666c7c9b7df63417e280a2ad3b3b3b16e7b3d8855003810a245e967bb08
 //META: purpose=Boundary: an enumerator whose value is signed `int` MAX (2147483647) collapses through `lowerEnumType` to that decimal literal in the Metal text.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

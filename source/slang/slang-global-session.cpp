@@ -5,16 +5,16 @@
 #include "core/slang-archive-file-system.h"
 #include "core/slang-performance-profiler.h"
 #include "core/slang-type-convert-util.h"
-#include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-doc-ast.h"
 #include "slang-doc-markdown-writer.h"
 #include "slang-options.h"
-#include "slang-parser.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-serialize-ast.h"
-#include "slang-serialize-container.h"
-#include "slang-serialize-ir.h"
+#include "slang/parser/slang-parser.h"
+#include "slang/semantic-checking/slang-check-impl.h"
+#include "slang/serialization/slang-serialize-ast.h"
+#include "slang/serialization/slang-serialize-container.h"
+#include "slang/serialization/slang-serialize-ir.h"
 
 extern Slang::String get_slang_cuda_prelude();
 extern Slang::String get_slang_cpp_prelude();
@@ -388,15 +388,22 @@ SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlag
 
 void Session::getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName)
 {
+    // Without SLANG_EMBED_CORE_MODULE_SOURCE the library code getters return null; there is no
+    // source to append then, and the result is empty.
+    auto append = [&](ComPtr<ISlangBlob> code)
+    {
+        if (code)
+            sb << (const char*)code->getBufferPointer();
+    };
     switch (moduleName)
     {
     case slang::BuiltinModuleName::Core:
-        sb << (const char*)getCoreLibraryCode()->getBufferPointer()
-           << (const char*)getHLSLLibraryCode()->getBufferPointer()
-           << (const char*)getAutodiffLibraryCode()->getBufferPointer();
+        append(getCoreLibraryCode());
+        append(getHLSLLibraryCode());
+        append(getAutodiffLibraryCode());
         break;
     case slang::BuiltinModuleName::GLSL:
-        sb << (const char*)getGLSLLibraryCode()->getBufferPointer();
+        append(getGLSLLibraryCode());
         break;
     }
 }
@@ -660,6 +667,11 @@ SlangResult Session::_readBuiltinModule(
 
     auto irChunk = moduleChunk->findIR();
     if (!irChunk)
+        return SLANG_FAIL;
+
+    UInt64 moduleVersion = 0;
+    SLANG_RETURN_ON_FAIL(readSerializedModuleInfo(irChunk, nullptr, moduleVersion, nullptr));
+    if (!IRModule::isModuleVersionSupported(moduleVersion))
         return SLANG_FAIL;
 
     auto astChunk = moduleChunk->findAST();
@@ -1144,11 +1156,21 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
     slang::SessionDesc* outDesc,
     ISlangUnknown** outAllocation)
 {
+    *outAllocation = nullptr;
     if (outDesc->structureSize < sizeof(slang::SessionDesc))
         return SLANG_E_BUFFER_TOO_SMALL;
     RefPtr<ParsedCommandLineData> outData = new ParsedCommandLineData();
     RefPtr<EndToEndCompileRequest> tempReq = new EndToEndCompileRequest(this);
-    tempReq->processCommandLineArguments(argv, argc);
+    SLANG_RETURN_ON_FAIL(
+        parseOptions(tempReq.Ptr(), argc, argv, CommandLineParsePurpose::SessionDescription));
+
+    // OptionsParser keeps `-allow-glsl` request-local so ordinary slangc compilation cannot leak
+    // it into imported modules. This API is specifically translating command-line options into a
+    // SessionDesc, so preserve the caller's request by materializing it as a session option on the
+    // temporary linkage immediately before serialization.
+    if (tempReq->getLegacyAllowGLSLInput())
+        tempReq->getOptionSet().set(CompilerOptionName::AllowGLSL, true);
+
     outData->options.setCount(1 + tempReq->getLinkage()->targets.getCount());
     int optionDataIndex = 0;
     SerializedOptionsData& optionData = outData->options[optionDataIndex];

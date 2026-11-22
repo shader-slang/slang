@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination
-//META: doc_section_digest=0e5b4c31fb3cb504b87417d8391d1c84f2175e1be41f81660fa7556568fce3ac
+//META: doc_section_digest=e492693f38638cb18557561f76c53c2ecd1552856a03aba9bd6c16c0bff73bd8
 //META: purpose=A vector && (legalizeLogicalAndOr's Khronos arm) lowers to OpLogicalAnd on bool3 operands.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

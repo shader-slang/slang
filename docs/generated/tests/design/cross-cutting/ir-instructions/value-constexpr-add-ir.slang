@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#value-instructions
-//META: doc_section_digest=f9ced424f75b0995671347e9ab72c4c596438a42cdf6bd9ecf359a2b13da7f4e
+//META: doc_section_digest=eb992431f4d874635d2da973730ce3ff72d018dedbdbec9c0f839f6aea79fa0c
 //META: purpose=Arithmetic on a generic value parameter lowers to the compile-time-folded `constexprAdd` variant rather than the ordinary runtime `add`.
 //META: intent=functional
 //META: pipeline_stage=lower

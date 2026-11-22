@@ -1,10 +1,10 @@
 
 // On Vulkan, we can only test float type for now because atomicAdd is not supported for half on our CI machine.
-//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DUNIT_TEST -xslang -DTEST_HALF=0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0
+//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUFFER):-output-using-type -xslang -experimental-feature -xslang -DUNIT_TEST -xslang -DTEST_HALF=0
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUFFER):-xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DUNIT_TEST -xslang -DTEST_HALF=0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DUNIT_TEST -xslang -DTEST_HALF=1
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-output-using-type -xslang -experimental-feature -xslang -DUNIT_TEST -xslang -DTEST_HALF=0
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-output-using-type -xslang -experimental-feature -xslang -DUNIT_TEST -xslang -DTEST_HALF=1
 import slang.neural;
 #pragma warning(disable: 41017)
 

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#vectors-matrices-and-composite
-//META: doc_section_digest=4be4c15ea47b77fa5c11493f84e33669d7c20c2d179310e3570700407b2ebc9f
+//META: doc_section_digest=d954301fdc74111df1e5e54e77e9f4a6d231275aa7a1492da12b7560db422806
 //META: purpose=Boundary: Optional<T> composes with a Vec<T> payload; the Optional operand is the Vec(...) IR type.
 //META: intent=boundary
 //META: pipeline_stage=lower

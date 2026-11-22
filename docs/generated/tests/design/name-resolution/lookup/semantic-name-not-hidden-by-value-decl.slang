@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#concepts
-//META: doc_section_digest=66115897ba3bf509762cdb486bd39ade9574d8d8ea06eb5213c6d9a683af6562
+//META: doc_section_digest=9beb7ce113203f7b6a97267dc5716f8e7cf59ebe42628adaf018784110a2aac5
 //META: purpose=The semantic category sits outside the default lookup mask, so a value declared with a system-value semantic's spelling neither hides the semantic annotation nor is hidden by it.
 //META: intent=functional
 //META: pipeline_stage=check

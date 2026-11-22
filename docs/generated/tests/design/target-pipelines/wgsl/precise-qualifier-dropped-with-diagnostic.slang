@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#wgslsourceemitter-policy-overrides-and-bool-conditioned-values
-//META: doc_section_digest=d47eda324078a32dbc73f59419bad83ce4ed4cd8713fc5e48372759b3592f93c
+//META: doc_section_digest=3eb656b9aedf4fda1a1310d903954e043c88751dba5159c8d5337e7ff6d4c613
 //META: purpose=The WGSL emitter drops a precise qualifier and reports E56005 instead of emitting a precise keyword
 //META: intent=negative
 //META: pipeline_stage=emit

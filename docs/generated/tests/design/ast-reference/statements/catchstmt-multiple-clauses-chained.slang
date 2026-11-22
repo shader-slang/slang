@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#throwstmt-and-catchstmt
-//META: doc_section_digest=0c9bef4794f61ac3fead35d16b0cd0603f6881658db01263a9dfdf11e63c7f46
+//META: doc_section_digest=9a6cecec6f6b38732550b099e7d3df67449d1415430eff969ce34213cd09eefb
 //META: purpose=A `do` body may be followed by several `catch` clauses; the clauses chain so that each later handler protects the one before it, and an error raised in the body is taken by the first matching handler.
 //META: intent=boundary
 //META: pipeline_stage=check

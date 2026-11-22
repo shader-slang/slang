@@ -17,6 +17,23 @@ allowed-tools:
 
 ## Step 1: Trigger Release CI
 
+Fetch `upstream/master` and record the Slang commit and user-skills gitlink selected for the preflight:
+
+```bash
+git fetch upstream master
+release_sha="$(git rev-parse upstream/master)"
+skills_sha="$(git rev-parse "${release_sha}:external/slang-user-skills")"
+printf 'Slang release candidate: %s\nUser-skills commit: %s\n' "$release_sha" "$skills_sha"
+```
+
+The gitlink stored in `$release_sha` is the sole source of truth for the user-skills revision that commit will package.
+Do not infer a different revision from the current tip of any `slang-user-skills` branch.
+
+Report `$release_sha` and `$skills_sha` to the release operator and request explicit confirmation that `$skills_sha` is the user-skills revision approved for the release.
+Stop and wait for approval before triggering Release CI.
+If the operator expects a different user-skills revision, stop the release process, update the gitlink through a reviewed Slang pull request, fetch the updated `upstream/master`, and restart the preflight.
+After approval, use that recorded full SHA as `$skills_sha` in every later comparison, reassigning the variable if a command runs in a new shell.
+
 Manually trigger the Release workflow on the `master` branch from:
 <https://github.com/shader-slang/slang/actions/workflows/release.yml>
 
@@ -33,6 +50,9 @@ gh run list --workflow=release.yml --limit 1 --json status,conclusion,databaseId
 ```
 
 Wait until the run completes successfully before proceeding.
+The release configuration requires the exact `external/slang-user-skills` commit recorded by `master`, and every binary-package job verifies the bundled files and provenance before upload.
+Confirm that the `Verify bundled user skills` steps passed; a missing, modified, or mismatched skills checkout is a release blocker.
+Each successful verification log must report `skills $skills_sha`, matching the commit approved by the release operator.
 
 ## Step 2: Determine the Version
 
@@ -88,6 +108,13 @@ Create an annotated tag on `upstream/master` with the release notes as the messa
 # Make sure local master is up to date
 git fetch upstream && git checkout master && git merge --ff-only upstream/master
 
+# Confirm that the commit being tagged still selects the approved skills commit
+tag_skills_sha="$(git rev-parse HEAD:external/slang-user-skills)"
+if [[ "$tag_skills_sha" != "$skills_sha" ]]; then
+    echo "User-skills gitlink changed after approval; restart the release preflight." >&2
+    exit 1
+fi
+
 # Create the annotated tag (paste the release-note.sh output as the message body)
 git tag -a vYYYY.N -m "<tag message with release notes>"
 
@@ -110,10 +137,14 @@ vYYYY.N
 ## Interactive Workflow
 
 1. Check prerequisites: verify `gh` is installed and has `read:project` scope (`gh auth status`)
-2. Trigger the Release CI on master (`gh workflow run release.yml --ref master`)
-3. Monitor the CI run until it passes (~30 minutes)
-4. Query the project board to determine the current sprint and compute the version number
-5. Run `docs/scripts/release-note.sh` to generate release notes
-6. Create the annotated tag on `upstream/master` with the release notes
-7. Push the tag to `upstream` to trigger release packaging
-8. Verify the release CI was triggered for the new tag
+2. Record `$release_sha` from `upstream/master` and `$skills_sha` from that commit's `external/slang-user-skills` gitlink
+3. Report both SHAs to the release operator, request explicit approval of `$skills_sha` for the release, and stop until approval is received
+4. Trigger the Release CI on master (`gh workflow run release.yml --ref master`)
+5. Monitor the CI run until it passes (~30 minutes), including every `Verify bundled user skills` step
+6. Confirm every verification log reports `skills $skills_sha`, matching the user-skills commit approved by the release operator
+7. Query the project board to determine the current sprint and compute the version number
+8. Run `docs/scripts/release-note.sh` to generate release notes
+9. Before tagging, confirm that the current `upstream/master` gitlink still equals the approved `$skills_sha`; restart the preflight if it changed
+10. Create the annotated tag on `upstream/master` with the release notes
+11. Push the tag to `upstream` to trigger release packaging
+12. Verify the release CI was triggered for the new tag

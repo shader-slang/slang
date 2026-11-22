@@ -3,7 +3,7 @@
 // Confirm that precedence is correctly handled
 // for cast from scalar to vector.
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 int test(float a)
 {

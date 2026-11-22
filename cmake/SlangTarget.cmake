@@ -1,4 +1,47 @@
 #
+# Embed the shared longPathAware application manifest into a target, so that
+# the Windows LongPathsEnabled registry opt-in takes effect for the built
+# executable.
+#
+# On Windows 10 (1607) and later the per-machine LongPathsEnabled registry
+# opt-in only takes effect for an executable that declares longPathAware in
+# its application manifest. Without that declaration our tools still fail to
+# open or write files whose full paths exceed MAX_PATH, even on machines
+# where long paths are enabled. CMake embeds .manifest source files into
+# binaries built with the MSVC toolchain (both the VS and the Ninja
+# generators), so listing the shared manifest as a source is all it takes.
+#
+# slang_add_target calls this for every executable it creates. An executable
+# in the main slang build that is declared with a raw add_executable does not
+# go through that path, so it must call this helper itself to opt in
+# (standalone sub-project targets such as spvdb have no SlangTarget.cmake and
+# sit outside this convention). This is for executable targets only — CMake
+# silently ignores a .manifest source on a library, so a misuse would look
+# like success, and the helper rejects non-executable targets at configure
+# time instead. The helper attaches the one fixed shared manifest; it does
+# not take a caller-supplied manifest. Non-MSVC Windows toolchains (e.g.
+# MinGW) embed no manifest here; no in-tree preset or CI leg builds Windows
+# that way, and a windres-based story would be needed if one ever does.
+#
+function(slang_add_windows_manifest target)
+    get_target_property(target_type ${target} TYPE)
+    if(NOT target_type STREQUAL "EXECUTABLE")
+        message(
+            SEND_ERROR
+            "slang_add_windows_manifest: '${target}' is a ${target_type}, but the longPathAware manifest is only meaningful on an executable target"
+        )
+        return()
+    endif()
+
+    if(WIN32 AND MSVC)
+        target_sources(
+            ${target}
+            PRIVATE ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/slang-app.manifest
+        )
+    endif()
+endfunction()
+
+#
 # A function to make target specification a little more declarative
 #
 # See the comments on the options below for usage
@@ -23,9 +66,10 @@ function(slang_add_target dir type)
         NO_SOURCE
         # Don't generate split debug info for this target
         NO_SPLIT_DEBUG_INFO
-        # Don't apply ASAN instrumentation to this target (use when the target
-        # links external libraries that are not ASAN-instrumented)
-        SKIP_ASAN
+        # Skip sanitizer (ASan/UBSan/TSan) instrumentation for this target.
+        # Intended for targets that wrap external libraries built without
+        # sanitizers (the sole current user is slang-glslang).
+        SKIP_SANITIZERS
     )
     set(single_value_args
         # Set the target name, useful for multiple targets from the same
@@ -181,6 +225,13 @@ function(slang_add_target dir type)
     endif()
 
     #
+    # Embed a longPathAware application manifest into Windows executables.
+    #
+    if(type STREQUAL "EXECUTABLE")
+        slang_add_windows_manifest(${target})
+    endif()
+
+    #
     # Set the output directory
     #
     # We don't want the output directory to be sensitive to where
@@ -321,16 +372,24 @@ function(slang_add_target dir type)
     #
     # Set common compile options and properties
     #
-    set(_asan_opt "")
-    if(ARG_SKIP_ASAN)
-        set(_asan_opt SKIP_ASAN)
+    set(_sanitizer_opt "")
+    if(ARG_SKIP_SANITIZERS)
+        set(_sanitizer_opt SKIP_SANITIZERS)
     endif()
     if(ARG_USE_EXTRA_WARNINGS)
-        set_default_compile_options(${target} USE_EXTRA_WARNINGS ${_asan_opt})
+        set_default_compile_options(
+            ${target}
+            USE_EXTRA_WARNINGS
+            ${_sanitizer_opt}
+        )
     elseif(ARG_USE_FEWER_WARNINGS)
-        set_default_compile_options(${target} USE_FEWER_WARNINGS ${_asan_opt})
+        set_default_compile_options(
+            ${target}
+            USE_FEWER_WARNINGS
+            ${_sanitizer_opt}
+        )
     else()
-        set_default_compile_options(${target} ${_asan_opt})
+        set_default_compile_options(${target} ${_sanitizer_opt})
     endif()
 
     # Set debug info options if not disabled
@@ -660,6 +719,12 @@ function(slang_add_target dir type)
             endif()
             set(export_args)
         endif()
+        # The component options in ARGN apply to the binaries only. The public
+        # headers are part of the public API, so they stay in the default
+        # component even when the library itself is in an EXCLUDE_FROM_ALL
+        # component. Consider a build with SLANG_EMBED_CORE_MODULE=OFF: there
+        # slang-compiler is installed only by the "generators" component, but a
+        # default install still has to provide slang.h.
         install(
             TARGETS ${target} ${export_args}
             ARCHIVE DESTINATION ${archive_subdir}
@@ -669,7 +734,6 @@ function(slang_add_target dir type)
             RUNTIME DESTINATION ${runtime_subdir}
             ${ARGN}
             PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-            ${ARGN}
         )
     endmacro()
 

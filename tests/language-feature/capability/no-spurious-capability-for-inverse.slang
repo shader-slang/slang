@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -target spirv -entry computeMain -stage compute -profile spirv_1_6
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute -profile spirv_1_6
 
 // Verify that calling the stdlib `inverse` function does not spuriously
 // require `spvImageGatherExtended`.  The SPIR-V path only needs the
@@ -8,6 +8,8 @@
 // CHECK-NOT: spvImageGatherExtended
 // CHECK-NOT: warning
 // CHECK: computeMain
+
+import glsl;
 
 RWStructuredBuffer<float4x4> buf;
 

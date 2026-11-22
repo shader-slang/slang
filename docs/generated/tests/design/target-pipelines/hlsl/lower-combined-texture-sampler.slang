@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#lowercombinedtexturesamplers
-//META: doc_section_digest=d9a153da9036e5a14fc6b96b56c2a7c25e36c399eb9196b07071293d6598857a
+//META: doc_section_digest=2c12c182458c73ae06317619cf488687f97dcb4e230c94df829602fac6ac0eaf
 //META: purpose=Slang's Sampler2D is split by lowerCombinedTextureSamplers into a separable Texture2D + SamplerState pair in HLSL emit.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

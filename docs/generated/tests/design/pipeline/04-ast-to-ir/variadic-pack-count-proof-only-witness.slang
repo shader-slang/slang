@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#variadic-pack-count-witnesses
-//META: doc_section_digest=27de2c3f4422e88c12831854004fb0c605b318f0f9e5ce8e1fd3e5ab1ae208f4
+//META: doc_section_digest=5b58a2fbbfdc353279fef7a454e3a7dbc92c17daee8ab7cad6aba08de5870f6f
 //META: purpose=A `where countof(T) == N` constraint on a variadic generic lowers as a proof-only witness: the generic's parameter list ends with a hidden `param %w : witness_table_t(Void)`, the module holds one `witness_table %t : witness_table_t(Void)(Void);`, and the call site reads `call specialize(%sum, 2 : Int, TypePack(Int, Int), %t)(...)`.
 //META: intent=functional
 //META: pipeline_stage=lower

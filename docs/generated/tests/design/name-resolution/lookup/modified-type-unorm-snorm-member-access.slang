@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#member-lookup
-//META: doc_section_digest=fc857e43020ac66546c51043cd77e6a53aea17212ca602e37a98726239622ecc
+//META: doc_section_digest=31abb67bf5286f69461146710f091d89f6d90d100b6c4de40ee80f2ebf88ef5a
 //META: purpose=The other two modifier spellings that produce a modified type, unorm and snorm, are equally transparent to member lookup.
 //META: intent=boundary
 //META: pipeline_stage=check

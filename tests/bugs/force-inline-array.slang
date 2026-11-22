@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -output-using-type -vk -emit-spirv-directly -xslang -g0
+//TEST:COMPARE_COMPUTE(targets=all-glsl-dx11-dx12-wgpu, filecheck-buffer=CHECK):-output-using-type -xslang -g0
 
 struct Coord
 {

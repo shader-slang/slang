@@ -3,9 +3,7 @@
 // Test that a function/method can return a value of
 // aggregate type that includes an opaque type
 
-//TEST(compute):COMPARE_COMPUTE:
-//TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -llvm
+//TEST:COMPARE_COMPUTE(targets=all-llvm):
 
 struct Things
 {

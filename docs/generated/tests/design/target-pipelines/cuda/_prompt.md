@@ -72,7 +72,11 @@ CUDA-specific passes plus the arms CUDA shares with CPU and Metal:
   become the CUDA thread/block index expressions (anchor
   `#legalizeentrypointvaryingparamsforcuda`).
 - `lowerImmutableBufferLoadForCUDA` (anchor
-  `#lowerimmutablebufferloadforcuda`).
+  `#lowerimmutablebufferloadforcuda`). Positive `__ldg` checks must
+  load from eligible global-memory storage such as
+  `StructuredBuffer<T>` or `ConstantBuffer<T>`. Add the complementary
+  top-level `uniform` boundary: it is rooted in the emitted
+  `__constant__` `SLANG_globalParams` group and must not use `__ldg`.
 - `undoParameterCopy` and `transformParamsToConstRef` (anchor
   `#undoparametercopy-and-transformparamstoconstref`).
 - `legalizeArrayReturnType`, default-option `legalizeByteAddressBufferOps`,
@@ -90,10 +94,10 @@ indexing, and the fact that `-target cuda` stops at CUDA C++ text.
 where CPU/Metal do Y". Verify by compiling the same source to the sibling target
 with a second directive and a distinct CHECK prefix.
 
-**Conditional gates.** `#required-lowering-pass-set-flags`,
-`#option-set-toggles-and-emit-side-options`,
+**Conditional gates.** `#conditional-gates`,
+`#conditional-gates`,
 `#context-predicates-and-capability-gates`, and
-`#cuda-specific-runtime-predicates` — a gate is testable when the doc names a
+`#conditional-gates` — a gate is testable when the doc names a
 source shape that trips it and an emit difference that follows.
 
 ### Not testable through `slangc -target cuda` (record under `## Untested claims`)
@@ -145,10 +149,10 @@ Use these to confirm a specific emitted token. Do **not** mine them for claims
 the doc does not state.
 
 - `source/slang/slang-emit.cpp`
-- `source/slang/slang-emit-cuda.cpp`
-- `source/slang/slang-emit-cpp.cpp`
-- `source/slang/slang-emit-c-like.cpp`
-- `source/slang/slang-ir-cuda-immutable-load.cpp`
+- `source/slang/emission/slang-emit-cuda.cpp`
+- `source/slang/emission/slang-emit-cpp.cpp`
+- `source/slang/emission/slang-emit-c-like.cpp`
+- `source/slang/ir-passes/slang-ir-cuda-immutable-load.cpp`
 
 ## Test directives
 

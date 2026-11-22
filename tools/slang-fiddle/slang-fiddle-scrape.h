@@ -2,7 +2,11 @@
 #pragma once
 
 #include "compiler-core/slang-lexer.h"
+#if SLANG_USE_SYSTEM_LUA
+#include <lua.hpp>
+#else
 #include "lua/lauxlib.h"
+#endif
 #include "slang-fiddle-diagnostics.h"
 
 namespace fiddle

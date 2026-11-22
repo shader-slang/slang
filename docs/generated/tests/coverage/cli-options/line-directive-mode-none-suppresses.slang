@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T15:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#option-set-toggles
-//META: doc_section_digest=65ae1152b296463b8293b7591a32f87fe87ce08c5528a74ea4488483c5c3c5b7
+//META: doc_section_digest=fbeeea07809c9805840949444c53383bbc2008651cf6d8186e90c648ffe29510
 //META: purpose=Verifies -line-directive-mode none removes all `#line` directives from HLSL output while the default emits C-style `#line N "file"`.
 //META: intent=characterization
 //META: covers=source/slang/slang-options.cpp

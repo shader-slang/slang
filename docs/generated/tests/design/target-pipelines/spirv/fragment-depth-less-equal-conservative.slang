@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#legalizeentrypointsforglsl-fragdepth-and-geometry-primitive-refinements
-//META: doc_section_digest=f52a7151fb266a0395ad9852aa535a328de8a8e0c05ff15ae8b0008b93f3fcaf
+//META: doc_section_digest=101470099f314769a6fe398920091b45f975c62ef00a261100bcd790353ab103
 //META: purpose=An SV_DepthLessEqual fragment output is recorded as the FragDepthLess system-value kind and the SPIR-V emit carries the conservative-depth DepthLess execution mode on the gl_FragDepth (BuiltIn FragDepth) output.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

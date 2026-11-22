@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#work-graph-record-types
-//META: doc_section_digest=7ce9495f8f8cf2b1b4adf2f417316b6d259dafe3e374c502b180caf6e4a76ab2
+//META: doc_section_digest=9440247b285eddb1647ff4031353b3207993dc8666f0bdfe3b36cb0d9ad97501
 //META: purpose=Allocating group-wide output records off a NodeOutput<T> yields a value typed GroupNodeOutputRecords(<T>).
 //META: intent=functional
 //META: pipeline_stage=lower

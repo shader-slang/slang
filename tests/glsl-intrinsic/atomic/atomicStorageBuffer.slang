@@ -1,11 +1,10 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl -DTARGET_GLSL
-//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly 
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/atomic/atomicStorageBuffer.slang -stage compute -entry computeMain -target glsl -DTARGET_GLSL
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/atomic/atomicStorageBuffer.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 #version 430
 
-// float2 is currently a very new extension; most hardware lacks 
-// this extension and will fail the test if attempting to use atomic_float2 
+// float2 is currently a very new extension; most hardware lacks
+// this extension and will fail the test if attempting to use atomic_float2
 // operations
 // #define TEST_when_shader_atomic_float2_is_available
 
@@ -115,7 +114,7 @@ bool i64_init(int64_t val, out int64_t data)
     return true;
 }
 bool i64_expect(int64_t val)
-{   
+{
     return int64Buffer.data[0] == val;
 }
 bool testAtomicInt64()
@@ -166,7 +165,7 @@ bool u32_init(uint val, out uint data)
     return true;
 }
 bool u32_expect(uint val)
-{   
+{
     return uint32Buffer.data[0] == val;
 }
 bool testAtomicUint32()
@@ -217,7 +216,7 @@ bool u64_init(uint64_t val, out uint64_t data)
     return true;
 }
 bool u64_expect(uint64_t val)
-{   
+{
     return uint64Buffer.data[0] == val;
 }
 bool testAtomicUint64()
@@ -268,7 +267,7 @@ bool f16_init(half val, out half data)
     return true;
 }
 bool f16_expect(half val)
-{   
+{
     return float16Buffer.data[0] == val;
 }
 bool testAtomicFloat16()
@@ -301,7 +300,7 @@ bool f32_init(float val, out float data)
     return true;
 }
 bool f32_expect(float val)
-{   
+{
     return float32Buffer.data[0] == val;
 }
 bool testAtomicFloat32()
@@ -334,7 +333,7 @@ bool f64_init(double val, out double data)
     return true;
 }
 bool f64_expect(double val)
-{   
+{
     return float64Buffer.data[0] == val;
 }
 bool testAtomicFloat64()
@@ -374,7 +373,7 @@ void computeMain()
             && testAtomicFloat16()
             && testAtomicFloat32()
             && testAtomicFloat64()
-            ;    
+            ;
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
     // BUF: 1

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/base.md#expr-syntaxnode
-//META: doc_section_digest=369743522fa835d335b8cfc1d7160c48df288006a4cdb5149e41fdce6b476f7e
+//META: doc_section_digest=3ceadb9e8d42625f40a72efaaf60c33dc05dd0990014975dfffb9d8d5c3ed92f
 //META: purpose=The type an Expr carries records l-value/r-value information as well as the type itself, so assigning to a call result is rejected.
 //META: intent=negative
 //META: pipeline_stage=check

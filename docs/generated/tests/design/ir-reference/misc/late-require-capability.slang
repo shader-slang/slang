@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#compiler-dictionary-and-late-capability-requirements
-//META: doc_section_digest=fc0d5f50b673be2d3dcdb59c6ba77ed859daa9fda1a7df05cc36a96f62f883dd
+//META: doc_section_digest=33a83f163d58d5303f0b6a4fca4888b3116167e18a987ac25535e1502d5e4342
 //META: purpose=A `__requireCapability(...)` statement also emits a `LateRequireCapability` inst whose single operand is the encoded capability set.
 //META: intent=functional
 //META: pipeline_stage=lower

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomic-operations
-//META: doc_section_digest=e0b71e7cc30a0e069a5833b7fdc7038f02b6ab982bbba6656983e3a65dcba7ce
+//META: doc_section_digest=05d2a0b4a3db43236d3559421222e61b18c415c1fc63143d73dee571f32aaba5
 //META: purpose=`Atomic<float>::and(v)` is rejected as a missing member — `'and' is not a member of 'Atomic<float>'` — rather than as a bad argument type, because the bitwise atomics live in an extension constrained to `IBitAtomicable`.
 //META: intent=negative
 //META: pipeline_stage=check

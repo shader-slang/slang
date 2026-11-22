@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/values.md#out--inout-argument-casts
-//META: doc_section_digest=4e540a522f9a0cc4f325c6d7e9f89f294e159f1a25d5b1bbbfbd0c481519dfe0
+//META: doc_section_digest=3d6bc9494eca7dfe819dc8113825be51fde86d8045b3a28a809c78deb26e1702
 //META: purpose=Negative: an `out` argument whose type difference the l-value coercion does not cover (`int` passed to `out float`) is rejected at semantic check with E30047, so no `outImplicitCast` is ever lowered.
 //META: intent=negative
 //META: pipeline_stage=check

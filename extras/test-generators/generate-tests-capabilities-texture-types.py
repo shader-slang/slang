@@ -127,7 +127,7 @@ def getWgslTests():
     backend = {
         "name" : "wgsl",
         "versions" : [
-            ("1.0", "wgsl", "-wgpu")
+            ("1.0", "wgsl", "wgpu")
         ]
     }
 
@@ -186,8 +186,8 @@ def getMetalTests():
         "versions" : [
             ("1.0", None, None), # unsupported by Slang
             ("2.0", None, None), # unsupported by Slang
-            ("2.3", "metal -profile metallib_2_3", "-mtl"),
-            ("2.4", "metal -profile metallib_2_4", "-mtl"),
+            ("2.3", "metal -profile metallib_2_3", "metal"),
+            ("2.4", "metal -profile metallib_2_4", "metal"),
         ]
     }
 
@@ -239,7 +239,7 @@ def getMetalTests():
     return (backend, tests)
 
 
-def getGlslTests(nameSuffix, simpleTarget, vkTargetAdditionalFlags):
+def getGlslTests(nameSuffix, simpleTarget, computeTestTarget):
 
     backend = {
         "name" : f"glsl{nameSuffix}",
@@ -249,15 +249,15 @@ def getGlslTests(nameSuffix, simpleTarget, vkTargetAdditionalFlags):
             ("120", None, None), # unsupported by Slang
             ("130", None, None), # unsupported by Slang
             ("140", None, None), # unsupported by Slang
-            ("150", f"{simpleTarget} -profile glsl_150", f"-vk {vkTargetAdditionalFlags}"),
-            ("330", f"{simpleTarget} -profile glsl_330", f"-vk {vkTargetAdditionalFlags}"),
-            ("400", f"{simpleTarget} -profile glsl_400", f"-vk {vkTargetAdditionalFlags}"),
-            ("410", f"{simpleTarget} -profile glsl_410", f"-vk {vkTargetAdditionalFlags}"),
-            ("420", f"{simpleTarget} -profile glsl_420", f"-vk {vkTargetAdditionalFlags}"),
-            ("430", f"{simpleTarget} -profile glsl_430", f"-vk {vkTargetAdditionalFlags}"),
-            ("440", f"{simpleTarget} -profile glsl_440", f"-vk {vkTargetAdditionalFlags}"),
-            ("450", f"{simpleTarget} -profile glsl_450", f"-vk {vkTargetAdditionalFlags}"),
-            ("460", f"{simpleTarget} -profile glsl_460", f"-vk {vkTargetAdditionalFlags}"),
+            ("150", f"{simpleTarget} -profile glsl_150", computeTestTarget),
+            ("330", f"{simpleTarget} -profile glsl_330", computeTestTarget),
+            ("400", f"{simpleTarget} -profile glsl_400", computeTestTarget),
+            ("410", f"{simpleTarget} -profile glsl_410", computeTestTarget),
+            ("420", f"{simpleTarget} -profile glsl_420", computeTestTarget),
+            ("430", f"{simpleTarget} -profile glsl_430", computeTestTarget),
+            ("440", f"{simpleTarget} -profile glsl_440", computeTestTarget),
+            ("450", f"{simpleTarget} -profile glsl_450", computeTestTarget),
+            ("460", f"{simpleTarget} -profile glsl_460", computeTestTarget),
         ]
     }
 
@@ -465,6 +465,10 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
             disableNegativeSimpleTestPrefix = "DISABLE_"
             testDisabledComment += f"\n// Negative test disabled, see https://github.com/shader-slang/slang/issues/{testInfo.disableNegativeTestForIssue}"
 
+    # The compute test line runs once for the target that `targets=` names. A test that has no
+    # target is always disabled, and its line has `targets=none`.
+    computeTestTargets = "none" if positiveComputeTestTarget == "None" else positiveComputeTestTarget
+
     testStr = f"""// THIS IS A GENERATED FILE. DO NOT EDIT!
 // Instead, edit extras/test-generators/generate-tests-capabilities-texture-types.py, and
 // regenerate this test by running:
@@ -478,8 +482,8 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
 //
 {testDisabledComment}
 //{disablePositiveSimpleTestPrefix}TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target {positiveSimpleTestTarget}
-//{disableComputeTestPrefix}TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): {positiveComputeTestTarget}
-//{disableNegativeSimpleTestPrefix}TEST:SIMPLE(filecheck=NEGATIVE): -restrictive-capability-check -entry fragMain -stage fragment -target {negativeSimpleTestTarget}
+//{disableComputeTestPrefix}TEST:COMPARE_COMPUTE(targets={computeTestTargets}, filecheck-buffer=POSITIVE_RESULT):
+//{disableNegativeSimpleTestPrefix}TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target {negativeSimpleTestTarget}
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -491,13 +495,10 @@ RWStructuredBuffer<int> outputBuffer;
 void fragMain()
 {{
 // POSITIVE-NOT: {{{{(error|warning).*}}}}:
-// POSITIVE: result code = 0
-// POSITIVE-NOT: {{{{(error|warning).*}}}}:
 // POSITIVE-LABEL: {labelName}
 // POSITIVE-NOT: {{{{(error|warning).*}}}}:
 
-// Expect either a compilation error or warning 41012 for upgraded profile to support functionality
-// NEGATIVE: {{{{error[E[[:digit:]]+]}}}}:
+//NEGATIVE: error
 
     int ret = 0;
     {getStatementsForTestOp(testInfo.testOp)}
@@ -550,7 +551,7 @@ def main():
 
     generateTests(getWgslTests())
     generateTests(getMetalTests())
-    generateTests(getGlslTests('-vk', 'glsl', '-emit-spirv-via-glsl'))
+    generateTests(getGlslTests(nameSuffix='-vk', simpleTarget='glsl', computeTestTarget='glsl'))
 
 
 if __name__ == "__main__":

@@ -4,16 +4,10 @@
 // cases because they include the DX11/FXC path, and FXC rejects the generated
 // HLSL `Load<T>` syntax. CPU/Vulkan/D3D12/WGPU still enable it to cover generic
 // typed loads, including the WGSL lowering this test was extended for.
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -xslang -DBAB_GENERIC_LOAD_COVERAGE
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -xslang -DRWBAB -xslang -DBAB_GENERIC_LOAD_COVERAGE
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -xslang -DRWBAB
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -xslang -DBAB_GENERIC_LOAD_COVERAGE
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -xslang -DRWBAB -xslang -DBAB_GENERIC_LOAD_COVERAGE
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj -xslang -DBAB_GENERIC_LOAD_COVERAGE
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj -xslang -DRWBAB -xslang -DBAB_GENERIC_LOAD_COVERAGE
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DBAB_GENERIC_LOAD_COVERAGE
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DRWBAB -xslang -DBAB_GENERIC_LOAD_COVERAGE
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+cpu+wgpu):-xslang -DBAB_GENERIC_LOAD_COVERAGE
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+cpu+wgpu):-xslang -DRWBAB -xslang -DBAB_GENERIC_LOAD_COVERAGE
+//TEST:COMPARE_COMPUTE(targets=all):
+//TEST:COMPARE_COMPUTE(targets=all):-xslang -DRWBAB
 
 //TEST:SIMPLE(filecheck=SPV):-target spirv -entry computeMain -stage compute -emit-spirv-directly
 

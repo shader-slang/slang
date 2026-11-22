@@ -1,7 +1,7 @@
-// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target hlsl -profile cs_6_6 -entry computeMain -experimental-feature
-// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target wgsl -stage compute -entry computeMain -experimental-feature
-// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target glsl -stage compute -entry computeMain -experimental-feature
-// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain -experimental-feature
+// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl -profile cs_6_6 -entry computeMain -experimental-feature
+// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target wgsl -stage compute -entry computeMain -experimental-feature
+// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target glsl -stage compute -entry computeMain -experimental-feature
+// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target cpp -stage compute -entry computeMain -experimental-feature
 
 import slang.neural;
 
@@ -21,5 +21,11 @@ void computeMain(uint tid : SV_GroupIndex)
         1);
 }
 
-// CHECK: static assertion failed
-// CHECK: NetworkParameterLayoutConverter.toOptimalLayout
+// toOptimalLayout's [require]s (cuda/metal/spirv compute) fire at the entry
+// point before the lowered body's own static_assert is reached, so the
+// diagnostic names the call site rather than the converter's internals. That
+// also retires this file's coverage of the converter's own
+// "supports CUDA, SPIR-V, and Metal targets only" static_assert — from this
+// entry point it is no longer reachable.
+// CHECK: error[E36107]: unavailable features in entry point
+// CHECK: see using of 'toOptimalLayout'

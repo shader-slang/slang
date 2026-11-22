@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#associated-type-bounds
-//META: doc_section_digest=71d487355c4bcb7872fbd2df16f024978d48bf90eba4da3f6bd6ba782dd68d15
+//META: doc_section_digest=0c68bfe17b84bd9c39a85e11be734dc556a406eabd46eed808e1ec3d8d61b661
 //META: purpose=An interface-level subtype constraint (`interface IDerived : IBase`) lowers as its own requirement entry whose requirement value is a WitnessTableType — `interface_req_entry(%key, witness_table_t(%IBase))`.
 //META: intent=functional
 //META: pipeline_stage=lower

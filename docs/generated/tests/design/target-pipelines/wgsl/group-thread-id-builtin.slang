@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#legalizeirforwgsl
-//META: doc_section_digest=33ccb88a3da115be9cff2c913440e47d7a1de3a78d0cd2269b27a0b1b59788c0
+//META: doc_section_digest=86620dc839535002087154141c15a7d452a7ce8a626c5c081b7136a0ff4ed6d6
 //META: purpose=SV_GroupThreadID becomes @builtin(local_invocation_id) on the WGSL entry-point parameter
 //META: intent=functional
 //META: pipeline_stage=ir-pass

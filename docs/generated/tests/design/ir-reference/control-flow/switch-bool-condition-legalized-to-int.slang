@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#switch-and-targetswitch
-//META: doc_section_digest=bb310095020a0added87bde60cb729ab81078e469d274a935ab7dd9ece947e47
+//META: doc_section_digest=9ed6898dc4712155dd5c86ec8e6556e0db11da6e13cde8988194d8247ca4141f
 //META: purpose=A switch whose condition is a bool is legalized on targets requiring an integer switch — the scrutinee gains a bool-to-int conversion and each case key is rewritten to the matching integer (true to 1, false to 0) — while targets that accept a bool switch keep `case true:` / `case false:`.
 //META: intent=functional
 //META: pipeline_stage=emit

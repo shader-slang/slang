@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#entrypoint--entrypointdecoration
-//META: doc_section_digest=ff6c94094e2d0e2a20dc1c11d1c633e985b5a8ead5b778a7bb6d4b79b6c30013
+//META: doc_section_digest=f91249d2e8a42fc3ec6ad95c39ad5d65e4982723fb7beeb3095464f47cc54d67
 //META: purpose=A non-entry helper called from main does not carry entryPoint, while main does, so the decoration is scoped to the entry-point function alone.
 //META: intent=functional
 //META: pipeline_stage=lower

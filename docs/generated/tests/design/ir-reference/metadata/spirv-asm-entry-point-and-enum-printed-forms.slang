@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#spirvasmoperand
-//META: doc_section_digest=30d7b2afee044e4800553745578314d872096bca3b9b7d00e70fdc652dd523c8
+//META: doc_section_digest=68106a291d7f7a8630bdf58b4820819939b762de014ec19cab695b1ed173d8c3
 //META: purpose=The __entryPoint token prints bare with no parentheses inside its SPIRVAsmInst, while a named enumerator beside it prints as only its wrapped integer.
 //META: intent=functional
 //META: pipeline_stage=lower

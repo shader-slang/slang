@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#storage-only-floating-point
-//META: doc_section_digest=1fcf56ca9c97e99f04a29d7585a24446c455c4e0b2006ddc95096b3ac22eb358
+//META: doc_section_digest=f5b583f28a33d31cfd085806a27cd0dc991ff52e4389577a35aa5289d1f9d2c2
 //META: purpose=The three storage-only float opcodes BFloat16Type, FloatE4M3Type and FloatE5M2Type appear as struct-field types in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower

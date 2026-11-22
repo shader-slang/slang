@@ -2,8 +2,7 @@
 
 // Test that a function/method can return a value of an opaque type.
 
-//TEST(compute):COMPARE_COMPUTE:
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -llvm
+//TEST:COMPARE_COMPUTE(targets=all-llvm):
 
 struct Stuff
 {

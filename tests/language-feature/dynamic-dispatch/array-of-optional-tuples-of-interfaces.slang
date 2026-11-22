@@ -1,13 +1,13 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type -Xslang -Wno-41020
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -Xslang -Wno-41020
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 //
 // Test vectors of interface types
-// 
+//
 
-public interface ITerm 
+public interface ITerm
 {
     float4 evaluate(float4 u);
 }
@@ -39,10 +39,10 @@ extension<int N> Array<Term, N>
             var term = this[i];
             if (let t = term)
             {
-                // This is strictly not necessary, but the 
+                // This is strictly not necessary, but the
                 // front-end complains if we use 't' directly.
                 //
-                var t2 = t; 
+                var t2 = t;
 
                 v += t2._0.evaluate(u) * t2._1;
             }
@@ -58,21 +58,21 @@ void computeMain(uint3 threadId: SV_DispatchThreadID) {
 
     let pixel = uint2(threadId.x, threadId.y);
     Array<Term, 3> terms1 =
-        { 
-            Term({Multiply(4.f), 0.5f}), 
-            Term({Pow(2), 0.5f}), 
+        {
+            Term({Multiply(4.f), 0.5f}),
+            Term({Pow(2), 0.5f}),
             none
         };
 
     // 4 * 0.5 * 0.5 + (0.5 ^ 2) * 0.5 = 1 + 0.125 = 1.125
     outputBuffer[0] = terms1.sumOver(float4(0.5)).x; // CHECK: 1.125
 
-    Array<Term, 4> terms2 = 
-        { 
-            Term({Multiply(3.f), 1.f}), 
-            none, 
-            Term({Multiply(4.f), 0.5f}), 
-            Term({Multiply(5.f), 0.5f}) 
+    Array<Term, 4> terms2 =
+        {
+            Term({Multiply(3.f), 1.f}),
+            none,
+            Term({Multiply(4.f), 0.5f}),
+            Term({Multiply(5.f), 0.5f})
         };
 
     // 3 * 0.5 + 4 * 0.5 * 0.5 + 5 * 0.5 * 0.5 = 1.5 + 1 + 1.25 = 3.75

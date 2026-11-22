@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#interlocked-is-a-wrapper-not-an-opcode
-//META: doc_section_digest=7b87b736cd493e5a9697e064429849fbc9b5f1e3a536c25c80750e511548e528
+//META: doc_section_digest=f6cf80458915c8409d3d0c1d97c3c8a35a8993765cb056ae9eb82e0b5301e131
 //META: purpose=HLSL's `InterlockedAdd(dest, value, original)` is a `[ForceInline]` core-module function, so immediately after AST lowering `func %main` holds a `call`, not an `atomicAdd` opcode.
 //META: intent=functional
 //META: pipeline_stage=lower

@@ -313,6 +313,12 @@ struct WorkspaceFolder
 
 struct InitializeParams
 {
+    // The single workspace root used by clients that do not send `workspaceFolders`.
+    JSONOptional<String> rootUri;
+
+    // Deprecated by LSP in favor of `rootUri`, but still sent by some older clients.
+    JSONOptional<String> rootPath;
+
     List<WorkspaceFolder> workspaceFolders;
     static const UnownedStringSlice methodName;
     static const StructRttiInfo g_rttiInfo;

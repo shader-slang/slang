@@ -1,9 +1,15 @@
 implementing numerics;
 
-// These aliases combine an extensible scalar capability with the sealed builtin representation
-// domain needed by builtin vector, matrix, cooperative-vector, and intrinsic declarations. The
-// public spelling deliberately describes the complete useful constraint; clients should not need
-// to name the implementation-level `__Builtin...` interfaces directly.
+/// Identifies the non-void builtin scalar representations supported by compiler-defined casts.
+/// This sealed interface is a dispatch marker, not a mathematical capability. Prefer a more
+/// specific `IScalar...` or `IBuiltinScalar...` interface when an algorithm requires arithmetic.
+/// The `DispatchMarker` suffix distinguishes this alias from the capability conjunctions below.
+public typealias IBuiltinScalarTypeDispatchMarker = __BuiltinScalarType;
+
+// The remaining aliases combine an extensible scalar capability with the sealed builtin
+// representation domain needed by builtin vector, matrix, cooperative-vector, and intrinsic
+// declarations. Each public spelling describes a complete useful constraint; clients should not
+// need to name the implementation-level `__Builtin...` interfaces directly.
 
 /// Restricts `IScalarShapedType` to builtin arithmetic scalar representations.
 public typealias IBuiltinScalarShapedType = __BuiltinArithmeticType & IScalarShapedType;
@@ -11,31 +17,34 @@ public typealias IBuiltinScalarShapedType = __BuiltinArithmeticType & IScalarSha
 /// Restricts `IScalarAdditive` to builtin arithmetic scalar representations.
 public typealias IBuiltinScalarAdditive = __BuiltinArithmeticType & IScalarAdditive;
 
-/// Restricts `IScalarNumeric` to builtin arithmetic scalar representations.
-public typealias IBuiltinScalarNumeric = __BuiltinArithmeticType & IScalarNumeric;
+/// Restricts `IScalarNumeric` to builtin arithmetic scalar representations and includes numeric
+/// extrema operations supported by that closed builtin domain.
+public typealias IBuiltinScalarNumeric =
+    __BuiltinArithmeticType & IScalarNumeric & INumericExtrema;
 
 /// Restricts `IScalarSignedNumeric` to builtin signed arithmetic scalar representations.
 public typealias IBuiltinScalarSignedNumeric =
-    __BuiltinSignedArithmeticType & IScalarSignedNumeric;
+    __BuiltinSignedArithmeticType & IScalarSignedNumeric & INumericExtrema;
 
 /// Restricts `IScalarIntegerType` to builtin integer scalar representations.
-public typealias IBuiltinScalarIntegerType = __BuiltinIntegerType & IScalarIntegerType;
+public typealias IBuiltinScalarIntegerType =
+    __BuiltinIntegerType & IScalarIntegerType & INumericExtrema;
 
 /// Restricts `IScalarUnsignedIntegerType` to builtin unsigned integer scalar representations.
 public typealias IBuiltinScalarUnsignedIntegerType =
-    __BuiltinIntegerType & IScalarUnsignedIntegerType;
+    __BuiltinIntegerType & IScalarUnsignedIntegerType & INumericExtrema;
 
 /// Restricts `IScalarSignedIntegerType` to builtin signed integer scalar representations.
 public typealias IBuiltinScalarSignedIntegerType =
-    __BuiltinIntegerType & IScalarSignedIntegerType;
+    __BuiltinIntegerType & IScalarSignedIntegerType & INumericExtrema;
 
 /// Restricts `IScalarFractional` to builtin floating-point scalar representations.
 public typealias IBuiltinScalarFractional =
-    __BuiltinFloatingPointType & IScalarFractional;
+    __BuiltinFloatingPointType & IScalarFractional & INumericExtrema;
 
 /// Restricts `IScalarFloatingPoint` to builtin floating-point scalar representations.
 public typealias IBuiltinScalarFloatingPointType =
-    __BuiltinFloatingPointType & IScalarFloatingPoint;
+    __BuiltinFloatingPointType & IScalarFloatingPoint & INumericExtrema;
 
 /// Restricts `IScalarElementaryFunctions` to builtin floating-point scalar representations.
 public typealias IBuiltinScalarElementaryFunctions =
@@ -64,19 +73,29 @@ public interface IBooleanMask
     bool all();
 }
 
-/// Describes the scalar and comparison-result types of a numeric value.
+/// Describes the logical shape and component-wise selection of a numeric value.
 public interface INumericShapedType
 {
     /// The logical scalar repeated by this type. A logical scalar uses `Scalar == This`.
     associatedtype Scalar;
 
-    /// The result type of component-wise comparison and classification operations.
+    /// A Boolean shape with one decision per logical component of this type.
+    ///
+    /// Component-wise comparisons and classifications produce masks, and `selectComponents`
+    /// consumes one.
     associatedtype Mask : IBooleanMask;
 
     /// Constructs a value whose every logical component is `value`.
     ///
     /// For a logical scalar, this operation returns `value` unchanged.
     static This fromScalar(Scalar value);
+
+    /// Returns each logical component from `ifTrue` where `condition` is true, and from `ifFalse`
+    /// otherwise.
+    ///
+    /// Each component of `condition` controls the corresponding component of the result.
+    /// Each selected component is returned unchanged.
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse);
 }
 
 /// Refines `INumericShapedType` for a logical scalar.
@@ -359,6 +378,31 @@ public interface IScalarFloatingPoint : IFloatingPoint, IScalarFractional
 {
 }
 
+/// Supports splitting floating-point values with same-shape integer outputs.
+///
+/// Conformances provide an integer type with the same logical shape as the floating-point type.
+/// Matrix conformances preserve the layout of both the fractional and integer results.
+public interface IFloatingPointWithIntegerPart : IFloatingPoint
+{
+    /// The integer output type, with the same logical shape and layout as `This`.
+    associatedtype IntegerPart : INumericShapedType;
+    __constraint IntegerPart.Scalar : IScalarIntegerType;
+
+    /// Splits this value into component-wise integer and fractional parts.
+    ///
+    /// Each whole part must be representable as `IntegerPart.Scalar`. The whole parts are
+    /// truncated toward zero and written to `integralPart`. The returned fractions follow
+    /// `fractionalPart(out This)` semantics, including the target's treatment of signed zero.
+    This fractionalPart(out IntegerPart integralPart);
+}
+
+/// Scalar refinement of `IFloatingPointWithIntegerPart` with a scalar integer output.
+public interface IScalarFloatingPointWithIntegerPart
+    : IFloatingPointWithIntegerPart, IScalarFloatingPoint
+{
+    __constraint IntegerPart : IScalarIntegerType;
+}
+
 /// Supports exponential, logarithmic, and power functions without implying arithmetic or ordering.
 public interface IExponentialFunctions
 {
@@ -459,15 +503,20 @@ public typealias IElementaryFunctions =
 /// Scalar refinement of `IElementaryFunctions`.
 public typealias IScalarElementaryFunctions = IElementaryFunctions & IScalarShapedType;
 
-/// Supports operations whose conventional definitions depend on a real ordering.
-public interface IRealOrderingFunctions
+/// Supports component-wise numerical extrema operations.
+public interface INumericExtrema
 {
     /// Computes the component-wise minimum.
     This minimum(This other);
 
     /// Computes the component-wise maximum.
     This maximum(This other);
+}
 
+/// Refines `INumericExtrema` with the step operation, whose conventional definition depends on a
+/// real ordering.
+public interface IRealOrderingFunctions : INumericExtrema
+{
     /// Returns the component-wise step result: zero where this value is less than `edge`, and one
     /// otherwise.
     This step(This edge);

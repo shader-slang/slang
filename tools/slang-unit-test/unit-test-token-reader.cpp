@@ -31,7 +31,7 @@
 using namespace Slang;
 using namespace Slang::Misc;
 
-SLANG_UNIT_TEST(tokenReaderEmptyInput)
+SLANG_UNIT_TEST(tokenReaderEmptyInput, NoRenderApi)
 {
     TokenReader r("");
     SLANG_CHECK(r.IsEnd());
@@ -40,7 +40,7 @@ SLANG_UNIT_TEST(tokenReaderEmptyInput)
     SLANG_CHECK(r.NextToken().Type == TokenType::Unknown);
 }
 
-SLANG_UNIT_TEST(tokenReaderIdentifiers)
+SLANG_UNIT_TEST(tokenReaderIdentifiers, NoRenderApi)
 {
     TokenReader r("foo bar_baz Qux2");
     SLANG_CHECK(r.ReadWord() == "foo");
@@ -49,7 +49,7 @@ SLANG_UNIT_TEST(tokenReaderIdentifiers)
     SLANG_CHECK(r.IsEnd());
 }
 
-SLANG_UNIT_TEST(tokenReaderIntLiterals)
+SLANG_UNIT_TEST(tokenReaderIntLiterals, NoRenderApi)
 {
     TokenReader r("0 42 -7 +123");
     SLANG_CHECK(r.ReadInt() == 0);
@@ -61,7 +61,7 @@ SLANG_UNIT_TEST(tokenReaderIntLiterals)
     SLANG_CHECK(r2.ReadInt() == 123);
 }
 
-SLANG_UNIT_TEST(tokenReaderUIntLiterals)
+SLANG_UNIT_TEST(tokenReaderUIntLiterals, NoRenderApi)
 {
     TokenReader r("0 42 4000000000");
     SLANG_CHECK(r.ReadUInt() == 0);
@@ -69,7 +69,7 @@ SLANG_UNIT_TEST(tokenReaderUIntLiterals)
     SLANG_CHECK(r.ReadUInt() == 4000000000U);
 }
 
-SLANG_UNIT_TEST(tokenReaderFloatLiterals)
+SLANG_UNIT_TEST(tokenReaderFloatLiterals, NoRenderApi)
 {
     TokenReader r("0.0 1.5 -2.25 1e3 -3.14");
     SLANG_CHECK(r.ReadDouble() == 0.0);
@@ -79,7 +79,7 @@ SLANG_UNIT_TEST(tokenReaderFloatLiterals)
     SLANG_CHECK(r.ReadFloat() == -3.14f);
 }
 
-SLANG_UNIT_TEST(tokenReaderStringLiteral)
+SLANG_UNIT_TEST(tokenReaderStringLiteral, NoRenderApi)
 {
     TokenReader r("\"hello\" \"two words\" \"\"");
     SLANG_CHECK(r.ReadStringLiteral() == "hello");
@@ -87,7 +87,7 @@ SLANG_UNIT_TEST(tokenReaderStringLiteral)
     SLANG_CHECK(r.ReadStringLiteral() == "");
 }
 
-SLANG_UNIT_TEST(tokenReaderOperators)
+SLANG_UNIT_TEST(tokenReaderOperators, NoRenderApi)
 {
     TokenReader r("a + b == c");
     auto t = r.ReadToken();
@@ -102,7 +102,7 @@ SLANG_UNIT_TEST(tokenReaderOperators)
     SLANG_CHECK(t.Type == TokenType::Identifier && t.Content == "c");
 }
 
-SLANG_UNIT_TEST(tokenReaderPunctuation)
+SLANG_UNIT_TEST(tokenReaderPunctuation, NoRenderApi)
 {
     TokenReader r("(){}[];,.");
     SLANG_CHECK(r.ReadToken().Type == TokenType::LParent);
@@ -116,7 +116,7 @@ SLANG_UNIT_TEST(tokenReaderPunctuation)
     SLANG_CHECK(r.ReadToken().Type == TokenType::Dot);
 }
 
-SLANG_UNIT_TEST(tokenReaderLookAheadAndAdvance)
+SLANG_UNIT_TEST(tokenReaderLookAheadAndAdvance, NoRenderApi)
 {
     TokenReader r("foo bar baz");
     SLANG_CHECK(r.LookAhead(String("foo")));
@@ -128,21 +128,21 @@ SLANG_UNIT_TEST(tokenReaderLookAheadAndAdvance)
     SLANG_CHECK(r.IsEnd());
 }
 
-SLANG_UNIT_TEST(tokenReaderReadExpected)
+SLANG_UNIT_TEST(tokenReaderReadExpected, NoRenderApi)
 {
     TokenReader r("foo bar");
     SLANG_CHECK(r.Read("foo") == "foo");
     SLANG_CHECK(r.Read(String("bar")) == "bar");
 }
 
-SLANG_UNIT_TEST(tokenReaderReadType)
+SLANG_UNIT_TEST(tokenReaderReadType, NoRenderApi)
 {
     TokenReader r("123 hello");
     SLANG_CHECK(r.Read(TokenType::IntLiteral));
     SLANG_CHECK(r.Read(TokenType::Identifier));
 }
 
-SLANG_UNIT_TEST(tokenReaderBack)
+SLANG_UNIT_TEST(tokenReaderBack, NoRenderApi)
 {
     TokenReader r("foo bar baz");
     SLANG_CHECK(r.ReadWord() == "foo");
@@ -152,7 +152,7 @@ SLANG_UNIT_TEST(tokenReaderBack)
     SLANG_CHECK(r.ReadWord() == "baz");
 }
 
-SLANG_UNIT_TEST(tokenReaderTokenPosition)
+SLANG_UNIT_TEST(tokenReaderTokenPosition, NoRenderApi)
 {
     TokenReader r("foo\nbar");
     Token t = r.ReadToken();
@@ -167,7 +167,7 @@ SLANG_UNIT_TEST(tokenReaderTokenPosition)
     SLANG_CHECK(line2 > line1);
 }
 
-SLANG_UNIT_TEST(tokenReaderReadIntThrowsOnNonInt)
+SLANG_UNIT_TEST(tokenReaderReadIntThrowsOnNonInt, NoRenderApi)
 {
     TokenReader r("not-a-number");
     bool threw = false;
@@ -182,7 +182,7 @@ SLANG_UNIT_TEST(tokenReaderReadIntThrowsOnNonInt)
     SLANG_CHECK(threw);
 }
 
-SLANG_UNIT_TEST(tokenReaderReadStringThrowsOnIdentifier)
+SLANG_UNIT_TEST(tokenReaderReadStringThrowsOnIdentifier, NoRenderApi)
 {
     TokenReader r("foo");
     bool threw = false;
@@ -197,7 +197,7 @@ SLANG_UNIT_TEST(tokenReaderReadStringThrowsOnIdentifier)
     SLANG_CHECK(threw);
 }
 
-SLANG_UNIT_TEST(tokenReaderReadAfterEnd)
+SLANG_UNIT_TEST(tokenReaderReadAfterEnd, NoRenderApi)
 {
     TokenReader r("foo");
     SLANG_CHECK(r.ReadWord() == "foo");

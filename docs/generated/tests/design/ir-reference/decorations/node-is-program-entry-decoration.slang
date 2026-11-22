@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#work-graph-nodes
-//META: doc_section_digest=d3211cb2c8bf1946c6d21c3025a61938abd597a5f02eff70e030d767da85143a
+//META: doc_section_digest=ba5cf53411be35c9a539664a4903ff408ae31f00dc971f0c8a66a83a4ff5743e
 //META: purpose=A [NodeIsProgramEntry] attribute lowers to a nodeIsProgramEntry decoration with no operands on the node function.
 //META: intent=functional
 //META: pipeline_stage=lower

@@ -8,7 +8,7 @@ using namespace Slang;
 // Neither flag is observable in the emitted MSL or in the metallib -- one built without
 // `-fmetal-enable-logging` still compiles, it just drops `os_log` calls at runtime -- so the
 // command line is the only level at which losing either is caught.
-SLANG_UNIT_TEST(metalCompileArgs)
+SLANG_UNIT_TEST(metalCompileArgs, NoRenderApi)
 {
     const auto hasArg = [](const DownstreamCompileOptions& options, const char* arg)
     {

@@ -220,8 +220,9 @@ public:
     template<typename P, typename... Args>
     bool diagnose(P const& pos, DiagnosticInfo const& info, Args const&... args)
     {
-        // If we want to force generation of rich diagnostics do that here
-        if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics))
+        // Both rich and Visual Studio output consume structured diagnostics.
+        if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics) ||
+            m_diagnosticFormat == SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO)
         {
             DiagnosticArg as[] = {DiagnosticArg(args)...};
             return diagnoseRichImpl(getDiagnosticPos(pos), info, (int)sizeof...(args), as);
@@ -236,8 +237,9 @@ public:
     template<typename P>
     bool diagnose(P const& pos, DiagnosticInfo const& info)
     {
-        // If we want to force generation of rich diagnostics do that here
-        if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics))
+        // Both rich and Visual Studio output consume structured diagnostics.
+        if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics) ||
+            m_diagnosticFormat == SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO)
         {
             return diagnoseRichImpl(getDiagnosticPos(pos), info, 0, nullptr);
         }
@@ -354,8 +356,12 @@ public:
     void setSourceLineMaxLength(Index length) { m_sourceLineMaxLength = length; }
     Index getSourceLineMaxLength() const { return m_sourceLineMaxLength; }
 
-    /// Set the diagnostic color mode for rich diagnostics
-    /// AUTO will check writer->isConsole() to determine if colors should be used
+    /// Select how human-readable diagnostics are presented.
+    void setDiagnosticFormat(SlangDiagnosticFormat format) { m_diagnosticFormat = format; }
+    SlangDiagnosticFormat getDiagnosticFormat() const { return m_diagnosticFormat; }
+
+    /// Set the diagnostic color mode for rich diagnostics.
+    /// AUTO checks writer->isConsole() to determine if colors should be used.
     void setDiagnosticColorMode(SlangDiagnosticColor mode) { m_diagnosticColorMode = mode; }
     SlangDiagnosticColor getDiagnosticColorMode() const { return m_diagnosticColorMode; }
 
@@ -429,6 +435,7 @@ public:
         if (parentSink)
         {
             setFlags(parentSink->getFlags());
+            setDiagnosticFormat(parentSink->getDiagnosticFormat());
             setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
             setEnableUnicode(parentSink->getEnableUnicode());
             setEnabledWarningLevels(parentSink->getEnabledWarningLevels());
@@ -512,6 +519,8 @@ protected:
     uint32_t m_enabledWarningLevels = (uint32_t(1) << uint32_t(WarningLevel::Extra));
 
     RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
+
+    SlangDiagnosticFormat m_diagnosticFormat = SLANG_DIAGNOSTIC_FORMAT_DEFAULT;
 
     // Rich diagnostics rendering options
     SlangDiagnosticColor m_diagnosticColorMode = SLANG_DIAGNOSTIC_COLOR_AUTO;

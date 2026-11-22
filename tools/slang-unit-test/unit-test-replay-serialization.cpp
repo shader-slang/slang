@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-serialization.cpp
 // Unit tests for basic type serialization round-trips
 
@@ -7,7 +8,7 @@
 // Basic Integer Types
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextInt8)
+SLANG_UNIT_TEST(replayContextInt8, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -17,7 +18,7 @@ SLANG_UNIT_TEST(replayContextInt8)
     SLANG_CHECK(roundTripCheck<int8_t>(42));
 }
 
-SLANG_UNIT_TEST(replayContextInt16)
+SLANG_UNIT_TEST(replayContextInt16, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -27,7 +28,7 @@ SLANG_UNIT_TEST(replayContextInt16)
     SLANG_CHECK(roundTripCheck<int16_t>(12345));
 }
 
-SLANG_UNIT_TEST(replayContextInt32)
+SLANG_UNIT_TEST(replayContextInt32, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -37,7 +38,7 @@ SLANG_UNIT_TEST(replayContextInt32)
     SLANG_CHECK(roundTripCheck<int32_t>(123456789));
 }
 
-SLANG_UNIT_TEST(replayContextInt64)
+SLANG_UNIT_TEST(replayContextInt64, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -47,7 +48,7 @@ SLANG_UNIT_TEST(replayContextInt64)
     SLANG_CHECK(roundTripCheck<int64_t>(1234567890123456789LL));
 }
 
-SLANG_UNIT_TEST(replayContextUInt8)
+SLANG_UNIT_TEST(replayContextUInt8, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -56,7 +57,7 @@ SLANG_UNIT_TEST(replayContextUInt8)
     SLANG_CHECK(roundTripCheck<uint8_t>(128));
 }
 
-SLANG_UNIT_TEST(replayContextUInt16)
+SLANG_UNIT_TEST(replayContextUInt16, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -65,7 +66,7 @@ SLANG_UNIT_TEST(replayContextUInt16)
     SLANG_CHECK(roundTripCheck<uint16_t>(32768));
 }
 
-SLANG_UNIT_TEST(replayContextUInt32)
+SLANG_UNIT_TEST(replayContextUInt32, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -74,7 +75,7 @@ SLANG_UNIT_TEST(replayContextUInt32)
     SLANG_CHECK(roundTripCheck<uint32_t>(2147483648U));
 }
 
-SLANG_UNIT_TEST(replayContextRejectsTruncatedOutputUInt32)
+SLANG_UNIT_TEST(replayContextRejectsTruncatedOutputUInt32, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -101,7 +102,7 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedOutputUInt32)
     SLANG_CHECK(caughtException);
 }
 
-SLANG_UNIT_TEST(replayContextUInt64)
+SLANG_UNIT_TEST(replayContextUInt64, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -114,7 +115,7 @@ SLANG_UNIT_TEST(replayContextUInt64)
 // Floating-Point Types
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextFloat)
+SLANG_UNIT_TEST(replayContextFloat, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -125,7 +126,7 @@ SLANG_UNIT_TEST(replayContextFloat)
     SLANG_CHECK(roundTripCheck<float>(1.0e-38f));
 }
 
-SLANG_UNIT_TEST(replayContextDouble)
+SLANG_UNIT_TEST(replayContextDouble, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -140,7 +141,7 @@ SLANG_UNIT_TEST(replayContextDouble)
 // Boolean Type
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextBool)
+SLANG_UNIT_TEST(replayContextBool, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -165,7 +166,7 @@ static void writeRepeatedBytes(size_t count, uint8_t value)
     }
 }
 
-SLANG_UNIT_TEST(replayContextString)
+SLANG_UNIT_TEST(replayContextString, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -195,7 +196,7 @@ SLANG_UNIT_TEST(replayContextString)
     SLANG_CHECK(testString("Unicode test: こんにちは"));
 }
 
-SLANG_UNIT_TEST(replayContextRejectsOutputStringNullnessMismatch)
+SLANG_UNIT_TEST(replayContextRejectsOutputStringNullnessMismatch, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -245,7 +246,7 @@ SLANG_UNIT_TEST(replayContextRejectsOutputStringNullnessMismatch)
     }
 }
 
-SLANG_UNIT_TEST(replayContextAcceptsMaxStringLength)
+SLANG_UNIT_TEST(replayContextAcceptsMaxStringLength, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -271,7 +272,7 @@ SLANG_UNIT_TEST(replayContextAcceptsMaxStringLength)
     SLANG_CHECK(ctx().getStream().atEnd());
 }
 
-SLANG_UNIT_TEST(replayContextRejectsStringLengthPastLimit)
+SLANG_UNIT_TEST(replayContextRejectsStringLengthPastLimit, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -300,7 +301,7 @@ SLANG_UNIT_TEST(replayContextRejectsStringLengthPastLimit)
     SLANG_CHECK(caughtException);
 }
 
-SLANG_UNIT_TEST(replayContextRejectsOversizedStringLength)
+SLANG_UNIT_TEST(replayContextRejectsOversizedStringLength, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -329,7 +330,7 @@ SLANG_UNIT_TEST(replayContextRejectsOversizedStringLength)
     SLANG_CHECK(caughtException);
 }
 
-SLANG_UNIT_TEST(replayContextRejectsTruncatedStringPayload)
+SLANG_UNIT_TEST(replayContextRejectsTruncatedStringPayload, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -360,7 +361,7 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedStringPayload)
     SLANG_CHECK(caughtException);
 }
 
-SLANG_UNIT_TEST(replayContextRejectsTruncatedStringLength)
+SLANG_UNIT_TEST(replayContextRejectsTruncatedStringLength, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -389,7 +390,7 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedStringLength)
     SLANG_CHECK(caughtException);
 }
 
-SLANG_UNIT_TEST(replayContextRejectsCumulativeReplayArenaAllocationPastBudget)
+SLANG_UNIT_TEST(replayContextRejectsCumulativeReplayArenaAllocationPastBudget, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -429,7 +430,7 @@ static void writeArrayHeader(uint64_t arrayCount)
     ctx().getStream().write(&arrayCount, sizeof(arrayCount));
 }
 
-SLANG_UNIT_TEST(replayContextAcceptsMaxArrayCountAtAllocationLimit)
+SLANG_UNIT_TEST(replayContextAcceptsMaxArrayCountAtAllocationLimit, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -459,7 +460,7 @@ SLANG_UNIT_TEST(replayContextAcceptsMaxArrayCountAtAllocationLimit)
     SLANG_CHECK(!caughtException);
 }
 
-SLANG_UNIT_TEST(replayContextRejectsOversizedArrayCount)
+SLANG_UNIT_TEST(replayContextRejectsOversizedArrayCount, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -485,7 +486,7 @@ SLANG_UNIT_TEST(replayContextRejectsOversizedArrayCount)
     SLANG_CHECK(caughtException);
 }
 
-SLANG_UNIT_TEST(replayContextRejectsArrayAllocationPastLimit)
+SLANG_UNIT_TEST(replayContextRejectsArrayAllocationPastLimit, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -511,7 +512,7 @@ SLANG_UNIT_TEST(replayContextRejectsArrayAllocationPastLimit)
     SLANG_CHECK(caughtException);
 }
 
-SLANG_UNIT_TEST(replayContextRejectsArrayCountThatDoesNotFitCountType)
+SLANG_UNIT_TEST(replayContextRejectsArrayCountThatDoesNotFitCountType, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -537,7 +538,7 @@ SLANG_UNIT_TEST(replayContextRejectsArrayCountThatDoesNotFitCountType)
     SLANG_CHECK(caughtException);
 }
 
-SLANG_UNIT_TEST(replayContextRejectsTruncatedArrayPayload)
+SLANG_UNIT_TEST(replayContextRejectsTruncatedArrayPayload, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -563,7 +564,7 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedArrayPayload)
     SLANG_CHECK(caughtException);
 }
 
-SLANG_UNIT_TEST(replayContextCountsNestedStringArrayAllocations)
+SLANG_UNIT_TEST(replayContextCountsNestedStringArrayAllocations, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -596,7 +597,7 @@ SLANG_UNIT_TEST(replayContextCountsNestedStringArrayAllocations)
 // Slang Enums
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextSlangEnums)
+SLANG_UNIT_TEST(replayContextSlangEnums, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -649,7 +650,7 @@ SLANG_UNIT_TEST(replayContextSlangEnums)
 // SlangUUID
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextSlangUUID)
+SLANG_UNIT_TEST(replayContextSlangUUID, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -676,7 +677,7 @@ SLANG_UNIT_TEST(replayContextSlangUUID)
 // CompilerOptionValue
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextCompilerOptionValue)
+SLANG_UNIT_TEST(replayContextCompilerOptionValue, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -708,7 +709,7 @@ SLANG_UNIT_TEST(replayContextCompilerOptionValue)
 // PreprocessorMacroDesc
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextPreprocessorMacroDesc)
+SLANG_UNIT_TEST(replayContextPreprocessorMacroDesc, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -734,7 +735,7 @@ SLANG_UNIT_TEST(replayContextPreprocessorMacroDesc)
 // TargetDesc
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextTargetDesc)
+SLANG_UNIT_TEST(replayContextTargetDesc, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -770,7 +771,7 @@ SLANG_UNIT_TEST(replayContextTargetDesc)
 // Multiple Values in Sequence
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextMultipleValues)
+SLANG_UNIT_TEST(replayContextMultipleValues, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -817,7 +818,7 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
 // TypeMismatchException
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextTypeMismatch)
+SLANG_UNIT_TEST(replayContextTypeMismatch, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -844,3 +845,4 @@ SLANG_UNIT_TEST(replayContextTypeMismatch)
     }
     SLANG_CHECK(caughtException);
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#metals-three-lowerbufferelementtypetostoragetype-invocations
-//META: doc_section_digest=41531393ced08c0803ee8c63b01f36a7cafa65309b49df24964c1309a93f4b8e
+//META: doc_section_digest=3aceda666e9b61557ae6e477f56a082f9ca8a551751410e690a18985649e0b14
 //META: purpose=Boundary: the smallest square matrix (`float2x2`) in a device buffer also lowers to packed-vector storage, emitted as MSL `packed_float2`.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

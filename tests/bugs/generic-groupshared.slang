@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute,vulkan):COMPARE_COMPUTE_EX:-vk -slang -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -14,7 +13,7 @@ RWStructuredBuffer<int> outputBuffer;
 // particular function (and the `groupshared` declaration inside
 // it) "works," but the function itself is not something that we
 // intend to be supported in Slang.
-// 
+//
 [ForceInline]
 Ref<uint> table<let n: int>(int index)
 {

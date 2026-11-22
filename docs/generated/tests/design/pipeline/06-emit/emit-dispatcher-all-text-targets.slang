@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#emit-dispatcher
-//META: doc_section_digest=931b6be8623259835eb4a857276a2ea3e6c3d0ca8f46230a8f6b9a1c92951550
+//META: doc_section_digest=92e023f0a75afa74e97ee54b41fb321e85a40d089c1c1745a438f658bc96eee2
 //META: purpose=One compute kernel routed through the emit dispatcher produces target-shaped text for every textual backend plus the direct SPIR-V backend.
 //META: intent=functional
 //META: pipeline_stage=emit

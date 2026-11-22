@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T14:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#specialize
-//META: doc_section_digest=5cac296d266201e4d3de96f7fc1898dce2f4e449490481d5cad84d3767af5dad
+//META: doc_section_digest=0cc99cb5e0e3d3377473e83d6b3cf2854bebe79ada87f0ce4ea42180738db9ee
 //META: purpose=Explicitly specializing a generic with an interface (existential) type argument is rejected with E33180.
 //META: intent=characterization
 //META: covers=source/slang/slang-ir-specialize.cpp

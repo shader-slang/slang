@@ -1,7 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl -DTARGET_GLSL
-//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/atomic/atomicCounter.slang -stage compute -entry computeMain -target glsl -DTARGET_GLSL
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/atomic/atomicCounter.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 #version 430
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
@@ -50,7 +49,7 @@ bool testAtomicUint()
 // ensure the code emits for `one` index into [3] for 12/4
 // CHECK_GLSL-DAG: {{.*}}_data_{{.*}}[3]{{.*}}
     return true
-    
+
         && atomicCounterExchange(one, 5) != 100
 // CHECK_GLSL-DAG: atomicAdd(
 // CHECK_SPV-DAG: OpAtomicIIncrement
@@ -82,7 +81,7 @@ bool testAtomicUint()
         && atomicCounterExchange(one, 5) != 100
 // CHECK_GLSL-DAG: atomicMax(
 // CHECK_SPV-DAG: OpAtomicUMax
-        && atomicCounterMax(one, 1) == 5 
+        && atomicCounterMax(one, 1) == 5
         && atomicCounter(one) == 5
 
 // CHECK_GLSL-DAG: atomicAnd(
@@ -106,13 +105,13 @@ bool testAtomicUint()
 // CHECK_GLSL-DAG: atomicCompSwap(
 // CHECK_SPV-DAG: OpAtomicCompareExchange
         && atomicCounterExchange(one, 5) != 100
-        && atomicCounterCompSwap(one, 5, 3) == 5 
+        && atomicCounterCompSwap(one, 5, 3) == 5
         && atomicCounter(one) == 3
 
 // CHECK_GLSL-DAG: atomicCompSwap(
 // CHECK_SPV-DAG: OpAtomicCompareExchange
         && atomicCounterExchange(one, 5) != 100
-        && atomicCounterCompSwap(one, 5, 3) == 5 
+        && atomicCounterCompSwap(one, 5, 3) == 5
         && atomicCounter(one) == 3
 
         && counterAsParam(one);

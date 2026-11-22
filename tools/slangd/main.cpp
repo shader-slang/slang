@@ -3,7 +3,7 @@
 // This file implements the entry point for `slangd`, the daemon process of Slang's language server.
 
 #include "core/slang-basic.h"
-#include "slang/slang-language-server.h"
+#include "slang/language-server/slang-language-server.h"
 
 #include <thread>
 

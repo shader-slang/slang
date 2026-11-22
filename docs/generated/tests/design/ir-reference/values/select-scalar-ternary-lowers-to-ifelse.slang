@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#select
-//META: doc_section_digest=e40d6712a2443477b9dd87fd4146f5ac3852042d7d571c4f7aa5a1ef274fdbc1
+//META: doc_section_digest=3b5109edc595d8e386591ea291155032aaed6d4073b37d2b31e86bba10c285b4
 //META: purpose=A scalar-conditioned ternary `?:` inside a function does NOT lower to `select`; it lowers to an `ifElse` with then/else blocks and a join-block `param`, because Slang's scalar `?:` short-circuits.
 //META: intent=functional
 //META: pipeline_stage=lower

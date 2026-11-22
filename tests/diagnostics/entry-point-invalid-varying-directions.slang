@@ -1,14 +1,11 @@
-// Test that invalid varying types are caught in `out`, `inout`, and `__ref`
-// parameters, with correct direction labelling in the diagnostic text.
-//
-// `InOutModifier` inherits from `OutModifier` in the AST, so the direction
-// detection logic must check `InOutModifier` first to avoid mislabeling
-// `inout` parameters as "output". `RefModifier` is a separate modifier and
-// should also label as "input/output".
+// Test that invalid varying types are caught in `out` and `inout` parameters, with correct
+// direction labelling in the diagnostic text.
+// An `inout` parameter is both a stage input and a stage output, so it must
+// not be labelled as only "output".
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=OUT,non-exhaustive):-target spirv -entry outParam -stage fragment
 //DIAGNOSTIC_TEST:SIMPLE(diag=INOUT,non-exhaustive):-target spirv -entry inoutParam -stage fragment
-//DIAGNOSTIC_TEST:SIMPLE(diag=REF,non-exhaustive):-target spirv -entry refParam -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=IN_OUT,non-exhaustive):-target spirv -entry inAndOutParam -stage fragment
 
 [shader("fragment")]
 void outParam(out DifferentialPair<float> dp : SV_Target0)
@@ -22,8 +19,9 @@ void inoutParam(inout DifferentialPair<float> dp : SV_Target0)
 {
 }
 
+// The two-keyword spelling `in out` declares the same passing mode as `inout`.
 [shader("fragment")]
-void refParam(__ref DifferentialPair<float> dp : SV_Target0)
-//REF: used as input/output
+void inAndOutParam(in out DifferentialPair<float> dp : SV_Target0)
+//IN_OUT: used as input/output
 {
 }

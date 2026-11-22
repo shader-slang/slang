@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#generic-parameters-accessors-and-synthesized-members
-//META: doc_section_digest=5af69869d1bb41b9ec6da86b628cac4884b654398df91d571e67dbe22a034ace
+//META: doc_section_digest=9cf2018f7631fb1edb894cee46db1dd141344017dc943113e8662661b88df42c
 //META: purpose=A synthesized differential type propagates an `internal` parent's visibility, so a `public` function naming that `Differential` in its signature is rejected with `use-of-less-visible-type` (30604).
 //META: intent=negative
 //META: pipeline_stage=check

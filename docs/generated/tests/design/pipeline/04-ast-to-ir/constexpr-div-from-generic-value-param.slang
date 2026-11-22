@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#builtin-operators-bypass-call-lowering
-//META: doc_section_digest=84a14c8c06fb62977462b222065d70ef81479ad93846db3d8c9e968027e956d2
+//META: doc_section_digest=406739b370a5ef05319669d01da3461b7d7e09195ac8ecfdfe64017fe9eca325
 //META: purpose=An array extent `N / 2` on a generic value parameter arrives as a `BuiltinOperationIntVal` and lowers to the hoistable `constexprDiv(%N, 2 : Int)` opcode keyed on its BuiltinOperationKind.
 //META: intent=functional
 //META: pipeline_stage=lower

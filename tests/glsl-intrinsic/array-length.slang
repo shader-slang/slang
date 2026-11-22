@@ -1,10 +1,8 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj  -allow-glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -shaderobj -render-feature hardware-device -allow-glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -shaderobj -allow-glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -shaderobj -allow-glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -allow-glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -g0 -allow-glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-llvm -compute -shaderobj -allow-glsl
+//TEST:COMPARE_COMPUTE(targets=vk+metal+cpu+wgpu+llvm, filecheck-buffer=BUF):
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-render-feature hardware-device
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUF):-g0
+
+import glsl;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

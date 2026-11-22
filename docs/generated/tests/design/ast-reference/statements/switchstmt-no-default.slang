@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#switchstmt-casestmt-defaultstmt
-//META: doc_section_digest=c17fa898c930ec5bd9c17383b899c278d84a084e1966bd606af453fb02db5a07
+//META: doc_section_digest=13efdda0ccc7720aa861efdef335d6633fc6c1f771e3f28b4047c028e42fa9a0
 //META: purpose=A SwitchStmt without a DefaultStmt marker lets an unmatched condition value pass through the switch without entering any case section.
 //META: intent=boundary
 //META: pipeline_stage=lower

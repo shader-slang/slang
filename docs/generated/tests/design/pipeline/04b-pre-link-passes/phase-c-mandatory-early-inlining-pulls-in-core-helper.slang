@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#performmandatoryearlyinlining-and-the-surrounding-loop
-//META: doc_section_digest=334e18bcc405858cc1b138ad3c309f182a118316cbcb940b8ace0438053c2b33
+//META: doc_section_digest=45700e5c47e0a2ee88e4d198dd52d0a8014c20dcf49db894f9da9ec487600515
 //META: purpose=The prelinkIR import of cross-module [unsafeForceInlineEarly] bodies plus the Phase C mandatory-early-inlining loop leaves the core arithmetic operator inlined rather than called.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

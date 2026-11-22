@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#byteaddressbufferstore-operand-naming
-//META: doc_section_digest=dd396c93c301bd7bc4aa81cc65b19551c535ca8bad0b2958e43e8832c6e6ce21
+//META: doc_section_digest=506781798e5ac2ada0cb22420a06962f4ca8860da13dd9451ced8a02b444b1c9
 //META: purpose=`byteAddressBufferStore` carries four operands in the order `buffer, offset, alignment, value` — the alignment literal sits at operand 2 and the stored value at operand 3, the reverse of the Lua operand names.
 //META: intent=functional
 //META: pipeline_stage=lower

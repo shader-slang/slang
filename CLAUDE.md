@@ -207,6 +207,35 @@ change.)
   newElementType, `vector<T,N>` → `vector<newElementType,N>`, `matrix<T,R,C>` → `matrix<newElementType,R,C>`."_
   — not _"element coerce target"_.
 
+- **Write comments as declarative statements about the design, not imperatives directed at the
+  reader.** State how the code is structured and why, in the present tense ("We split X into Y
+  because Z"), not as an instruction to whoever is reading it ("Keep X in Y"). Prefer:
+
+  > _"We have split support for automatic differentiation into a supplement that loads as a
+  > separate module, in order to improve compile times for code that doesn't need it. Existing
+  > Slang code may assume autodiff support is pervasively available, so we place the relevant
+  > public declarations and attributes here in the core module rather than the supplement; user
+  > code that refers to these attributes triggers on-demand loading of the autodiff supplement."_
+
+  over:
+
+  > _"Keep the custom-derivative attribute spellings in the base module. Semantic checking uses a
+  > recognized attribute as the signal to load the full autodiff module before validating it."_
+
+  An imperative comment tends to state only _what_ to do and skip _why_ the structure exists;
+  declarative "we" phrasing makes the why unavoidable. Give a paragraph an explicit subject
+  instead of opening with an unattached "This."
+
+- **Keep comments proportionate to what they explain, and land on a conclusion.** A comment
+  records durable state — an invariant, a constraint, the reason for an unusual shape — not the
+  edits or review rounds that produced it (a renumbering note belongs in the commit message, not
+  the header). Prefer one "if X, then Y, because Z" sentence over a paragraph of premises that
+  never states its point. If justifying a single conditional or a single line takes several
+  paragraphs, treat that as a signal to restructure the code — extract a named helper, assert the
+  invariant, simplify the condition — rather than a signal to add more prose. This is about
+  ordinary comments; a genuinely subtle cross-pass invariant can still warrant the fuller worked
+  example below, but that is the exception, not the default.
+
 - **Use conversational examples for code comments and PR explanations.** When explaining a subtle
   compiler path, prefer "Consider this example:" followed by the relevant user code. Do not use
   abstract labels such as "Full source shape", "AST trace", or "IR trace" as a substitute for
@@ -340,12 +369,12 @@ working on repro handling. Inputs are validated before use.
 **Compiler Pipeline**:
 
 - **Lexer** (`source/compiler-core/slang-lexer.cpp`): Tokenizes source code
-- **Preprocessor** (`source/slang/slang-preprocessor.cpp`): Handles #include, macros, conditionals
-- **Parser** (`source/slang/slang-parser.cpp`): Recursive descent parser producing AST
+- **Preprocessor** (`source/slang/preprocessor/slang-preprocessor.cpp`): Handles #include, macros, conditionals
+- **Parser** (`source/slang/parser/slang-parser.cpp`): Recursive descent parser producing AST
 - **Semantic Checker** (`source/slang/slang-check.cpp`): Type checking, name resolution, validation
-- **IR Generation** (`source/slang/slang-lower-to-ir.cpp`): Converts AST to Slang IR
-- **IR Passes** (`source/slang/slang-ir-*.cpp`): Optimization and lowering passes
-- **Code Emission** (`source/slang/slang-emit-*.cpp`): Target-specific code generation
+- **IR Generation** (`source/slang/lower-to-ir/slang-lower-to-ir.cpp`): Converts AST to Slang IR
+- **IR Passes** (`source/slang/ir-passes/slang-ir-*.cpp`): Optimization and lowering passes
+- **Code Emission** (`source/slang/emission/slang-emit-*.cpp`): Target-specific code generation
 
 **Key Directories**:
 
@@ -388,17 +417,17 @@ working on repro handling. Inputs are validated before use.
 ### Adding New Language Features
 
 1. Update lexer for new tokens (`source/compiler-core/slang-lexer.cpp`)
-2. Extend parser for new syntax (`source/slang/slang-parser.cpp`)
-3. Add semantic analysis (`source/slang/slang-check-*.cpp`)
-4. Implement IR generation (`source/slang/slang-ir-*.cpp`)
-5. Add code generation for each target backend (`source/slang/slang-emit-*.cpp`)
+2. Extend parser for new syntax (`source/slang/parser/slang-parser.cpp`)
+3. Add semantic analysis (`source/slang/semantic-checking/slang-check-*.cpp`)
+4. Implement IR generation (`source/slang/lower-to-ir/slang-lower-to-ir.cpp`)
+5. Add code generation for each target backend (`source/slang/emission/slang-emit-*.cpp`)
 6. Write comprehensive tests under `tests/`
 
 ### Common Development Tasks
 
-- **Adding an IR instruction**: Update the Lua definition files in `source/slang/slang-ir-insts.lua`, then regenerate
+- **Adding an IR instruction**: Update the Lua definition files in `source/slang/ir/slang-ir-insts.lua`, then regenerate
 - **Adding a built-in function**: Add to appropriate module in `prelude/`
-- **Adding a new target**: Implement new emitter in `source/slang/slang-emit-*.cpp`
+- **Adding a new target**: Implement new emitter in `source/slang/emission/slang-emit-*.cpp`
 
 ### Capability Atoms Documentation
 
@@ -515,7 +544,7 @@ Use the `/repro-remix` skill or see `extras/repro-remix.md`.
 
 ### Language Server
 
-- Language Server Protocol implementation in `source/slang/slang-language-server.cpp`
+- Language Server Protocol implementation in `source/slang/language-server/slang-language-server.cpp`
 - Supports IntelliSense, completion, diagnostics, formatting
 - Used by VS Code and Visual Studio extensions
 

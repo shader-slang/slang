@@ -31,7 +31,12 @@ typedef enum
     NVRTC_ERROR_NO_NAME_EXPRESSIONS_AFTER_COMPILATION = 8,
     NVRTC_ERROR_NO_LOWERED_NAMES_BEFORE_COMPILATION = 9,
     NVRTC_ERROR_NAME_EXPRESSION_NOT_VALID = 10,
-    NVRTC_ERROR_INTERNAL_ERROR = 11
+    NVRTC_ERROR_INTERNAL_ERROR = 11,
+    // Returned by nvrtcGetPCHCreateStatus (NVRTC 12.8+) when no precompiled header was created for
+    // a compile — because an existing one was reused, or the compiler declined. This typedef is a
+    // partial mirror of NVRTC's nvrtcResult (cuda/nvrtcResult.h); that enum is append-only, and 13
+    // is this code's value as of CUDA 12.8 (NVRTC_ERROR_TIME_FILE_WRITE_FAILED is 12).
+    NVRTC_ERROR_NO_PCH_CREATE_ATTEMPTED = 13
 } nvrtcResult;
 
 typedef struct _nvrtcProgram* nvrtcProgram;
@@ -118,8 +123,11 @@ public:
     SlangResult init(ISlangSharedLibrary* library);
 
     NVRTCDownstreamCompiler() {}
+    ~NVRTCDownstreamCompiler();
 
 protected:
+    SlangResult _preloadBuiltinsLibrary();
+
     struct ScopeProgram
     {
         ScopeProgram(NVRTCDownstreamCompiler* compiler, nvrtcProgram program)
@@ -154,6 +162,11 @@ protected:
 
     SLANG_NVRTC_FUNCS(SLANG_NVTRC_MEMBER_FUNCS);
 
+    // Optional: reports whether NVRTC created an automatic precompiled header for a program
+    // (`-pch`, NVRTC 12.8+). Loaded null-tolerantly in init() because it is absent on older
+    // toolkits, where `-pch` is never requested.
+    nvrtcResult (*m_nvrtcGetPCHCreateStatus)(nvrtcProgram prog) = nullptr;
+
     // Holds list of paths passed in where cuda_fp16.h is found. Does *NOT*
     // include cuda_fp16.h.
     List<String> m_cudaFp16FoundPaths;
@@ -174,6 +187,10 @@ protected:
     String m_optixIncludePath;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
+
+    // On Windows, the `nvrtc-builtins64_<major><minor>.dll` that sits next to the NVRTC library.
+    // We keep it loaded for the lifetime of the compiler. See `_preloadBuiltinsLibrary`.
+    SharedLibrary::Handle m_builtinsLibrary = nullptr;
 };
 
 #define SLANG_NVRTC_RETURN_ON_FAIL(x) \
@@ -192,6 +209,11 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
 
     SLANG_NVRTC_FUNCS(SLANG_NVTRC_GET_FUNC)
 
+    // Optional symbol (NVRTC 12.8+). Deliberately outside SLANG_NVRTC_FUNCS, whose members are all
+    // required: a null here must not fail init() on an older NVRTC that lacks `-pch`.
+    m_nvrtcGetPCHCreateStatus =
+        (nvrtcResult(*)(nvrtcProgram))library->findFuncByName("nvrtcGetPCHCreateStatus");
+
     m_sharedLibrary = library;
 
     m_desc.type = SLANG_PASS_THROUGH_NVRTC;
@@ -199,7 +221,49 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
     int major, minor;
     m_nvrtcVersion(&major, &minor);
     m_desc.version.set(major, minor);
+
+    // A failure here is not fatal. NVRTC may still find its builtins library through `PATH`.
+    _preloadBuiltinsLibrary();
     return SLANG_OK;
+}
+
+NVRTCDownstreamCompiler::~NVRTCDownstreamCompiler()
+{
+    if (m_builtinsLibrary)
+        SharedLibrary::unload(m_builtinsLibrary);
+}
+
+// Loads `nvrtc-builtins64_<major><minor>.dll` from the directory of the NVRTC library that we
+// loaded, if that file exists there.
+//
+// NVRTC loads its builtins library by name when `nvrtcCompileProgram` runs. Windows then searches
+// the application directory, System32, the current directory and `PATH`, but not the directory
+// of NVRTC itself. Slang can find NVRTC through `CUDA_PATH\bin\x64` without that directory being
+// on `PATH`; in that case the compile fails with "failed to open nvrtc-builtins64_132.dll".
+// When a module with the requested name is already loaded in the process, Windows returns it
+// without a search. So we load the builtins library by its full path here, and
+// `nvrtcCompileProgram` then finds it. This does not change the DLL search order of the process.
+SlangResult NVRTCDownstreamCompiler::_preloadBuiltinsLibrary()
+{
+#if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
+    const String nvrtcPath =
+        SharedLibraryUtils::getSharedLibraryFileName((void*)m_nvrtcCreateProgram);
+    if (nvrtcPath.getLength() == 0)
+        return SLANG_E_NOT_FOUND;
+
+    // NVRTC 13.2 asks for "nvrtc-builtins64_132.dll", that is, major and minor version.
+    StringBuilder fileName;
+    fileName << "nvrtc-builtins64_" << int(m_desc.version.m_major) << int(m_desc.version.m_minor)
+             << ".dll";
+    const String builtinsPath =
+        Path::combine(Path::getParentDirectory(nvrtcPath), fileName.produceString());
+    if (!File::exists(builtinsPath))
+        return SLANG_E_NOT_FOUND;
+
+    return SharedLibrary::loadWithPlatformPath(builtinsPath.getBuffer(), m_builtinsLibrary);
+#else
+    return SLANG_E_NOT_IMPLEMENTED;
+#endif
 }
 
 static SlangResult _parseLocation(
@@ -1143,6 +1207,22 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddFp8Bf16Support(
     return SLANG_OK;
 }
 
+// Return whether the caller supplied an NVRTC architecture option. Leave its value and any
+// conflicting user options for NVRTC to validate, including architectures unknown to Slang.
+static bool _hasExplicitNVRTCArchitecture(Slice<TerminatedCharSlice> arguments)
+{
+    for (auto argument : arguments)
+    {
+        auto text = asStringSlice(argument);
+        if (text == "-arch" || text.startsWith("-arch=") || text == "--gpu-architecture" ||
+            text.startsWith("--gpu-architecture="))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 SlangResult NVRTCDownstreamCompiler::compile(
     const DownstreamCompileOptions& inOptions,
     IArtifact** outArtifact)
@@ -1287,6 +1367,10 @@ SlangResult NVRTCDownstreamCompiler::compile(
         cmdLine.addArg("-w");
     }
 
+    // An explicit downstream architecture overrides the derived one. For example, a caller may
+    // pass `-arch=compute_120` before Slang has a corresponding capability. Passing both options
+    // would make NVRTC warn or fail, depending on its version, so only emit the caller's option.
+    if (!_hasExplicitNVRTCArchitecture(options.compilerSpecificArguments))
     {
         // The lowest supported CUDA architecture version supported
         // by any version of NVRTC we support is `compute_30`.
@@ -1344,15 +1428,22 @@ SlangResult NVRTCDownstreamCompiler::compile(
     List<const char*> headers;
     List<const char*> headerIncludeNames;
 
-    // If compiling for OptiX, we need to add the appropriate search paths to the
-    // command line.
+    // OptiX needs `--relocatable-device-code=true` only for ray-tracing pipelines. A compute
+    // shader that uses OptiX cooperative vectors needs the headers but not this flag.
     //
     if (options.pipelineType == PipelineType::RayTracing)
     {
         // OptiX requires this flag (OptiX Programming Guide, section 6.1). It prevents the compiler
         // from removing callables as dead code.
         cmdLine.addArg("--relocatable-device-code=true");
+    }
 
+    // If the code needs OptiX, we need to add the appropriate search paths to the
+    // command line.
+    //
+    if (options.pipelineType == PipelineType::RayTracing ||
+        (options.flags & DownstreamCompileOptions::Flag::RequiresOptix))
+    {
         if (SLANG_FAILED(_maybeAddOptixSupport(options, cmdLine, diagnostics)))
         {
             diagnostics->setResult(SLANG_FAIL);
@@ -1382,6 +1473,22 @@ SlangResult NVRTCDownstreamCompiler::compile(
 
     StringBuilder storage;
     auto sourceContents = SliceUtil::toTerminatedCharSlice(storage, sourceBlob);
+
+    // Enable NVRTC automatic precompiled headers (12.8+) only when the prelude reaches NVRTC as a
+    // leading `#include`. NVRTC's PCH covers the tokens up to the first non-directive token (the
+    // "header stop point"); with the include form the whole prelude is behind that point and is
+    // precompiled once, then reused by later compiles with compatible options and leading
+    // directives in the same process. When the prelude is prepended
+    // verbatim instead (the default when no tool installs the include form), the stop point falls
+    // near the top of the prelude, so the PCH would capture too little to help and is not
+    // requested.
+    const bool nvrtcSupportsPch = m_desc.version >= SemanticVersion(12, 8);
+    const bool pchRequested =
+        nvrtcSupportsPch && asStringSlice(sourceContents).trimStart().startsWith("#include");
+    if (pchRequested)
+    {
+        cmdLine.addArg("-pch");
+    }
 
     nvrtcProgram program = nullptr;
     nvrtcResult res = m_nvrtcCreateProgram(
@@ -1491,6 +1598,25 @@ SlangResult NVRTCDownstreamCompiler::compile(
         {
             diagnostics->setResult(SLANG_FAIL);
         }
+    }
+
+    // When we requested `-pch` and the query is available (NVRTC 12.8+), record whether NVRTC
+    // created the automatic precompiled header for this compile. NVRTC does not surface this
+    // through the emitted PTX, so append it to the diagnostics log as a stable, Slang-owned marker
+    // that tests can read to observe PCH creation and rebuild-on-change: "created" (a header was
+    // built this compile), "not-created" (none was built this compile — an existing one was reused,
+    // or the compiler declined), or "create-failed" (creation was attempted but failed). NVRTC does
+    // not report reuse directly; a caller infers it from a "not-created" that follows a "created"
+    // for the same key.
+    if (pchRequested && m_nvrtcGetPCHCreateStatus)
+    {
+        const nvrtcResult pchStatus = m_nvrtcGetPCHCreateStatus(program);
+        const char* pchState = pchStatus == NVRTC_SUCCESS                         ? "created"
+                               : pchStatus == NVRTC_ERROR_NO_PCH_CREATE_ATTEMPTED ? "not-created"
+                                                                                  : "create-failed";
+        StringBuilder pchStatusLine;
+        pchStatusLine << "slang-nvrtc-pch-status: " << pchState << "\n";
+        diagnostics->appendRaw(SliceUtil::asCharSlice(pchStatusLine));
     }
 
     if (res == nvrtc::NVRTC_SUCCESS)

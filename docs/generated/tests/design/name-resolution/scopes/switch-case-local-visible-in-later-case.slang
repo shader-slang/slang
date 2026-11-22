@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#scope-bearing-ast-nodes
-//META: doc_section_digest=d6a8e6a85f98f1fe1e7c4215cf8b2b2f8cf50505ce91badfb5ce987b8c7527a4
+//META: doc_section_digest=ba0fbb59f19c90964f30f63e36bd6d872a6caad870e1c39a6b2b4f2f5f9714ca
 //META: purpose=A plain `switch` gives its whole body one scoped BlockStmt, so a local declared under one `case` label is still in scope in textually later cases of the same switch.
 //META: intent=functional
 //META: pipeline_stage=check

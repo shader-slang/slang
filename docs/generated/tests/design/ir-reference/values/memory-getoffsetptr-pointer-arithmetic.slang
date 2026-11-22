@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#memory
-//META: doc_section_digest=2a7e11ed01098a86b63060423b4c3849bf9aa3b3c45a6bdc1347a679da04c37c
+//META: doc_section_digest=f662fb7782cd3fc576fa13c3285e3f58c0e5cf06b8fc8ea778138d3616c5a4bf
 //META: purpose=Pointer `operator+` lowers to `getOffsetPtr(base, offset)`, which advances a pointer by a count of elements rather than by bytes and is a different opcode from `getElementPtr`.
 //META: intent=functional
 //META: pipeline_stage=lower

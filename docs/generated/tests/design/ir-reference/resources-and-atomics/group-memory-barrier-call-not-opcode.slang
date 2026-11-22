@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#controlbarrier-vs-groupmemorybarrierwithgroupsync
-//META: doc_section_digest=1ff69c327de4ae40216584981ae7517b53fd5dc7120baac3f27ac252e1508864
+//META: doc_section_digest=b5bb477b8dc3ab13fffb64524a869751519cd2bad7694a685d8a90a1be1b01ab
 //META: purpose=`GroupMemoryBarrierWithGroupSync()` never creates the opcode of the same name — the core-module function is `__intrinsic_asm` per target, so lowering leaves a `call` and each backend emits its own barrier text.
 //META: intent=functional
 //META: pipeline_stage=lower

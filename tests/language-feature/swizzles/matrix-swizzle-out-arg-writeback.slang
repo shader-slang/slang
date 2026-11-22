@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv-asm -entry computeMain -stage compute -O1
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_OUTPUT): -cpu -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK_OUTPUT): -output-using-type
 
 // Regression test for #10212.
 // Matrix swizzles passed as out/inout arguments must write back to the selected
@@ -12,13 +12,13 @@
 // column 1. The checks below make sure call write-back fixup preserves those
 // l-values instead of materializing the swizzle as an r-value.
 
-// CHECK_HLSL: writeOut_0(m_0[int(3)][int(0)], 7.0f);
-// CHECK_HLSL: writeOut_0(m_0[int(3)][int(0)], 11.0f);
-// CHECK_HLSL: addInOut_0(m_0[int(2)][int(1)], 5.0f);
-// CHECK_HLSL: writeOut_0(v_0[int(1)], 13.0f);
+// CHECK_HLSL: writeOut_0(m_0[3L][int(0)], 7.0f);
+// CHECK_HLSL: writeOut_0(m_0[3L][int(0)], 11.0f);
+// CHECK_HLSL: addInOut_0(m_0[2L][1L], 5.0f);
+// CHECK_HLSL: writeOut_0(v_0[1L], 13.0f);
 // CHECK_HLSL: addInOut_0(v_0[int(0)], 17.0f);
-// CHECK_HLSL: outputBuffer_0[int(0)] = m_0[int(3)][int(0)];
-// CHECK_HLSL: outputBuffer_0[int(1)] = m_0[int(2)][int(1)];
+// CHECK_HLSL: outputBuffer_0[int(0)] = m_0[3L][int(0)];
+// CHECK_HLSL: outputBuffer_0[1L] = m_0[2L][1L];
 
 // CHECK_SPV-DAG: %[[ROW3:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_Function_v4float %m %int_3
 // CHECK_SPV-DAG: %[[ELEM30:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_Function_float %[[ROW3]] %int_0

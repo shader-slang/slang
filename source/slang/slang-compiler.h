@@ -39,7 +39,6 @@
 #include "slang-compile-request.h"
 #include "slang-compiler-api.h"
 #include "slang-compiler-options.h"
-#include "slang-content-assist-info.h"
 #include "slang-diagnostics.h"
 #include "slang-end-to-end-request.h"
 #include "slang-global-session.h"
@@ -48,14 +47,15 @@
 #include "slang-linkable.h"
 #include "slang-module.h"
 #include "slang-pass-through.h"
-#include "slang-preprocessor.h"
 #include "slang-profile.h"
-#include "slang-serialize-ir-types.h"
 #include "slang-session.h"
-#include "slang-syntax.h"
 #include "slang-target.h"
 #include "slang-translation-unit.h"
 #include "slang.h"
+#include "slang/ast/slang-syntax.h"
+#include "slang/language-server/slang-content-assist-info.h"
+#include "slang/preprocessor/slang-preprocessor.h"
+#include "slang/serialization/slang-serialize-ir-types.h"
 
 #include <chrono>
 

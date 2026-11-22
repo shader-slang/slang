@@ -3,8 +3,8 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=1195a752790819415908e083ce9656a353d4764f2fab38cc5aa27d92f184c486
-//META: purpose=A `matrix<half, 3, 3>` global lowers with IR type `Mat(Half, 3 : Int, 3 : Int, 0 : Int)`.
+//META: doc_section_digest=dd99e7be1e43f7dbf1c422a81f414e18dee5066cd4a3a5026a22bae8d7e540e8
+//META: purpose=A `matrix<half, 3, 3>` global lowers with IR type `Mat(Half, 3 : Int, 3 : Int, 0 : Enum(Int))`.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
@@ -23,4 +23,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // CHECK: [nameHint("m")]
-// CHECK: let {{.*}}m{{.*}}: Mat(Half, 3 : Int, 3 : Int, 0 : Int){{.*}}= global_param
+// CHECK: let {{.*}}m{{.*}}: Mat(Half, 3 : Int, 3 : Int, 0 : Enum(Int)){{.*}}= global_param

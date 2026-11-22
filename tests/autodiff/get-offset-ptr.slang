@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck-buffer=CHECK): -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out, name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -38,7 +38,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     sbuf[0] = 3.0f;
     sbuf[1] = 0.0f;
-    
+
     bwd_diff(function)({ __getAddress(sbuf[0]), __getAddress(sbuf[1]) }, 1.f);
 
     outputBuffer[0] = sbuf[1];

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/values.md#literal-payload-encoding
-//META: doc_section_digest=5f27d4bb5fbd1429627db68bec594389689c236998e7182eaaf350ae3ceda2ee
+//META: doc_section_digest=14cd6e5688aa5a37c4a0c35b957fbdce4d155a0d4efe4a41d203a279ed17f84c
 //META: purpose=A `nullptr` literal becomes a `ptr_constant` whose inline payload the IR dump renders as the bare token `<ptr>` at each use site.
 //META: intent=functional
 //META: pipeline_stage=lower

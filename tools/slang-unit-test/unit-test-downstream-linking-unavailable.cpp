@@ -33,12 +33,16 @@ using namespace Slang;
 namespace
 {
 
-// Which linker the fake library exports, covering the three states the caller must tell apart.
+// Which linker the fake library exports, covering the states the caller must tell apart. Every
+// state except `PresentAcceptingWithoutFree` also exports `glslang_freeLinkResult`, so the failure
+// tests can check that a link that returned no buffer frees nothing.
 enum class FakeLinkerState
 {
     Absent,
     PresentRejecting,
     PresentAccepting,
+    // An older `slang-glslang` that links but predates `glslang_freeLinkResult`.
+    PresentAcceptingWithoutFree,
 };
 
 // Set by the fake linkers so the tests can tell "returned failure" from "was never called".
@@ -57,10 +61,12 @@ int fakeLinkReturningFailure(glslang_LinkRequest* request)
     return false;
 }
 
-// Return the first input module as the link result, which is a well-formed answer to the request:
-// the caller only reads `linkResult`/`linkResultSize` and wraps them in a blob. Echoing an input
-// keeps the fake honest -- the bytes handed back are bytes the compiler produced. The buffer is
-// owned by the caller's `spirvFiles` entry, which outlives the `link` call.
+// The buffer the fake linker hands out, standing in for the real linker's allocation.
+List<uint32_t> gFakeLinkResult;
+
+// Return a copy of the first input module as the link result, which is a well-formed answer to the
+// request. Echoing an input keeps the fake honest -- the bytes handed back are bytes the compiler
+// produced.
 int fakeLinkReturningFirstModule(glslang_LinkRequest* request)
 {
     gFakeLinkerWasCalled = true;
@@ -68,9 +74,31 @@ int fakeLinkReturningFirstModule(glslang_LinkRequest* request)
     {
         return false;
     }
-    request->linkResult = request->modules[0];
+    gFakeLinkResult.clear();
+    gFakeLinkResult.addRange(request->modules[0], Index(request->moduleSizes[0]));
+    request->linkResult = gFakeLinkResult.getBuffer();
     request->linkResultSize = request->moduleSizes[0];
     return true;
+}
+
+int gFakeFreeLinkResultCallCount = 0;
+const uint32_t* gFakeFreedLinkResult = nullptr;
+
+// Record which buffer the caller handed back. Overwriting it stands in for the real `delete[]`: a
+// caller that copies the result only after handing it back then reads `0xCDCDCDCD` instead of the
+// linked words. Only the buffer `fakeLinkReturningFirstModule` handed out is overwritten, so a
+// wrong pointer shows up in the pointer check rather than by corrupting unrelated memory.
+void fakeFreeLinkResult(const uint32_t* linkResult)
+{
+    ++gFakeFreeLinkResultCallCount;
+    gFakeFreedLinkResult = linkResult;
+    if (linkResult == gFakeLinkResult.getBuffer())
+    {
+        for (auto& word : gFakeLinkResult)
+        {
+            word = 0xCDCDCDCD;
+        }
+    }
 }
 
 // Accept whatever it is handed. These tests are about the linking path, so validation must not be
@@ -141,10 +169,16 @@ public:
             case FakeLinkerState::PresentRejecting:
                 return (void*)fakeLinkReturningFailure;
             case FakeLinkerState::PresentAccepting:
+            case FakeLinkerState::PresentAcceptingWithoutFree:
                 return (void*)fakeLinkReturningFirstModule;
             default:
                 return nullptr;
             }
+        }
+        if (symbol == "glslang_freeLinkResult" &&
+            m_linkerState != FakeLinkerState::PresentAcceptingWithoutFree)
+        {
+            return (void*)fakeFreeLinkResult;
         }
         return nullptr;
     }
@@ -240,7 +274,7 @@ SlangResult linkTwoModules(IDownstreamCompiler* compiler, ComPtr<IArtifact>& out
 
 // When the linker entry point is absent, `link` must say "not available" rather than call through a
 // null pointer.
-SLANG_UNIT_TEST(downstreamLinkReportsUnavailableWhenSymbolMissing)
+SLANG_UNIT_TEST(downstreamLinkReportsUnavailableWhenSymbolMissing, NoRenderApi)
 {
     ComPtr<ISlangSharedLibraryLoader> loader(new FakeLoader(FakeLinkerState::Absent));
     RefPtr<DownstreamCompilerSet> set;
@@ -248,19 +282,21 @@ SLANG_UNIT_TEST(downstreamLinkReportsUnavailableWhenSymbolMissing)
     SLANG_CHECK_ABORT(compiler != nullptr);
 
     gFakeLinkerWasCalled = false;
+    gFakeFreeLinkResultCallCount = 0;
     ComPtr<IArtifact> artifact;
     const SlangResult result = linkTwoModules(compiler, artifact);
 
     SLANG_CHECK(result == SLANG_E_NOT_AVAILABLE);
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(!gFakeLinkerWasCalled);
+    SLANG_CHECK(gFakeFreeLinkResultCallCount == 0);
     // A failed link must not hand back an artifact; `slang-emit.cpp` would `loadBlob` from it.
     SLANG_CHECK(artifact == nullptr);
 }
 
 // The control for the test above: a linker that is present and rejects the modules must keep
 // returning `SLANG_FAIL`, so an unconditional `SLANG_E_NOT_AVAILABLE` cannot satisfy both tests.
-SLANG_UNIT_TEST(downstreamLinkReportsFailWhenLinkerRejects)
+SLANG_UNIT_TEST(downstreamLinkReportsFailWhenLinkerRejects, NoRenderApi)
 {
     ComPtr<ISlangSharedLibraryLoader> loader(new FakeLoader(FakeLinkerState::PresentRejecting));
     RefPtr<DownstreamCompilerSet> set;
@@ -268,18 +304,22 @@ SLANG_UNIT_TEST(downstreamLinkReportsFailWhenLinkerRejects)
     SLANG_CHECK_ABORT(compiler != nullptr);
 
     gFakeLinkerWasCalled = false;
+    gFakeFreeLinkResultCallCount = 0;
     ComPtr<IArtifact> artifact;
     const SlangResult result = linkTwoModules(compiler, artifact);
 
     SLANG_CHECK(result == SLANG_FAIL);
     SLANG_CHECK(result != SLANG_E_NOT_AVAILABLE);
     SLANG_CHECK(gFakeLinkerWasCalled);
+    // A rejected link returns no buffer, so there is nothing to hand back.
+    SLANG_CHECK(gFakeFreeLinkResultCallCount == 0);
     SLANG_CHECK(artifact == nullptr);
 }
 
 // The success path, which neither failure test covers: a linker that is present and accepts must
-// produce an artifact.
-SLANG_UNIT_TEST(downstreamLinkSucceedsWhenLinkerAccepts)
+// produce an artifact, and must get its result buffer back exactly once so the library that
+// allocated it can free it.
+SLANG_UNIT_TEST(downstreamLinkSucceedsWhenLinkerAccepts, NoRenderApi)
 {
     ComPtr<ISlangSharedLibraryLoader> loader(new FakeLoader(FakeLinkerState::PresentAccepting));
     RefPtr<DownstreamCompilerSet> set;
@@ -287,12 +327,44 @@ SLANG_UNIT_TEST(downstreamLinkSucceedsWhenLinkerAccepts)
     SLANG_CHECK_ABORT(compiler != nullptr);
 
     gFakeLinkerWasCalled = false;
+    gFakeFreeLinkResultCallCount = 0;
+    gFakeFreedLinkResult = nullptr;
+    ComPtr<IArtifact> artifact;
+    const SlangResult result = linkTwoModules(compiler, artifact);
+
+    SLANG_CHECK(gFakeLinkerWasCalled);
+    SLANG_CHECK(result == SLANG_OK);
+    SLANG_CHECK_ABORT(artifact != nullptr);
+    SLANG_CHECK(gFakeFreeLinkResultCallCount == 1);
+    SLANG_CHECK(gFakeFreedLinkResult == gFakeLinkResult.getBuffer());
+
+    // `fakeFreeLinkResult` overwrote the linked buffer with `0xCDCDCDCD`, so the artifact still
+    // holding module A's bytes means it copied them before handing the buffer back.
+    ComPtr<ISlangBlob> blob;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(artifact->loadBlob(ArtifactKeep::No, blob.writeRef())));
+    SLANG_CHECK(blob->getBufferSize() == sizeof(kSpirvModuleA));
+    SLANG_CHECK(memcmp(blob->getBufferPointer(), kSpirvModuleA, sizeof(kSpirvModuleA)) == 0);
+}
+
+// A `slang-glslang` without `glslang_freeLinkResult` must still link: the caller skips the free
+// rather than calling through a null pointer.
+SLANG_UNIT_TEST(downstreamLinkSucceedsWithoutFreeLinkResult, NoRenderApi)
+{
+    ComPtr<ISlangSharedLibraryLoader> loader(
+        new FakeLoader(FakeLinkerState::PresentAcceptingWithoutFree));
+    RefPtr<DownstreamCompilerSet> set;
+    IDownstreamCompiler* compiler = getFakeSpirvOptCompiler(set, loader);
+    SLANG_CHECK_ABORT(compiler != nullptr);
+
+    gFakeLinkerWasCalled = false;
+    gFakeFreeLinkResultCallCount = 0;
     ComPtr<IArtifact> artifact;
     const SlangResult result = linkTwoModules(compiler, artifact);
 
     SLANG_CHECK(gFakeLinkerWasCalled);
     SLANG_CHECK(result == SLANG_OK);
     SLANG_CHECK(artifact != nullptr);
+    SLANG_CHECK(gFakeFreeLinkResultCallCount == 0);
 }
 
 namespace
@@ -440,7 +512,7 @@ FakeGlslangCompileOutcome compileWithFakeGlslang(
 
 // The consumer half: linking two modules with the linker absent must name the missing capability
 // rather than fail silently, which is what the guard alone would produce.
-SLANG_UNIT_TEST(downstreamLinkingUnavailableDiagnosesMissingLinker)
+SLANG_UNIT_TEST(downstreamLinkingUnavailableDiagnosesMissingLinker, NoRenderApi)
 {
     const FakeGlslangCompileOutcome outcome = compileWithFakeGlslang(FakeLinkerState::Absent, true);
     const UnownedStringSlice diagnosticSlice = outcome.diagnostics.getUnownedSlice();
@@ -470,7 +542,7 @@ SLANG_UNIT_TEST(downstreamLinkingUnavailableDiagnosesMissingLinker)
 // The other side of the caller's branch: a linker that is present and rejects the modules must not
 // produce the "unavailable" diagnostic, so routing every failure to that message cannot satisfy
 // both this test and the one above.
-SLANG_UNIT_TEST(downstreamLinkRejectionDoesNotDiagnoseUnavailable)
+SLANG_UNIT_TEST(downstreamLinkRejectionDoesNotDiagnoseUnavailable, NoRenderApi)
 {
     const FakeGlslangCompileOutcome outcome =
         compileWithFakeGlslang(FakeLinkerState::PresentRejecting, true);
@@ -490,7 +562,7 @@ SLANG_UNIT_TEST(downstreamLinkRejectionDoesNotDiagnoseUnavailable)
 // optimization level leaves `needsOptimization` true. So this compile must succeed and stay silent
 // even though `glslang_linkSPIRV` is just as absent as in the test above: it rules out the
 // diagnostic being triggered by merely loading a linker-less library.
-SLANG_UNIT_TEST(downstreamLinkingUnavailableIsSilentForSingleModule)
+SLANG_UNIT_TEST(downstreamLinkingUnavailableIsSilentForSingleModule, NoRenderApi)
 {
     const FakeGlslangCompileOutcome outcome =
         compileWithFakeGlslang(FakeLinkerState::Absent, false);

@@ -1,17 +1,16 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-shuffle.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-shuffle.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 
 // not testing hlsl due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
+//DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-shuffle.slang -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 // not testing cuda due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
+//DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-shuffle.slang -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 // not testing cpp due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DTARGET_CPP
+//DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CPP): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-shuffle.slang -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU -render-feature half
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF):-entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=BUF):-entry computeMain -source-language glsl -xslang -DWGPU -render-feature half
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUF):-entry computeMain -source-language glsl -xslang -DMETAL
 
 #version 430
 
@@ -24,7 +23,7 @@
 #endif
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
-buffer MyBlockName2 
+buffer MyBlockName2
 {
     uint data[];
 } outputBuffer;
@@ -78,7 +77,7 @@ bool testShuffleX() {
         & testVShuffleX<float, 2>()
         & testVShuffleX<float, 3>()
         & testVShuffleX<float, 4>()
-        & test1ShuffleX<half>() 
+        & test1ShuffleX<half>()
         & testVShuffleX<half, 2>()
         & testVShuffleX<half, 3>()
         & testVShuffleX<half, 4>()
@@ -97,7 +96,7 @@ bool testShuffleX() {
         & testVShuffleX<double, 2>()
         & testVShuffleX<double, 3>()
         & testVShuffleX<double, 4>()
-        & test1ShuffleX<int8_t>() 
+        & test1ShuffleX<int8_t>()
         & testVShuffleX<int8_t, 2>()
         & testVShuffleX<int8_t, 3>()
         & testVShuffleX<int8_t, 4>()

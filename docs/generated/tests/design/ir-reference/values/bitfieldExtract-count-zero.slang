@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#arithmetic-and-bitwise
-//META: doc_section_digest=19b077f47f71a1feb81adb9dea6ff4919edb188c235b3634dce08c45cf359e3c
+//META: doc_section_digest=156280c3625197a4ed3b683ed5771a1ea94cd998308b23695241f7f96edbb6a7
 //META: purpose=Boundary: `bitfieldExtract(a, 0, 0)` lowers to `bitfieldExtract(%a, 0 : UInt, 0 : UInt)` — the count=0 edge of the bitfield-width range.
 //META: intent=boundary
 //META: pipeline_stage=lower

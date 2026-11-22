@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#option-set-toggles
-//META: doc_section_digest=51a3cfba2e9b446866969702a281584b197e5b4c38e04278312f866f3a25794f
+//META: doc_section_digest=7b73796b1513f898e87604b7436f2c6892de119e5b53805d355755089b918219
 //META: purpose=A column-major source matrix layout emits the transposed SPIR-V member decoration `RowMajor`, the opposite pole of the same transposition rule.
 //META: intent=boundary
 //META: pipeline_stage=emit

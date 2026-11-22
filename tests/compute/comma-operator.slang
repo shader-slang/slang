@@ -1,7 +1,7 @@
 // comma-operator.slang
 
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj -xslang -Wno-41024
-//TEST(compute):COMPARE_COMPUTE: -shaderobj -xslang -Wno-41024
+//TEST:COMPARE_COMPUTE(targets=cpu):-xslang -Wno-41024
+//TEST:COMPARE_COMPUTE(targets=all): -xslang -Wno-41024
 
 // Test that the "comma operator" behaves as expected
 

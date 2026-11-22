@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#moving-and-deleting-control-flow-instructions
-//META: doc_section_digest=1a35f3e6e880b02476bb7fbe3db3c3bfa0fe959a20d8b9005e5bd64d9b003102
+//META: doc_section_digest=b5c40a8fba2f1860c6461d18d1356180fc9df68f942c590a3816aa17abbdab12
 //META: purpose=Printf survives dead-code elimination at -O3 because it reports as possibly-side-effecting, while a genuinely unused arithmetic value next to it is removed.
 //META: intent=functional
 //META: pipeline_stage=emit

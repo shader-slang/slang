@@ -2,18 +2,50 @@
 # Our wrapper for glslang
 #
 if(SLANG_ENABLE_SLANG_GLSLANG)
+    if(SLANG_USE_SYSTEM_GLSLANG)
+        # Installed glslang places SPIRV/GlslangToSpv.h below include/glslang.
+        find_path(
+            SLANG_GLSLANG_SPIRV_INCLUDE_DIR
+            NAMES SPIRV/GlslangToSpv.h
+            PATH_SUFFIXES glslang
+            REQUIRED
+        )
+        set(slang_glslang_extra_includes ${SLANG_GLSLANG_SPIRV_INCLUDE_DIR})
+    endif()
     slang_add_target(
         .
         MODULE
         USE_FEWER_WARNINGS
-        SKIP_ASAN
+        # Skip ASan and TSan instrumentation of this wrapper: it links the external
+        # glslang / SPIRV-Tools libraries, which are unsanitized and, on the
+        # platforms where TSan runs, are never instrumented regardless of this flag.
+        # ASan simply leaves that boundary unchecked. TSan stays sound because it
+        # intercepts pthread/mutex synchronization process-wide, so glslang's own
+        # locking is observed even though its memory accesses are not; the mutable
+        # data crossing the boundary is per-call and disjoint (glslang's pool
+        # allocator is thread-local), and shared inputs such as the resource-limit
+        # table are read-only.
+        SKIP_SANITIZERS
         LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt SPIRV-Tools-link
         INCLUDE_DIRECTORIES_PRIVATE
+            ${slang_SOURCE_DIR}/source
             ${slang_SOURCE_DIR}/include
             ${CMAKE_CURRENT_BINARY_DIR}/../slang/slang-version-header
+            ${slang_glslang_extra_includes}
+        INCLUDE_FROM_PRIVATE
+            unordered_dense::unordered_dense
         INSTALL
         EXPORT_SET_NAME SlangTargets
     )
+    if(SLANG_GLSLANG_USES_MIMALLOC)
+        # The DllMain in slang-glslang.cpp configures the mimalloc copy that SPIRV-Tools-opt links
+        # in, so it needs that copy's header and must link against the same target.
+        target_link_libraries(slang-glslang PRIVATE mimalloc-static)
+        target_compile_definitions(
+            slang-glslang
+            PRIVATE SLANG_GLSLANG_USES_MIMALLOC=1
+        )
+    endif()
     # Our only interface is through what we define in source/slang-glslang, in the
     # interests of hygiene, hide anything else we link in. This hides our own non-exported symbols;
     # the version script below is what bounds the final export list.

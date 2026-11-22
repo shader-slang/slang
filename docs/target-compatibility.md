@@ -179,7 +179,7 @@ When using 'Sample' on a TextureArray, CUDA treats the array index parameter as 
 
 This feature means that a multiple Samplers can be used with a Texture. In terms of the HLSL code this can be seen as the 'SamplerState' being a parameter passed to the 'Sample' method on a texture object.
 
-On CUDA the SamplerState is ignored, because on this target a 'texture object' is the Texture and Sampler combination.
+On CUDA the SamplerState is ignored, because on this target a 'texture object' is the Texture and Sampler combination. `SampleGrad` does not accept a separate SamplerState on CUDA; use the combined-sampler form (for example `Sampler2D.SampleGrad`).
 
 <a id="graphics-pipeline"></a>
 
@@ -207,7 +207,7 @@ In practice to write shader code that works across D3D12 and VK you should have 
 
 ## tex.Load
 
-tex.Load on a read-only texture is supported on CUDA for `Texture1D`, `Texture2D`, `Texture3D`, and the 1D/2D array forms; the mip map selection argument is ignored (the fetch reads the base level). Load is also allowed on RWTexture types on CUDA. Note: half-typed textures are not supported for Load or SampleLevel on CUDA (use a float texture).
+tex.Load on a read-only texture is supported on CUDA for `Texture1D`, `Texture2D`, `Texture3D`, and the 1D/2D array forms; the mip map selection argument is ignored (the fetch reads the base level). Load is also allowed on RWTexture types on CUDA. Note: half-typed textures are not supported for Load, SampleLevel or SampleGrad on CUDA (use a float texture).
 
 <a id="full-bool"></a>
 
@@ -229,7 +229,8 @@ On GLSL and VK targets loop unrolling uses the [GL_EXT_control_flow_attributes](
 
 Metal Shading Language does not support loop unrolling.
 
-Slang does have a cross target mechanism to [unroll loops](language-reference/06-statements.md), in the section `Compile-Time For Statement`.
+Slang also has a target-independent mechanism to unroll loops. See attribute
+[\[ForceUnroll\]](https://shader-slang.org/stdlib-reference/attributes/forceunroll-05.html).
 
 <a id="rwbuffer-atomics"></a>
 

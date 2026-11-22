@@ -1623,31 +1623,13 @@ public extension<
     [__unsafeForceInlineEarly]
     This minimum(This other)
     {
-        This result;
-        [ForceUnroll]
-        for (int row = 0; row < R; ++row)
-        {
-            [ForceUnroll]
-            for (int column = 0; column < C; ++column)
-                result[row][column] =
-                    __numericsBuiltinMinimum(this[row][column], other[row][column]);
-        }
-        return result;
+        return __numericsBuiltinMinimum(this, other);
     }
 
     [__unsafeForceInlineEarly]
     This maximum(This other)
     {
-        This result;
-        [ForceUnroll]
-        for (int row = 0; row < R; ++row)
-        {
-            [ForceUnroll]
-            for (int column = 0; column < C; ++column)
-                result[row][column] =
-                    __numericsBuiltinMaximum(this[row][column], other[row][column]);
-        }
-        return result;
+        return __numericsBuiltinMaximum(this, other);
     }
 
     [__unsafeForceInlineEarly]
@@ -1665,5 +1647,73 @@ public extension<
             }
         }
         return result;
+    }
+}
+
+// Integer-output splits use the same native operations as the core overloads. These separate
+// conformances supply the additional capability without changing the `IFloatingPoint` contract.
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+public extension half : IScalarFloatingPointWithIntegerPart
+{
+    typealias IntegerPart = int;
+
+    [__unsafeForceInlineEarly]
+    This fractionalPart(out IntegerPart integralPart)
+    {
+        return __numericInterfaceBuiltinSplitFractionWithIntegerPart(this, integralPart);
+    }
+}
+
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+public extension float : IScalarFloatingPointWithIntegerPart
+{
+    typealias IntegerPart = int;
+
+    [__unsafeForceInlineEarly]
+    This fractionalPart(out IntegerPart integralPart)
+    {
+        return __numericInterfaceBuiltinSplitFractionWithIntegerPart(this, integralPart);
+    }
+}
+
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+public extension double : IScalarFloatingPointWithIntegerPart
+{
+    typealias IntegerPart = int;
+
+    [__unsafeForceInlineEarly]
+    This fractionalPart(out IntegerPart integralPart)
+    {
+        return __numericInterfaceBuiltinSplitFractionWithIntegerPart(this, integralPart);
+    }
+}
+
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+public extension<
+    T : __BuiltinFloatingPointType & IScalarFloatingPoint,
+    let N : int> vector<T, N> : IFloatingPointWithIntegerPart
+{
+    typealias IntegerPart = vector<int, N>;
+
+    [__unsafeForceInlineEarly]
+    This fractionalPart(out IntegerPart integralPart)
+    {
+        return __numericInterfaceBuiltinSplitFractionWithIntegerPart(this, integralPart);
+    }
+}
+
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+public extension<
+    T : __BuiltinFloatingPointType & IScalarFloatingPoint,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode> matrix<T, R, C, L> : IFloatingPointWithIntegerPart
+{
+    typealias IntegerPart = matrix<int, R, C, L>;
+
+    [__unsafeForceInlineEarly]
+    This fractionalPart(out IntegerPart integralPart)
+    {
+        return __numericInterfaceBuiltinSplitFractionWithIntegerPart(this, integralPart);
     }
 }

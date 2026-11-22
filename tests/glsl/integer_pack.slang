@@ -1,5 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-via-glsl
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-metal-wgpu, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 
 #version 450
 

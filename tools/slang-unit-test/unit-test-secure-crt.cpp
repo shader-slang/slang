@@ -18,7 +18,7 @@ static const char* const kNullDevice = "NUL";
 static const char* const kNullDevice = "/dev/null";
 #endif
 
-SLANG_UNIT_TEST(secureCrtMemcpyS)
+SLANG_UNIT_TEST(secureCrtMemcpyS, NoRenderApi)
 {
     // Happy path
     {
@@ -59,7 +59,7 @@ SLANG_UNIT_TEST(secureCrtMemcpyS)
     }
 }
 
-SLANG_UNIT_TEST(secureCrtFopenS)
+SLANG_UNIT_TEST(secureCrtFopenS, NoRenderApi)
 {
     // Happy path — open a temp file
     {
@@ -103,7 +103,7 @@ SLANG_UNIT_TEST(secureCrtFopenS)
     }
 }
 
-SLANG_UNIT_TEST(secureCrtFreadS)
+SLANG_UNIT_TEST(secureCrtFreadS, NoRenderApi)
 {
     // Happy path — use tmpfile() for portability (no /dev/zero on MinGW)
     {
@@ -176,7 +176,7 @@ SLANG_UNIT_TEST(secureCrtFreadS)
     }
 }
 
-SLANG_UNIT_TEST(secureCrtStrnlenS)
+SLANG_UNIT_TEST(secureCrtStrnlenS, NoRenderApi)
 {
     // Happy path
     {
@@ -204,7 +204,7 @@ SLANG_UNIT_TEST(secureCrtStrnlenS)
     }
 }
 
-SLANG_UNIT_TEST(secureCrtWcsnlenS)
+SLANG_UNIT_TEST(secureCrtWcsnlenS, NoRenderApi)
 {
     // Happy path
     {
@@ -234,7 +234,7 @@ SLANG_UNIT_TEST(secureCrtWcsnlenS)
     }
 }
 
-SLANG_UNIT_TEST(secureCrtSprintfS)
+SLANG_UNIT_TEST(secureCrtSprintfS, NoRenderApi)
 {
     // Happy path
     {
@@ -279,7 +279,7 @@ SLANG_UNIT_TEST(secureCrtSprintfS)
     }
 }
 
-SLANG_UNIT_TEST(secureCrtSwprintfS)
+SLANG_UNIT_TEST(secureCrtSwprintfS, NoRenderApi)
 {
     // Happy path
     {
@@ -327,7 +327,7 @@ SLANG_UNIT_TEST(secureCrtSwprintfS)
     }
 }
 
-SLANG_UNIT_TEST(secureCrtStrcpyS)
+SLANG_UNIT_TEST(secureCrtStrcpyS, NoRenderApi)
 {
     // Happy path
     {
@@ -392,7 +392,7 @@ SLANG_UNIT_TEST(secureCrtStrcpyS)
     }
 }
 
-SLANG_UNIT_TEST(secureCrtWcscpyS)
+SLANG_UNIT_TEST(secureCrtWcscpyS, NoRenderApi)
 {
     // Happy path
     {
@@ -456,7 +456,7 @@ SLANG_UNIT_TEST(secureCrtWcscpyS)
     }
 }
 
-SLANG_UNIT_TEST(secureCrtStrncpyS)
+SLANG_UNIT_TEST(secureCrtStrncpyS, NoRenderApi)
 {
     // Happy path — copy with count
     {
@@ -529,7 +529,7 @@ SLANG_UNIT_TEST(secureCrtStrncpyS)
     }
 }
 
-SLANG_UNIT_TEST(secureCrtWcsncpyS)
+SLANG_UNIT_TEST(secureCrtWcsncpyS, NoRenderApi)
 {
     // Happy path
     {
@@ -609,7 +609,7 @@ SLANG_UNIT_TEST(secureCrtWcsncpyS)
 #else
 // On Windows, the CRT provides these functions natively — nothing to test.
 #include "unit-test/slang-unit-test.h"
-SLANG_UNIT_TEST(secureCrtWindowsStub)
+SLANG_UNIT_TEST(secureCrtWindowsStub, NoRenderApi)
 {
     // Placeholder so the test binary has at least one test on Windows.
     SLANG_CHECK(true);

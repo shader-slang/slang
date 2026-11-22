@@ -13,7 +13,7 @@
 // component -- returning one type's specialized witness for the other -- would surface as `S2`'s
 // results matching `S`'s pattern instead of its own.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 interface I0
 {

@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T15:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#parser
-//META: doc_section_digest=c39eecf47526b6e548c8ccebdb5fde86d82376490c6f2ece4b5dc9a3f0f3f30a
+//META: doc_section_digest=2750ebdacd6384004d00a1def232494c4a2de1b361668acaae71431742e5a4d8
 //META: purpose=Verifies a user `operator+` declaration parses and a `a + b` use of it evaluates to the overload's result.
 //META: intent=characterization
 //META: covers=source/slang/slang-parser.cpp

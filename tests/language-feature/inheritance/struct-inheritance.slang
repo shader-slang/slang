@@ -1,7 +1,6 @@
 // struct-inheritance.slang
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test that we can define a `struct` type
 // that inherits from another `struct`.

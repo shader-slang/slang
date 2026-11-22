@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#istype
-//META: doc_section_digest=96c88cd229bf1685831b41b4f853c066f396c97bc43dfff2bd5daafb4bb81fe0
+//META: doc_section_digest=eba8b802107a7b78ba644a0cd5bc2ccb99ac9f038f6d40e2a7f909357d146094
 //META: purpose=The `is` operator on an existential value lowers to a four-operand `IsType(value, valueWitness, typeOperand, targetWitness)` inst whose result type is `bool`.
 //META: intent=functional
 //META: pipeline_stage=lower

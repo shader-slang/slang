@@ -152,12 +152,12 @@ cleanup:
 }
 #endif
 
-SLANG_UNIT_TEST(io)
+SLANG_UNIT_TEST(io, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_checkGenerateTemporary()));
 }
 
-SLANG_UNIT_TEST(ioLargeFileExists)
+SLANG_UNIT_TEST(ioLargeFileExists, NoRenderApi)
 {
 #if SLANG_WINDOWS_FAMILY
     SLANG_CHECK(SLANG_SUCCEEDED(_checkLargeFileExists()));
@@ -166,7 +166,7 @@ SLANG_UNIT_TEST(ioLargeFileExists)
 #endif
 }
 
-SLANG_UNIT_TEST(uriGetPathPercentDecode)
+SLANG_UNIT_TEST(uriGetPathPercentDecode, NoRenderApi)
 {
     SLANG_CHECK(URI::fromString(toSlice("file://path%20name")).getPath() == "path name");
     SLANG_CHECK(URI::fromString(toSlice("file://%20")).getPath() == " ");

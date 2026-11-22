@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#other
-//META: doc_section_digest=892b92052aae4d71e1cd28cc1ecd17d43d75413f857441cfa244f1066aa8c1fb
+//META: doc_section_digest=25e94198cfd90f64f6e36c4d960d5bb85db8178b17b1ac5e0ed392b86d21a135
 //META: purpose=The synthesized struct initializer carries a constructor decoration; the dump prints constructor(true) with a Bool literal operand.
 //META: intent=functional
 //META: pipeline_stage=lower

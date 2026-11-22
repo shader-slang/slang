@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#finalize-phase-completeoverloadcandidate
-//META: doc_section_digest=a916857bbe07c220fc4b183b2a1794d39a799be9e41fa992dc6a49d37be94635
+//META: doc_section_digest=be7cb845146dff6e17cc55868c420377fde289080c02c7b773e24e30ea6297e1
 //META: purpose=When a candidate ends at GenericArgumentInferenceFailed with OrdinaryGenericParamNotInferred, CompleteOverloadCandidate emits the focused could-not-infer-parameter diagnostic naming the parameter.
 //META: intent=negative
 //META: pipeline_stage=check

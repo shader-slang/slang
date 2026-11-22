@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=5fdd0ac6daa767e15b8f1dad12d2d7a2846fe891f83f100e2466f794797eb465
+//META: doc_section_digest=c5af8ae560515f62aefb59225c78774ee7d8bd8656a9f3cf1b634fcb3e1f88e4
 //META: purpose=`introduceExplicitGlobalContext` (reached by the Metal fallthrough) packs loose `uniform` globals into a `GlobalParams` struct passed as a `constant*` kernel parameter.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

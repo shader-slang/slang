@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#edge-cases-and-failure-modes
-//META: doc_section_digest=4c78ab08cf659f53d04e87356fa441615410f33a23152c70e9fb93b377efd998
+//META: doc_section_digest=074addd0c2d66598101cf0dfc70be7e1bcffe641d2e7c455a491f14df2014a84
 //META: purpose=A result whose first item is a namespace is exempted from the ambiguity report, so a name reachable as two same-named namespaces stays usable as a qualifier.
 //META: intent=boundary
 //META: pipeline_stage=check

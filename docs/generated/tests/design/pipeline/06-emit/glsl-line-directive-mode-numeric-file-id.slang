@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#emit-dispatcher
-//META: doc_section_digest=f136369c763a469783c526b150d8baf5d8f6435a816fbf58504eaa5c871b9d36
+//META: doc_section_digest=92e023f0a75afa74e97ee54b41fb321e85a40d089c1c1745a438f658bc96eee2
 //META: purpose=GLSL targets resolve to the GLSL line-directive mode, so their `#line` directives carry a numeric source-string number instead of the quoted file name the C-style mode uses.
 //META: intent=functional
 //META: pipeline_stage=emit

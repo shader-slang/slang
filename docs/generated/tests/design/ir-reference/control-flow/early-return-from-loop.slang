@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-returns-and-yields
-//META: doc_section_digest=010f71e10305e8452b6909c94e2da52806525700f6c78aa6daffe80e8b4ca211
+//META: doc_section_digest=19520b191e2b148481e6b700687fe1131b2a8c16bbfb46366168336ce634d33f
 //META: purpose=An early-return inside a loop body produces a return_val terminator on a block that is not the function's natural exit — return is a per-block terminator independent of loop structure.
 //META: intent=functional
 //META: pipeline_stage=lower

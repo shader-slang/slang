@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-5
-remediated_at: 2026-08-04T09:06:00Z
+remediator_model: claude-sonnet-5-5
+remediated_at: 2026-11-03T07:10:00Z
 target_doc: ast-reference/base.md
 review_report: ../../reviews/ast-reference/base.md.review.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_before: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
 actions:
-  fixed: 4
+  fixed: 3
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,18 +18,12 @@ actions:
 
 ## Summary
 
-All four findings were verified against the source and the per-document
-prompt, and all four were fixed. Two were factual or contract wording in
-a single line each (`Scope`, the `DeclBase` family line); one removed
-concrete-leaf class names from the root prose and two support-table
-cells; one added a second role sentence to the `NodeBase` and `Stmt`
-callouts. The front matter was not touched.
+All three findings were verified against the current source and fixed with minimal edits. Fixed: 3; no rejections, deferrals or escalations. The document grew by 29 bytes (18,478 bytes, well under the 49,152 cap).
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Confirmed: `source/slang/slang-parser.cpp:144-152` (`Parser::PushScope`) creates a `Scope` and stores it in `containerDecl->ownedScope`, declared at `source/slang/slang-ast-decl.h:141`. The unqualified "not parsed" wording was wrong. | Root-hierarchy bullet and the `Scope` support-table cell now say it is not a syntax node but is created during parsing and attached to container declarations |
-| F-002 | fixed | `docs/generated/design/_meta/prompts/ast-reference-base.md:44-46` lists `DeclBase` among the roots that must read `(no dedicated family page)`. | `Family page:` line for `DeclBase` changed to `(no dedicated family page)` |
-| F-003 | fixed | `docs/generated/design/_meta/prompts/ast-reference-base.md:61-62` forbids concrete leaves on this page; the checklist at lines 57-58 also limits named classes to the three watched headers, which excludes `DeclGroup` (`source/slang/slang-ast-decl.h`). | `DeclBase` prose now says "a concrete group node" and links `declarations.md`; `DeclRef<T>` and `BuiltinOperationKind` cells replaced leaf names with family-page links |
-| F-004 | fixed | `docs/generated/design/_meta/prompts/ast-reference-base.md:37` requires 2-4 sentences per root; both callouts had one. | Added one role sentence to `NodeBase` (shared state for all allocated nodes) and to `Stmt` (`ModifiableSyntaxNode` supplies loc and `Modifiers`) |
+| F-001 | fixed | Confirmed: `source/slang/slang-parser.cpp` `DeclGroupBuilder::addToGroup` calls `CompleteDecl` with the shared modifiers for each member. | DeclBase section: replaced inheritance explanation with `DeclGroupBuilder`/`CompleteDecl` attachment. |
+| F-002 | fixed | Confirmed: `Scope` is `class Scope : public NodeBase` in `source/slang/slang-ast-base.h`. | Support types intro: most entries are non-node helpers in the support-types header; `Scope` is the exception. |
+| F-003 | fixed | Confirmed: `SyntaxClass<T>::isSubClassOf<U>()` in `source/slang/slang-ast-support-types.h` places no concreteness restriction. | `SyntaxClass<T>` row: "concrete AST class" -> "AST class, including abstract bases". |

@@ -61,7 +61,9 @@ static FileSystemStyle _getFileSystemStyle(ISlangFileSystem* system, ComPtr<ISla
     return style;
 }
 
-// Calcuate a combined path, just using Path:: string processing
+// Calculate a combined path from a file or directory and a path, using only Path:: string
+// processing. The result is simplified: `.` and `x/..` segments are collapsed, leading `..`
+// segments are kept.
 static SlangResult _calcCombinedPath(
     SlangPathType fromPathType,
     const char* fromPath,
@@ -81,7 +83,23 @@ static SlangResult _calcCombinedPath(
             relPath = Path::combine(fromPath, path);
             break;
         }
+    default:
+        return SLANG_E_INVALID_ARG;
     }
+
+    // The combined path is the spelling used for every later operation on the file (existence
+    // checks, unique identity, loading), so it must be the minimal one: a path assembled with
+    // `..` segments, like `dir/../dir/file.slang`, inflates the effective length, and on Windows
+    // a path over the legacy ~260-character limit makes those operations fail even though the
+    // equivalent simplified path would fit. `Path::simplify` collapses `x/..` pairs, matching
+    // what `getPath(PathKind::Simplified)` returns for the same path, and keeps leading `..`
+    // segments, which cannot be resolved without an absolute base.
+    //
+    // The `x/..` resolution is lexical by design: `x` collapses to its written parent even
+    // when it is a symlink or does not exist, which is the same lexical form the include
+    // handling and `getPath(PathKind::Simplified)` establish, and it keeps the combined path
+    // independent of file system state.
+    relPath = Path::simplify(relPath);
 
     *pathOut = StringUtil::createStringBlob(relPath).detach();
     return SLANG_OK;

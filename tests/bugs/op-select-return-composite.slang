@@ -1,6 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-d3d12 -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -profile sm_6_0
+//TEST:COMPARE_COMPUTE(targets=vk+dx12, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-output-using-type -profile sm_6_0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -19,7 +18,7 @@ struct CompositeType
 [numthreads(1,1,1)]
 void computeMain(){
 
-    CompositeType composite = CompositeType(-1); 
+    CompositeType composite = CompositeType(-1);
     if (outputBuffer[0] == 0)
     {
         composite = outputBuffer[1] > -1 ? CompositeType(1) : CompositeType(-1);

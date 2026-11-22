@@ -51,4 +51,5 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 // GLSL: imageAtomicAdd(tex_{{[0-9]+}}, ivec2(
 
-// METAL: tex_{{[0-9]+}}.atomic_fetch_add(tid_{{[0-9]+}}.xy,
+// METAL: tid_{{[0-9]+}}.xy
+// METAL: tex_{{[0-9]+}}.atomic_fetch_add(_S{{[0-9]+}},

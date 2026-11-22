@@ -30,10 +30,6 @@ on:
         required: false
         type: string
         default: ""
-      deploy-pages:
-        required: false
-        type: boolean
-        default: false
       pr-comment:
         required: false
         type: boolean
@@ -149,7 +145,7 @@ jobs:
           # Use gcc-built LLVM for Linux (ABI-compatible with clang-18)
           compiler: ${{ inputs.os == 'linux' && 'gcc' || inputs.compiler }}
           platform: ${{ inputs.platform }}
-          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
           build-if-missing: "true"
           github-token: ${{ github.token }}
 
@@ -248,7 +244,7 @@ jobs:
           )
 
           # Add platform-appropriate expected failure lists
-          test_args+=("-expected-failure-list" "tests/expected-failure-no-gpu.txt")
+          test_args+=("-expected-failure-list" "tests/expected-failure-nogpu.txt")
 
           # macOS: cross-dylib C++ exception tests fail in-process (server-count=1)
           if [[ "${{ inputs.os }}" == "macos" ]]; then
@@ -268,13 +264,14 @@ jobs:
             # further entries here if another LLVM variant starts crashing — each is
             # a named, individually-removable line rather than a blanket disable.
             #
-            # The `.6` is positional: it is the index of the crashing directive
-            # within parameter-block.slang, so adding, removing or reordering
-            # `//TEST` lines in that file shifts it, and this would then silently
-            # exclude an unrelated subtest. Re-derive it with
-            # `slang-test -dry-run tests/compute/parameter-block.slang` and look for
-            # the `syn (llvm)` entry.
-            test_args+=("-exclude-prefix" "tests/compute/parameter-block.slang.6")
+            # The entry is the whole name of the crashing test: the test of the
+            # target `llvm` of the first line of parameter-block.slang. The first
+            # line has no number in the name. The name has the index of the line,
+            # so adding or removing a `//TEST` line before it changes the name,
+            # and this entry then matches nothing. Check the name with
+            # `slang-test -dry-run tests/compute/parameter-block.slang`, which
+            # prints the index 0 as `.0`.
+            test_args+=("-exclude-prefix" "tests/compute/parameter-block.slang (llvm)")
             #
             # Metal cannot be narrowed the same way: slang-rhi aborts on
             # `SLANG_RHI_ASSERT(index < m_size)` in src/core/short_vector.h, which
@@ -333,7 +330,7 @@ jobs:
         run: |
           $testArgs = @(
             '-expected-failure-list', 'tests/expected-failure-github.txt'
-            '-expected-failure-list', 'tests/expected-failure-no-gpu.txt'
+            '-expected-failure-list', 'tests/expected-failure-nogpu.txt'
             '-skip-reference-image-generation'
             '-show-adapter-info'
             '-enable-debug-layers', 'true'
@@ -588,7 +585,6 @@ jobs:
           Get-Content 'coverage-summary.json' | Write-Host
 
       - name: Upload Coverage Artifacts for Merging
-        if: ${{ !inputs.deploy-pages }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: coverage-${{ inputs.os }}-${{ inputs.platform }}
@@ -609,82 +605,6 @@ jobs:
             build/${{ inputs.config }}/lib/libslang.*
             build/coverage-data/full.cobertura.xml
           retention-days: 7
-
-      - name: Checkout Coverage Reports Repository
-        if: ${{ inputs.deploy-pages }}
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-        with:
-          repository: "shader-slang/slang-coverage-reports"
-          path: "coverage-repo"
-          token: ${{ secrets.SLANG_COVERAGE_REPORTS_PAT }}
-
-      - name: Deploy Coverage to Separate Repository
-        if: ${{ inputs.deploy-pages }}
-        run: |
-          # Get current date and short commit hash
-          REPORT_DATE=$(date -u +"%Y-%m-%d")
-          COMMIT_SHORT=$(git rev-parse --short HEAD)
-          FULL_COMMIT=$(git rev-parse HEAD)
-          REPORT_DIR="reports/history/${REPORT_DATE}-${COMMIT_SHORT}"
-
-          cd coverage-repo
-
-          # Configure git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Create directory structure
-          mkdir -p "${REPORT_DIR}"
-          mkdir -p reports/latest
-
-          # Copy coverage HTML to historical location
-          cp -r ../coverage-html/* "${REPORT_DIR}/"
-
-          # Copy slangc compiler-only HTML report if it exists
-          if [[ -d ../coverage-html-slangc ]]; then
-            mkdir -p "${REPORT_DIR}/slangc"
-            cp -r ../coverage-html-slangc/* "${REPORT_DIR}/slangc/"
-          fi
-
-          # Copy coverage summary JSON if it exists
-          if [[ -f ../coverage-summary.json ]]; then
-            cp ../coverage-summary.json "${REPORT_DIR}/"
-          fi
-
-          # Update latest (replace entire directory)
-          rm -rf reports/latest/*
-          cp -r ../coverage-html/* reports/latest/
-
-          # Copy slangc report to latest
-          if [[ -d ../coverage-html-slangc ]]; then
-            mkdir -p reports/latest/slangc
-            cp -r ../coverage-html-slangc/* reports/latest/slangc/
-          fi
-
-          # Copy coverage summary to latest
-          if [[ -f ../coverage-summary.json ]]; then
-            cp ../coverage-summary.json reports/latest/
-          fi
-
-          # Generate historical index
-          bash ../tools/coverage/generate-history-index.sh reports/history
-
-          # Generate main landing page
-          bash ../tools/coverage/generate-landing-page.sh reports
-
-          # Commit and push if there are changes
-          git add reports/
-          if ! git diff --cached --quiet; then
-            TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-            git commit -m "Add coverage report for ${REPORT_DATE} (${COMMIT_SHORT})" \
-                       -m "Generated from shader-slang/slang@${FULL_COMMIT}" \
-                       -m "Date: ${TIMESTAMP}"
-
-            git push origin main
-            echo "Coverage report deployed successfully"
-          else
-            echo "No changes to coverage report"
-          fi
 
       - name: Report Coverage in PR
         if: ${{ inputs.pr-comment }}

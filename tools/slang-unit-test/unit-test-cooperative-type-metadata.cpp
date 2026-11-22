@@ -338,6 +338,13 @@ static const CooperativeMetadataTargetDesc kCooperativeVectorTargets[] = {
     {"cuda_optix", SLANG_CUDA_SOURCE, nullptr, kCudaOptixCoopVecCaps, 1},
 };
 
+// OptiX rejects a transposed matrix with an int8 interpretation and `coopVecMatMulPacked` (E55204),
+// so the test that uses both runs only on the targets that support them.
+static const CooperativeMetadataTargetDesc kCooperativeVectorInt8TransposeAndPackedTargets[] = {
+    {"spirv", SLANG_SPIRV, "spirv_1_6", kSpirvCoopVecCaps, 1},
+    {"hlsl", SLANG_HLSL, "sm_6_9", nullptr, 0},
+};
+
 static const CooperativeMetadataTargetDesc kCooperativeVectorTrainingTargets[] = {
     {"spirv", SLANG_SPIRV, "spirv_1_6", kSpirvCoopVecTrainingCaps, 2},
     {"hlsl", SLANG_HLSL, "sm_6_9", nullptr, 0},
@@ -467,7 +474,7 @@ static const slang::CooperativeMatrixCombination kExpectedCooperativeMatrixSubgr
          .scope = SLANG_SCOPE_WAVE},
 };
 
-SLANG_UNIT_TEST(cooperativeMatrixSubgroupTypeMetadata)
+SLANG_UNIT_TEST(cooperativeMatrixSubgroupTypeMetadata, NoRenderApi)
 {
     for (const auto& target : kCooperativeMatrixSubgroupTargets)
     {
@@ -491,7 +498,7 @@ SLANG_UNIT_TEST(cooperativeMatrixSubgroupTypeMetadata)
     }
 }
 
-SLANG_UNIT_TEST(cooperativeMatrixWorkgroupTypeMetadata)
+SLANG_UNIT_TEST(cooperativeMatrixWorkgroupTypeMetadata, NoRenderApi)
 {
     const char* workgroupSource = R"(
 using namespace linalg;
@@ -563,7 +570,7 @@ void computeMain()
     }
 }
 
-SLANG_UNIT_TEST(cooperativeMatrixHlslTypeMetadata)
+SLANG_UNIT_TEST(cooperativeMatrixHlslTypeMetadata, NoRenderApi)
 {
     for (const auto& target : kCooperativeMatrixHlslTargets)
     {
@@ -587,7 +594,7 @@ SLANG_UNIT_TEST(cooperativeMatrixHlslTypeMetadata)
     }
 }
 
-SLANG_UNIT_TEST(cooperativeVectorTypeMetadata)
+SLANG_UNIT_TEST(cooperativeVectorTypeMetadata, NoRenderApi)
 {
     const char* source = R"(
 using namespace linalg;
@@ -701,7 +708,7 @@ void computeMain()
          .transpose = false},
     };
 
-    for (const auto& target : kCooperativeVectorTargets)
+    for (const auto& target : kCooperativeVectorInt8TransposeAndPackedTargets)
     {
         auto metadata = _compileAndGetCooperativeMetadata(source, "coopVectorTypeModule", target);
         SLANG_CHECK(metadata != nullptr);
@@ -720,7 +727,7 @@ void computeMain()
     }
 }
 
-SLANG_UNIT_TEST(cooperativeVectorTrainingMetadata)
+SLANG_UNIT_TEST(cooperativeVectorTrainingMetadata, NoRenderApi)
 {
     const char* source = R"(
 using namespace linalg;
@@ -770,7 +777,7 @@ void computeMain()
     }
 }
 
-SLANG_UNIT_TEST(cooperativeVectorMixedTrainingAndNonTrainingMetadata)
+SLANG_UNIT_TEST(cooperativeVectorMixedTrainingAndNonTrainingMetadata, NoRenderApi)
 {
     const char* source = R"(
 using namespace linalg;
@@ -845,7 +852,7 @@ void computeMain()
     }
 }
 
-SLANG_UNIT_TEST(cooperativeMetadataLoweredVectorTarget)
+SLANG_UNIT_TEST(cooperativeMetadataLoweredVectorTarget, NoRenderApi)
 {
     const char* source = R"(
 using namespace linalg;
@@ -896,7 +903,7 @@ void computeMain()
     }
 }
 
-SLANG_UNIT_TEST(cooperativeMetadataEmptyShader)
+SLANG_UNIT_TEST(cooperativeMetadataEmptyShader, NoRenderApi)
 {
     const char* source = R"(
 RWStructuredBuffer<float> outputBuffer;
@@ -931,7 +938,7 @@ void computeMain()
 // Two coopMatMulAdd operations with identical matrix type parameters must collapse to
 // one matrix combination and three matrix types, exercising the sorted-unique insertion
 // path for both the matrix-type and matrix-combination lists.
-SLANG_UNIT_TEST(cooperativeMatrixMetadataDeduplication)
+SLANG_UNIT_TEST(cooperativeMatrixMetadataDeduplication, NoRenderApi)
 {
     const char* source = R"(
 using namespace linalg;
@@ -1011,7 +1018,7 @@ void computeMain()
 // Loading cooperative vectors of the same component type with several distinct widths
 // must collapse to a single vector type-usage entry whose `maxSize` equals the largest width,
 // exercising the size-merging path of `_insertOrUpdateCooperativeVectorTypeUsageInfo`.
-SLANG_UNIT_TEST(cooperativeVectorTypeMaxSizeMerging)
+SLANG_UNIT_TEST(cooperativeVectorTypeMaxSizeMerging, NoRenderApi)
 {
     const char* source = R"(
 using namespace linalg;

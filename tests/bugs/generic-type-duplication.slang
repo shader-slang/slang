@@ -1,7 +1,6 @@
 // Test that the same generic type specialization does not get emitted as different types in target code.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute,vulkan):COMPARE_COMPUTE_EX:-vk -slang -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 struct MyGeneric<let addOne: bool>
 {

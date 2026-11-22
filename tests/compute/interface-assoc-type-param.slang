@@ -1,7 +1,6 @@
 // Tests using associated types through an existential-struct-typed param.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 [anyValueSize(8)]
 interface IInterface

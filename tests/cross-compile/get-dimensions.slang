@@ -1,10 +1,5 @@
-//DISABLE_TEST:REFLECTION: -profile cs_5_0 -entry computeMain -target cpp 
-//TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d11 -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
+//DISABLE_TEST:REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
+//TEST:COMPARE_COMPUTE(targets=all-metal):
 
 struct Thing
 {
@@ -35,7 +30,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int index = int(dispatchThreadID.x);
     int last = -1;
-    
+
     uint count = 0, stride = 0;
     if (index == 0)
     {
@@ -55,7 +50,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     else if (index == 3)
     {
         buffer3.GetDimensions(count, stride);
-        
+
         last = buffer3.Load(int(count - 1)).a;
     }
     else

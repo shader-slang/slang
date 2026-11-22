@@ -21,7 +21,7 @@ static ICompressionSystem* _getCompressionSystem(CompressionSystemType type)
     return nullptr;
 }
 
-SLANG_UNIT_TEST(compression)
+SLANG_UNIT_TEST(compression, NoRenderApi)
 {
     // Test out compression systems
     for (Index i = 0; i < Count(CompressionSystemType::CountOf); ++i)

@@ -2,8 +2,8 @@
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-//META: doc_ref=docs/generated/design/target-pipelines/cuda.md#option-set-toggles-and-emit-side-options
-//META: doc_section_digest=50a146895994e911cc46818c5e9119d818f6d3745a677728ecde705d3636ba92
+//META: doc_ref=docs/generated/design/target-pipelines/cuda.md#conditional-gates
+//META: doc_section_digest=53c4b02712abd1606ada0cd075435fc703c872ab9fb03c55c715018c720c4b38
 //META: purpose=Boundary - slangc -trace-coverage-counter-width 32 stores the corresponding byte width, so the synthesized coverage buffer narrows from the default ulonglong counters to uint counters incremented by 1U.
 //META: intent=boundary
 //META: pipeline_stage=emit

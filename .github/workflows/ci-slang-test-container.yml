@@ -21,10 +21,6 @@ on:
         required: false
         type: string
         default: t4
-      enable-debug-layers:
-        required: false
-        type: boolean
-        default: true
 
 jobs:
   # Run GPU tests in container with Vulkan and CUDA support.
@@ -45,7 +41,7 @@ jobs:
       packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0
       options: >-
         --gpus all
         --user root
@@ -117,6 +113,36 @@ jobs:
           # Display environment configuration
           print-env-info
 
+      - name: Check supported APIs
+        run: |
+          # The GPU tiers run the tests of the Vulkan and CUDA APIs. Fail now if
+          # the machine cannot start one of them, and do not run the tests to
+          # find out that they are all ignored.
+          for attempt in 1 2 3; do
+            if smokeResult=$("$bin_dir/slang-test" "tests/render/check-backend-support-on-ci.slang" 2>&1); then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::slang-test failed to run after 3 attempts"
+              echo "$smokeResult"
+              exit 1
+            fi
+            echo "Attempt $attempt failed, retrying..."
+            sleep 2
+          done
+          echo "$smokeResult"
+
+          missing=0
+          for api in "vk,vulkan" "cuda"; do
+            if echo "$smokeResult" | grep -qi "${api}: Supported"; then
+              echo "✅ ${api} API support detected"
+            else
+              echo "::error::${api} API support not detected"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
       # Cores are written to /var/cores by kernel.core_pattern (set in the
       # scaler's startup.sh on the host before this container started).
       # /var/cores is bind-mounted in via container.options. gdb is baked
@@ -130,7 +156,6 @@ jobs:
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
 
-          test_roots=()
           slang_test_args=(
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-linux.txt"
@@ -138,23 +163,27 @@ jobs:
             "-show-adapter-info"
           )
 
+          # The GPU tiers run the same way, and differ only in which tests they
+          # select (see the case below). Restrict to GPU APIs ("all" without cpu
+          # and llvm, where llvm is the tests that use -emit-cpu-via-llvm) so
+          # (cpu) / (llvm) tests are skipped, and use -compile-test false so the
+          # compile tests (the tests that use no API, such as SIMPLE) and the
+          # unit tests that need no GPU are skipped too — the CPU-only tier
+          # covers those. -compile-test false keeps the COMPILE lines that
+          # prepare the input of a GPU test in the same file (for example a
+          # COMPILE line before a COMPARE_COMPUTE line), the lines that need
+          # NVRTC, and the unit tests that declare a GPU API.
+          slang_test_args+=("-api" "all-cpu-llvm" "-compile-test" "false")
+
           case "${{ inputs.gpu-tier }}" in
             t4)
-              # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped — the
-              # CPU-only tier covers those. Intentionally NOT using -api-only:
-              # no-API tests (COMPILE directives in multi-step compile→dispatch
-              # sequences, SIMPLE/DIAGNOSTIC tests that validate SPIR-V emission)
-              # still need to run on the GPU tier for correctness.
-              slang_test_args+=("-api" "vk+cuda+dx11+dx12+mtl+wgpu")
               # T4 cannot execute SM 8.0+ cooperative matrix PTX safely.
-              slang_test_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
-              slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
+              slang_test_args+=("-exclude-list" "tests/tests-require-sm80.txt")
               ;;
             sm80plus)
               # Keep L4/Blackwell cost bounded: run only the capability subset
               # that T4 cannot safely cover, not a second full Linux GPU suite.
-              test_roots=("tests/cooperative-matrix/" "tests/neural/" "slang-unit-test-tool/cooperativeMatrixSubgroupTypeMetadata.internal")
-              slang_test_args+=("-api" "vk+cuda")
+              slang_test_args+=("-include-list" "tests/tests-require-sm80.txt")
               ;;
             *)
               echo "::error::unknown gpu-tier '${{ inputs.gpu-tier }}' (expected t4 or sm80plus)"
@@ -167,7 +196,20 @@ jobs:
             slang_test_args+=("-server-count" "${{ inputs.server-count }}")
           fi
 
-          # Skip most neural tests in debug builds to reduce CI time
+          # The validation layers run in the release jobs only. The results are the
+          # same, and the debug jobs are slower, so this spreads the work.
+          # A debug build of slang-test turns them on by default, so the debug
+          # jobs turn them off.
+          if [[ "${{ inputs.config }}" == "release" ]]; then
+            slang_test_args+=("-enable-debug-layers" "true")
+          else
+            slang_test_args+=("-enable-debug-layers" "false")
+          fi
+
+          # Skip most neural tests in debug builds to reduce CI time. This
+          # applies to the sm80plus tier too: a debug sm80plus job runs all
+          # cooperative-matrix tests and the neural tests that
+          # skip-list-debug.txt keeps enabled.
           if [[ "${{ inputs.config }}" == "debug" ]]; then
             slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")
           fi
@@ -175,46 +217,38 @@ jobs:
           # Print the fully-resolved command so the CI log shows exactly which
           # arguments were used (the conditional logic only shows the source).
           printf '+ %q' "$bin_dir/slang-test"
-          printf ' %q' "${test_roots[@]}" "${slang_test_args[@]}"
+          printf ' %q' "${slang_test_args[@]}"
           printf '\n'
 
-          "$bin_dir/slang-test" "${test_roots[@]}" "${slang_test_args[@]}"
+          status=0
+          "$bin_dir/slang-test" "${slang_test_args[@]}" || status=$?
+
+          # The tests that need a T4 machine select only the cpu API, so the run
+          # above leaves them out. A second run executes them. It takes the
+          # arguments of the first run, without the options that choose the
+          # tests of the tier.
+          if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
+            t4_args=()
+            for ((i = 0; i < ${#slang_test_args[@]}; i++)); do
+              case "${slang_test_args[i]}" in
+                -api | -compile-test | -exclude-list)
+                  i=$((i + 1))
+                  ;;
+                *)
+                  t4_args+=("${slang_test_args[i]}")
+                  ;;
+              esac
+            done
+            t4_args+=("-include-list" "tests/tests-require-t4.txt")
+            printf '+ %q' "$bin_dir/slang-test"
+            printf ' %q' "${t4_args[@]}"
+            printf '\n'
+            "$bin_dir/slang-test" "${t4_args[@]}" || status=$?
+          fi
+          exit "$status"
 
       - name: Check slang-test worktree cleanliness
         if: always()
-        run: |
-          status="$(git status --short --untracked-files=all -- . ':(exclude)artifacts/**')"
-          if [[ -n "$status" ]]; then
-            echo "::error::slang-test left generated or modified files in the worktree"
-            printf '%s\n' "$status"
-            exit 1
-          fi
-
-      - name: Run slangc tests
-        if: inputs.gpu-tier == 't4'
-        run: |
-          ulimit -c unlimited
-          PATH=$bin_dir:$PATH tools/slangc-test/test.sh
-
-      - name: Test Slang via glsl
-        if: inputs.gpu-tier == 't4' && inputs.config == 'release' && github.event_name == 'pull_request'
-        run: |
-          ulimit -c unlimited
-          export SLANG_RUN_SPIRV_VALIDATION=1
-          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-          "$bin_dir/slang-test" \
-            -use-test-server \
-            -server-count ${{ inputs.server-count }} \
-            -emit-spirv-via-glsl \
-            -api vk \
-            -skip-list tests/skip-list-gpu-t4.txt \
-            -expected-failure-list tests/expected-failure-via-glsl.txt \
-            -expected-failure-list tests/expected-failure-github.txt \
-            -expected-failure-list tests/expected-failure-linux.txt \
-            -expected-failure-list tests/expected-failure-linux-gpu.txt
-
-      - name: Check via-glsl slang-test worktree cleanliness
-        if: always() && inputs.gpu-tier == 't4' && inputs.config == 'release' && github.event_name == 'pull_request'
         run: |
           status="$(git status --short --untracked-files=all -- . ':(exclude)artifacts/**')"
           if [[ -n "$status" ]]; then

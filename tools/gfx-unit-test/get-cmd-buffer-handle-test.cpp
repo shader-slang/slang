@@ -85,13 +85,13 @@ void getBufferHandleTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum
 }
 
 #if SLANG_WINDOWS_FAMILY
-SLANG_UNIT_TEST(getCmdBufferHandleD3D12)
+SLANG_UNIT_TEST(getCmdBufferHandleD3D12, D3D12)
 {
     return getBufferHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 #endif
 
-SLANG_UNIT_TEST(getCmdBufferHandleVulkan)
+SLANG_UNIT_TEST(getCmdBufferHandleVulkan, Vulkan)
 {
     return getBufferHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
 }

@@ -555,6 +555,39 @@ matcher will consume. A `//TEST` directive with no corresponding
 CHECK pattern is rejected by lint — such a test runs but verifies
 nothing.
 
+### Exit code of `filecheck=` tests (READ — `slang-test` enforces it)
+
+A `SIMPLE`, `SIMPLE_EX`, `INTERPRET` or `REFLECTION` test with
+`filecheck=PREFIX` (including the `//DIAGNOSTIC_TEST:SIMPLE(filecheck=...)`
+spelling) fails when the tool's exit code is not the expected one. The
+expected exit code is `0` unless the directive says otherwise with
+`exit-code=N`:
+
+```
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):
+```
+
+- A test whose claim is "the compiler rejects X" (an error diagnostic)
+  must set `exit-code=2`: `2` is a failed compile.
+- A test that passes a bad command-line option or a malformed option value
+  expects `exit-code=1`: `1` is a command-line error.
+- A positive test (valid code, emitted text) keeps the default `0`. If it
+  now fails with `2`, the code is rejected: read the diagnostic and fix
+  the test, never add `exit-code=2` to hide it.
+- Pair every `exit-code=2` with a `CHECK` on the diagnostic code (for
+  example `// CHECK: E30011`), so the test cannot pass on an unrelated error.
+  `CHECK-NOT: error` is useless: the FileCheck input always contains the
+  header `standard error`.
+- One test line cannot carry both `diag=` and `filecheck=`. Use one line for
+  each check.
+- A multi-line file numbers its test lines from 0 (`foo.slang`,
+  `foo.slang.1`, ...). Each line needs its own `exit-code=` if it fails.
+
+Run the test locally after editing the directive; the message
+`expected exit code 0, but the exit code is 2` means the directive needs
+`exit-code=2` (negative test) or the code is wrongly rejected (positive test).
+
 ### FileCheck / CHECK pattern hygiene (READ — most CHECK failures come from these)
 
 You are writing a pattern that must match the compiler's _actual_
@@ -896,14 +929,25 @@ These are not lint-enforced, but skip them only with a
   printf/atomic. A pure-internal computation is removed before the
   CHECK can see it.
 - **Identifier mangling varies per target.** A Slang local `a` may
-  appear as `a_0` in HLSL, `globalParams_0.a_0` in CUDA via param-
-  block lowering, or `__ldg(&...->a_0)` in CUDA via read-only buffer
-  lowering. Use FileCheck wildcards like `a_{{[0-9]+}}` rather than
-  literal `a_0`.
-- **CUDA factors `__ldg(&uniform)` reads into temporaries**,
-  splitting compound expressions on uniform operands. To observe a
-  binary expression on CUDA, derive operands from thread/dispatch
-  IDs (or locals holding them) rather than from `uniform` globals.
+  appear as `a_0` in HLSL or `globalParams_0->a_0` after CUDA
+  parameter-group lowering. A field loaded from a CUDA read-only
+  buffer may instead appear inside `__ldg(&...->a_0)`. Use FileCheck
+  wildcards like `a_{{[0-9]+}}` rather than literal `a_0`.
+- **WGSL spells the unconditional loop header `loop`.** Structured
+  loops lower to an unconditional header with the exit test as an
+  early `break`; HLSL, GLSL, Metal, CUDA and C++ spell that header
+  `for(;;)`, and WGSL spells it `loop` (only the header token
+  differs). Anchor a WGSL header match, either as the whole line
+  `{{^ *loop$}}` or as `loop` followed by a `-NEXT: {` check,
+  because a bare `loop` also matches identifiers that contain it.
+- **CUDA `__ldg` is memory-space-sensitive.** Top-level `uniform`
+  values are fields of `SLANG_globalParams`, which CUDA emits in
+  `__constant__` memory, so the immutable-load pass must leave those
+  reads plain. `__ldg` lowers to `ld.global.nc` and is reserved for
+  eligible global-memory reads such as `StructuredBuffer<T>` or
+  `ConstantBuffer<T>` contents. Use one of those buffer types when a
+  positive test needs to observe `__ldg`; use a top-level `uniform`
+  with `CHECK-NOT: __ldg` when testing the exclusion.
 - **Metal `[[buffer(N)]]` indices are positional**, not driven by
   `vk::binding(...)` or HLSL `register(uN)`. Two struct fields bound
   via `vk::binding(7)` and `vk::binding(3)` may still emit as
@@ -1043,11 +1087,9 @@ emit behavior will often fail because the pass had nothing to do.
   literals, for any value the pass needs to see at runtime.
 - **Sink intermediate values into an `RWStructuredBuffer`** so DCE
   cannot remove them.
-- **Defeat compile-time literal recognition** when the value matters:
-  on CUDA `__ldg(&uniform)` reads, the optimizer can re-fold loads
-  into temporaries (see "CUDA factors `__ldg(&uniform)` reads into
-  temporaries" above). Use thread/dispatch IDs as operands when the
-  CHECK must observe a binary op on the result.
+- **Defeat compile-time literal recognition** when the value matters.
+  Use thread/dispatch IDs or buffer-fed values as operands when the
+  CHECK must observe a binary op rather than a folded constant.
 
 #### Tests must compile cleanly first
 
@@ -1073,8 +1115,8 @@ pitfalls observed in earlier bundles:
   and the closesthit/anyhit signature emits without it.
 - **Entry-point stage capabilities are checked at type-check time.**
   If the core module excludes a target from the capability set for
-  a given intrinsic (e.g. `NonUniformResourceIndex` requires
-  `cpp_cuda_glsl_hlsl_spirv` and so excludes Metal), the test
+  a given intrinsic (e.g. one declared only
+  `[require(cpp_cuda_glsl_hlsl_spirv)]` excludes Metal and WGSL), the test
   rejects with E36107 before any emit happens. This is usually a
   doc-bug; see [Record a doc-gap](#record-a-doc-gap-when-the-doc-claims-a-surface-the-compiler-rejects)
   below.
@@ -1093,9 +1135,6 @@ we have already surfaced:
 - The SPIR-V doc names `-validate-spirv` as the CLI flag enabling
   spirv-val; no such flag exists. Only `SLANG_RUN_SPIRV_VALIDATION`
   (env var) and `-skip-spirv-validation` are real surfaces.
-- The Metal doc claims `NonUniformResourceIndex` is a pass-through;
-  the core module excludes Metal from its capability set, so the
-  intrinsic does not even compile.
 
 Recording the doc-gap is more valuable than working around the
 fabrication: the next doc regeneration consumes the row and fixes

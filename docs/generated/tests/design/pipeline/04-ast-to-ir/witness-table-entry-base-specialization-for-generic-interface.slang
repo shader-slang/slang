@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#generics-and-existentials
-//META: doc_section_digest=f9fbc5ab50420dd2b267ddb86a5eff193a88f8bd53dbaeb86a9ca9fdcaf05b23
+//META: doc_section_digest=00fef3057358760d4225321cd326293f0cb1ef37b4a7e3a927e9a7448fe83891
 //META: purpose=In a conformance to a generic interface, an entry satisfied by a member of the conforming type stays flat while an entry inherited from the interface's own default implementation gains an extra base-specialization layer — `specialize(specialize(%impl, Int), %S, %table)`.
 //META: intent=functional
 //META: pipeline_stage=lower

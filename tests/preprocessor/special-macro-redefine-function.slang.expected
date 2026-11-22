@@ -1,9 +1,0 @@
-result code = 0
-standard error = {
-tests/preprocessor/special-macro-redefine-function.slang(7): warning 15404: Redefinition of builtin macro '__FILE__'
-#define __FILE__(x) "Is" x
-        ^~~~~~~~
-}
-standard output = {
-"Is" "Anybody" "Is" There __FILE__ 
-}

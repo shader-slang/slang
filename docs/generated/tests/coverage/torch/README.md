@@ -12,7 +12,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 ## Intent
 
 White-box characterization tests for the PyTorch C++ binding generator
-`source/slang/slang-ir-pytorch-cpp-binding.cpp` (~15% covered). These pin the
+`source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp` (~15% covered). These pin the
 **current observed behaviour** of the `-target torch` emission pipeline driven
 by `[TorchEntryPoint]`, `[AutoPyBindCUDA]`, `[CudaKernel]`, and `TorchTensor` /
 `TensorView`. The strategy: one test per composite-type lowering branch of
@@ -34,14 +34,14 @@ so they are not tagged `characterization-unverified`.
 
 | Test                                                                                 | Pins                                                                                                                                                 | covers=                                       |
 | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| [`torch-entrypoint-struct-return.slang`](torch-entrypoint-struct-return.slang)       | A `[TorchEntryPoint]` struct `{float, TorchTensor<float>}` return flattens to `std::tuple<float, torch::Tensor>`; pybind `m.def` exports it.         | source/slang/slang-ir-pytorch-cpp-binding.cpp |
-| [`torch-entrypoint-vector-roundtrip.slang`](torch-entrypoint-vector-roundtrip.slang) | A `float3` parameter and return both map to `std::tuple<float, float, float>` (vector branch).                                                       | source/slang/slang-ir-pytorch-cpp-binding.cpp |
-| [`torch-entrypoint-matrix-return.slang`](torch-entrypoint-matrix-return.slang)       | A `float2x2` maps to a nested `std::tuple<std::tuple<float,float>, std::tuple<float,float>>` (matrix branch).                                        | source/slang/slang-ir-pytorch-cpp-binding.cpp |
-| [`torch-entrypoint-array-roundtrip.slang`](torch-entrypoint-array-roundtrip.slang)   | A fixed `float[2]` parameter and return both map to `std::tuple<float, float>` (array branch).                                                       | source/slang/slang-ir-pytorch-cpp-binding.cpp |
-| [`autobind-cuda-struct-reflection.slang`](autobind-cuda-struct-reflection.slang)     | An `[AutoPyBindCUDA]` kernel with a struct-of-builtins param emits a host wrapper (uint3 block/grid + flattened struct) plus `__typeinfo__MyStruct`. | source/slang/slang-ir-pytorch-cpp-binding.cpp |
-| [`autobind-cuda-array-reflection.slang`](autobind-cuda-array-reflection.slang)       | An `[AutoPyBindCUDA]` kernel with a `float3[4]` param emits a `__typeinfo__Array__4` reflection function named by element count.                     | source/slang/slang-ir-pytorch-cpp-binding.cpp |
-| [`torch-return-string-rejected.slang`](torch-return-string-rejected.slang)           | A `[TorchEntryPoint]` returning `String` is rejected with E55101 (invalid pytorch kernel return type).                                               | source/slang/slang-ir-pytorch-cpp-binding.cpp |
-| [`torch-param-string-rejected.slang`](torch-param-string-rejected.slang)             | A `[TorchEntryPoint]` taking a `String` parameter is rejected with E55102 (invalid pytorch kernel parameter type).                                   | source/slang/slang-ir-pytorch-cpp-binding.cpp |
+| [`torch-entrypoint-struct-return.slang`](torch-entrypoint-struct-return.slang)       | A `[TorchEntryPoint]` struct `{float, TorchTensor<float>}` return flattens to `std::tuple<float, torch::Tensor>`; pybind `m.def` exports it.         | source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp |
+| [`torch-entrypoint-vector-roundtrip.slang`](torch-entrypoint-vector-roundtrip.slang) | A `float3` parameter and return both map to `std::tuple<float, float, float>` (vector branch).                                                       | source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp |
+| [`torch-entrypoint-matrix-return.slang`](torch-entrypoint-matrix-return.slang)       | A `float2x2` maps to a nested `std::tuple<std::tuple<float,float>, std::tuple<float,float>>` (matrix branch).                                        | source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp |
+| [`torch-entrypoint-array-roundtrip.slang`](torch-entrypoint-array-roundtrip.slang)   | A fixed `float[2]` parameter and return both map to `std::tuple<float, float>` (array branch).                                                       | source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp |
+| [`autobind-cuda-struct-reflection.slang`](autobind-cuda-struct-reflection.slang)     | An `[AutoPyBindCUDA]` kernel with a struct-of-builtins param emits a host wrapper (uint3 block/grid + flattened struct) plus `__typeinfo__MyStruct`. | source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp |
+| [`autobind-cuda-array-reflection.slang`](autobind-cuda-array-reflection.slang)       | An `[AutoPyBindCUDA]` kernel with a `float3[4]` param emits a `__typeinfo__Array__4` reflection function named by element count.                     | source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp |
+| [`torch-return-string-rejected.slang`](torch-return-string-rejected.slang)           | A `[TorchEntryPoint]` returning `String` is rejected with E55101 (invalid pytorch kernel return type).                                               | source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp |
+| [`torch-param-string-rejected.slang`](torch-param-string-rejected.slang)             | A `[TorchEntryPoint]` taking a `String` parameter is rejected with E55102 (invalid pytorch kernel parameter type).                                   | source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp |
 
 ## Unreachable gaps
 
@@ -56,3 +56,21 @@ so they are not tagged `characterization-unverified`.
 ## Doc gaps observed
 
 NA
+
+## Drift review
+
+Reviewed at `d592afa9b9` against `ef1068b548`, the commit this bundle was
+generated from. 2 commits touched its watched paths in between; all
+8 existing tests still pass.
+
+One diagnostic new since the base commit is raised from
+`slang-ir-pytorch-cpp-binding.cpp`: E55103, for a bodyless `[TorchEntryPoint]`
+function, added by #12514 to replace a crash. It already has a hand-written test
+(`tests/autodiff/torch-entrypoint-bodyless.slang`). No test was added.
+
+The other commit in the window, #12508, fixes a crash after the
+`UnableToAutoMapCudaTypeToHostType` diagnostic -- the same SIGSEGV recorded in
+`Unreachable gaps` below as the reason E56001 is filed as a finding rather than
+pinned as a test. That row should be re-checked when the finding is next
+triaged; it was left as-is here because confirming it needs the finding's repro,
+not a drift review.

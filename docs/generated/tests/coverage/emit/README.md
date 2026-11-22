@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-05T00:00:00Z
-source_commit: 5634a0ea1b
-watched_paths_digest: 7c8fbec89ad4217847f03ab88cd9895b0e9ec0d88dc602baa08bac9cb716a0e1
+model: claude-sonnet-5-5
+generated_at: 2026-11-08T21:31:43Z
+source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
+watched_paths_digest: 8eb6116b92c8689ce7d0c815d0983bdb429907f1dfd7f57c0eedd415fa0fbd0e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -12,7 +12,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 ## Intent
 
 White-box characterization tests for the target back-end emitters
-`source/slang/slang-emit-c-like.cpp`, `slang-emit-glsl.cpp` and
+`source/slang/emission/slang-emit-c-like.cpp`, `slang-emit-glsl.cpp` and
 `slang-emit-spirv.cpp`. They pin the **current observed emitted text** of
 CLI-reachable, otherwise-untested emit arms, not a spec.
 
@@ -60,19 +60,19 @@ deliberately **not** pinned, and a finding is filed instead — see
 
 | Test                                                                                                     | What it pins (current behaviour)                                                                                                                                                                                                                                                                                                                                                                             | covers=                            |
 | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
-| [`bitfield-extract-insert.slang`](bitfield-extract-insert.slang)                                         | `bitfieldExtract`/`bitfieldInsert` emit native `OpBitFieldUExtract`/`OpBitFieldInsert` on SPIR-V, GLSL `bitfieldExtract`/`bitfieldInsert`, and expanded shift/mask arithmetic on HLSL/Metal/WGSL.                                                                                                                                                                                                            | source/slang/slang-emit-spirv.cpp  |
-| [`glsl-bool-vector-logical-legalization.slang`](glsl-bool-vector-logical-legalization.slang)             | `&&`, `\|\|` and `^` on `bool3` are legalized for GLSL by round-tripping both operands through `uvec3` (`bvec3(uvec3(a)&uvec3(b))`), while SPIR-V uses `OpLogicalAnd`/`OpLogicalOr`/`OpLogicalNotEqual` on `%v3bool`, HLSL/Metal keep the operator on the boolean vector, and WGSL lowers the short-circuiting forms to `select`.                                                                            | source/slang/slang-emit-glsl.cpp   |
-| [`glsl-image-format-inference-by-element-type.slang`](glsl-image-format-inference-by-element-type.slang) | With no `[format(...)]`, the GLSL format is inferred from the element type: component count picks `r`/`rg`/`rgba` (3 components widen to `rgba`) and the base type picks `32f`/`16f`/`32ui`/`32i`/`16i`/`8ui`, with a matching `image2D`/`uimage2D`/`iimage2D`/`i16image2D`/`u8image2D` type name.                                                                                                           | source/slang/slang-emit-glsl.cpp   |
-| [`glsl-interpolation-modifiers.slang`](glsl-interpolation-modifiers.slang)                               | On a fragment varying, `nointerpolation` becomes GLSL `flat` and `linear` becomes `smooth`, while `noperspective`/`centroid`/`sample` keep their names; SPIR-V uses `Flat`/`NoPerspective`/`Centroid`/`Sample` decorations and emits none for `linear`; HLSL round-trips all five.                                                                                                                           | source/slang/slang-emit-glsl.cpp   |
-| [`glsl-structured-buffer-data-layouts.slang`](glsl-structured-buffer-data-layouts.slang)                 | `Std140DataLayout`/`Std430DataLayout`/`ScalarDataLayout` select `layout(std140)`/`layout(std430)`/`layout(scalar)` (the last also requiring `GL_EXT_scalar_block_layout`), a read-only `StructuredBuffer` gets `readonly`, and `globallycoherent` becomes `coherent`; SPIR-V carries the same information as `ArrayStride`/`Offset` decorations plus `OpDecorate ... Coherent`.                              | source/slang/slang-emit-glsl.cpp   |
-| [`glsl-track-liveness-spirv-intrinsics.slang`](glsl-track-liveness-spirv-intrinsics.slang)               | `-track-liveness` on the GLSL target declares one `spirv_instruction(id = 256)` / `(id = 257)` function per marked local type (`spirv_by_reference` + `spirv_literal` parameters) and calls `livenessStart_N`/`livenessEnd_N` at the range boundaries.                                                                                                                                                       | source/slang/slang-emit-glsl.cpp   |
-| [`make-matrix-from-scalar-fanout.slang`](make-matrix-from-scalar-fanout.slang)                           | `float3x3(scalar)` fans the scalar out to 9 constructor args on HLSL/GLSL/Metal/WGSL, a nested `OpCompositeConstruct` on SPIR-V, and a single-arg `makeMatrix<float,3,3>` on CUDA.                                                                                                                                                                                                                           | source/slang/slang-emit-c-like.cpp |
-| [`matrix-reshape-row-truncation.slang`](matrix-reshape-row-truncation.slang)                             | `(float3x3)float4x4` emits a constructor of the first three rows each `.xyz`-truncated on HLSL/GLSL/Metal/WGSL, and the same shape as three `OpVectorShuffle`s + `OpCompositeConstruct` on SPIR-V.                                                                                                                                                                                                           | source/slang/slang-emit-c-like.cpp |
-| [`matrix-vector-mul-operand-order.slang`](matrix-vector-mul-operand-order.slang)                         | `mul(M, v)` stays `mul(M, v)` on HLSL, reverses to `v * M` on GLSL/Metal/WGSL (column-major), and emits `OpVectorTimesMatrix` on SPIR-V.                                                                                                                                                                                                                                                                     | source/slang/slang-emit-glsl.cpp   |
-| [`spirv-image-format-table.slang`](spirv-image-format-table.slang)                                       | Each of 27 otherwise-undeclared `[format("...")]` attributes selects its SPIR-V image format in `OpTypeImage` (including the `Rgb10A2` vs `Rgb10a2ui` capitalisation difference), and the module declares `StorageImageExtendedFormats`.                                                                                                                                                                     | source/slang/slang-emit-spirv.cpp  |
-| [`spirv-unorm-snorm-image-format-by-width.slang`](spirv-unorm-snorm-image-format-by-width.slang)         | A `unorm`/`snorm` storage image with no `[format(...)]` infers an 8-bit normalized SPIR-V format sized by component count (`R8`/`Rg8`/`Rgba8` and the `Snorm` variants), with 3 components widening onto the 4-component format.                                                                                                                                                                             | source/slang/slang-emit-spirv.cpp  |
-| [`struct-return-value-roundtrip.slang`](struct-return-value-roundtrip.slang)                             | A by-value struct returned from a helper and read field-by-field round-trips its fields (`makePair(7)` → 7+14=21) under the interpreter.                                                                                                                                                                                                                                                                     | source/slang/slang-emit-c-like.cpp |
-| [`switch-fallthrough-shared-case.slang`](switch-fallthrough-shared-case.slang)                           | Adjacent empty cases share one label; a non-`break` case falls through. Three shapes are pinned: HLSL and WGSL duplicate the default body inline (WGSL also merges the shared cases into one comma-separated selector list and reports E41026), GLSL and Metal keep a natural C fall-through with the default body emitted once, and SPIR-V keeps one `OpSwitch` with 0 and 1 mapped to the same case label. | source/slang/slang-emit-c-like.cpp |
+| [`bitfield-extract-insert.slang`](bitfield-extract-insert.slang)                                         | `bitfieldExtract`/`bitfieldInsert` emit native `OpBitFieldUExtract`/`OpBitFieldInsert` on SPIR-V, GLSL `bitfieldExtract`/`bitfieldInsert`, and expanded shift/mask arithmetic on HLSL/Metal/WGSL.                                                                                                                                                                                                            | source/slang/emission/slang-emit-spirv.cpp  |
+| [`glsl-bool-vector-logical-legalization.slang`](glsl-bool-vector-logical-legalization.slang)             | `&&`, `\|\|` and `^` on `bool3` are legalized for GLSL by round-tripping both operands through `uvec3` (`bvec3(uvec3(a)&uvec3(b))`), while SPIR-V uses `OpLogicalAnd`/`OpLogicalOr`/`OpLogicalNotEqual` on `%v3bool`, HLSL/Metal keep the operator on the boolean vector, and WGSL lowers the short-circuiting forms to `select`.                                                                            | source/slang/emission/slang-emit-glsl.cpp   |
+| [`glsl-image-format-inference-by-element-type.slang`](glsl-image-format-inference-by-element-type.slang) | With no `[format(...)]`, the GLSL format is inferred from the element type: component count picks `r`/`rg`/`rgba` (3 components widen to `rgba`) and the base type picks `32f`/`16f`/`32ui`/`32i`/`16i`/`8ui`, with a matching `image2D`/`uimage2D`/`iimage2D`/`i16image2D`/`u8image2D` type name.                                                                                                           | source/slang/emission/slang-emit-glsl.cpp   |
+| [`glsl-interpolation-modifiers.slang`](glsl-interpolation-modifiers.slang)                               | On a fragment varying, `nointerpolation` becomes GLSL `flat` and `linear` becomes `smooth`, while `noperspective`/`centroid`/`sample` keep their names; SPIR-V uses `Flat`/`NoPerspective`/`Centroid`/`Sample` decorations and emits none for `linear`; HLSL round-trips all five.                                                                                                                           | source/slang/emission/slang-emit-glsl.cpp   |
+| [`glsl-structured-buffer-data-layouts.slang`](glsl-structured-buffer-data-layouts.slang)                 | `Std140DataLayout`/`Std430DataLayout`/`ScalarDataLayout` select `layout(std140)`/`layout(std430)`/`layout(scalar)` (the last also requiring `GL_EXT_scalar_block_layout`), a read-only `StructuredBuffer` gets `readonly`, and `globallycoherent` becomes `coherent`; SPIR-V carries the same information as `ArrayStride`/`Offset` decorations plus `OpDecorate ... Coherent`.                              | source/slang/emission/slang-emit-glsl.cpp   |
+| [`glsl-track-liveness-spirv-intrinsics.slang`](glsl-track-liveness-spirv-intrinsics.slang)               | `-track-liveness` on the GLSL target declares one `spirv_instruction(id = 256)` / `(id = 257)` function per marked local type (`spirv_by_reference` + `spirv_literal` parameters) and calls `livenessStart_N`/`livenessEnd_N` at the range boundaries.                                                                                                                                                       | source/slang/emission/slang-emit-glsl.cpp   |
+| [`make-matrix-from-scalar-fanout.slang`](make-matrix-from-scalar-fanout.slang)                           | `float3x3(scalar)` fans the scalar out to 9 constructor args on HLSL/GLSL/Metal/WGSL, a nested `OpCompositeConstruct` on SPIR-V, and a single-arg `makeMatrix<float,3,3>` on CUDA.                                                                                                                                                                                                                           | source/slang/emission/slang-emit-c-like.cpp |
+| [`matrix-reshape-row-truncation.slang`](matrix-reshape-row-truncation.slang)                             | `(float3x3)float4x4` emits a constructor of the first three rows each `.xyz`-truncated on HLSL/GLSL/Metal/WGSL, and the same shape as three `OpVectorShuffle`s + `OpCompositeConstruct` on SPIR-V.                                                                                                                                                                                                           | source/slang/emission/slang-emit-c-like.cpp |
+| [`matrix-vector-mul-operand-order.slang`](matrix-vector-mul-operand-order.slang)                         | `mul(M, v)` stays `mul(M, v)` on HLSL, reverses to `v * M` on GLSL/Metal/WGSL (column-major), and emits `OpVectorTimesMatrix` on SPIR-V.                                                                                                                                                                                                                                                                     | source/slang/emission/slang-emit-glsl.cpp   |
+| [`spirv-image-format-table.slang`](spirv-image-format-table.slang)                                       | Each of 27 otherwise-undeclared `[format("...")]` attributes selects its SPIR-V image format in `OpTypeImage` (including the `Rgb10A2` vs `Rgb10a2ui` capitalisation difference), and the module declares `StorageImageExtendedFormats`.                                                                                                                                                                     | source/slang/emission/slang-emit-spirv.cpp  |
+| [`spirv-unorm-snorm-image-format-by-width.slang`](spirv-unorm-snorm-image-format-by-width.slang)         | A `unorm`/`snorm` storage image with no `[format(...)]` infers an 8-bit normalized SPIR-V format sized by component count (`R8`/`Rg8`/`Rgba8` and the `Snorm` variants), with 3 components widening onto the 4-component format.                                                                                                                                                                             | source/slang/emission/slang-emit-spirv.cpp  |
+| [`struct-return-value-roundtrip.slang`](struct-return-value-roundtrip.slang)                             | A by-value struct returned from a helper and read field-by-field round-trips its fields (`makePair(7)` → 7+14=21) under the interpreter.                                                                                                                                                                                                                                                                     | source/slang/emission/slang-emit-c-like.cpp |
+| [`switch-fallthrough-shared-case.slang`](switch-fallthrough-shared-case.slang)                           | Adjacent empty cases share one label; a non-`break` case falls through. Three shapes are pinned: HLSL and WGSL duplicate the default body inline (WGSL also merges the shared cases into one comma-separated selector list and reports E41026), GLSL and Metal keep a natural C fall-through with the default body emitted once, and SPIR-V keeps one `OpSwitch` with 0 and 1 mapped to the same case label. | source/slang/emission/slang-emit-c-like.cpp |
 
 ## Untested claims
 
@@ -128,7 +128,7 @@ of `tests/`), not the incomplete profile handed to the sweep.
   reached emit on a target that does not override them, which no CLI input produces.
 - **`CLikeSourceEmitter::emitLivenessImpl` (`:690`) is not reachable via
   `-track-liveness`.** On the Khronos targets `applyGLSLLiveness`
-  (`slang-emit.cpp:2603`) rewrites the markers into intrinsic calls before emit —
+  (`slang-emit.cpp:2751`) rewrites the markers into intrinsic calls before emit —
   that is what `glsl-track-liveness-spirv-intrinsics.slang` pins — and on `cpp`,
   `cuda` and `hlsl` the same flag (with and without `-O1`) emits no `SLANG_LIVE_START`
   / `SLANG_LIVE_END` at all.
@@ -172,7 +172,7 @@ of `tests/`), not the incomplete profile handed to the sweep.
 - **`-track-liveness` produces an invalid module on direct SPIR-V.** Any shader with a
   tracked local emits an `OpLifetimeStart` of 5 words where the SPIR-V grammar allows
   3, and `spirv-opt` rejects it (slangc exits 255, no output). `applyGLSLLiveness`
-  (`slang-emit.cpp:2603`) is gated on `isKhronosTarget`, which is true for SPIR-V as
+  (`slang-emit.cpp:2751`) is gated on `isKhronosTarget`, which is true for SPIR-V as
   well as GLSL, but the pass rewrites markers into the `spirv_instruction` function
   calls that only the GLSL text path consumes. No shipped test passes the flag on any
   target, which is consistent with the breakage surviving. This is why the claim above
@@ -231,3 +231,25 @@ this list records only the ones whose reason needs more than a table cell.
 ## Doc gaps observed
 
 NA
+
+## Drift review
+
+Reviewed at `d592afa9b9` against `ef1068b548`, the commit this bundle was
+generated from. 37 commits touched its watched paths in between; all
+13 existing tests still pass.
+
+Three diagnostics new since the base commit are raised from this bundle's
+`coverage_targets`: E55210 (`abort` format string must be a literal), E57005
+(SPIR-V resource heap stride too small for an acceleration-structure entry) and
+E57006 (`-spirv-resource-heap-stride` conflicting with
+`-spirv-unified-descriptor-heap-stride`). All three already have hand-written
+regression tests that shipped with the PRs that introduced them
+(`tests/spirv/descriptor-heap-acceleration-structure.slang`,
+`tests/spirv/descriptor-heap-unified-stride.slang`,
+`tests/diagnostics/abort-format-not-literal.slang`), pinning the same
+observable behaviour this bundle would pin. No test was added.
+
+One citation had drifted and was corrected: `applyGLSLLiveness` is called from
+`slang-emit.cpp:2751`, not `:2603`. The `CLikeSourceEmitter` line citations
+(`:371`, `:584`, `:591`, `:690`, `:800`) were re-checked against
+`slang-emit-c-like.cpp` and are all still exact.

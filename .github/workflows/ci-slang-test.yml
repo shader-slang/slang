@@ -18,48 +18,30 @@ on:
       runs-on:
         required: true
         type: string
-      full-gpu-tests:
-        required: false
-        type: boolean
-        default: false
       server-count:
         required: false
         type: number
         default: 8
-      enable-debug-layers:
-        required: false
-        type: boolean
-        default: true
       artifact-suffix:
         required: false
         type: string
         default: ""
         description: "Optional suffix for artifact name (e.g., '-cuda')"
-      cpu-only:
+      slang-user-skills:
         required: false
         type: boolean
         default: false
-        description: "Restrict slang-test to CPU and LLVM backends via -api cpu+llvm"
-      gpu-api-only:
-        required: false
-        type: boolean
-        default: false
-        description: "Restrict slang-test to GPU APIs (vk+cuda+dx11+dx12+mtl+wgpu) while retaining no-API tests needed by multi-step workflows"
+        description: "Validate the bundled Slang user skills and their examples"
       gpu-tier:
         required: false
         type: string
         default: ""
-        description: "GPU tier label (e.g., 't4', 'sm80plus'). Used to apply tier-specific skip lists."
-      api:
-        required: false
-        type: string
-        default: ""
-        description: "Override the -api expression passed to slang-test (e.g. 'dx11+dx12' or 'vk+cuda+cpu+llvm'). Overrides cpu-only and gpu-api-only when set."
+        description: "GPU tier of the runner: 't4', 'sm80plus', 'metal' (macOS), or 'nogpu' (no GPU). Empty runs all tests. It chooses the tests that the job runs."
 
 jobs:
   test-slang:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 80
+    timeout-minutes: 120
     defaults:
       run:
         shell: bash
@@ -87,10 +69,20 @@ jobs:
           git reset --hard HEAD
 
       - name: Checkout OptiX headers
-        if: (inputs.full-gpu-tests || inputs.gpu-api-only) && inputs.os != 'macos'
+        if: inputs.gpu-tier == 't4' || inputs.gpu-tier == 'sm80plus'
         run: |
           git submodule sync -- external/optix-dev
           git submodule update --init --depth=1 external/optix-dev
+
+      - name: Checkout Slang user skills
+        if: inputs.slang-user-skills
+        run: |
+          git submodule sync -- external/slang-user-skills
+          git submodule update --init --depth=1 external/slang-user-skills
+
+      - name: Test user-skills package verifier
+        if: inputs.slang-user-skills
+        run: python3 extras/tests/test_verify_user_skills_package.py
 
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
@@ -100,7 +92,13 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
-          cpu-only: ${{ inputs.cpu-only }}
+          gpu-tier: ${{ inputs.gpu-tier }}
+
+      - name: Validate Slang user-skill examples
+        if: inputs.slang-user-skills
+        run: >-
+          python3 external/slang-user-skills/scripts/validate-examples.py
+          --slangc "$bin_dir/slangc"
 
       # slang-test's CUDA pass-through compiles through NVRTC, so the
       # offline (non-NVRTC) branch of the prelude is never compiled by the
@@ -111,28 +109,24 @@ jobs:
       # intrinsics need __CUDA_ARCH__ >= 530 (fp16) / 800 (bf16); nvcc's
       # default sm_52 has neither. Compile-only, so any arch works.
       - name: Compile offline (non-NVRTC) CUDA prelude test
-        if: inputs.os == 'windows' && inputs.full-gpu-tests
+        if: inputs.os == 'windows' && (inputs.gpu-tier == 't4' || inputs.gpu-tier == 'sm80plus')
         run: >-
           nvcc -std=c++17 -arch=compute_80 -c tests/cuda/cuda-prelude-vec1-make.cu
           -I prelude -o "${{ runner.temp }}/cuda-prelude-vec1-make.obj"
 
       - name: Test Slang
-        env:
-          API_INPUT: ${{ inputs.api }}
         run: |
-          # Fail fast on mutually exclusive inputs — both would accumulate
-          # -api filters and produce an empty test partition.
-          if [[ "${{ inputs.cpu-only }}" == "true" && "${{ inputs.gpu-api-only }}" == "true" ]]; then
-            echo "::error::cpu-only and gpu-api-only are mutually exclusive"
-            exit 1
-          fi
-
           # SPIR-V emission / validation don't need a GPU — keep on all tiers.
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-          # Vulkan runtime validation needs a Vulkan device; skip on CPU tier.
-          if [[ "${{ inputs.cpu-only }}" != "true" && "${{ inputs.enable-debug-layers }}" == "true" ]]; then
+          # The validation layers run in the release jobs only. The results are the
+          # same, and the debug jobs are slower, so this spreads the work.
+          if [[ "${{ inputs.config }}" == "release" ]]; then
+            enable_debug_layers=true
             export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
+          else
+            enable_debug_layers=false
+            unset VK_INSTANCE_LAYERS
           fi
           # Force AVX-512 off in slang-llvm's JIT TargetMachine. We have observed
           # intermittent illegal-instruction failures on both GitHub-hosted and
@@ -149,34 +143,57 @@ jobs:
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
-            "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
+            "-enable-debug-layers" "$enable_debug_layers"
           )
 
           # slang-test accepts only a single -api option (a later one silently
           # overrides an earlier one), so select exactly one expression.
           # "-api all" is equivalent to the default (all APIs enabled).
-          if [[ -n "$API_INPUT" ]]; then
-            # Explicit override: caller supplies the exact -api expression,
-            # e.g. "dx11+dx12" or "vk+cuda+cpu+llvm" for a per-engine split.
-            api_expr="$API_INPUT"
-          elif [[ "${{ inputs.cpu-only }}" == "true" ]]; then
-            # Restrict to CPU / LLVM backends; tests requiring any GPU API get
-            # ignored by the test filter rather than run-and-failed.
-            api_expr="cpu+llvm"
-          elif [[ "${{ inputs.os }}" == "macos" ]]; then
-            # Metal is the only GPU API on macOS; restrict to it. (cpu)/(llvm)
-            # tests are skipped here and covered by the CPU-only tier, while
-            # no-API tests still run because their requiredFlags==0.
-            api_expr="mtl"
-          elif [[ "${{ inputs.gpu-api-only }}" == "true" ]]; then
-            # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped.
-            # Intentionally NOT using -api-only: no-API tests still need to run
-            # because COMPILE directives in multi-step compile→dispatch tests
-            # have requiredFlags==0 and would be skipped, breaking the dispatch.
-            api_expr="vk+cuda+dx11+dx12+mtl+wgpu"
-          else
-            api_expr="all"
-          fi
+          case "${{ inputs.gpu-tier }}" in
+            nogpu)
+              # Restrict to CPU / LLVM backends; tests requiring any GPU API get
+              # ignored by the test filter rather than run-and-failed. The
+              # compile tests (the tests that use no API, such as SIMPLE) and
+              # the unit tests that need no GPU run here, and in a job that has
+              # no tier. The GPU tiers use -compile-test false.
+              api_expr="cpu+llvm"
+              slang_test_args+=("-compile-test" "true")
+              # The tests that need a T4 machine run in the -t4 jobs.
+              slang_test_args+=("-exclude-list" "tests/tests-require-t4.txt")
+              ;;
+            t4 | sm80plus)
+              # The GPU tiers run the same way, and differ only in which tests
+              # they select (see below). Restrict to GPU APIs ("all" without
+              # cpu and llvm, where llvm is the tests that use
+              # -emit-cpu-via-llvm) so (cpu) / (llvm) tests are skipped, and use
+              # -compile-test false so the compile tests (the tests that use no
+              # API, such as SIMPLE) and the unit tests that need no GPU are
+              # skipped too: the nogpu jobs run them. -compile-test false keeps
+              # the COMPILE lines that prepare the input of a GPU test in the
+              # same file (for example a COMPILE line before a COMPARE_COMPUTE
+              # line), the lines that need NVRTC, and the unit tests that
+              # declare a GPU API.
+              api_expr="all-cpu-llvm"
+              slang_test_args+=("-compile-test" "false")
+              if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
+                # T4 runners cannot execute SM 8.0+ cooperative matrix / neural
+                # tests.
+                slang_test_args+=("-exclude-list" "tests/tests-require-sm80.txt")
+              else
+                # Keep the SM80 cost bounded: run only the tests that T4 cannot.
+                slang_test_args+=("-include-list" "tests/tests-require-sm80.txt")
+              fi
+              ;;
+            metal | "")
+              # metal is the GPU of macOS. No tier: by default, run every test.
+              api_expr="all"
+              slang_test_args+=("-compile-test" "true")
+              ;;
+            *)
+              echo "::error::unknown gpu-tier '${{ inputs.gpu-tier }}' (expected t4, sm80plus, metal or nogpu)"
+              exit 1
+              ;;
+          esac
 
           slang_test_args+=("-api" "$api_expr")
 
@@ -186,21 +203,14 @@ jobs:
             slang_test_args+=("-server-count" "${{ inputs.server-count }}")
           fi
 
-          # Add no-GPU failure list for non-GPU tests
-          if [[ "${{ inputs.full-gpu-tests }}" != "true" ]]; then
-            slang_test_args+=("-expected-failure-list" "tests/expected-failure-no-gpu.txt")
+          # Add no-GPU failure list for the jobs that have no GPU
+          if [[ "${{ inputs.gpu-tier }}" == "nogpu" ]]; then
+            slang_test_args+=("-expected-failure-list" "tests/expected-failure-nogpu.txt")
           fi
 
           # Add known failures on Linux regardless GPU presence
           if [[ "${{ inputs.os }}" == "linux" ]]; then
             slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux.txt")
-          fi
-
-
-          # T4 runners cannot execute SM 8.0+ cooperative matrix / neural tests
-          if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
-            slang_test_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
-            slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
           fi
 
           # Skip most neural tests in debug builds to reduce CI time
@@ -215,7 +225,32 @@ jobs:
           printf ' %q' "${slang_test_args[@]}"
           printf '\n'
 
-          "$bin_dir/slang-test" "${slang_test_args[@]}"
+          status=0
+          "$bin_dir/slang-test" "${slang_test_args[@]}" || status=$?
+
+          # The tests that need a T4 machine select only the cpu API, so the run
+          # above leaves them out. A second run executes them. It takes the
+          # arguments of the first run, without the options that choose the
+          # tests of the tier.
+          if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
+            t4_args=()
+            for ((i = 0; i < ${#slang_test_args[@]}; i++)); do
+              case "${slang_test_args[i]}" in
+                -api | -compile-test | -exclude-list)
+                  i=$((i + 1))
+                  ;;
+                *)
+                  t4_args+=("${slang_test_args[i]}")
+                  ;;
+              esac
+            done
+            t4_args+=("-include-list" "tests/tests-require-t4.txt")
+            printf '+ %q' "$bin_dir/slang-test"
+            printf ' %q' "${t4_args[@]}"
+            printf '\n'
+            "$bin_dir/slang-test" "${t4_args[@]}" || status=$?
+          fi
+          exit "$status"
 
       - name: Check slang-test worktree cleanliness
         if: always()
@@ -229,7 +264,7 @@ jobs:
 
       - name: Run Slang examples
         # Run examples on release for pull requests, and not on merge_group, to reduce CI load.
-        if: inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        if: inputs.gpu-tier != 'nogpu' && inputs.config == 'release' && github.event_name == 'pull_request'
         run: |
           .github/workflows/ci-examples.sh \
            --bin-dir "$bin_dir" \
@@ -237,39 +272,9 @@ jobs:
            --platform "${{ inputs.platform }}" \
            --config "${{ inputs.config }}" \
            --skip-file tests/expected-example-failure-github.txt
+      # The slangc tests need no GPU, so the CPU-only jobs run them, and the jobs
+      # that run only the GPU APIs do not.
       - name: Run slangc tests
+        if: inputs.gpu-tier != 't4' && inputs.gpu-tier != 'sm80plus'
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
-      - name: Test Slang via glsl
-        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
-        run: |
-          export SLANG_RUN_SPIRV_VALIDATION=1
-          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-          via_glsl_args=(
-            -use-test-server
-            -server-count ${{ inputs.server-count }}
-            -emit-spirv-via-glsl
-            -api vk
-            -expected-failure-list tests/expected-failure-via-glsl.txt
-            -skip-reference-image-generation
-          )
-          if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
-            via_glsl_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
-          fi
-          printf '+ %q' "$bin_dir/slang-test"
-          printf ' %q' "${via_glsl_args[@]}"
-          printf '\n'
-
-          "$bin_dir/slang-test" "${via_glsl_args[@]}"
-
-      - name: Check via-glsl slang-test worktree cleanliness
-        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: always() && inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
-        run: |
-          status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**')"
-          if [[ -n "$status" ]]; then
-            echo "::error::slang-test left generated or modified files in the worktree"
-            printf '%s\n' "$status"
-            exit 1
-          fi

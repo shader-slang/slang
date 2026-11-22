@@ -1,9 +1,7 @@
 //IGNORE_TEST:CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 //TEST:SIMPLE(filecheck=DXIL):-target dxbc-assembly -entry computeMain -profile cs_5_1
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -profile cs_5_1
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry computeMain -profile cs_5_1 -emit-spirv-via-glsl
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -36,16 +34,20 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK: %{{.*}} = OpAccessChain %[[P1]] %[[B0]] %int_{{.*}}
     // CHECK: OpStore %{{.*}} %[[N4]]
     // CUDA: Array<RWStructuredBuffer<int>>  g_aoa_0;
-    // CUDA: globalParams_0->g_aoa_0[index_0 >> int(2)].GetDimensions
-    // CUDA: _S1[index_0 >> int(2)]
+    // `buffer` is folded into both of its uses, so `baseIndex` is emitted at the second one,
+    // after the `GetDimensions` call (a possible side effect) and in a later block. The fold
+    // check does not fold `baseIndex` past either of these, so it gets a temporary.
+    // CUDA: [[BASE:baseIndex_[0-9]+]] = index_0 >> int(2);
+    // CUDA: globalParams_0->g_aoa_0{{\[}}[[BASE]]{{\]}}.GetDimensions
+    // CUDA: _S1{{\[}}[[BASE]]{{\]}}
     int index = int(dispatchThreadID.x);
-    
+
     int baseIndex = index >> 2;
     int innerIndex = index & 3;
 
     RWStructuredBuffer<int> buffer = g_aoa[NonUniformResourceIndex(baseIndex)];
 
-    // Get the size 
+    // Get the size
     uint bufferCount, bufferStride;
     buffer.GetDimensions(bufferCount, bufferStride);
 
@@ -53,5 +55,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         innerIndex = int(bufferCount - 1);
     }
-	outputBuffer[index] = buffer[innerIndex]; 
+	outputBuffer[index] = buffer[innerIndex];
 }

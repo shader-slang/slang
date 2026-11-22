@@ -3,6 +3,8 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include "core/slang-io.h"
+#include "core/slang-platform.h"
+#include "core/slang-process.h"
 #include "core/slang-std-writers.h"
 #include "core/slang-string-util.h"
 #include "core/slang-test-tool-util.h"
@@ -24,11 +26,13 @@
 #pragma comment(lib, "advapi32")
 #endif
 
+#include <errno.h>
 #include <slang-rhi.h>
 #include <slang-rhi/acceleration-structure-utils.h>
 #include <slang-rhi/shader-cursor.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #define ENABLE_RENDERDOC_INTEGRATION 0
 
 #if ENABLE_RENDERDOC_INTEGRATION
@@ -696,13 +700,15 @@ struct AssignValsFromLayoutContext
             ComPtr<ITextureView> textureView;
             SLANG_RETURN_ON_FAIL(texture->getDefaultView(textureView.writeRef()));
 
-            // Determine access mode from the shader parameter's resource type
-            auto handleType = dstCursor.getTypeLayout()->getType();
-            auto resourceType = handleType->getElementType();
-            auto resourceAccess =
-                resourceType ? resourceType->getResourceAccess() : SLANG_RESOURCE_ACCESS_READ_WRITE;
+            // The `TEST_INPUT` kind decides the access: an `RWTexture*` input sets `isRWTexture`,
+            // which also chose the `UnorderedAccess` state (and so the texture's usage) above. The
+            // input kind must match the shader's handle type (`Texture2D.Handle` vs
+            // `RWTexture2D.Handle`), and render-test cannot check that here: on SPIR-V and D3D12
+            // the handle is reflected as a plain `uint2`, which carries no resource access.
+            DescriptorHandleAccess access = srcVal->textureDesc.isRWTexture
+                                                ? DescriptorHandleAccess::ReadWrite
+                                                : DescriptorHandleAccess::Read;
             DescriptorHandle handle;
-            DescriptorHandleAccess access = getDescriptorHandleAccess(resourceAccess);
 
             // Try to get descriptor handle - will fail on backends that don't support it
             auto result = textureView->getDescriptorHandle(access, &handle);
@@ -820,8 +826,18 @@ struct AssignValsFromLayoutContext
                 slangTypeLayout = slangTypeLayout->getElementTypeLayout();
                 break;
             }
+            // Create the object in the session the program was compiled in, as
+            // the typed branch above does. `createShaderObjectFromTypeLayout`
+            // would use slang-rhi's own device session, which numbers type
+            // conformances independently of the program, so an interface-typed
+            // field would get a conformance ID the shader does not use.
+            //
             auto slangType = slangTypeLayout->getType();
-            device->createShaderObjectFromTypeLayout(slangTypeLayout, shaderObject.writeRef());
+            device->createShaderObject(
+                slangSession(),
+                slangType,
+                rhi::ShaderObjectContainerType::None,
+                shaderObject.writeRef());
         }
 
         SLANG_RETURN_ON_FAIL(assign(ShaderCursor(shaderObject), srcVal->contentVal));
@@ -1175,21 +1191,15 @@ void RenderTestApp::_initializeRenderPass()
 
 void RenderTestApp::_initializeAccelerationStructure()
 {
-    if (!m_device->hasFeature("ray-tracing"))
+    // Inline ray queries need the acceleration structure too. Metal supports them without
+    // ray-tracing pipelines.
+    if (!m_device->hasFeature("ray-tracing") && !m_device->hasFeature("ray-query"))
         return;
     BufferDesc vertexBufferDesc = {};
     vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
     vertexBufferDesc.usage = BufferUsage::AccelerationStructureBuildInput;
     vertexBufferDesc.defaultState = ResourceState::AccelerationStructureBuildInput;
     ComPtr<IBuffer> vertexBuffer = m_device->createBuffer(vertexBufferDesc, &kVertexData[0]);
-
-    BufferDesc transformBufferDesc = {};
-    transformBufferDesc.size = sizeof(float) * 12;
-    transformBufferDesc.usage = BufferUsage::AccelerationStructureBuildInput;
-    transformBufferDesc.defaultState = ResourceState::AccelerationStructureBuildInput;
-    float transformData[12] =
-        {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
-    ComPtr<IBuffer> transformBuffer = m_device->createBuffer(transformBufferDesc, &transformData);
 
     // Build bottom level acceleration structure.
     {
@@ -1200,7 +1210,6 @@ void RenderTestApp::_initializeAccelerationStructure()
         buildInput.triangles.vertexFormat = Format::RGB32Float;
         buildInput.triangles.vertexCount = kVertexCount;
         buildInput.triangles.vertexStride = sizeof(Vertex);
-        buildInput.triangles.preTransformBuffer = transformBuffer;
         buildInput.triangles.flags = AccelerationStructureGeometryFlags::Opaque;
         AccelerationStructureBuildDesc buildDesc = {};
         buildDesc.inputs = &buildInput;
@@ -1217,11 +1226,14 @@ void RenderTestApp::_initializeAccelerationStructure()
         scratchBufferDesc.size = accelerationStructureSizes.scratchSize;
         ComPtr<IBuffer> scratchBuffer = m_device->createBuffer(scratchBufferDesc);
 
+        // Compact the acceleration structure where the device can report its compacted size.
+        // Metal can't, so there the acceleration structure is used as built.
         ComPtr<IQueryPool> compactedSizeQuery;
         QueryPoolDesc queryPoolDesc = {};
         queryPoolDesc.count = 1;
         queryPoolDesc.type = QueryType::AccelerationStructureCompactedSize;
-        m_device->createQueryPool(queryPoolDesc, compactedSizeQuery.writeRef());
+        if (SLANG_FAILED(m_device->createQueryPool(queryPoolDesc, compactedSizeQuery.writeRef())))
+            compactedSizeQuery = nullptr;
 
         // Build acceleration structure.
         ComPtr<IAccelerationStructure> draftAS;
@@ -1229,37 +1241,54 @@ void RenderTestApp::_initializeAccelerationStructure()
         draftDesc.size = accelerationStructureSizes.accelerationStructureSize;
         m_device->createAccelerationStructure(draftDesc, draftAS.writeRef());
 
-        compactedSizeQuery->reset();
+        if (!compactedSizeQuery)
+        {
+            auto encoder = m_queue->createCommandEncoder();
+            encoder->buildAccelerationStructure(
+                buildDesc,
+                draftAS,
+                nullptr,
+                scratchBuffer,
+                0,
+                nullptr);
+            m_queue->submit(encoder->finish());
+            m_queue->waitOnHost();
+            m_bottomLevelAccelerationStructure = draftAS;
+        }
+        else
+        {
+            compactedSizeQuery->reset();
 
-        auto encoder = m_queue->createCommandEncoder();
-        AccelerationStructureQueryDesc compactedSizeQueryDesc = {};
-        compactedSizeQueryDesc.queryPool = compactedSizeQuery;
-        compactedSizeQueryDesc.queryType = QueryType::AccelerationStructureCompactedSize;
-        encoder->buildAccelerationStructure(
-            buildDesc,
-            draftAS,
-            nullptr,
-            scratchBuffer,
-            1,
-            &compactedSizeQueryDesc);
-        m_queue->submit(encoder->finish());
-        m_queue->waitOnHost();
+            auto encoder = m_queue->createCommandEncoder();
+            AccelerationStructureQueryDesc compactedSizeQueryDesc = {};
+            compactedSizeQueryDesc.queryPool = compactedSizeQuery;
+            compactedSizeQueryDesc.queryType = QueryType::AccelerationStructureCompactedSize;
+            encoder->buildAccelerationStructure(
+                buildDesc,
+                draftAS,
+                nullptr,
+                scratchBuffer,
+                1,
+                &compactedSizeQueryDesc);
+            m_queue->submit(encoder->finish());
+            m_queue->waitOnHost();
 
-        uint64_t compactedSize = 0;
-        compactedSizeQuery->getResult(0, 1, &compactedSize);
-        AccelerationStructureDesc finalDesc;
-        finalDesc.size = compactedSize;
-        m_device->createAccelerationStructure(
-            finalDesc,
-            m_bottomLevelAccelerationStructure.writeRef());
+            uint64_t compactedSize = 0;
+            compactedSizeQuery->getResult(0, 1, &compactedSize);
+            AccelerationStructureDesc finalDesc;
+            finalDesc.size = compactedSize;
+            m_device->createAccelerationStructure(
+                finalDesc,
+                m_bottomLevelAccelerationStructure.writeRef());
 
-        encoder = m_queue->createCommandEncoder();
-        encoder->copyAccelerationStructure(
-            m_bottomLevelAccelerationStructure,
-            draftAS,
-            AccelerationStructureCopyMode::Compact);
-        m_queue->submit(encoder->finish());
-        m_queue->waitOnHost();
+            encoder = m_queue->createCommandEncoder();
+            encoder->copyAccelerationStructure(
+                m_bottomLevelAccelerationStructure,
+                draftAS,
+                AccelerationStructureCopyMode::Compact);
+            m_queue->submit(encoder->finish());
+            m_queue->waitOnHost();
+        }
     }
 
     // Build top level acceleration structure.
@@ -1355,16 +1384,49 @@ void RenderTestApp::finalize()
     m_compilationOutput.output.reset();
 }
 
+/// Open `fileName` for binary writing, retrying a few times when the OS denies access, and report
+/// the path and the reason on stderr if the file still cannot be opened.
+///
+/// slang-test creates the output file just before it starts render-test. On Windows, another
+/// process, such as a virus scanner or the search indexer, can still hold the new file for a short
+/// time and make our open fail with EACCES (a sharing violation). That failure is transient, so we
+/// retry it with a growing delay. Any other error cannot be fixed by waiting, so we report it at
+/// once. Without the message, the test fails with exit code 1 and no output at all.
+static SlangResult openOutputFileForWrite(const String& fileName, FILE*& outFile)
+{
+    const int kMaxAttempts = 5;
+    int err = 0;
+    for (int attempt = 0; attempt < kMaxAttempts; ++attempt)
+    {
+        if (attempt != 0)
+            Process::sleepCurrentThread(attempt * 100);
+
+        FILE* f = nullptr;
+        err = (int)fopen_s(&f, fileName.getBuffer(), "wb");
+        if (err == 0 && f)
+        {
+            outFile = f;
+            return SLANG_OK;
+        }
+        if (err != EACCES)
+            break;
+    }
+    fprintf(
+        stderr,
+        "error: failed to open output file '%s' for writing: %s (errno %d)\n",
+        fileName.getBuffer(),
+        strerror(err),
+        err);
+    return SLANG_FAIL;
+}
+
 Result RenderTestApp::writeBindingOutput(const String& fileName)
 {
     // Wait until everything is complete
     m_queue->waitOnHost();
 
     FILE* f = nullptr;
-    if (fopen_s(&f, fileName.getBuffer(), "wb") != 0 || !f)
-    {
-        return SLANG_FAIL;
-    }
+    SLANG_RETURN_ON_FAIL(openOutputFileForWrite(fileName, f));
     FileWriter writer(f, WriterFlags(0));
 
     for (auto outputItem : m_outputPlan.items)
@@ -1646,6 +1708,33 @@ static void initializeRenderDoc() {}
 static void renderDocBeginFrame() {}
 static void renderDocEndFrame() {}
 #endif
+
+/// Stops the Vulkan validation layer from also writing its messages to stdout.
+///
+/// The Khronos validation layer logs every message to stdout by itself, in addition to calling
+/// the debug messenger that the device registers. That messenger already collects the messages in
+/// `CoreDebugCallback`, and slang-test appends them to the output of the test. The text on stdout
+/// is therefore redundant, and it breaks the reply of a test server when it contains a blank line,
+/// because the server sends its JSON-RPC replies on stdout. We set `debug_action` to
+/// `VK_DBG_LAYER_ACTION_CALLBACK`, which keeps only the callbacks that the application registers.
+/// A value that the user has already set is left as it is. The layer reads the variable when
+/// the Vulkan instance is created, so this runs before the first device is created.
+static void _routeVulkanValidationMessagesToDebugCallback()
+{
+    const char* const name = "VK_KHRONOS_VALIDATION_DEBUG_ACTION";
+
+    Slang::StringBuilder existingValue;
+    if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
+            Slang::UnownedStringSlice(name),
+            existingValue)))
+        return;
+
+#if SLANG_WINDOWS_FAMILY
+    ::SetEnvironmentVariableA(name, "VK_DBG_LAYER_ACTION_CALLBACK");
+#else
+    ::setenv(name, "VK_DBG_LAYER_ACTION_CALLBACK", 0);
+#endif
+}
 
 static SlangResult _innerMain(
     Slang::StdWriters* stdWriters,
@@ -1963,6 +2052,7 @@ static SlangResult _innerMain(
         {
             if (options.enableDebugLayers)
             {
+                _routeVulkanValidationMessagesToDebugCallback();
                 getRHI()->enableDebugLayers();
             }
             Slang::ComPtr<rhi::IDevice> rhiDevice;
@@ -2049,9 +2139,19 @@ static SlangResult _innerMain(
         RenderTestApp app;
         renderDocBeginFrame();
         SLANG_RETURN_ON_FAIL(app.initialize(session, deviceWrapper.get(), options, input));
-        app.update();
+        // A failure reported by `update` (binding the parameters or writing the output) means the
+        // test output was not produced or cannot be trusted. We return it only after the frame-end
+        // cleanup, so that the RenderDoc frame opened above is closed on this path as well.
+        //
+        // SLANG_E_NOT_AVAILABLE is turned into a failure because the test harness reads it as
+        // "ignore this test", and that outcome is reserved for the device and feature gating
+        // earlier in this function.
+        SlangResult updateResult = app.update();
         renderDocEndFrame();
         app.finalize();
+        if (updateResult == SLANG_E_NOT_AVAILABLE)
+            updateResult = SLANG_FAIL;
+        SLANG_RETURN_ON_FAIL(updateResult);
     }
 
     return SLANG_OK;
@@ -2069,6 +2169,11 @@ SLANG_TEST_TOOL_API SlangResult innerMain(
     const char* const* inArgv)
 {
     using namespace Slang;
+
+    // render-test-tool is a shared library with its own copy of the static CRT, so the CRT report
+    // mode that test-server sets does not reach this module. Both `main` and test-server enter
+    // here.
+    TestToolUtil::suppressDebugDialogs();
 
     // Assume we will used the shared session
     ComPtr<slang::IGlobalSession> session(sharedSession);
@@ -2105,11 +2210,6 @@ SLANG_TEST_TOOL_API SlangResult innerMain(
 int main(int argc, char** argv)
 {
     using namespace Slang;
-
-#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
-    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
-    _set_abort_behavior(0, _WRITE_ABORT_MSG);
-#endif
 
     SlangSession* session = spCreateSession(nullptr);
 

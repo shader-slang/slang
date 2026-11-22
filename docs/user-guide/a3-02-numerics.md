@@ -185,6 +185,25 @@ bool isPositive<T : IIntegerType>(T value)
 
 It is often possible to write generic numeric code without using the `Scalar` or `Mask` associated types explicitly.
 
+### Selecting Components
+
+Every type conforming to `INumericShapedType` supports selecting components from two values with a mask of type `T.Mask`:
+
+```slang
+T replaceComponents<T : INumericShapedType>(T original, T replacement, T.Mask replaceMask)
+{
+    return select(replaceMask, replacement, original);
+}
+```
+
+Each result component comes from `replacement` where the corresponding mask component is true, and from `original` otherwise.
+For a logical scalar, the mask is a single `bool` and selects the entire value.
+Like other function calls, `select` evaluates its arguments before selecting the result; it does not short-circuit evaluation of either value argument.
+
+The generic overload calls `T.selectComponents(condition, ifTrue, ifFalse)`.
+Custom shaped types provide this static operation as part of their `INumericShapedType` conformance.
+The existing built-in `select` overloads remain available for concrete built-in types.
+
 ## Conversion from Built-In Scalar Types
 
 All types that conform to `INumeric` support being constructed from values of any built-in integer type:
@@ -242,6 +261,39 @@ The module provides corresponding built-in restrictions for its scalar capabilit
 
 Use the extensible `IScalar...` interfaces when an algorithm should admit user-defined scalar representations.
 Use the corresponding `IBuiltinScalar...` definition when the algorithm also depends on a compiler-supported built-in representation.
+`IBuiltinScalarNumeric` and the builtin scalar aliases that refine it also include `INumericExtrema`, because every builtin arithmetic scalar representation provides `min` and `max`.
+This additional guarantee belongs only to the closed builtin domain; `IScalarNumeric` remains independent of extrema so that user-defined numeric representations do not need to invent an ordering.
+
+## Converting Built-In Scalar Representations
+
+Generic code cannot always express a conversion between two independently chosen built-in scalar types through constructor syntax.
+The numerics module provides explicit helpers for scalar, vector, and matrix conversions:
+
+```slang
+TDestination convertValue<
+    TDestination : IBuiltinScalarTypeDispatchMarker,
+    TSource : IBuiltinScalarTypeDispatchMarker>(TSource value)
+{
+    return convertBuiltinScalar<TDestination>(value);
+}
+
+int3 convertCoordinates(float3 value)
+{
+    return convertBuiltinVector<int>(value);
+}
+```
+
+`convertBuiltinScalar` uses the compiler's `BuiltinCast` operation directly rather than resolving a constructor overload.
+Integer and floating-point conversions use the corresponding numeric cast, while conversion to `bool` tests whether the source value is nonzero.
+For example, `convertBuiltinScalar<bool>(0.5)` is `true`.
+Conversion from `bool` to a numeric destination maps `false` to zero and `true` to one.
+`convertBuiltinVector` and `convertBuiltinMatrix` apply `BuiltinCast` to each component.
+Both shaped conversions preserve the input shape, and matrix conversion also preserves the input layout.
+The helpers do not perform bit reinterpretation, scalar splatting, or shape conversion.
+
+`IBuiltinScalarTypeDispatchMarker` admits `bool`, the built-in integer types, and `half`, `float`, and `double`.
+It excludes `void`, user-defined types, enums, and specialized storage types such as `BFloat16`, `FloatE4M3`, and `FloatE5M2`.
+It is a sealed representation marker rather than a mathematical capability, so generic algorithms should combine it with the appropriate numeric interface when they also perform arithmetic.
 
 ## Choosing the Right Numeric Interface
 
@@ -262,6 +314,7 @@ The typical arithmetic operations are divided as follows:
 - `IFractional` refines `INumeric`, and provides division and reciprocal operations.
   It does not imply floating-point representation, elementary functions, ordering, or differentiability.
 - `IFloatingPoint` refines `IFractional`, and provides operations tied to a floating-point representation, including rounding, floating-point remainder, splitting, sign copying, and classification.
+- `IFloatingPointWithIntegerPart` refines `IFloatingPoint` with splitting into a floating-point fraction and a same-shape integer output.
 
 The separation between `IFractional` and `IFloatingPoint` allows developers to introduce custom fixed-point, ratio, dual-number, and interval types without forcing them to provide the illusion of an IEEE-like representation.
 
@@ -289,6 +342,40 @@ When a generic algorithm only works with scalar types, then one of the scalar-sp
 - `IScalarUnsignedIntegerType`
 - `IScalarFractional`
 - `IScalarFloatingPoint`
+- `IScalarFloatingPointWithIntegerPart`
+
+### Splitting Floating-Point Values
+
+`IFloatingPoint` supports `modf(value, integralPart)` with both arguments of the same type.
+For an integer output, `IFloatingPointWithIntegerPart` provides the associated type `IntegerPart`:
+
+```slang
+T split<T : IFloatingPointWithIntegerPart>(T value, out T.IntegerPart whole)
+{
+    return modf(value, whole);
+}
+```
+
+`IntegerPart` conforms to `INumericShapedType`, and its `Scalar` conforms to `IScalarIntegerType`.
+For built-in floating-point scalars, `IntegerPart` is `int`.
+For built-in floating-point vectors and matrices, it has the same dimensions and `int` components; matrices preserve their layout in both results.
+Custom conformances can choose another integer representation, such as `int64_t`, whose logical component type satisfies `IScalarIntegerType`.
+The whole parts truncate toward zero and must be representable as `IntegerPart.Scalar`.
+The returned fractions preserve the behavior of the floating-point-output operation, including its treatment of signed zero on each target.
+
+`IScalarFloatingPointWithIntegerPart` constrains `IntegerPart` to `IScalarIntegerType`, so scalar algorithms can use the conformance's chosen scalar integer type:
+
+```slang
+T splitScalar<T : IScalarFloatingPointWithIntegerPart>(T value, out T.IntegerPart whole)
+{
+    return modf(value, whole);
+}
+```
+
+An algorithm requiring a specific integer representation can add a constraint such as `where T.IntegerPart == int`.
+
+A user-defined floating-point type opts in by implementing the applicable refinement, defining `IntegerPart`, and providing `fractionalPart(out IntegerPart)`.
+Types implementing `IFloatingPoint` alone continue to support floating-point outputs.
 
 ### Elementary-Function Capabilities
 
@@ -346,9 +433,18 @@ bool allLessThan<T : IComponentwiseOrdered>(T left, T right)
 }
 ```
 
-#### Real Number Ordering
+#### Numeric Extrema and Real Number Ordering
 
-The `IRealOrderingFunctions` interface provides element-wise minimum, maximum, and step-function operations whose conventional definitions depend on the ordering behavior of types such as IEEE floating-point numbers.
+The `INumericExtrema` interface provides element-wise minimum and maximum operations for numeric types.
+Its built-in conformances include integer scalars, vectors, matrices, and cooperative vectors, as well as floating-point scalars, vectors, matrices, and cooperative vectors.
+On HLSL/DXIL, these operations select the numeric operand when exactly one input is a NaN, and return a NaN when both inputs are NaNs.
+Slang selects the corresponding `NMin`/`NMax` SPIR-V operations, including when a generic call reaches the operations through an interface witness.
+GLSL uses native `min`/`max` without additional NaN checks or selections, so its NaN behavior can differ from HLSL/DXIL.
+Floating-point modes that allow the target compiler to assume finite inputs can relax this behavior.
+SPIR-V's extended instructions require `SPV_KHR_float_controls2` for reliable observation of special values.
+Slang currently matches DXC's `NMin`/`NMax` lowering without enabling those controls, so even precise mode does not guarantee every NaN result on Vulkan.
+WGSL permits such assumptions for runtime expressions, so a NaN result is not portable on that target.
+The `IRealOrderingFunctions` interface refines it with the step-function operation, whose conventional definition depends on real-ordering behavior such as that of IEEE floating-point numbers.
 
 ### The `IReal` Convenience Definition
 
@@ -393,6 +489,11 @@ extension MyComplex : IScalarShapedType
     static This fromScalar(This value)
     {
         return value;
+    }
+
+    static This selectComponents(bool condition, This ifTrue, This ifFalse)
+    {
+        return condition ? ifTrue : ifFalse;
     }
 }
 ```
@@ -465,13 +566,17 @@ Operations that are inherently discontinuous or that produce classifications rem
 
 Conversion to an `IDifferentiableFractional` type from scalar floating-point values, whether through construction with a value of a built-in floating-point type or through the `fromScalar` operation, preserves differentiability when the scalar value is itself differentiable.
 
+`IDifferentiableNumericShapedType` also provides differentiable component selection.
+The `select` overload in `slang.numerics.differentiable` propagates derivatives through the selected components of its two value arguments, with the mask treated as nondifferentiable.
+Custom conformances provide a `[Differentiable]` implementation of `selectComponents` whose mask parameter is marked `no_diff`.
+
 ## Built-In Conformances and Current Limitations
 
 The numerics module defines conformances to the appropriate interfaces for:
 
 - the built-in integer and floating-point scalar types
 - vectors of built-in scalar types
-- matrices of built-in floating-point types
+- matrices of built-in integer or floating-point types
 - cooperative vectors of built-in integer or floating-point types
 
 Cooperative vectors of built-in integer types conform to the applicable integer interfaces.
@@ -480,7 +585,8 @@ Importing `slang.numerics.differentiable` adds the corresponding differentiable 
 
 Known limitations include:
 
-- Matrices of built-in integer types do not currently conform to the numeric interfaces.
+- Matrices of built-in integer types provide `INumericExtrema`.
+  Matrices with `int` components also provide `INumericShapedType` for integer-output splitting, but do not implement the full integer arithmetic interface hierarchy.
 - Cooperative vectors of built-in floating-point types satisfy `IReal`, but do not currently conform to `IFloatingPoint`.
 - Dot-product conformances currently cover built-in numeric scalars and ordinary vectors, but not matrices or cooperative vectors.
 - Cooperative matrices do not currently conform to the numeric interfaces.

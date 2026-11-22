@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-c-wgsl-legalization-lowering-phi-elimination
-//META: doc_section_digest=7f402a030d783be73ebd9f61d618704d309d68695b9ed3f5583606a450130887
+//META: doc_section_digest=a15f36e90ce71c175813e4f9aaae1546ac333d5b71b1977e258855334d9377bf
 //META: purpose=legalizeUniformBufferLoad / invertYOfPositionOutput / rcpWOfPositionInput are gated on isKhronosTarget or HLSL and do not fire for the WGSL target
 //META: intent=negative
 //META: pipeline_stage=ir-pass
