@@ -177,7 +177,6 @@ def generate_test_script(cmake_config, gfx_only, config):
             " -category full"
             " -expected-failure-list tests/expected-failure-github.txt"
             " -expected-failure-list tests/expected-failure-linux.txt"
-            " -expected-failure-list tests/expected-failure-linux-gpu.txt"
             " -skip-reference-image-generation"
             " -show-adapter-info"
             " -use-test-server"

@@ -38,7 +38,7 @@ static String parseError(const char* value)
     return error;
 }
 
-SLANG_UNIT_TEST(slangTestTargetListParsing)
+SLANG_UNIT_TEST(slangTestTargetListParsing, NoRenderApi)
 {
     // `all` has every target.
     SLANG_CHECK(expandLabels("all") == "vk glsl dx11 dx12 metal cuda cpu wgpu llvm");
@@ -89,7 +89,7 @@ SLANG_UNIT_TEST(slangTestTargetListParsing)
     SLANG_CHECK(getTestTarget(TestTargetFlag::Cpu).api == RenderApiType::CPU);
 }
 
-SLANG_UNIT_TEST(slangTestTargetListErrors)
+SLANG_UNIT_TEST(slangTestTargetListErrors, NoRenderApi)
 {
     // A wrong name is an error, and the text names it. A silent skip would run the test on fewer
     // targets than the author wants.
@@ -124,7 +124,7 @@ SLANG_UNIT_TEST(slangTestTargetListErrors)
         parseError("all-vk-glsl-dx11-dx12-metal-cuda-cpu-wgpu-llvm").indexOf("no target") >= 0);
 }
 
-SLANG_UNIT_TEST(slangTestTargetLabels)
+SLANG_UNIT_TEST(slangTestTargetLabels, NoRenderApi)
 {
     // A hyphen in a label would be ambiguous with `all-<name>`, and a comma would split the label.
     // Every label has neither.
@@ -137,7 +137,7 @@ SLANG_UNIT_TEST(slangTestTargetLabels)
     }
 }
 
-SLANG_UNIT_TEST(slangTestTargetArgs)
+SLANG_UNIT_TEST(slangTestTargetArgs, NoRenderApi)
 {
     // `vk` and `glsl` name their path of the compiler, so they are two tests. `cpu` has one
     // argument.
@@ -159,7 +159,7 @@ SLANG_UNIT_TEST(slangTestTargetArgs)
     SLANG_CHECK(args[0] == "-cpu");
 }
 
-SLANG_UNIT_TEST(slangTestTargetDefinition)
+SLANG_UNIT_TEST(slangTestTargetDefinition, NoRenderApi)
 {
     // The macro name is `SLANG_TEST_` and the label in capital letters.
     SLANG_CHECK(
@@ -179,7 +179,7 @@ SLANG_UNIT_TEST(slangTestTargetDefinition)
     }
 }
 
-SLANG_UNIT_TEST(slangTestTargetNames)
+SLANG_UNIT_TEST(slangTestTargetNames, NoRenderApi)
 {
     SLANG_CHECK(isTestTargetName(UnownedStringSlice("all")));
     SLANG_CHECK(isTestTargetName(UnownedStringSlice("none")));
@@ -189,7 +189,7 @@ SLANG_UNIT_TEST(slangTestTargetNames)
     SLANG_CHECK(!isTestTargetName(UnownedStringSlice("filecheck-buffer")));
 }
 
-SLANG_UNIT_TEST(slangTestTargetsSupportedCommands)
+SLANG_UNIT_TEST(slangTestTargetsSupportedCommands, NoRenderApi)
 {
     SLANG_CHECK(isTargetsOptionSupportedByCommand(UnownedStringSlice("COMPARE_COMPUTE")));
     SLANG_CHECK(isTargetsOptionSupportedByCommand(UnownedStringSlice("COMPARE_COMPUTE_EX")));

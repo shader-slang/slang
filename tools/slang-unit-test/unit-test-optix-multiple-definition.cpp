@@ -227,7 +227,7 @@ static ComPtr<slang::IBlob> _compileEntryPoint(
 // entry points. Both entry points construct CallablePayload, so both PTX modules define the same
 // synthesized CallablePayload initializer. Relocatable device code makes that helper externally
 // visible unless Slang or the downstream toolchain gives it module-local linkage.
-SLANG_UNIT_TEST(optixMultipleDefinition)
+SLANG_UNIT_TEST(optixMultipleDefinition, CUDA)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
     if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))

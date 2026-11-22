@@ -13,7 +13,7 @@ using namespace Slang;
 
 // Test that the reflection API provides correct info about attributes.
 
-SLANG_UNIT_TEST(attributeReflection)
+SLANG_UNIT_TEST(attributeReflection, NoRenderApi)
 {
     const char* userSourceBody = R"(
         public enum E
@@ -85,7 +85,7 @@ SLANG_UNIT_TEST(attributeReflection)
 
 // Test that the [RootSignature] attribute on an entry point can be queried
 // through the user-attribute reflection API, with its string argument intact.
-SLANG_UNIT_TEST(rootSignatureAttributeReflection)
+SLANG_UNIT_TEST(rootSignatureAttributeReflection, NoRenderApi)
 {
     const char* userSourceBody = R"rs(
         [RootSignature("DescriptorTable(SRV(t0))")]

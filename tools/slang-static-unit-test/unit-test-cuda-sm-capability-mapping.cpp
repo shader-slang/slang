@@ -14,7 +14,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(cudaSMCapabilityVersionMappingIsComplete)
+SLANG_UNIT_TEST(cudaSMCapabilityVersionMappingIsComplete, NoRenderApi)
 {
     // SLANG_CHECK_MSG takes a string literal, so the specific offending atom is logged
     // separately (as the other tests in this directory do) to keep a failure diagnosable.

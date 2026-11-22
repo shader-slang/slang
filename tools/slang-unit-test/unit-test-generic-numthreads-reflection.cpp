@@ -14,7 +14,7 @@ using namespace Slang;
 // Test that `getComputeThreadGroupSize` works on compute shader entrypoints that has
 // generic/unknown workgroup sizes without crashing.
 
-SLANG_UNIT_TEST(genericNumThreadsReflection)
+SLANG_UNIT_TEST(genericNumThreadsReflection, NoRenderApi)
 {
     const char* userSourceBody = R"(
         [SpecializationConstant]

@@ -13,7 +13,7 @@ using namespace Slang;
 
 // Loading a repro must restore the saved HLSL receiver default before checking method bodies.
 // We replay snapshots saved before semantic checking into requests with the opposite setting.
-SLANG_UNIT_TEST(hlslMutatingMethodDefaultSurvivesRepro)
+SLANG_UNIT_TEST(hlslMutatingMethodDefaultSurvivesRepro, NoRenderApi)
 {
     SLANG_ALLOW_DEPRECATED_BEGIN
     const bool optionValues[] = {false, true};
@@ -74,7 +74,7 @@ SLANG_UNIT_TEST(hlslMutatingMethodDefaultSurvivesRepro)
 }
 
 // An extracted command needs the opt-in flag exactly when the saved receiver setting is enabled.
-SLANG_UNIT_TEST(hlslMutatingMethodDefaultSurvivesReproExtraction)
+SLANG_UNIT_TEST(hlslMutatingMethodDefaultSurvivesReproExtraction, NoRenderApi)
 {
     const bool optionValues[] = {false, true};
     for (bool isEnabled : optionValues)

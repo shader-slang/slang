@@ -28,7 +28,7 @@ using namespace Slang;
 // path used by slang-rhi.
 //
 // See: https://github.com/shader-slang/slang/issues/10959
-SLANG_UNIT_TEST(descriptorSetSpaceOffsetReflection)
+SLANG_UNIT_TEST(descriptorSetSpaceOffsetReflection, NoRenderApi)
 {
     const char* userSource = R"(
         RWStructuredBuffer<uint> A : register(u0);

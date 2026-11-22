@@ -9,7 +9,7 @@ using namespace Slang;
 // Test that the findFieldByName recognizes a fully qualified name to disambiguate entries in
 // namespaces.
 
-SLANG_UNIT_TEST(reflectionGlobalParamInNamespace)
+SLANG_UNIT_TEST(reflectionGlobalParamInNamespace, NoRenderApi)
 {
     const char* userSourceBody = R"(
         namespace NS {

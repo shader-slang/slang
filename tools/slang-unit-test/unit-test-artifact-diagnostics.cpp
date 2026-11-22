@@ -13,7 +13,7 @@ using namespace Slang;
 // length; otherwise TerminatedCharSlice(nullptr, 0) runs SLANG_ASSERT(in[0] == 0) on a null
 // pointer. Every downstream compiler's diagnostics flow through getRaw(), so this guards the shared
 // compiler-core fix on every platform, independent of any downstream toolkit.
-SLANG_UNIT_TEST(artifactDiagnosticsGetRawEmpty)
+SLANG_UNIT_TEST(artifactDiagnosticsGetRawEmpty, NoRenderApi)
 {
     ComPtr<IArtifactDiagnostics> diagnostics = ArtifactDiagnostics::create();
     TerminatedCharSlice raw = diagnostics->getRaw();

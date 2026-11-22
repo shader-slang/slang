@@ -2264,7 +2264,7 @@ static SlangResult _testLinkTimeOptionsAffectCompilerOptionHash()
     return SLANG_OK;
 }
 
-SLANG_UNIT_TEST(SlangcReadFromStdin)
+SLANG_UNIT_TEST(SlangcReadFromStdin, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testSlangStdin(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testHlslStdin(unitTestContext)));
@@ -2293,14 +2293,14 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testLinkTimeOptionsAffectCompilerOptionHash()));
 }
 
-SLANG_UNIT_TEST(SlangcCoverageManifestOutputMetalLib)
+SLANG_UNIT_TEST(SlangcCoverageManifestOutputMetalLib, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecarForMetalLibDisassembly(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarForMetalLibDisassembly(unitTestContext)));
 }
 
-SLANG_UNIT_TEST(SlangcSeparateDebugInfoOutput)
+SLANG_UNIT_TEST(SlangcSeparateDebugInfoOutput, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(
         _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(unitTestContext, false)));
@@ -2346,7 +2346,7 @@ SLANG_UNIT_TEST(SlangcSeparateDebugInfoOutput)
     SLANG_CHECK(SLANG_SUCCEEDED(_testSeparateDebugInfoOutputDoesNotAffectCompilerOptionHash()));
 }
 
-SLANG_UNIT_TEST(SlangcCoverageManifestOutput)
+SLANG_UNIT_TEST(SlangcCoverageManifestOutput, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecar(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecarForDisassembly(unitTestContext)));

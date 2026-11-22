@@ -62,7 +62,7 @@ bool slicesEqual(
 
 } // namespace
 
-SLANG_UNIT_TEST(nameConventionInferStyle)
+SLANG_UNIT_TEST(nameConventionInferStyle, NoRenderApi)
 {
     using NCU = NameConventionUtil;
     SLANG_CHECK(NCU::inferStyleFromText(toSlice("foo-bar-baz")) == NameStyle::Kabab);
@@ -73,7 +73,7 @@ SLANG_UNIT_TEST(nameConventionInferStyle)
     SLANG_CHECK(NCU::inferStyleFromText(toSlice("singleword")) == NameStyle::Camel);
 }
 
-SLANG_UNIT_TEST(nameConventionInferConvention)
+SLANG_UNIT_TEST(nameConventionInferConvention, NoRenderApi)
 {
     using NCU = NameConventionUtil;
     SLANG_CHECK(NCU::inferConventionFromText(toSlice("foo-bar")) == NameConvention::LowerKabab);
@@ -84,7 +84,7 @@ SLANG_UNIT_TEST(nameConventionInferConvention)
     SLANG_CHECK(NCU::inferConventionFromText(toSlice("FooBar")) == NameConvention::UpperCamel);
 }
 
-SLANG_UNIT_TEST(nameConventionSplit)
+SLANG_UNIT_TEST(nameConventionSplit, NoRenderApi)
 {
     using NCU = NameConventionUtil;
     List<UnownedStringSlice> slices;
@@ -111,7 +111,7 @@ SLANG_UNIT_TEST(nameConventionSplit)
     SLANG_CHECK(slices[0] == toSlice("singleword"));
 }
 
-SLANG_UNIT_TEST(nameConventionSplitInferred)
+SLANG_UNIT_TEST(nameConventionSplitInferred, NoRenderApi)
 {
     using NCU = NameConventionUtil;
     List<UnownedStringSlice> slices;
@@ -123,7 +123,7 @@ SLANG_UNIT_TEST(nameConventionSplitInferred)
     SLANG_CHECK(slices[2] == toSlice("now"));
 }
 
-SLANG_UNIT_TEST(nameConventionConvertRoundTrips)
+SLANG_UNIT_TEST(nameConventionConvertRoundTrips, NoRenderApi)
 {
     // Each pair should round-trip through every style.
     struct Case
@@ -173,14 +173,14 @@ SLANG_UNIT_TEST(nameConventionConvertRoundTrips)
     }
 }
 
-SLANG_UNIT_TEST(nameConventionConvertUpperVariants)
+SLANG_UNIT_TEST(nameConventionConvertUpperVariants, NoRenderApi)
 {
     SLANG_CHECK(convertVia(NameStyle::Snake, "foo_bar", NameConvention::UpperSnake) == "FOO_BAR");
     SLANG_CHECK(convertVia(NameStyle::Snake, "foo_bar", NameConvention::UpperKabab) == "FOO-BAR");
     SLANG_CHECK(convertVia(NameStyle::Snake, "foo_bar", NameConvention::UpperCamel) == "FooBar");
 }
 
-SLANG_UNIT_TEST(nameConventionConvertInferred)
+SLANG_UNIT_TEST(nameConventionConvertInferred, NoRenderApi)
 {
     // No `from` style argument: convert() infers it.
     SLANG_CHECK(convertInferred("foo-bar-baz", NameConvention::LowerSnake) == "foo_bar_baz");
@@ -189,7 +189,7 @@ SLANG_UNIT_TEST(nameConventionConvertInferred)
     SLANG_CHECK(convertInferred("FooBarBaz", NameConvention::UpperKabab) == "FOO-BAR-BAZ");
 }
 
-SLANG_UNIT_TEST(nameConventionFlags)
+SLANG_UNIT_TEST(nameConventionFlags, NoRenderApi)
 {
     SLANG_CHECK(isUpper(NameConvention::UpperKabab));
     SLANG_CHECK(isUpper(NameConvention::UpperSnake));
@@ -206,7 +206,7 @@ SLANG_UNIT_TEST(nameConventionFlags)
     SLANG_CHECK(makeLower(NameStyle::Kabab) == NameConvention::LowerKabab);
 }
 
-SLANG_UNIT_TEST(nameConventionJoinWithJoinChar)
+SLANG_UNIT_TEST(nameConventionJoinWithJoinChar, NoRenderApi)
 {
     UnownedStringSlice slices[] = {
         toSlice("foo"),

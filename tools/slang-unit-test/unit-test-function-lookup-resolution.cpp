@@ -20,7 +20,7 @@ static String getTypeFullName(slang::TypeReflection* type)
 
 // Test that the reflection API provides correctly resolved lookup results.
 
-SLANG_UNIT_TEST(functionLookupResolution)
+SLANG_UNIT_TEST(functionLookupResolution, NoRenderApi)
 {
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(

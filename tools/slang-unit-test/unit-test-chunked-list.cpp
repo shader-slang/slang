@@ -17,7 +17,7 @@ static bool _checkArrayView(ArrayView<T> v0, ArrayView<T> v1)
     return true;
 }
 
-SLANG_UNIT_TEST(chunkedList)
+SLANG_UNIT_TEST(chunkedList, NoRenderApi)
 {
     {
         ChunkedList<String> stringList;

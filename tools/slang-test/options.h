@@ -73,8 +73,10 @@ struct Options
     // When true results from ignored tests are not shown
     bool hideIgnored = false;
 
-    // When true only tests that use an api that matches the enabledApis flags will run
-    bool apiOnly = false;
+    // When false the compile tests, which are the tests that use no render API, do not run. Such
+    // a test line (for example a SIMPLE line) compiles code and checks the output. The compile
+    // tests that GPU tests need still run (see TestContext::canRunTestWithRenderApiFlags).
+    bool compileTest = true;
 
     // Use verbose paths
     bool verbosePaths = false;
@@ -153,8 +155,13 @@ struct Options
     };
     Slang::List<TestListFileInfo> expectedFailureFiles;
 
+    // The entries of the `-skip-list` and `-exclude-list` files
     Slang::List<Slang::String> skipList;
     Slang::List<TestListFileInfo> skipListFiles;
+
+    // The entries of the `-include-list` files. Options::parse adds them to testPrefixes.
+    Slang::List<Slang::String> includeList;
+    Slang::List<TestListFileInfo> includeListFiles;
 
     /// Parse the args, report any errors into stdError, and write the results into optionsOut
     static SlangResult parse(

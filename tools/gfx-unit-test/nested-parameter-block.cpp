@@ -122,12 +122,12 @@ void nestedParameterBlockTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, resultBuffer, std::array{1123u, 1123u, 1123u, 1123u});
 }
 
-SLANG_UNIT_TEST(nestedParameterBlockTestD3D12)
+SLANG_UNIT_TEST(nestedParameterBlockTestD3D12, D3D12)
 {
     runTestImpl(nestedParameterBlockTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(nestedParameterBlockTestVulkan)
+SLANG_UNIT_TEST(nestedParameterBlockTestVulkan, Vulkan)
 {
     runTestImpl(nestedParameterBlockTestImpl, unitTestContext, DeviceType::Vulkan);
 }

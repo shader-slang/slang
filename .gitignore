@@ -7,6 +7,7 @@
 *.vcxproj.user
 *.sdf
 *.ilk
+*.dSYM/
 *.obj
 *.slang-module
 *.zip

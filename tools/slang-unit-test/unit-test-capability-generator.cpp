@@ -70,7 +70,7 @@ struct TempDir
     }
 };
 
-SLANG_UNIT_TEST(CapabilityGeneratorFailsOnError)
+SLANG_UNIT_TEST(CapabilityGeneratorFailsOnError, NoRenderApi)
 {
     const String generatorPath = _getGeneratorPath(unitTestContext);
     if (!File::exists(generatorPath))

@@ -118,7 +118,7 @@ static SlangResult _check()
     return SLANG_OK;
 }
 
-SLANG_UNIT_TEST(sourceMap)
+SLANG_UNIT_TEST(sourceMap, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_check()));
 }

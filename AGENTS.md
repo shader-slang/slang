@@ -173,7 +173,7 @@ Slang tests:
 - For targeted runs, pass a prefix, for example
   `build/Debug/bin/slang-test tests/diagnostics/my-test`.
 
-Unit tests live under `tools/slang-unit-test` and typically use `SLANG_UNIT_TEST(name)`.
+Unit tests live under `tools/slang-unit-test` and typically use `SLANG_UNIT_TEST(name, NoRenderApi)`. A test that runs a render API names it, as in `SLANG_UNIT_TEST(name, Vulkan | CUDA)`.
 
 ## Problem-Solving Methodology
 

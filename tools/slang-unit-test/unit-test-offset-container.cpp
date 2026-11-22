@@ -52,7 +52,7 @@ struct Root
 
 } // namespace
 
-SLANG_UNIT_TEST(offsetContainer)
+SLANG_UNIT_TEST(offsetContainer, NoRenderApi)
 {
     _checkEncodeDecode(253);
 

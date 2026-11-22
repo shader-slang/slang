@@ -5,7 +5,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(commandLineArgs)
+SLANG_UNIT_TEST(commandLineArgs, NoRenderApi)
 {
     RefPtr<CommandLineContext> context = new CommandLineContext;
 

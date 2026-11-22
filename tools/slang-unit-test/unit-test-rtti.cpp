@@ -34,7 +34,7 @@ static const StructRttiInfo _makeSomeStructRtti()
 }
 /* static */ const StructRttiInfo SomeStruct::g_rttiInfo = _makeSomeStructRtti();
 
-SLANG_UNIT_TEST(Rtti)
+SLANG_UNIT_TEST(Rtti, NoRenderApi)
 {
     using namespace Slang;
 
