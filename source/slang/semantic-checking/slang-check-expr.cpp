@@ -58,6 +58,26 @@ void SemanticsContext::ExprLocalScope::addBinding(LetExpr* binding)
     }
 }
 
+/* static */ Expr* SemanticsContext::ExprLocalScope::skipBindings(Expr* expr)
+{
+    while (auto letExpr = as<LetExpr>(expr))
+        expr = letExpr->body;
+    return expr;
+}
+
+Expr* SemanticsContext::ExprLocalScope::hoistBindings(ASTBuilder* astBuilder, Expr* expr)
+{
+    while (auto letExpr = as<LetExpr>(expr))
+    {
+        auto binding = astBuilder->create<LetExpr>();
+        binding->decl = letExpr->decl;
+        binding->loc = letExpr->loc;
+        addBinding(binding);
+        expr = letExpr->body;
+    }
+    return expr;
+}
+
 
 /// Move `expr` into a temporary variable and execute `func` on that variable.
 ///
@@ -2291,6 +2311,10 @@ Expr* SemanticsVisitor::CheckTerm(Expr* term)
     // If we have already checked the expr, don't check again.
     if (term->checked)
     {
+        // If it was checked in its own scope, we hoist its `LetExpr` bindings into the current
+        // scope, as if it had been checked here.
+        if (auto exprLocalScope = getExprLocalScope())
+            return exprLocalScope->hoistBindings(m_astBuilder, term);
         return term;
     }
 
@@ -5198,6 +5222,16 @@ Type* SemanticsExprVisitor::getBuiltinArithmeticCommonType(Type* left, Type* rig
     return createVectorType(commonElementType, elementCount);
 }
 
+/// Return whether `expr` calls the `&&` or `||` operator.
+static bool isLogicOperator(InvokeExpr* expr)
+{
+    auto varExpr = as<VarExpr>(expr->functionExpr);
+    if (!varExpr)
+        return false;
+    auto name = getText(varExpr->name);
+    return name == "&&" || name == "||";
+}
+
 Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
 {
     LogicOperatorShortCircuitExpr* newExpr = nullptr;
@@ -5211,7 +5245,7 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
 
     if (auto varExpr = as<VarExpr>(expr->functionExpr))
     {
-        if ((getText(varExpr->name) == "&&") || (getText(varExpr->name) == "||"))
+        if (isLogicOperator(expr))
         {
             // We only use short-circuiting in scalar input, will fall back
             // to non-short-circuiting in vector input.
@@ -5278,10 +5312,18 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         OperandTryCoverageRAII operandTryCoverage(
             this,
             shouldDeferArgumentTryCoverage(expr) ? &pendingTryCoverage : nullptr);
-        // Next check the argument expressions
-        for (auto& arg : expr->arguments)
+        // Next check the argument expressions. The right operand of a short-circuiting `&&` or
+        // `||` and the arms of `?:` may be skipped at run time, so we check each of them in its
+        // own scope: their temporaries are then evaluated only when the operand is.
+        Index firstConditionalArg = expr->arguments.getCount();
+        if (as<SelectExpr>(expr) || (m_shouldShortCircuitLogicExpr && isLogicOperator(expr)))
+            firstConditionalArg = 1;
+        for (Index i = 0; i < expr->arguments.getCount(); i++)
         {
-            arg = CheckExpr(arg);
+            auto& arg = expr->arguments[i];
+            arg = i < firstConditionalArg
+                      ? CheckExpr(arg)
+                      : SemanticsVisitor(withExprLocalScope(nullptr)).CheckExpr(arg);
         }
     }
 
