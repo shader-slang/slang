@@ -73,6 +73,11 @@ jobs:
       config: release
       runs-on: '["macos-latest"]'
 
+  # The Windows aarch64 jobs build natively on a Windows ARM64 runner instead of
+  # cross-compiling from windows-latest. common-setup pins MSVC 14.44 on that runner
+  # because the default MSVC 14.52.37025 crashes with C1001
+  # (actions/runner-images#15328). The x64 images ship 14.44 without its ARM64
+  # target tools, so a cross-compile cannot use the pin.
   windows-aarch64-debug:
     uses: ./.github/workflows/cmake-options-build.yml
     with:
@@ -80,8 +85,7 @@ jobs:
       compiler: cl
       platform: aarch64
       config: debug
-      runs-on: '["windows-latest"]'
-      arch: "amd64_arm64"
+      runs-on: '["windows-11-vs2026-arm"]'
 
   windows-aarch64-release:
     uses: ./.github/workflows/cmake-options-build.yml
@@ -90,8 +94,7 @@ jobs:
       compiler: cl
       platform: aarch64
       config: release
-      runs-on: '["windows-latest"]'
-      arch: "amd64_arm64"
+      runs-on: '["windows-11-vs2026-arm"]'
 
   # windows-vs2019-debug: disabled — windows-2019 runner is being retired (June 2025)
   # windows-vs2019-release: disabled — windows-2019 runner is being retired (June 2025)
