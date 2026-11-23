@@ -1,8 +1,8 @@
 //TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=CHECK):
-//DISABLED_TEST: COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
-//DISABLED_TEST: COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d11
-//DISABLED_TEST: COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d12
-//DISABLED_TEST: COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d11
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d12
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal
 
 struct Obj
 {

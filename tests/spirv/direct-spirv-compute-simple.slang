@@ -1,5 +1,5 @@
 // direct-spirv-compute-simple.slang
-//TESTD:SIMPLE:-target spirv -entry computeMain -stage compute
+//DISABLE_TEST:SIMPLE:-target spirv -entry computeMain -stage compute
 //TEST:COMPARE_COMPUTE(targets=all):
 
 // Test runinng a shader generated from direct SPIR-V emit.

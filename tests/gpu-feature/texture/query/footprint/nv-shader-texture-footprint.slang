@@ -1,15 +1,15 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -emit-spirv-via-glsl -entry fragmentMain -stage fragment -DENABLE_CLAMP -O3
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry fragmentMain -stage fragment -DENABLE_CLAMP -O3
-//DISABLED_TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry fragmentMain -stage fragment -DENABLE_CLAMP -emit-spirv-directly
+//DISABLE_TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry fragmentMain -stage fragment -DENABLE_CLAMP -emit-spirv-directly
 
-//DISABLED_TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry fragmentMain -stage fragment
+//DISABLE_TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry fragmentMain -stage fragment
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry fragmentMain -stage fragment
 
 // TODO: The SPIRV test is fine locally, but seems to lead to an impossible to debug hang in CI
 
-//DISABLED_TEST:SIMPLE:-target spirv-assembly -entry fragmentMain -stage fragment -DENABLE_CLAMP
-//DISABLED_TEST:SIMPLE:-target dxil-assembly -entry fragmentMain -stage fragment
-//DISABLED_TEST:SIMPLE:-target hlsl -entry fragmentMain -stage fragment
+//DISABLE_TEST:SIMPLE:-target spirv-assembly -entry fragmentMain -stage fragment -DENABLE_CLAMP
+//DISABLE_TEST:SIMPLE:-target dxil-assembly -entry fragmentMain -stage fragment
+//DISABLE_TEST:SIMPLE:-target hlsl -entry fragmentMain -stage fragment
 
 // In order to make sure that all of the data produced in each
 // query is referenced (and thus cannot be DCE'd away), we maintain

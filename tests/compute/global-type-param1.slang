@@ -1,4 +1,4 @@
-//DISABLED_TEST(smoke,compute):COMPARE_COMPUTE:
+//DISABLE_TEST(smoke,compute):COMPARE_COMPUTE:
 
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBufer

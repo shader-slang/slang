@@ -5,10 +5,10 @@
 // doesn't work right on the shader object path for a bunch
 // of complicated reasons.
 
-//DISABLED_TEST(compute):COMPARE_COMPUTE:-dx11
-//DISABLED_TEST(compute):COMPARE_COMPUTE:-cpu
-//DISABLED_TEST(compute):COMPARE_COMPUTE:-vk
-//DISABLED_TEST(compute):COMPARE_COMPUTE:-cuda
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-dx11
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-cpu
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-vk
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda
 
 [anyValueSize(8)]
 interface IInterface

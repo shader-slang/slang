@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-via-glsl -entry computeMain -profile glsl_450 -stage compute
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -entry computeMain -profile glsl_450 -stage compute
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -entry computeMain -profile glsl_450 -stage compute
 
 Texture2DArray t2dArray;
 RWStructuredBuffer<float4> result;

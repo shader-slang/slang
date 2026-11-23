@@ -4,9 +4,9 @@
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry fragmentMain -profile sm_6_5 -stage fragment -DNV_SHADER_EXTN_SLOT=u0 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry fragmentMain -stage fragment
 
-//DISABLED_TEST:SIMPLE:-target spirv-assembly -entry fragmentMain -stage fragment
-//DISABLED_TEST:SIMPLE:-target dxil-assembly -entry fragmentMain -stage fragment
-//DISABLED_TEST:SIMPLE:-target hlsl -entry fragmentMain -stage fragment
+//DISABLE_TEST:SIMPLE:-target spirv-assembly -entry fragmentMain -stage fragment
+//DISABLE_TEST:SIMPLE:-target dxil-assembly -entry fragmentMain -stage fragment
+//DISABLE_TEST:SIMPLE:-target hlsl -entry fragmentMain -stage fragment
 
 uniform Texture2D textures[] : register(t2, space10);
 uniform SamplerState sampler;
