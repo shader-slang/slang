@@ -1135,4 +1135,40 @@ Index StringUtil::calcLevenshteinDistanceCaseInsensitive(
     return _calcLevenshteinDistance(a, b, /*caseInsensitive:*/ true);
 }
 
+bool StringUtil::isNearMissSpelling(
+    const UnownedStringSlice& typed,
+    const UnownedStringSlice& intended)
+{
+    const Index typedLength = typed.getLength();
+    const Index intendedLength = intended.getLength();
+
+    if (typedLength == intendedLength)
+    {
+        // A transposition of two adjacent characters differs in exactly one neighboring pair,
+        // swapped, as in "TSET" vs "TEST". An exact match falls through: it is not a misspelling.
+        Index firstDiff = 0;
+        while (firstDiff < typedLength && typed[firstDiff] == intended[firstDiff])
+            firstDiff++;
+        if (firstDiff + 1 >= typedLength)
+            return false;
+        if (typed[firstDiff] != intended[firstDiff + 1] ||
+            typed[firstDiff + 1] != intended[firstDiff])
+            return false;
+        for (Index i = firstDiff + 2; i < typedLength; ++i)
+        {
+            if (typed[i] != intended[i])
+                return false;
+        }
+        return true;
+    }
+
+    // An insertion or a deletion is the case where the lengths differ by one and the plain
+    // edit distance is one. The length check keeps a single-substitution pair, which also has
+    // plain edit distance one, out: a substitution is not a near miss.
+    if (typedLength - intendedLength == 1 || intendedLength - typedLength == 1)
+        return calcLevenshteinDistance(typed, intended) == 1;
+
+    return false;
+}
+
 } // namespace Slang

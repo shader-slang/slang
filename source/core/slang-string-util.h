@@ -246,6 +246,21 @@ struct StringUtil
     static Index calcLevenshteinDistanceCaseInsensitive(
         const UnownedStringSlice& a,
         const UnownedStringSlice& b);
+
+    /// True when `typed` differs from `intended` by exactly one edit that is a character
+    /// insertion, a character deletion, or a transposition of two adjacent characters, which
+    /// makes `typed` a likely misspelling of `intended`. A single substitution does not count:
+    /// one substitution away from a short word is usually a different real word rather than a
+    /// typo of it ("NEST" is not a misspelling of "TEST"), so callers can use this to flag
+    /// typos of reserved words without colliding with short real words. The comparison is
+    /// case-sensitive, and an exact match is not a near miss.
+    ///
+    /// For example, `isNearMissSpelling("TSET", "TEST")` is true (transposition),
+    /// `isNearMissSpelling("dTEST", "TEST")` is true (insertion), and
+    /// `isNearMissSpelling("TESTD", "TEST")` is true (deletion).
+    static bool isNearMissSpelling(
+        const UnownedStringSlice& typed,
+        const UnownedStringSlice& intended);
 };
 
 /* A helper class that allows parsing of lines from text with iteration. Uses
