@@ -1071,12 +1071,8 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
     // Add compiler options, including search path, preprocessor includes, etc.
     m_optionSet.buildHash(builder);
 
-    auto addTargetDigest = [&](TargetRequest* targetReq)
+    auto addDownstreamCompilerDigest = [&](PassThroughMode passThroughMode)
     {
-        targetReq->getOptionSet().buildHash(builder);
-
-        const PassThroughMode passThroughMode =
-            getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
         const SourceLanguage sourceLanguage =
             getDefaultSourceLanguageForDownstreamCompiler(passThroughMode);
 
@@ -1108,6 +1104,24 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
                 builder.append(versionString);
             }
         }
+    };
+
+    auto addTargetDigest = [&](TargetRequest* targetReq)
+    {
+        targetReq->getOptionSet().buildHash(builder);
+
+        const auto target = targetReq->getTarget();
+        const auto compiler = getDownstreamCompilerRequiredForTarget(target);
+        const auto binaryTarget = getBinaryTargetForAssembly(target);
+        if (binaryTarget != CodeGenTarget::None)
+        {
+            // For cubin-asm, NVRTC compiles the CUDA prelude into the binary that nvdisasm
+            // reads. Changing the prelude must invalidate the assembly as well as the binary.
+            const auto binaryCompiler = getDownstreamCompilerRequiredForTarget(binaryTarget);
+            if (binaryCompiler != compiler)
+                addDownstreamCompilerDigest(binaryCompiler);
+        }
+        addDownstreamCompilerDigest(compiler);
     };
 
     // Add the target specified by targetIndex

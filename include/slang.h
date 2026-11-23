@@ -724,6 +724,8 @@ typedef uint32_t SlangSizeT;
         SLANG_HOST_LLVM_IR = 35,     ///< Host LLVM IR assembly
         SLANG_SHADER_LLVM_IR = 36,   ///< Host LLVM IR assembly (kernel/shader)
 
+        SLANG_CUDA_OBJECT_CODE_ASM = 37, ///< Disassembled CUDA machine code (SASS).
+
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -760,6 +762,7 @@ typedef uint32_t SlangSizeT;
         SLANG_PASS_THROUGH_METAL = 12,        ///< Metal compiler
         SLANG_PASS_THROUGH_TINT = 13,         ///< Tint WGSL compiler
         SLANG_PASS_THROUGH_SPIRV_LINK = 14,   ///< SPIRV-link
+        SLANG_PASS_THROUGH_NVDISASM = 15,     ///< NVIDIA CUDA binary disassembler.
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 

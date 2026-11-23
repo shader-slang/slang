@@ -313,6 +313,10 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         // implies 'complete for executation', irrespective of it being text.
     case SLANG_PTX:
         return Desc::make(Kind::ObjectCode, Payload::PTX, Style::Kernel, 0);
+    case SLANG_CUDA_OBJECT_CODE:
+        return Desc::make(Kind::ObjectCode, Payload::CuBin, Style::Kernel, 0);
+    case SLANG_CUDA_OBJECT_CODE_ASM:
+        return Desc::make(Kind::Assembly, Payload::CuBin, Style::Kernel, 0);
     case SLANG_OBJECT_CODE:
         return Desc::make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
     case SLANG_HOST_HOST_CALLABLE:
@@ -411,16 +415,18 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         {
             switch (desc.payload)
             {
-            case Payload::SPIRV:
-                return SLANG_SPIRV_ASM;
             case Payload::DXIL:
                 return SLANG_DXIL_ASM;
             case Payload::DXBC:
                 return SLANG_DXBC_ASM;
+            case Payload::SPIRV:
+                return SLANG_SPIRV_ASM;
             case Payload::PTX:
                 return SLANG_PTX;
             case Payload::MetalAIR:
                 return SLANG_METAL_LIB_ASM;
+            case Payload::CuBin:
+                return SLANG_CUDA_OBJECT_CODE_ASM;
             case Payload::WGSL_SPIRV:
                 return SLANG_WGSL_SPIRV_ASM;
             default:
@@ -455,16 +461,18 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         {
             switch (desc.payload)
             {
-            case Payload::SPIRV:
-                return SLANG_SPIRV;
             case Payload::DXIL:
                 return SLANG_DXIL;
             case Payload::DXBC:
                 return SLANG_DXBC;
+            case Payload::SPIRV:
+                return SLANG_SPIRV;
             case Payload::PTX:
                 return SLANG_PTX;
             case Payload::MetalAIR:
                 return SLANG_METAL_LIB_ASM;
+            case Payload::CuBin:
+                return SLANG_CUDA_OBJECT_CODE;
             case Payload::WGSL_SPIRV:
                 return SLANG_WGSL_SPIRV;
             default:
@@ -695,8 +703,7 @@ static const KindExtension g_cpuKindExts[] = {
 
 /* static */ ArtifactDesc ArtifactDescUtil::getDescFromPath(const UnownedStringSlice& slice)
 {
-    auto extension = Path::getPathExt(slice);
-    return getDescFromExtension(extension);
+    return getDescFromExtension(TypeTextUtil::getOutputPathExtension(slice));
 }
 
 /* static*/ SlangResult ArtifactDescUtil::appendCpuExtensionForKind(Kind kind, StringBuilder& out)
@@ -747,6 +754,8 @@ static UnownedStringSlice _getPayloadExtension(ArtifactPayload payload)
 
     case Payload::PTX:
         return toSlice("ptx");
+    case Payload::CuBin:
+        return toSlice("cubin");
 
     case Payload::LLVMIR:
         return toSlice("llvm-ir");
@@ -815,6 +824,12 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
             if (desc.payload == Payload::PTX)
             {
                 out << _getPayloadExtension(desc.payload);
+                return SLANG_OK;
+            }
+
+            if (desc.payload == Payload::CuBin)
+            {
+                out << "cubin.asm";
                 return SLANG_OK;
             }
 
@@ -924,20 +939,12 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
         }
     }
 
-    // Strip any extension
+    StringBuilder descExt;
+    if (SLANG_SUCCEEDED(appendDefaultExtension(desc, descExt)) && descExt.getLength())
     {
-        StringBuilder descExt;
-        if (SLANG_SUCCEEDED(appendDefaultExtension(desc, descExt)) && descExt.getLength())
-        {
-            // TODO(JS):
-            // It has an extension. We could check if they are the same
-            // but if they are not that might be fine, because of case insensitivity
-            // or perhaps there are multiple valid extensions. So for now we just strip
-            // and don't bother confirming with something like..
-            // if (Path::getPathExt(name) == descExt))
-
-            name = Path::getFileNameWithoutExt(name);
-        }
+        const auto ext = TypeTextUtil::getOutputPathExtension(name.getUnownedSlice());
+        if (ext.begin())
+            name.reduceLength(name.getLength() - ext.getLength() - 1);
     }
 
     return name;

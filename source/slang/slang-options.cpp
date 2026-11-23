@@ -2087,7 +2087,7 @@ void OptionsParser::addOutputPath(String const& path, CodeGenTarget impliedForma
 void OptionsParser::addOutputPath(char const* inPath)
 {
     String path = String(inPath);
-    String ext = Path::getPathExt(path);
+    const auto ext = TypeTextUtil::getOutputPathExtension(path.getUnownedSlice());
 
     if (ext == toSlice("slang-module") || ext == toSlice("slang-lib") || ext == toSlice("dir") ||
         ext == toSlice("zip"))
@@ -2103,8 +2103,7 @@ void OptionsParser::addOutputPath(char const* inPath)
     }
     else
     {
-        const SlangCompileTarget target =
-            TypeTextUtil::findCompileTargetFromExtension(ext.getUnownedSlice());
+        const SlangCompileTarget target = TypeTextUtil::findCompileTargetFromExtension(ext);
         // If the target is not found the value returned is Unknown. This is okay because
         // we allow an unknown-format `-o`, assuming we get a target format
         // from another argument.
@@ -3253,9 +3252,11 @@ void OptionsParser::_resolveOutputPaths(
                 {
                 case CodeGenTarget::CPPSource:
                 case CodeGenTarget::CPPHeader:
-                case CodeGenTarget::PTX:
                 case CodeGenTarget::CUDASource:
                 case CodeGenTarget::CUDAHeader:
+                case CodeGenTarget::PTX:
+                case CodeGenTarget::CUDAObjectCode:
+                case CodeGenTarget::CUDAObjectCodeAssembly:
 
                 case CodeGenTarget::HostHostCallable:
                 case CodeGenTarget::ShaderHostCallable:
@@ -5084,16 +5085,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 List<CapabilityName> requestedCapabilities;
                 for (auto atomVal : rawTarget.optionSet.getArray(CompilerOptionName::Capability))
                 {
-                    CapabilityName capabilityName = CapabilityName::Invalid;
-                    switch (atomVal.kind)
-                    {
-                    case CompilerOptionValueKind::Int:
-                        capabilityName = CapabilityName(atomVal.intValue);
-                        break;
-                    case CompilerOptionValueKind::String:
-                        capabilityName = findCapabilityName(atomVal.stringValue.getUnownedSlice());
-                        break;
-                    }
+                    auto capabilityName = atomVal.getCapabilityName();
                     if (capabilityName != CapabilityName::Invalid)
                         requestedCapabilities.add(capabilityName);
                 }

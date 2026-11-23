@@ -18,6 +18,7 @@ SourceLanguage getDefaultSourceLanguageForDownstreamCompiler(PassThroughMode com
     switch (compiler)
     {
     case PassThroughMode::None:
+    case PassThroughMode::Nvdisasm:
         {
             return SourceLanguage::Unknown;
         }
@@ -121,9 +122,12 @@ PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target)
             return PassThroughMode::GenericCCpp;
         }
     case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDAObjectCode:
         {
             return PassThroughMode::NVRTC;
         }
+    case CodeGenTarget::CUDAObjectCodeAssembly:
+        return PassThroughMode::Nvdisasm;
     case CodeGenTarget::WGSLSPIRV:
         {
             return PassThroughMode::Tint;

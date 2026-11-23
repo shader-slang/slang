@@ -6017,7 +6017,7 @@ warning(
 err(
     "pass-through-compiler-not-found",
     52002,
-    "pass-through compiler not found",
+    "pass-through compiler not found ('~compiler')",
     span { loc = "location", message = "could not find a suitable pass-through compiler for '~compiler'." }
 )
 

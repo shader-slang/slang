@@ -66,48 +66,32 @@ namespace Slang
         return SLANG_FAIL;
     }
     auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-    SLANG_RETURN_ON_FAIL(compiler->convert(artifact, assemblyDesc, outArtifact));
+    ComPtr<IArtifact> assembly;
+    SlangResult result = compiler->convert(artifact, assemblyDesc, assembly.writeRef());
+    // A failed converter may return no artifact; others attach diagnostics to a partial result.
+    if (sink && assembly)
+    {
+        SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(sink, compiler, assembly));
+    }
+    SLANG_RETURN_ON_FAIL(result);
+    *outArtifact = assembly.detach();
     auto downstreamElapsedTime =
         (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
     session->addDownstreamCompileTime(downstreamElapsedTime);
     return SLANG_OK;
 }
 
-SlangResult ArtifactOutputUtil::maybeDisassemble(
-    Session* session,
-    IArtifact* artifact,
-    DiagnosticSink* sink,
-    ComPtr<IArtifact>& outArtifact)
+ComPtr<IArtifact> ArtifactOutputUtil::maybeDisassemble(Session* session, IArtifact* artifact)
 {
-    const auto desc = artifact->getDesc();
-    if (ArtifactDescUtil::isText(desc))
-    {
-        // Nothing to convert
-        return SLANG_OK;
-    }
+    if (ArtifactDescUtil::isText(artifact->getDesc()))
+        return nullptr;
 
-    auto toDesc = desc;
-    toDesc.kind = ArtifactKind::Assembly;
-    // If this likes a playsible disassebly conversion
-    if (ArtifactDescUtil::isDisassembly(desc, toDesc))
-    {
-        ComPtr<IArtifact> disassemblyArtifact;
+    ComPtr<IArtifact> assembly;
+    if (SLANG_FAILED(dissassembleWithDownstream(session, artifact, nullptr, assembly.writeRef())))
+        return nullptr;
 
-        if (SLANG_SUCCEEDED(dissassembleWithDownstream(
-                session,
-                artifact,
-                sink,
-                disassemblyArtifact.writeRef())))
-        {
-            // Check it is now text
-            SLANG_ASSERT(ArtifactDescUtil::isText(disassemblyArtifact->getDesc()));
-
-            outArtifact.swap(disassemblyArtifact);
-            return SLANG_OK;
-        }
-    }
-
-    return SLANG_OK;
+    SLANG_ASSERT(ArtifactDescUtil::isText(assembly->getDesc()));
+    return assembly;
 }
 
 /* static */ SlangResult ArtifactOutputUtil::write(
@@ -192,16 +176,11 @@ static SlangResult _requireBlob(
     const UnownedStringSlice& writerName,
     ISlangWriter* writer)
 {
-    // If the output is console we will try and turn into disassembly
+    // Prefer assembly on a console. write() falls back to a hex dump for binary artifacts.
     if (writer->isConsole())
     {
-        ComPtr<IArtifact> disassemblyArtifact;
-        maybeDisassemble(session, artifact, sink, disassemblyArtifact);
-
-        if (disassemblyArtifact)
-        {
-            return write(disassemblyArtifact, sink, writerName, writer);
-        }
+        if (auto assembly = maybeDisassemble(session, artifact))
+            return write(assembly, sink, writerName, writer);
     }
 
     return write(artifact, sink, writerName, writer);

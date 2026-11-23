@@ -101,6 +101,10 @@ struct TypeTextUtil
     /// If doesn't match any target will return SLANG_TARGET_UNKNOWN
     static SlangCompileTarget findCompileTargetFromExtension(const UnownedStringSlice& slice);
 
+    /// Returns the longest registered target extension in the filename, or its final extension
+    /// for other output formats. For example, "kernel.debug.cubin.asm" yields "cubin.asm".
+    static UnownedStringSlice getOutputPathExtension(const UnownedStringSlice& path);
+
     /// Given a name suitable target
     /// If doesn't match any target will return SLANG_TARGET_UNKNOWN
     static SlangCompileTarget findCompileTargetFromName(const UnownedStringSlice& slice);

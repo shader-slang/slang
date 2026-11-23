@@ -3020,9 +3020,11 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::MetalLibAssembly:
         return &kMetalLayoutRulesFamilyImpl;
 
-    case CodeGenTarget::PTX:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
         {
             return &kCUDALayoutRulesFamilyImpl;
         }
@@ -3362,6 +3364,8 @@ bool isCUDATarget(CodeGenTarget codeGenTarget)
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
         return true;
     }
 }
@@ -3460,9 +3464,10 @@ TargetBuiltinTypeLayoutInfo getBuiltinTypeLayoutInfo(TargetRequest* targetReq)
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
-    case CodeGenTarget::CUDAObjectCode:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
         // Assume we're targeting the compiler's host, so we can just get the
         // pointer size from the host here.
         info.genericPointerSize = sizeof(void*);
@@ -3532,10 +3537,11 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
             // For CPU based scenarios are generated via C++
             return SourceLanguage::CPP;
         }
-    case CodeGenTarget::CUDAObjectCode:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
         {
             return SourceLanguage::CUDA;
         }

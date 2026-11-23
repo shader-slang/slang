@@ -21,13 +21,8 @@ struct ArtifactOutputUtil
         DiagnosticSink* sink,
         IArtifact** outArtifact);
 
-    /// Disassembles if that is plausible
-    /// Errors are output to sink if set. If not desired pass nullptr
-    static SlangResult maybeDisassemble(
-        Session* session,
-        IArtifact* artifact,
-        DiagnosticSink* sink,
-        ComPtr<IArtifact>& outArtifact);
+    /// Returns assembly for optional display or dumping, or null if disassembly is unavailable.
+    static ComPtr<IArtifact> maybeDisassemble(Session* session, IArtifact* artifact);
 
     /// Writes output to writer, will convert into disassembly if that is possible and appropriate
     /// (if outputting to console for example). Errors are output to sink if set. If not desired

@@ -10,6 +10,9 @@ namespace Slang
 
 struct NVRTCDownstreamCompilerUtil
 {
+    /// Returns whether the NVRTC adapter created by locateCompilers can retrieve machine code.
+    static bool supportsCubin(IDownstreamCompiler* compiler);
+
     static SlangResult locateCompilers(
         const String& path,
         ISlangSharedLibraryLoader* loader,

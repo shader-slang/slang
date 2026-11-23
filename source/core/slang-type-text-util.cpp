@@ -2,6 +2,7 @@
 #include "slang-type-text-util.h"
 
 #include "slang-array-view.h"
+#include "slang-io.h"
 #include "slang-string-util.h"
 
 namespace Slang
@@ -82,7 +83,8 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] = {
     {SLANG_CUDA_SOURCE, "cu", "cuda,cu", "CUDA source code"},
     {SLANG_CUDA_HEADER, "cuh", "cuh", "CUDA source header"},
     {SLANG_PTX, "ptx", "ptx", "PTX assembly"},
-    {SLANG_CUDA_OBJECT_CODE, "obj,o", "cuobj,cubin", "CUDA binary"},
+    {SLANG_CUDA_OBJECT_CODE, "cubin", "cuobj,cubin", "CUDA binary"},
+    {SLANG_CUDA_OBJECT_CODE_ASM, "cubin.asm,cubin-asm", "cubin-asm", "CUDA machine assembly"},
     {SLANG_SHADER_HOST_CALLABLE, "", "host-callable,callable", "Host callable"},
     {SLANG_OBJECT_CODE,
      "obj,o",
@@ -141,6 +143,7 @@ static const NamesDescriptionValue s_compilerInfos[] = {
     {SLANG_PASS_THROUGH_SPIRV_OPT, "spirv-opt", "spirv-tools SPIRV optimizer"},
     {SLANG_PASS_THROUGH_METAL, "metal", "Metal shader compiler"},
     {SLANG_PASS_THROUGH_TINT, "tint", "Tint compiler"},
+    {SLANG_PASS_THROUGH_NVDISASM, "nvdisasm", "NVIDIA CUDA binary disassembler"},
 };
 
 static const NamesDescriptionValue s_archiveTypeInfos[] = {
@@ -432,6 +435,21 @@ static const NamesDescriptionValue s_fileSystemTypes[] = {
         }
     }
     return SLANG_TARGET_UNKNOWN;
+}
+
+/* static */ UnownedStringSlice TypeTextUtil::getOutputPathExtension(const UnownedStringSlice& path)
+{
+    auto suffix = path.tail(Path::findLastSeparatorIndex(path) + 1);
+    Index dot = suffix.indexOf('.');
+    if (dot < 0)
+        return {};
+
+    do
+    {
+        suffix = suffix.tail(dot + 1);
+        dot = suffix.indexOf('.');
+    } while (dot >= 0 && findCompileTargetFromExtension(suffix) == SLANG_TARGET_UNKNOWN);
+    return suffix;
 }
 
 /* static */ SlangCompileTarget TypeTextUtil::findCompileTargetFromName(
