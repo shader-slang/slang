@@ -3330,6 +3330,14 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                                 builder.setInsertBefore(use->getUser());
                                 IRCloneEnv env;
                                 auto clonedInst = Slang::cloneInst(&env, &builder, inst);
+
+                                // A hoistable clone (e.g. a type) is placed next to its
+                                // operands, not at the insert point. If it still does not
+                                // reach the use, rerunning would loop forever.
+                                if (!isInstAvailableAtBlock(*dom, clonedInst, userBlock))
+                                    SLANG_UNEXPECTED("legalizeDefUse: cannot make a hoistable inst "
+                                                     "available at its use site");
+
                                 builder.replaceOperand(use, clonedInst);
 
                                 // If any operands of the gep inst is not defined at the use site,
