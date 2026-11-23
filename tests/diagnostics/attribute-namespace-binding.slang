@@ -4,7 +4,7 @@
 // `int iParam` parameter, i.e. it did not fall through to the 'unknown attribute' path. See
 // shader-slang/slang#12668.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute -no-codegen
 
 namespace my_namespace
 {
@@ -15,8 +15,9 @@ namespace my_namespace
     };
 }
 
-// CHECK: attribute 'my_namespace_Example' expects 1 arguments (0 provided)
 [my_namespace::Example()]
+//CHECK:       ^^^^^^^ wrong number of attribute arguments
+//CHECK:       ^^^^^^^ attribute 'my_namespace_Example' expects 1 arguments (0 provided)
 [numthreads(1, 1, 1)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {

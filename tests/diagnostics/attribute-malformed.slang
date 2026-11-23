@@ -3,10 +3,13 @@
 // parser must not synthesize a name expression from a failed identifier read, or the checker would
 // later type-check a `VarExpr` built from an error token with no name.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute -no-codegen
 
-// CHECK: unexpected {{.*}}expected identifier
 []
+/*CHECK:
+ ^ unexpected token
+ ^ unexpected ']', expected identifier
+*/
 [numthreads(1, 1, 1)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
