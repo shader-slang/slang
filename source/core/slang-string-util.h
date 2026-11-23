@@ -257,7 +257,7 @@ struct StringUtil
     ///
     /// For example, `isNearMissSpelling("TSET", "TEST")` is true (transposition),
     /// `isNearMissSpelling("dTEST", "TEST")` is true (insertion), and
-    /// `isNearMissSpelling("TESTD", "TEST")` is true (deletion).
+    /// `isNearMissSpelling("TST", "TEST")` is true (deletion).
     static bool isNearMissSpelling(
         const UnownedStringSlice& typed,
         const UnownedStringSlice& intended);

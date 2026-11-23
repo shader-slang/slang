@@ -357,11 +357,20 @@ SLANG_UNIT_TEST(stringUtilNearMissSpelling, NoRenderApi)
     // One insertion.
     SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TESTD"), toSlice("TEST")));
     SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("dTEST"), toSlice("TEST")));
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TESST"), toSlice("TEST")));
     SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("DISABLED_TEST"), toSlice("DISABLE_TEST")));
+
+    // The second real-world misspelling class from slang-test's directive sweep.
+    SLANG_CHECK(StringUtil::isNearMissSpelling(
+        toSlice("DISABLED_DIAGNOSTIC_TEST"),
+        toSlice("DISABLE_DIAGNOSTIC_TEST")));
 
     // One deletion.
     SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TST"), toSlice("TEST")));
     SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TEST"), toSlice("TESTS")));
+
+    // A transposition at the final pair.
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TETS"), toSlice("TEST")));
 
     // A single substitution is deliberately not a near miss: one substitution away from a
     // short word is usually a different real word.
@@ -378,7 +387,8 @@ SLANG_UNIT_TEST(stringUtilNearMissSpelling, NoRenderApi)
     SLANG_CHECK(!StringUtil::isNearMissSpelling(toSlice("Test"), toSlice("TEST")));
     SLANG_CHECK(!StringUtil::isNearMissSpelling(toSlice("test"), toSlice("TEST")));
 
-    // Degenerate inputs: shorter than a transposition pair, or empty against non-empty.
+    // Degenerate inputs: shorter than a transposition pair, or empty against non-empty. The
+    // empty slice is one deletion from a single-character word, but four deletions from TEST.
     SLANG_CHECK(!StringUtil::isNearMissSpelling(toSlice(""), toSlice("TEST")));
     SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice(""), toSlice("T")));
     SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TS"), toSlice("ST")));
