@@ -8,8 +8,8 @@ namespace Slang
 
 // Utilities over the directive-comment vocabulary that slang-test's file scanner recognizes —
 // the commands of `//TEST:`, `//DIAGNOSTIC_TEST:`, `//TEST_CATEGORY:`, `//TEST_IGNORE_FILE` and
-// their `DISABLE_`-prefixed forms — used to report a mistyped directive instead of silently
-// skipping it.
+// the `DISABLE_`-prefixed forms the scanner dispatches on — used to report a mistyped
+// directive instead of silently skipping it.
 struct TestDirectiveUtil
 {
     /// Returns the directive spelling that `command` is a near miss of — one character
