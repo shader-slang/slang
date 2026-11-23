@@ -34,6 +34,7 @@
 #include "slangc-tool.h"
 #include "slangi-tool.h"
 #include "test-context.h"
+#include "test-directive-util.h"
 #include "test-output-path-util.h"
 #include "test-reporter.h"
 #include "test-target-util.h"
@@ -582,35 +583,6 @@ static SlangResult _extractCommand(const char** ioCursor, UnownedStringSlice& ou
     }
 }
 
-// The directives that the collection loop in `_gatherTestsForFile` recognizes, in both their
-// plain and their `DISABLE_`-prefixed spellings. Keep this list in sync with the command
-// dispatch in that loop.
-static const UnownedStringSlice kTestDirectiveSpellings[] = {
-    UnownedStringSlice::fromLiteral("TEST"),
-    UnownedStringSlice::fromLiteral("DIAGNOSTIC_TEST"),
-    UnownedStringSlice::fromLiteral("TEST_CATEGORY"),
-    UnownedStringSlice::fromLiteral("TEST_IGNORE_FILE"),
-    UnownedStringSlice::fromLiteral("DISABLE_TEST"),
-    UnownedStringSlice::fromLiteral("DISABLE_DIAGNOSTIC_TEST"),
-};
-
-// Returns the directive that `command` is a near-miss spelling of — one character inserted,
-// deleted, or transposed relative to a recognized spelling — or an empty slice when there is
-// no such directive. A single substitution does not count: a word one substitution away from a
-// directive name is usually a different real word (a diagnostic test's annotation label, such
-// as `NEST` for `TEST`), not a typo of it.
-static UnownedStringSlice _findNearMissDirectiveCommand(const UnownedStringSlice& command)
-{
-    for (const UnownedStringSlice spelling : kTestDirectiveSpellings)
-    {
-        if (StringUtil::isNearMissSpelling(command, spelling))
-        {
-            return spelling;
-        }
-    }
-    return UnownedStringSlice();
-}
-
 static void applyMacroSubstitution(String filePath, TestDetails& details)
 {
     for (auto& arg : details.options.args)
@@ -1079,22 +1051,25 @@ static SlangResult _gatherTestsForFile(
             // lines that render-test parses, a diagnostic test's free-form annotation labels —
             // so they are skipped without a diagnostic. A near-miss spelling of a directive the
             // harness does recognize is different: the author meant a real directive, and
-            // silently skipping it would drop a test from the run with no diagnostic, the same
-            // way a file whose `//TEST:` line is mistyped reports "no tests run" while its
-            // coverage quietly vanishes.
-            const UnownedStringSlice nearMiss = _findNearMissDirectiveCommand(command);
+            // silently skipping it would drop a test from the run with no diagnostic.
+            // Mistyping the only directive of a file at least shows when that file is run
+            // alone (it contributes zero tests to the summary), but mistyping one directive
+            // among several leaves no trace anywhere. Failing the whole file, like the
+            // parse-error returns above, keeps the file's remaining lines from silently
+            // running partial coverage.
+            const UnownedStringSlice nearMiss =
+                TestDirectiveUtil::findNearMissDirectiveCommand(command);
             if (nearMiss.getLength() != 0)
             {
-                // Rebuild the spelling the author probably meant, with the `DISABLE_` prefix the
-                // loop stripped, and the command as it was written.
-                StringBuilder suggestion;
+                // Build `suggestion` from the matched spelling and `asWritten` from the
+                // unrecognized command, re-attaching the `DISABLE_` prefix the loop stripped.
+                const String suggestion =
+                    TestDirectiveUtil::getNearMissDirectiveSuggestion(nearMiss, hasDisablePrefix);
                 StringBuilder asWritten;
                 if (hasDisablePrefix)
                 {
-                    suggestion << "DISABLE_";
                     asWritten << "DISABLE_";
                 }
-                suggestion << nearMiss;
                 asWritten << command;
 
                 if (context && context->getTestReporter())
