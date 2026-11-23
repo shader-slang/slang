@@ -87,6 +87,11 @@ struct ContainerTypeKey
     }
 };
 
+/// One occupancy slot in the sequential-ID allocation space: a sequential ID reserved against a
+/// specific interface (identified by the interface's mangled name, not the witness's). The same
+/// numeric ID on two different interfaces is legal, so it is the pair — not the ID alone — that
+/// must be unique. Because the interface is keyed by mangled name, obfuscated or otherwise
+/// divergent linkage names for one logical interface split its occupancy into two keys.
 struct TypeConformanceSequentialIDKey
 {
     typedef TypeConformanceSequentialIDKey ThisType;
@@ -254,9 +259,18 @@ public:
 
     RefPtr<ASTBuilder> m_astBuilder;
 
-    // These helpers update/read the shared sequential-ID maps. Callers must hold
-    // `m_sequentialIDMapMutex`.
+    // These helpers maintain the shared sequential-ID bookkeeping. Callers must hold
+    // `m_sequentialIDMapMutex`. Both are allocation-protocol steps, not plain queries:
+    // `getFirstFree...` advances the per-interface cursor past occupied slots and returns the
+    // first free ID *without reserving it* — the caller must immediately pair it with
+    // `registerTypeConformanceWitnessSequentialID`, or two callers can be handed the same ID.
     uint32_t getFirstFreeTypeConformanceWitnessSequentialID(String const& interfaceMangledName);
+
+    // Records that a witness table owns `sequentialID` for its interface: the witness-name-to-ID
+    // map is overwritten last-wins (the old slot stays marked occupied and is never handed out
+    // again), and the (interface, ID) pair is marked occupied. Conflicting registrations are not
+    // reported here — a collision only matters inside one dispatch set, so duplicate IDs are
+    // diagnosed during `lowerGetTagFromSequentialID`, not at registration time.
     void registerTypeConformanceWitnessSequentialID(
         String const& witnessTableMangledName,
         String const& interfaceMangledName,
@@ -292,7 +306,10 @@ public:
     // Tracks which interface/sequential-ID pairs are already occupied.
     HashSet<TypeConformanceSequentialIDKey> usedTypeConformanceWitnessSequentialIDKeys;
 
-    // Counters for allocating sequential IDs to witness tables conforming to each interface type.
+    // Lower-bound cursors for allocating sequential IDs to witness tables conforming to each
+    // interface: `getFirstFreeTypeConformanceWitnessSequentialID` advances a cursor lazily past
+    // occupied slots, while actual occupancy is decided by
+    // `usedTypeConformanceWitnessSequentialIDKeys` above.
     Dictionary<String, uint32_t> mapInterfaceMangledNameToSequentialIDCounters;
     // Witness-table sequential ID assignment updates both maps together.
     std::mutex m_sequentialIDMapMutex;

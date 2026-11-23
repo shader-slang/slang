@@ -40,6 +40,8 @@ struct InvalidHit : IHit
 
 IHit make(uint t)
 {
+    // 99 is the sentinel that routes to the statically-constructed InvalidHit; it matches
+    // hitIDs[2] in the TEST_INPUT data above.
     if (t == 99)
         return InvalidHit();
     return createDynamicObject<IHit, int>(t, 0);

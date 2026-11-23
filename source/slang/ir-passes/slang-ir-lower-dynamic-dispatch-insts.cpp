@@ -895,6 +895,8 @@ struct SequentialIDTagLoweringContext : public InstPassBase
     // module can observe the same collision, and one diagnosis per conflicting ID is enough.
     // The add-then-refetch of `diagnosedSequentialIDs` re-fetches the set pointer after the
     // outer Dictionary insert, which can rehash and invalidate the previous pointer.
+    // A null sink only records the collision as diagnosed without reporting it; the sole
+    // caller (slang-emit.cpp) always passes a diagnostic sink.
     void diagnoseDuplicateSequentialID(
         IRInst* interfaceType,
         IRInst* witnessTable,

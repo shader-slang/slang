@@ -187,7 +187,11 @@ SLANG_UNIT_TEST(typeConformance, NoRenderApi)
         mesh,
         ishape,
         meshIShape.writeRef(),
-        1,
+        // The same numeric ID on two different interfaces is legal (occupancy is per
+        // interface), so Mesh:IShape = 0 may coexist with Diffuse:IBsdf = 0. Within one
+        // interface the IDs must be unique: duplicate explicit IDs are now an error (E50105),
+        // so Mesh and Sphere can no longer share 0 the way they did before.
+        0,
         diagnosticBlob.writeRef());
     session->createTypeConformanceComponentType(
         sphere,
@@ -277,6 +281,25 @@ SLANG_UNIT_TEST(typeConformanceSequentialIDAllocatesFirstFreeSlot, NoRenderApi)
     SLANG_CHECK(invalidID == 0);
     SLANG_CHECK(triangleID == 5);
     SLANG_CHECK(curvesID == 1);
+
+    // Only -1 is the automatic-assignment sentinel; an override outside [0, 4294967295] would
+    // wrap on the cast into the occupancy bookkeeping and is rejected.
+    ComPtr<slang::ITypeConformance> badConformance;
+    SLANG_CHECK_ABORT(
+        session->createTypeConformanceComponentType(
+            invalidHitInfo,
+            hitInfo,
+            badConformance.writeRef(),
+            -2,
+            diagnostics.writeRef()) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK_ABORT(
+        session->createTypeConformanceComponentType(
+            invalidHitInfo,
+            hitInfo,
+            badConformance.writeRef(),
+            4294967296LL + 5,
+            diagnostics.writeRef()) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK_ABORT(badConformance == nullptr);
 }
 
 // Verifies that implicit sequential-ID allocation fills multiple sparse gaps in ascending order
@@ -574,6 +597,9 @@ SLANG_UNIT_TEST(typeConformanceImplicitThenExplicitSequentialIDDiagnostic, NoRen
     SLANG_CHECK_ABORT(invalidHitInfo != nullptr);
     SLANG_CHECK_ABORT(triangleHitInfo != nullptr);
 
+    // Sentinel meaning "no ID written yet", chosen so the `== 0` check below fails if the
+    // query does not write; distinct from the NoneWitness special ID that happens to also
+    // be uint32_t(-1) inside the compiler.
     uint32_t invalidID = uint32_t(-1);
     SLANG_CHECK_ABORT(
         session->getTypeConformanceWitnessSequentialID(invalidHitInfo, hitInfo, &invalidID) ==
