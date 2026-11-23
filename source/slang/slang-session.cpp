@@ -1043,6 +1043,19 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
 
     SLANG_EXCEPTION_TRY
     {
+        if (conformanceIdOverride != -1 &&
+            (conformanceIdOverride < 0 || conformanceIdOverride > (SlangInt)0xFFFFFFFF))
+        {
+            // Only -1 is the "assign automatically" sentinel; every other value must be a
+            // valid 32-bit sequential ID, otherwise the cast into the occupancy bookkeeping
+            // would wrap it into an unrelated ID silently.
+            sink.diagnoseRaw(
+                Severity::Error,
+                "conformance sequential ID override must be -1 (assign automatically) "
+                "or an integer in [0, 4294967295].");
+            sink.getBlobIfNeeded(outDiagnostics);
+            return SLANG_E_INVALID_ARG;
+        }
         auto sharedSemanticsContext = getSemanticsForReflection();
         SemanticsVisitor visitor(sharedSemanticsContext);
         visitor = visitor.withSink(&sink);
@@ -1056,16 +1069,18 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
             result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
             if (conformanceIdOverride != -1)
             {
+                // The override is registered into the Linkage occupancy maps immediately, so
+                // that implicit allocations — including pre-compilation
+                // `getTypeConformanceWitnessSequentialID` queries — skip the reserved slot.
+                // The explicit-reservations-first ordering contract in slang.h relies on this.
                 auto subType = asInternal(type);
                 auto supType = asInternal(interfaceType);
-                if (subType && supType)
-                {
-                    std::lock_guard<std::mutex> lock(m_sequentialIDMapMutex);
-                    registerTypeConformanceWitnessSequentialID(
-                        getMangledNameForConformanceWitness(m_astBuilder, subType, supType),
-                        getMangledTypeName(m_astBuilder, supType),
-                        uint32_t(conformanceIdOverride));
-                }
+                SLANG_RELEASE_ASSERT(subType && supType);
+                std::lock_guard<std::mutex> lock(m_sequentialIDMapMutex);
+                registerTypeConformanceWitnessSequentialID(
+                    getMangledNameForConformanceWitness(m_astBuilder, subType, supType),
+                    getMangledTypeName(m_astBuilder, supType),
+                    uint32_t(conformanceIdOverride));
             }
         }
     }

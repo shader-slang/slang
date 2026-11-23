@@ -891,6 +891,10 @@ struct SequentialIDTagLoweringContext : public InstPassBase
     {
     }
 
+    // Emits E50105 at most once per (interface, sequential ID): several dispatch sites in one
+    // module can observe the same collision, and one diagnosis per conflicting ID is enough.
+    // The add-then-refetch of `diagnosedSequentialIDs` re-fetches the set pointer after the
+    // outer Dictionary insert, which can rehash and invalidate the previous pointer.
     void diagnoseDuplicateSequentialID(
         IRInst* interfaceType,
         IRInst* witnessTable,
@@ -942,6 +946,13 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         auto srcSeqID = inst->getOperand(1);
 
         Dictionary<UInt, UInt> mapping;
+        // First-wins bookkeeping of which witness table claimed each global sequential ID:
+        // `forEachInSet` walks the raw operand list, so the same table can legitimately be
+        // visited more than once — only two *different* tables sharing one ID are a conflict.
+        // A conflicting table is skipped entirely; E50105 is an error, so compilation fails
+        // anyway rather than silently resolving the collision through the first table's arm.
+        // Only this ID-to-tag direction diagnoses duplicates; the reverse RTTI direction
+        // (`lowerGetSequentialIDFromTag`) deliberately relies on this site to report them.
         Dictionary<uint32_t, IRInst*> witnessTableForSequentialID;
 
         // Map from sequential ID to unique ID
@@ -1045,6 +1056,13 @@ struct SequentialIDTagLoweringContext : public InstPassBase
     //
     // All witness tables will have a SequentialID decoration after this function is run.
     //
+    // Tables that already carry a SequentialID decoration (explicit overrides) have that ID
+    // pushed into the Linkage's occupancy bookkeeping; the session side registers such IDs at
+    // conformance-creation time, so this re-registration is the fallback for witness tables
+    // whose decoration arrives via linked or serialized IR, where no session-side call ran in
+    // this linkage. All other tables are assigned the first free ID for their interface, so
+    // implicit IDs skip explicit reservations instead of colliding with them.
+    //
     // The sequential ID in the decoration will be the same as the one specified in the Linkage.
     //
     // Otherwise, a new ID will be generated and assigned to the witness table object, and
@@ -1098,9 +1116,12 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                 auto interfaceName = String();
                 if (as<IRInterfaceType>(interfaceType))
                 {
+                    // An interface type that participates in dynamic dispatch must carry a
+                    // linkage decoration; the non-empty mangled name below doubles as the
+                    // "is a real interface conformance" predicate at the registration sites.
                     auto interfaceLinkage = interfaceType->findDecoration<IRLinkageDecoration>();
-                    SLANG_ASSERT(
-                        interfaceLinkage && "An interface type does not have a linkage,"
+                    SLANG_RELEASE_ASSERT(
+                        interfaceLinkage && "An interface type does not have a linkage decoration, "
                                             "but a witness table associated with it has one.");
                     interfaceName = interfaceLinkage->getMangledName();
                 }
