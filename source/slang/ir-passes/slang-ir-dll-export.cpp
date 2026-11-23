@@ -18,7 +18,7 @@ struct DllExportContext
     {
         NativeCallMarshallingContext marshalContext;
         marshalContext.diagnosticSink = diagnosticSink;
-        if (!marshalContext.checkNativeSignature(func))
+        if (!marshalContext.isFunctionSignatureValidForNativeCall(func))
             return;
         IRBuilder builder(module);
         auto wrapper = marshalContext.generateDLLExportWrapperFunc(builder, func);

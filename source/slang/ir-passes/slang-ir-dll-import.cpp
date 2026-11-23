@@ -116,7 +116,7 @@ struct DllImportContext
         IRBuilder builder(module);
         NativeCallMarshallingContext marshalContext;
         marshalContext.diagnosticSink = diagnosticSink;
-        if (!marshalContext.checkNativeSignature(func))
+        if (!marshalContext.isFunctionSignatureValidForNativeCall(func))
             return;
 
         auto nativeType = marshalContext.getNativeFuncType(builder, func->getDataType());

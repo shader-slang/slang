@@ -42,10 +42,14 @@ IRType* NativeCallMarshallingContext::getNativeType(IRBuilder& builder, IRType* 
 /// Returns whether a value of `type` is plain old data for a native call: its bytes mean the
 /// same thing to native code, and copying them neither creates nor ends any ownership.
 ///
-/// For example, `float3`, `NativeString`, `int*`, and `struct { int a; float b[4]; }` qualify,
-/// while `String`, a class, a resource, a COM pointer, and any struct or array containing one of
-/// them do not.
-static bool isPlainOldDataForNativeCall(IRType* type)
+/// For example, `float3`, `NativeString`, `int*`, `Tuple<int, float>`, and
+/// `struct { int a; float b[4]; }` qualify, while `String`, a class, a resource, a COM pointer, an
+/// unsized array, and any struct, tuple, or array containing one of them do not.
+///
+/// `typesInProgress` holds the aggregates whose classification is under way. A self-referential
+/// type such as `struct Node { int value; Node* next; }` reaches `Node` again through the pointer;
+/// that occurrence adds no new element types, so it counts as plain data and the recursion stops.
+static bool isPlainOldDataForNativeCall(IRType* type, HashSet<IRType*>& typesInProgress)
 {
     if (as<IRBasicType>(type))
         return true;
@@ -55,25 +59,56 @@ static bool isPlainOldDataForNativeCall(IRType* type)
         return true;
     case kIROp_VectorType:
     case kIROp_MatrixType:
-        return isPlainOldDataForNativeCall((IRType*)type->getOperand(0));
+        return isPlainOldDataForNativeCall((IRType*)type->getOperand(0), typesInProgress);
     case kIROp_PtrType:
         {
             // A raw pointer is plain data only if native code can use what it points to.
             auto valueType = as<IRPtrTypeBase>(type)->getValueType();
-            return as<IRVoidType>(valueType) || isPlainOldDataForNativeCall(valueType);
+            return as<IRVoidType>(valueType) ||
+                   isPlainOldDataForNativeCall(valueType, typesInProgress);
         }
     case kIROp_ArrayType:
-        return isPlainOldDataForNativeCall(as<IRArrayType>(type)->getElementType());
+        return isPlainOldDataForNativeCall(
+            as<IRArrayType>(type)->getElementType(),
+            typesInProgress);
+    case kIROp_UnsizedArrayType:
+        // An unsized array has no size that native code could agree on. A trailing unsized
+        // member could later map to a C flexible array member, but no form is supported yet.
+        return false;
     case kIROp_StructType:
-        for (auto field : as<IRStructType>(type)->getFields())
+    case kIROp_TupleType:
         {
-            if (!isPlainOldDataForNativeCall(field->getFieldType()))
-                return false;
+            if (!typesInProgress.add(type))
+                return true;
+            bool result = true;
+            if (auto structType = as<IRStructType>(type))
+            {
+                for (auto field : structType->getFields())
+                    result = result &&
+                             isPlainOldDataForNativeCall(field->getFieldType(), typesInProgress);
+            }
+            else
+            {
+                // The DLL passes run before `lowerTuples`, so a tuple is still a tuple here; its
+                // operands are its element types.
+                for (UInt i = 0; i < type->getOperandCount(); ++i)
+                    result =
+                        result &&
+                        isPlainOldDataForNativeCall((IRType*)type->getOperand(i), typesInProgress);
+            }
+            typesInProgress.remove(type);
+            return result;
         }
-        return true;
     default:
         return false;
     }
+}
+
+/// Returns whether a value of `type` is plain old data for a native call.
+static bool isPlainOldDataForNativeCall(IRType* type)
+{
+    HashSet<IRType*> typesInProgress;
+    return isPlainOldDataForNativeCall(type, typesInProgress);
 }
 
 /// Returns whether `type` is a `[COM]` interface or a `ComPtr` to one, which a native signature
@@ -83,7 +118,7 @@ static bool isComInterfaceForNativeCall(IRType* type)
     return type->getOp() == kIROp_InterfaceType || type->getOp() == kIROp_ComPtrType;
 }
 
-bool NativeCallMarshallingContext::checkNativeSignature(IRFunc* func)
+bool NativeCallMarshallingContext::isFunctionSignatureValidForNativeCall(IRFunc* func)
 {
     bool isSupported = true;
     auto funcType = func->getDataType();
@@ -253,7 +288,7 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeResultValue(
         break;
     case kIROp_StringType:
     case kIROp_ClassType:
-        SLANG_UNREACHABLE("checkNativeSignature rejects managed native results.");
+        SLANG_UNREACHABLE("isFunctionSignatureValidForNativeCall rejects managed native results.");
         break;
     case kIROp_InterfaceType:
         {

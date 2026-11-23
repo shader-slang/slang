@@ -13,7 +13,6 @@ struct IRFunc;
 struct IRFuncType;
 struct IRCall;
 struct IRInst;
-struct IRFunc;
 
 class NativeCallMarshallingContext
 {
@@ -27,8 +26,9 @@ public:
     // Get a native function type of `func`.
     IRFuncType* getNativeFuncType(IRBuilder& builder, IRFuncType* declaredFuncType);
 
-    /// Diagnoses every parameter and result of `func` whose type cannot cross a native
-    /// `[DllImport]` or `[DllExport]` boundary, and returns whether the signature is supported.
+    /// Returns whether every parameter and the result of `func` can cross a native `[DllImport]`
+    /// or `[DllExport]` boundary, and diagnoses each one that cannot. The function only validates;
+    /// it generates no marshalling code.
     ///
     /// Only types without managed elements have a lifetime that native code can honor, so a
     /// signature may use plain-old-data types (scalars, vectors, matrices, `NativeString`, raw
@@ -37,7 +37,7 @@ public:
     /// by-value input parameter, because the call only borrows its bytes (an import passes
     /// `const char*`) or copies them (an export builds a new `String`). Any other `String`, and
     /// any class, resource, or aggregate containing one, is rejected.
-    bool checkNativeSignature(IRFunc* func);
+    bool isFunctionSignatureValidForNativeCall(IRFunc* func);
 
     // Insert a call at builder's current position into a native func with original arguments.
     // `originalArgs` will be marshalled to native args before the actual call.
