@@ -10,6 +10,8 @@
 #include "slang-name-convention-util.h"
 #include "slang-name.h"
 
+#include <stdio.h>
+
 namespace Slang
 {
 
@@ -593,6 +595,25 @@ SlangResult DiagnosticSink::getBlobIfNeeded(ISlangBlob** outBlob)
     return SLANG_OK;
 }
 
+[[noreturn]] static void _abortCompilation(DiagnosticSink* sink, char const* message)
+{
+    SLANG_UNUSED(sink);
+#if !SLANG_HAS_EXCEPTIONS
+    // A fatal diagnostic cannot return an output blob when exceptions are disabled. For example,
+    // an imported module may have reported an error before "compilation ceased" stops the load.
+    // Preserve those earlier diagnostics as well as the fatal message before handleSignal traps.
+    // Writers are flushed before forwarding. Only the final sink reports its buffer, so a
+    // chain of writerless sinks emits one copy of the diagnostics.
+    if (!sink->writer)
+    {
+        fwrite(sink->outputBuffer.getBuffer(), 1, size_t(sink->outputBuffer.getLength()), stderr);
+    }
+    // Also flush stderr in case a writer forwarded buffered output there.
+    fflush(stderr);
+#endif
+    handleSignal(SignalType::AbortCompilation, message, true);
+}
+
 bool DiagnosticSink::diagnoseImpl(
     DiagnosticInfo const& info,
     const UnownedStringSlice& formattedMessage)
@@ -605,6 +626,11 @@ bool DiagnosticSink::diagnoseImpl(
     if (writer)
     {
         writer->write(formattedMessage.begin(), formattedMessage.getLength());
+#if !SLANG_HAS_EXCEPTIONS
+        // A parent sink can terminate while receiving this fatal diagnostic.
+        if (info.severity >= Severity::Fatal)
+            writer->flush();
+#endif
     }
     else
     {
@@ -620,7 +646,7 @@ bool DiagnosticSink::diagnoseImpl(
     {
         // TODO: figure out a better policy for aborting compilation
         std::string message(formattedMessage.begin(), formattedMessage.end());
-        SLANG_ABORT_COMPILATION(message.c_str());
+        _abortCompilation(this, message.c_str());
     }
     return true;
 }
@@ -679,6 +705,10 @@ bool DiagnosticSink::diagnoseRichImpl(
     if (writer)
     {
         writer->write(message.begin(), message.getLength());
+#if !SLANG_HAS_EXCEPTIONS
+        if (effectiveSeverity >= Severity::Fatal)
+            writer->flush();
+#endif
     }
     else
     {
@@ -697,7 +727,7 @@ bool DiagnosticSink::diagnoseRichImpl(
     if (effectiveSeverity >= Severity::Fatal)
     {
         std::string msg(message.begin(), message.end());
-        SLANG_ABORT_COMPILATION(msg.c_str());
+        _abortCompilation(this, msg.c_str());
     }
     return true;
 }
@@ -807,6 +837,10 @@ void DiagnosticSink::diagnoseRaw(Severity severity, const UnownedStringSlice& me
     {
         // If so, pass the error string along to them.
         writer->write(message.begin(), message.getLength());
+#if !SLANG_HAS_EXCEPTIONS
+        if (severity >= Severity::Fatal)
+            writer->flush();
+#endif
     }
     else
     {
@@ -823,7 +857,7 @@ void DiagnosticSink::diagnoseRaw(Severity severity, const UnownedStringSlice& me
     if (severity >= Severity::Fatal)
     {
         // TODO: figure out a better policy for aborting compilation
-        SLANG_ABORT_COMPILATION("");
+        _abortCompilation(this, "");
     }
 }
 
