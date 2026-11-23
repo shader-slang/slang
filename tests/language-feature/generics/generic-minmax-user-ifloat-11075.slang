@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // A user type conforming to `IFloat` needs no new members for the generic `min`/`max` overloads
 // (shader-slang/slang#11075): it inherits default `__min`/`__max` that order values with its own

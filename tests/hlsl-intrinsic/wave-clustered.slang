@@ -1,6 +1,6 @@
 //TEST_CATEGORY(wave, compute)
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-directly
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-via-glsl -profile sm_6_0 -Xslang... -capability GL_KHR_shader_subgroup_clustered -X.
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=glsl, filecheck-buffer=CHECK):-profile sm_6_0 -Xslang... -capability GL_KHR_shader_subgroup_clustered -X.
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

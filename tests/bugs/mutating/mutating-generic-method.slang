@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute,vulkan):COMPARE_COMPUTE_EX:-vk -slang -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Confirm that a generic method marked `[mutating]`
 // produces an `inout` parameter for `this`.

@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 tests/diagnostics/illegal-character.slang(4): error 10000: illegal character '`'
 `

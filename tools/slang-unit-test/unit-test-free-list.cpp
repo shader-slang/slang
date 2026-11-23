@@ -10,7 +10,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(freeList)
+SLANG_UNIT_TEST(freeList, NoRenderApi)
 {
     FreeList freeList;
     freeList.init(sizeof(int), sizeof(void*), 10);

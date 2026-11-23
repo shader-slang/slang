@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx12, filecheck-buffer=CHECK):-output-using-type
 //TEST(smoke):SIMPLE:
 
 // CHECK: type: float

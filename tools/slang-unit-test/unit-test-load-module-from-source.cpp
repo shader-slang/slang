@@ -12,7 +12,7 @@
 using namespace Slang;
 
 // Test the loadModuleFromSource method and slang_loadModuleFromSource function
-SLANG_UNIT_TEST(loadModuleFromSource)
+SLANG_UNIT_TEST(loadModuleFromSource, NoRenderApi)
 {
     // Test source code with various content
     const char* testSource = R"(

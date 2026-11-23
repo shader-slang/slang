@@ -1,7 +1,5 @@
 //TEST:SIMPLE(filecheck=METAL): -entry computeMain -stage compute -target metal -D GROUPID
 //TEST:SIMPLE(filecheck=METAL): -entry computeMain -stage compute -target metal
-//DISABLE_TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -output-using-type
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type
 
 // Compute test disabled; Buffer isn't handled by the test infrastructure
 // TODO: github issue #8456
@@ -34,4 +32,4 @@ void computeMain(uint GI : SV_GroupIndex)
     // BUF: 0
     // BUF: 1
     indirection(GI);
-} 
+}

@@ -11,16 +11,13 @@
 // invocation of __init(0).
 
 // 2025 - no warning about (S)0
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_2025_2026): -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_2025_2026):-cpu -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK_2025_2026): -output-using-type
 
 // 2026 - warn about (S)0  (semantics change in 202c)
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_2025_2026): -shaderobj -output-using-type -xslang -Wno-30087 -xslang -DSLANG2026=1
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_2025_2026):-cpu -shaderobj -output-using-type -xslang -Wno-30087 -xslang -DSLANG2026=1
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK_2025_2026): -output-using-type -xslang -Wno-30087 -xslang -DSLANG2026=1
 
 // 202c - verify that the semantics changed
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK202C): -shaderobj -output-using-type -xslang -DSLANG202C=1
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK202C):-cpu -shaderobj -output-using-type -xslang -DSLANG202C=1
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK202C): -output-using-type -xslang -DSLANG202C=1
 
 //TEST:SIMPLE(filecheck=WARNCHECK2025): -no-codegen -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=WARNCHECK2026): -no-codegen -stage compute -entry computeMain -DSLANG2026=1
@@ -98,14 +95,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK202C-NEXT: 0
 //CHECK202C-NEXT: 0
 
-//WARNCHECK2025: result code = 0
 //WARNCHECK2025-NOT: warning[E30087]
 //WARNCHECK2025: standard output = {
 
-//WARNCHECK2026: result code = 0
 //WARNCHECK2026: warning[E30087]
 //WARNCHECK2026: standard output = {
 
-//WARNCHECK202C: result code = 0
 //WARNCHECK202C-NOT: warning[E30087]
 //WARNCHECK202C: standard output = {

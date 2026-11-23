@@ -1,10 +1,10 @@
 // slang-module.cpp
 #include "slang-module.h"
 
-#include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-mangle.h"
-#include "slang-serialize-container.h"
+#include "slang/semantic-checking/slang-check-impl.h"
+#include "slang/serialization/slang-serialize-container.h"
 
 namespace Slang
 {

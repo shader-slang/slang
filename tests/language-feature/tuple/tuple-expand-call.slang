@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
 
@@ -17,7 +17,7 @@ int g<each T>(expand each Tuple<expand each T> t)
 void computeMain()
 {
     Tuple<expand each Tuple<int, float>> x = (2, 3.0f);
-    
+
     // CHECK: 2
     outputBuffer[0] = g<int, float>(expand each x);
 

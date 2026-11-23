@@ -1,4 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -wgsl -shaderobj -Xslang -O3
+// TODO: Enable the cpu and cuda targets. See https://github.com/shader-slang/slang/issues/14641
+//TEST:COMPARE_COMPUTE(targets=all-cpu-cuda, filecheck-buffer=CHECK):-Xslang -O3
 
 //TEST_INPUT:ubuffer(data=[1 0], stride=4):name inputBuffer
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer

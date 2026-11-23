@@ -56,6 +56,10 @@ EMSCRIPTEN_BINDINGS(slang)
             &slang::wgsl::Session::loadModuleFromSource,
             allow_raw_pointers())
         .function(
+            "loadModuleFromIRBlob",
+            &slang::wgsl::Session::loadModuleFromIRBlob,
+            allow_raw_pointers())
+        .function(
             "createCompositeComponentType",
             &slang::wgsl::Session::createCompositeComponentType,
             allow_raw_pointers());
@@ -289,6 +293,7 @@ EMSCRIPTEN_BINDINGS(slang)
         .value("MutableTexture", slang::BindingType::MutableTexture);
 
     class_<slang::wgsl::Module, base<slang::wgsl::ComponentType>>("Module")
+        .function("serialize", &slang::wgsl::Module::serialize)
         .function(
             "findEntryPointByName",
             &slang::wgsl::Module::findEntryPointByName,

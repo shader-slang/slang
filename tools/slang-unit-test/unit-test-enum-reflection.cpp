@@ -10,7 +10,7 @@ using namespace Slang;
 
 // Test that reflection API can correctly report info about enum declarations.
 
-SLANG_UNIT_TEST(enumReflection)
+SLANG_UNIT_TEST(enumReflection, NoRenderApi)
 {
     const char* userSourceBody = R"(
         enum Mode {

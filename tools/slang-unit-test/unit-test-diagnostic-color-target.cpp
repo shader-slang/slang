@@ -76,7 +76,7 @@ static String getTargetStageDiagnostics(
 // codegen. Regression test for the unconditional color-mode apply in applySettingsToDiagnosticSink,
 // where the second apply from ComponentType's (empty) option set overwrote the ALWAYS mode set by
 // the linkage option set with the AUTO default.
-SLANG_UNIT_TEST(diagnosticColorTargetStage)
+SLANG_UNIT_TEST(diagnosticColorTargetStage, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE_EX(filecheck=CHECK):-cpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck=CHECK):
 
 // render-test must report a failure from `RenderTestApp::update` (here, `applyBinding` failing
 // because the shader has no parameter named `doesNotExist`) through its result code, rather than

@@ -11,142 +11,143 @@
 #include "core/slang-type-text-util.h"
 #include "core/slang-writer.h"
 #include "slang-capability.h"
-#include "slang-check-out-of-bound-access.h"
-#include "slang-emit-c-like.h"
-#include "slang-emit-cpp.h"
-#include "slang-emit-cuda.h"
-#include "slang-emit-glsl.h"
-#include "slang-emit-hlsl.h"
-#include "slang-emit-llvm.h"
-#include "slang-emit-metal.h"
-#include "slang-emit-slang.h"
-#include "slang-emit-source-writer.h"
-#include "slang-emit-torch.h"
-#include "slang-emit-vm.h"
-#include "slang-emit-wgsl.h"
-#include "slang-ir-any-value-inference.h"
-#include "slang-ir-any-value-marshalling.h"
-#include "slang-ir-autodiff.h"
-#include "slang-ir-bind-existentials.h"
-#include "slang-ir-byte-address-legalize.h"
-#include "slang-ir-check-optional-none-usage.h"
-#include "slang-ir-check-recursion.h"
-#include "slang-ir-check-shader-parameter-type.h"
-#include "slang-ir-check-unsupported-inst.h"
-#include "slang-ir-cleanup-void.h"
-#include "slang-ir-collect-global-uniforms.h"
-#include "slang-ir-com-interface.h"
-#include "slang-ir-coverage-instrument.h"
-#include "slang-ir-cuda-immutable-load.h"
-#include "slang-ir-dce.h"
-#include "slang-ir-defer-buffer-load.h"
-#include "slang-ir-defunctionalization.h"
-#include "slang-ir-detect-uninitialized-resources.h"
-#include "slang-ir-dll-export.h"
-#include "slang-ir-dll-import.h"
-#include "slang-ir-early-raytracing-intrinsic-simplification.h"
-#include "slang-ir-eliminate-multilevel-break.h"
-#include "slang-ir-eliminate-phis.h"
-#include "slang-ir-entry-point-decorations.h"
-#include "slang-ir-entry-point-raw-ptr-params.h"
-#include "slang-ir-entry-point-uniforms.h"
-#include "slang-ir-expand-autodiff-parameter-contexts.h"
-#include "slang-ir-explicit-global-context.h"
-#include "slang-ir-explicit-global-init.h"
-#include "slang-ir-fix-entrypoint-callsite.h"
-#include "slang-ir-float-non-uniform-resource-index.h"
-#include "slang-ir-fuse-satcoop.h"
-#include "slang-ir-glsl-legalize.h"
-#include "slang-ir-glsl-liveness.h"
-#include "slang-ir-hlsl-legalize.h"
-#include "slang-ir-inline.h"
-#include "slang-ir-insts.h"
-#include "slang-ir-late-require-capability.h"
-#include "slang-ir-layout.h"
-#include "slang-ir-legalize-array-return-type.h"
-#include "slang-ir-legalize-binary-operator.h"
-#include "slang-ir-legalize-composite-select.h"
-#include "slang-ir-legalize-empty-array.h"
-#include "slang-ir-legalize-global-values.h"
-#include "slang-ir-legalize-image-subscript.h"
-#include "slang-ir-legalize-matrix-types.h"
-#include "slang-ir-legalize-mesh-outputs.h"
-#include "slang-ir-legalize-resource-globals.h"
-#include "slang-ir-legalize-uniform-buffer-load.h"
-#include "slang-ir-legalize-varying-params.h"
-#include "slang-ir-legalize-vector-types.h"
-#include "slang-ir-link.h"
-#include "slang-ir-liveness.h"
-#include "slang-ir-loop-unroll.h"
-#include "slang-ir-lower-append-consume-structured-buffer.h"
-#include "slang-ir-lower-binding-query.h"
-#include "slang-ir-lower-bit-cast.h"
-#include "slang-ir-lower-buffer-element-type.h"
-#include "slang-ir-lower-combined-texture-sampler.h"
-#include "slang-ir-lower-conditional-type.h"
-#include "slang-ir-lower-coopvec.h"
-#include "slang-ir-lower-copy-logical.h"
-#include "slang-ir-lower-cpu-resource-types.h"
-#include "slang-ir-lower-dynamic-dispatch-insts.h"
-#include "slang-ir-lower-dynamic-resource-heap.h"
-#include "slang-ir-lower-enum-type.h"
-#include "slang-ir-lower-glsl-ssbo-types.h"
-#include "slang-ir-lower-l-value-cast.h"
-#include "slang-ir-lower-matrix-swizzle-store.h"
-#include "slang-ir-lower-optional-type.h"
-#include "slang-ir-lower-reinterpret.h"
-#include "slang-ir-lower-result-type.h"
-#include "slang-ir-lower-tuple-types.h"
-#include "slang-ir-metadata.h"
-#include "slang-ir-metal-legalize.h"
-#include "slang-ir-missing-return.h"
-#include "slang-ir-optix-entry-point-uniforms.h"
-#include "slang-ir-pytorch-cpp-binding.h"
-#include "slang-ir-ray-tracing-legalize.h"
-#include "slang-ir-redundancy-removal.h"
-#include "slang-ir-resolve-texture-format.h"
-#include "slang-ir-resolve-varying-input-ref.h"
-#include "slang-ir-restructure-scoping.h"
-#include "slang-ir-restructure.h"
-#include "slang-ir-sccp.h"
-#include "slang-ir-simplify-for-emit.h"
-#include "slang-ir-specialize-address-space.h"
-#include "slang-ir-specialize-arrays.h"
-#include "slang-ir-specialize-buffer-load-arg.h"
-#include "slang-ir-specialize-matrix-layout.h"
-#include "slang-ir-specialize-resources.h"
-#include "slang-ir-specialize-stage-switch.h"
-#include "slang-ir-specialize.h"
-#include "slang-ir-ssa-simplification.h"
-#include "slang-ir-ssa.h"
-#include "slang-ir-string-hash.h"
-#include "slang-ir-strip-debug-info.h"
-#include "slang-ir-strip-default-construct.h"
-#include "slang-ir-strip-legalization-insts.h"
-#include "slang-ir-synthesize-active-mask.h"
-#include "slang-ir-thread-switch-on-constant-phi.h"
-#include "slang-ir-transform-params-to-constref.h"
-#include "slang-ir-translate-global-varying-var.h"
-#include "slang-ir-translate.h"
-#include "slang-ir-typeflow-specialize.h"
-#include "slang-ir-undo-param-copy.h"
-#include "slang-ir-uniformity.h"
-#include "slang-ir-user-type-hint.h"
-#include "slang-ir-validate.h"
-#include "slang-ir-variable-scope-correction.h"
-#include "slang-ir-vk-invert-y.h"
-#include "slang-ir-wgsl-legalize.h"
-#include "slang-ir-wrap-cbuffer-element.h"
-#include "slang-ir-wrap-structured-buffers.h"
-#include "slang-legalize-types.h"
-#include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
-#include "slang-pass-wrapper.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-syntax.h"
-#include "slang-type-layout.h"
-#include "slang-visitor.h"
 #include "slang-vm-bytecode.h"
+#include "slang/ast/slang-syntax.h"
+#include "slang/ast/slang-visitor.h"
+#include "slang/emission/slang-emit-c-like.h"
+#include "slang/emission/slang-emit-cpp.h"
+#include "slang/emission/slang-emit-cuda.h"
+#include "slang/emission/slang-emit-glsl.h"
+#include "slang/emission/slang-emit-hlsl.h"
+#include "slang/emission/slang-emit-llvm.h"
+#include "slang/emission/slang-emit-metal.h"
+#include "slang/emission/slang-emit-slang.h"
+#include "slang/emission/slang-emit-source-writer.h"
+#include "slang/emission/slang-emit-torch.h"
+#include "slang/emission/slang-emit-vm.h"
+#include "slang/emission/slang-emit-wgsl.h"
+#include "slang/ir-passes/slang-check-out-of-bound-access.h"
+#include "slang/ir-passes/slang-ir-any-value-inference.h"
+#include "slang/ir-passes/slang-ir-any-value-marshalling.h"
+#include "slang/ir-passes/slang-ir-autodiff.h"
+#include "slang/ir-passes/slang-ir-bind-existentials.h"
+#include "slang/ir-passes/slang-ir-byte-address-legalize.h"
+#include "slang/ir-passes/slang-ir-check-optional-none-usage.h"
+#include "slang/ir-passes/slang-ir-check-recursion.h"
+#include "slang/ir-passes/slang-ir-check-shader-parameter-type.h"
+#include "slang/ir-passes/slang-ir-check-unsupported-inst.h"
+#include "slang/ir-passes/slang-ir-cleanup-void.h"
+#include "slang/ir-passes/slang-ir-collect-global-uniforms.h"
+#include "slang/ir-passes/slang-ir-com-interface.h"
+#include "slang/ir-passes/slang-ir-coverage-instrument.h"
+#include "slang/ir-passes/slang-ir-cuda-immutable-load.h"
+#include "slang/ir-passes/slang-ir-dce.h"
+#include "slang/ir-passes/slang-ir-defer-buffer-load.h"
+#include "slang/ir-passes/slang-ir-defunctionalization.h"
+#include "slang/ir-passes/slang-ir-detect-uninitialized-resources.h"
+#include "slang/ir-passes/slang-ir-dll-export.h"
+#include "slang/ir-passes/slang-ir-dll-import.h"
+#include "slang/ir-passes/slang-ir-early-raytracing-intrinsic-simplification.h"
+#include "slang/ir-passes/slang-ir-eliminate-multilevel-break.h"
+#include "slang/ir-passes/slang-ir-eliminate-phis.h"
+#include "slang/ir-passes/slang-ir-eliminate-undefined-opaque-handles.h"
+#include "slang/ir-passes/slang-ir-entry-point-decorations.h"
+#include "slang/ir-passes/slang-ir-entry-point-raw-ptr-params.h"
+#include "slang/ir-passes/slang-ir-entry-point-uniforms.h"
+#include "slang/ir-passes/slang-ir-expand-autodiff-parameter-contexts.h"
+#include "slang/ir-passes/slang-ir-explicit-global-context.h"
+#include "slang/ir-passes/slang-ir-explicit-global-init.h"
+#include "slang/ir-passes/slang-ir-fix-entrypoint-callsite.h"
+#include "slang/ir-passes/slang-ir-float-non-uniform-resource-index.h"
+#include "slang/ir-passes/slang-ir-fuse-satcoop.h"
+#include "slang/ir-passes/slang-ir-glsl-legalize.h"
+#include "slang/ir-passes/slang-ir-glsl-liveness.h"
+#include "slang/ir-passes/slang-ir-hlsl-legalize.h"
+#include "slang/ir-passes/slang-ir-inline.h"
+#include "slang/ir-passes/slang-ir-late-require-capability.h"
+#include "slang/ir-passes/slang-ir-legalize-array-return-type.h"
+#include "slang/ir-passes/slang-ir-legalize-binary-operator.h"
+#include "slang/ir-passes/slang-ir-legalize-composite-select.h"
+#include "slang/ir-passes/slang-ir-legalize-empty-array.h"
+#include "slang/ir-passes/slang-ir-legalize-global-values.h"
+#include "slang/ir-passes/slang-ir-legalize-image-subscript.h"
+#include "slang/ir-passes/slang-ir-legalize-matrix-types.h"
+#include "slang/ir-passes/slang-ir-legalize-mesh-outputs.h"
+#include "slang/ir-passes/slang-ir-legalize-resource-globals.h"
+#include "slang/ir-passes/slang-ir-legalize-uniform-buffer-load.h"
+#include "slang/ir-passes/slang-ir-legalize-varying-params.h"
+#include "slang/ir-passes/slang-ir-legalize-vector-types.h"
+#include "slang/ir-passes/slang-ir-link.h"
+#include "slang/ir-passes/slang-ir-liveness.h"
+#include "slang/ir-passes/slang-ir-loop-unroll.h"
+#include "slang/ir-passes/slang-ir-lower-append-consume-structured-buffer.h"
+#include "slang/ir-passes/slang-ir-lower-binding-query.h"
+#include "slang/ir-passes/slang-ir-lower-bit-cast.h"
+#include "slang/ir-passes/slang-ir-lower-buffer-element-type.h"
+#include "slang/ir-passes/slang-ir-lower-combined-texture-sampler.h"
+#include "slang/ir-passes/slang-ir-lower-conditional-type.h"
+#include "slang/ir-passes/slang-ir-lower-coopvec.h"
+#include "slang/ir-passes/slang-ir-lower-copy-logical.h"
+#include "slang/ir-passes/slang-ir-lower-cpu-resource-types.h"
+#include "slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.h"
+#include "slang/ir-passes/slang-ir-lower-dynamic-resource-heap.h"
+#include "slang/ir-passes/slang-ir-lower-enum-type.h"
+#include "slang/ir-passes/slang-ir-lower-glsl-ssbo-types.h"
+#include "slang/ir-passes/slang-ir-lower-l-value-cast.h"
+#include "slang/ir-passes/slang-ir-lower-matrix-swizzle-store.h"
+#include "slang/ir-passes/slang-ir-lower-optional-type.h"
+#include "slang/ir-passes/slang-ir-lower-reinterpret.h"
+#include "slang/ir-passes/slang-ir-lower-result-type.h"
+#include "slang/ir-passes/slang-ir-lower-tuple-types.h"
+#include "slang/ir-passes/slang-ir-metadata.h"
+#include "slang/ir-passes/slang-ir-metal-legalize.h"
+#include "slang/ir-passes/slang-ir-missing-return.h"
+#include "slang/ir-passes/slang-ir-optix-entry-point-uniforms.h"
+#include "slang/ir-passes/slang-ir-pytorch-cpp-binding.h"
+#include "slang/ir-passes/slang-ir-ray-tracing-legalize.h"
+#include "slang/ir-passes/slang-ir-redundancy-removal.h"
+#include "slang/ir-passes/slang-ir-resolve-texture-format.h"
+#include "slang/ir-passes/slang-ir-resolve-varying-input-ref.h"
+#include "slang/ir-passes/slang-ir-restructure-scoping.h"
+#include "slang/ir-passes/slang-ir-restructure.h"
+#include "slang/ir-passes/slang-ir-sccp.h"
+#include "slang/ir-passes/slang-ir-simplify-for-emit.h"
+#include "slang/ir-passes/slang-ir-specialize-address-space.h"
+#include "slang/ir-passes/slang-ir-specialize-arrays.h"
+#include "slang/ir-passes/slang-ir-specialize-buffer-load-arg.h"
+#include "slang/ir-passes/slang-ir-specialize-matrix-layout.h"
+#include "slang/ir-passes/slang-ir-specialize-resources.h"
+#include "slang/ir-passes/slang-ir-specialize-stage-switch.h"
+#include "slang/ir-passes/slang-ir-specialize.h"
+#include "slang/ir-passes/slang-ir-ssa-simplification.h"
+#include "slang/ir-passes/slang-ir-ssa.h"
+#include "slang/ir-passes/slang-ir-string-hash.h"
+#include "slang/ir-passes/slang-ir-strip-debug-info.h"
+#include "slang/ir-passes/slang-ir-strip-default-construct.h"
+#include "slang/ir-passes/slang-ir-strip-legalization-insts.h"
+#include "slang/ir-passes/slang-ir-synthesize-active-mask.h"
+#include "slang/ir-passes/slang-ir-thread-switch-on-constant-phi.h"
+#include "slang/ir-passes/slang-ir-transform-params-to-constref.h"
+#include "slang/ir-passes/slang-ir-translate-global-varying-var.h"
+#include "slang/ir-passes/slang-ir-translate.h"
+#include "slang/ir-passes/slang-ir-typeflow-specialize.h"
+#include "slang/ir-passes/slang-ir-undo-param-copy.h"
+#include "slang/ir-passes/slang-ir-uniformity.h"
+#include "slang/ir-passes/slang-ir-user-type-hint.h"
+#include "slang/ir-passes/slang-ir-variable-scope-correction.h"
+#include "slang/ir-passes/slang-ir-vk-invert-y.h"
+#include "slang/ir-passes/slang-ir-wgsl-legalize.h"
+#include "slang/ir-passes/slang-ir-wrap-cbuffer-element.h"
+#include "slang/ir-passes/slang-ir-wrap-structured-buffers.h"
+#include "slang/ir-passes/slang-legalize-types.h"
+#include "slang/ir-passes/slang-pass-wrapper.h"
+#include "slang/ir/slang-ir-insts.h"
+#include "slang/ir/slang-ir-layout.h"
+#include "slang/ir/slang-ir-validate.h"
+#include "slang/layout-and-binding/slang-type-layout.h"
+#include "slang/lower-to-ir/slang-lower-to-ir.h"
 
 #include <limits>
 Slang::String get_slang_cpp_host_prelude();
@@ -399,9 +400,28 @@ static void reportCheckpointIntermediates(
 
 struct LinkingAndOptimizationOptions
 {
+    // Run existential and resource type legalization. It is false when the downstream
+    // compiler (C/C++, NVRTC, or LLVM) handles those types.
     bool shouldLegalizeExistentialAndResourceTypes = true;
+
+    // The target can emit a global constant's initializer. If it is false, global
+    // constants are inlined. Set it with `canTargetEmitGlobalInitializers`.
+    bool targetCanEmitGlobalInitializer = true;
+
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
+
+// Return true if the target can emit a global constant's initializer. It returns false for:
+// - CUDA: NVRTC rejects dynamic initialization of a `__device__` variable.
+// - CPU in kernel mode: a global constant can use global shader parameters, which
+//   cannot be emitted as constants. Host-style CPU targets do not have this problem.
+static bool canTargetEmitGlobalInitializers(CodeGenContext* codeGenContext)
+{
+    auto target = codeGenContext->getTargetFormat();
+    bool isUnsupported = target == CodeGenTarget::CUDASource ||
+                         (isCPUTarget(codeGenContext->getTargetReq()) && isKernelTarget(target));
+    return !isUnsupported;
+}
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
 // on the instructions we see.
@@ -438,6 +458,13 @@ void calcRequiredLoweringPassSet(
     // location-operand role that the pass knows how to consume.
     if (isRayTracingLocationOperand(inst->getOp()))
         result.rayTracingLocationOperand = true;
+
+    // Buffer types enable the pass, not only loads and stores, because a buffer that is unused or
+    // reached only through `GetEquivalentStructuredBuffer` (as `GetDimensions` and `Interlocked*`
+    // are) still needs translating on structured-buffer targets. We match the base class so that
+    // every byte-address buffer type enables it, including rasterizer-ordered ones.
+    if (as<IRByteAddressBufferTypeBase>(inst))
+        result.byteAddressBuffer = true;
 
     switch (inst->getOp())
     {
@@ -568,8 +595,6 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_ByteAddressBufferLoad:
     case kIROp_ByteAddressBufferStore:
-    case kIROp_HLSLRWByteAddressBufferType:
-    case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
         break;
     case kIROp_HLSLAppendStructuredBufferType:
@@ -787,6 +812,68 @@ static void unexportNonEmbeddableIR(IRModule* irModule, CodeGenTarget target)
                 {
                     dec->removeAndDeallocate();
                 }
+            }
+        }
+    }
+}
+
+// Insert a `metalTextureFence` before and after every write to a texture that Metal declares
+// `access::read_write`.
+//
+// MSL makes a thread's write to an `access::read_write` texture visible to that thread's
+// later reads of the texture only after a `fence()` on it (MSL 4.1 section 6.13.17); HLSL,
+// SPIR-V and WGSL order these accesses implicitly. The fence after each write is that
+// specified requirement. The fence before each write is not in section 6.13.17: it keeps the
+// write from moving ahead of an earlier read of the same texel, a write-after-read failure that
+// Dawn observed on Apple M1 hardware while it already fenced after every write
+// (crbug.com/417296309).
+//
+// The pass sees every texture write because Metal texture stores in the core module lower to
+// `ImageStore` or to a texture atomic, never to an `__intrinsic_asm` string, and because it runs
+// after `legalizeImageSubscript` has turned a partial texel store such as `tex[p].x = 1` into a
+// read followed by an `ImageStore`. A write-only texture is emitted as `access::write`, which has
+// no `fence()` and cannot be read back.
+static void insertMetalTextureFences(IRModule* module)
+{
+    IRBuilder builder(module);
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getModifiableChildren())
+            {
+                // Texture atomics other than loads also store to their texel, so they count as
+                // writes along with `ImageStore`.
+                IRInst* texture = nullptr;
+                IRImageSubscript* atomicSubscript = nullptr;
+                if (auto imageStore = as<IRImageStore>(inst))
+                    texture = imageStore->getImage();
+                else if (auto atomic = as<IRAtomicOperation>(inst);
+                         atomic && !as<IRAtomicLoad>(inst))
+                {
+                    atomicSubscript = getAtomicImageSubscript(atomic);
+                    if (atomicSubscript)
+                        texture = atomicSubscript->getImage();
+                }
+                if (!texture)
+                    continue;
+                auto textureType = as<IRTextureTypeBase>(texture->getDataType());
+                SLANG_RELEASE_ASSERT(textureType);
+                if (textureType->getAccess() == SLANG_RESOURCE_ACCESS_WRITE)
+                    continue;
+
+                // A texture atomic is emitted together with its `ImageSubscript` address, so its
+                // leading fence goes before that address rather than between the two.
+                builder.setInsertBefore(atomicSubscript ? atomicSubscript : inst);
+                builder
+                    .emitIntrinsicInst(builder.getVoidType(), kIROp_MetalTextureFence, 1, &texture);
+
+                builder.setInsertAfter(inst);
+                builder
+                    .emitIntrinsicInst(builder.getVoidType(), kIROp_MetalTextureFence, 1, &texture);
             }
         }
     }
@@ -1959,18 +2046,10 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(legalizeVectorTypes, sink);
 
-    // For CUDA targets, always inline global constants to avoid dynamic initialization
-    // of __device__ variables rejected by NVRTC. This runs independently of the broader
-    // resource/existential type legalization, which remains disabled for CUDA.
-    //
-    // We also need this pass on the CPU targets in shader mode, as global
-    // constants may reference global parameters, which can't be emitted as
-    // constants.
-    if (target == CodeGenTarget::CUDASource ||
-        (isCPUTarget(targetRequest) && isKernelTarget(target)) ||
-        options.shouldLegalizeExistentialAndResourceTypes)
+    if (options.shouldLegalizeExistentialAndResourceTypes ||
+        !options.targetCanEmitGlobalInitializer)
     {
-        SLANG_PASS(inlineGlobalConstantsForLegalization);
+        SLANG_PASS(inlineGlobalConstantsForLegalization, target);
     }
 
     // We don't need the legalize pass for C/C++ based types
@@ -2208,7 +2287,7 @@ Result linkAndOptimizeIR(
         // Depending on the target, we may decide to do
         // more aggressive translation that reduces the
         // load/store operations down to invididual scalars
-        // (splitting up vector ops).
+        // (splitting up vector and array ops).
         //
         switch (target)
         {
@@ -2217,8 +2296,9 @@ Result linkAndOptimizeIR(
             {
                 // We need to scalarize the loads on LLVM CPU targets, as
                 // ByteAddressBuffer loads & stores may only have an alignment
-                // of 4, meaning that vector loads / stores could be misaligned
-                // and cause crashes with SSE, AVX etc. SIMD instruction sets.
+                // of 4, meaning that vector or array loads / stores could be
+                // misaligned and cause crashes with SSE, AVX etc. SIMD
+                // instruction sets.
                 byteAddressBufferOptions.scalarizeVectorLoadStore = true;
             }
             break;
@@ -2465,7 +2545,7 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
         SLANG_PASS(legalizeDynamicResourcesForGLSL, codeGenContext);
 
-    // Legalize `ImageSubscript` loads.
+    // Legalize `ImageSubscript` loads and stores.
     switch (target)
     {
     case CodeGenTarget::MetalLibAssembly:
@@ -2476,6 +2556,11 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::SPIRVAssembly:
         {
             SLANG_PASS(legalizeImageSubscript, targetRequest, sink);
+
+            // On Metal, the texture fences go in afterwards,
+            // since the read-modify-writes that `legalizeImageSubscript` creates need them too.
+            if (isMetalTarget(targetRequest))
+                SLANG_PASS(insertMetalTextureFences);
         }
         break;
     default:
@@ -2507,7 +2592,7 @@ Result linkAndOptimizeIR(
         if (targetProgram->getOptionSet().getBoolOption(
                 CompilerOptionName::EnableExperimentalPasses))
             SLANG_PASS(introduceExplicitGlobalContext, target);
-        SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
+        SLANG_PASS(transformByValueParamsToBorrows, targetRequest, codeGenContext->getSink());
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
@@ -2668,15 +2753,16 @@ Result linkAndOptimizeIR(
     // says.
     SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
 
-    // Transform struct and array parameters to use ConstRef for better performance on Metal, C++
-    // and CUDA. This runs after `legalizeMatrixTypes`, because the pass transforms struct and
+    // Transform struct and array parameters into borrows for better performance on Metal, C++ and
+    // CUDA. This runs after `legalizeMatrixTypes`, because the pass transforms struct and
     // array parameters but not matrix parameters. A parameter of an int/uint/bool matrix type is
     // an array only after `legalizeMatrixTypes`, and Metal requires an array parameter to be
     // passed by reference. SPIR-V does the same transformation earlier, because the pass changes
-    // how `lowerBufferElementTypeToStorageType` sees array parameters.
+    // how `lowerBufferElementTypeToStorageType` sees array parameters. On the CUDA family the pass
+    // also passes entry-point uniform parameters to such callees by address.
     if ((isCPUTarget(targetRequest) && !isCPUTargetViaLLVM(targetRequest)) ||
         isCUDATarget(targetRequest) || isMetalTarget(targetRequest))
-        SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
+        SLANG_PASS(transformByValueParamsToBorrows, targetRequest, codeGenContext->getSink());
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays. This runs after
@@ -2726,6 +2812,7 @@ Result linkAndOptimizeIR(
     if (emitSpirvDirectly)
     {
         SLANG_PASS(performIntrinsicFunctionInlining);
+        SLANG_PASS(eliminateUndefinedOpaqueHandles, codeGenContext);
     }
 
     SLANG_PASS(eliminateMultiLevelBreak, targetProgram);
@@ -2735,6 +2822,13 @@ Result linkAndOptimizeIR(
         IRSimplificationOptions simplificationOptions = fastIRSimplificationOptions;
         simplificationOptions.cfgOptions.removeTrivialSingleIterationLoops = true;
         SLANG_PASS(simplifyIR, targetProgram, simplificationOptions, sink);
+    }
+    else if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    {
+        // Multi-level break lowering introduces local variables even in the minimum-optimization
+        // pipeline. Reconstruct SSA while each local's declaration still marks the start of its
+        // lifetime. SPIR-V places function variables in the entry block, losing that boundary.
+        SLANG_PASS(constructSSA);
     }
 
     if (isKhronosTarget(targetRequest) && !emitSpirvDirectly)
@@ -2754,11 +2848,9 @@ Result linkAndOptimizeIR(
     // The earlier void cleanup has already run, so remove these new placeholders before emit.
     SLANG_PASS(cleanUpVoidType);
 
-    // As a late step, we need to take the SSA-form IR and move things *out*
-    // of SSA form, by eliminating all "phi nodes" (block parameters) and
-    // introducing explicit temporaries instead. Doing this at the IR level
-    // means that subsequent emit logic doesn't need to contend with the
-    // complexities of blocks with parameters.
+    // Most targets need block parameters lowered to explicit temporary variables before emission.
+    // Direct SPIR-V retains scalar and composite parameters so their incoming values remain
+    // explicit.
     //
     {
         // Get the liveness mode.
@@ -2783,8 +2875,29 @@ Result linkAndOptimizeIR(
         PhiEliminationOptions phiEliminationOptions;
         if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
         {
-            phiEliminationOptions.eliminateCompositeTypedPhiOnly = false;
-            phiEliminationOptions.useRegisterAllocation = true;
+            // Consider an inlined search inside a ray-generation loop:
+            //
+            //     [ForceInline] float find(float t)
+            //     {
+            //         for (uint i = 0; i < 4; ++i)
+            //             if (t < buf[i]) return buf[i];
+            //         return 1.0;
+            //     }
+            //
+            //     for (int bounce = 0; bounce < 8; ++bounce)
+            //     {
+            //         TraceRay(...);
+            //         ray.TMax = find(t);
+            //     }
+            //
+            // After break lowering and SSA construction, the search result can have an undefined
+            // incoming value on an exhausted-search path where it is unused. Demoting that phi
+            // skips the undefined store. SPIR-V function-scope storage then keeps the previous
+            // iteration's contents, creating a false dependency across TraceRay when a downstream
+            // optimizer reconstructs SSA. The same problem affects structs, arrays, and matrices:
+            // demoting an undefined aggregate also leaves its scalar fields carrying old values.
+            // Emit the existing scalar and composite phis directly instead.
+            phiEliminationOptions.preserveScalarAndCompositePhis = true;
         }
         SLANG_PASS(eliminatePhis, livenessMode, phiEliminationOptions);
         // If liveness is enabled add liveness ranges based on the accumulated liveness
@@ -2952,6 +3065,8 @@ Result linkAndOptimizeIR(
     // We check D3D and Metal resource locals after all passes that can create mutable storage.
     // Minimum-optimization mode must still reject storage that its target cannot represent.
     SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
+    if (isD3DTarget(targetRequest))
+        SLANG_PASS(validateGroupSharedParamsForHLSL, targetRequest->getTargetCaps(), sink);
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 
@@ -3091,6 +3206,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         LinkingAndOptimizationOptions linkingAndOptimizationOptions;
 
         linkingAndOptimizationOptions.sourceEmitter = sourceEmitter;
+        linkingAndOptimizationOptions.targetCanEmitGlobalInitializer =
+            canTargetEmitGlobalInitializers(this);
 
         switch (sourceLanguage)
         {
@@ -3499,6 +3616,10 @@ static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
         optionSet.getBoolOption(CompilerOptionName::IncompleteLibrary))
         return false;
 
+    // `-validate-with-downstream-compiler` asks for validation without the environment variable.
+    if (optionSet.getBoolOption(CompilerOptionName::ValidateWithDownstreamCompiler))
+        return true;
+
     // Also check the environment variable SLANG_RUN_SPIRV_VALIDATION.
     // If it is set to "1", we should run validation.
     StringBuilder runSpirvValEnvVar;
@@ -3869,6 +3990,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
     linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
+    linkingAndOptimizationOptions.targetCanEmitGlobalInitializer =
+        canTargetEmitGlobalInitializers(codeGenContext);
     SLANG_RETURN_ON_FAIL(
         linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
 

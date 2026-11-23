@@ -11,7 +11,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(atomicReflection)
+SLANG_UNIT_TEST(atomicReflection, NoRenderApi)
 {
     const char* userSourceBody = R"(
         RWStructuredBuffer<uint> bufA;  // for reference

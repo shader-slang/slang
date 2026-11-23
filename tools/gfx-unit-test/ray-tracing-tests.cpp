@@ -440,22 +440,22 @@ void rayTracingTestImpl(IDevice* device, UnitTestContext* context)
     test.run();
 }
 
-SLANG_UNIT_TEST(RayTracingTestAD3D12)
+SLANG_UNIT_TEST(RayTracingTestAD3D12, D3D12)
 {
     runTestImpl(rayTracingTestImpl<RayTracingTestA>, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(RayTracingTestAVulkan)
+SLANG_UNIT_TEST(RayTracingTestAVulkan, Vulkan)
 {
     runTestImpl(rayTracingTestImpl<RayTracingTestA>, unitTestContext, DeviceType::Vulkan);
 }
 
-SLANG_UNIT_TEST(RayTracingTestBD3D12)
+SLANG_UNIT_TEST(RayTracingTestBD3D12, D3D12)
 {
     runTestImpl(rayTracingTestImpl<RayTracingTestB>, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(RayTracingTestBVulkan)
+SLANG_UNIT_TEST(RayTracingTestBVulkan, Vulkan)
 {
     runTestImpl(rayTracingTestImpl<RayTracingTestB>, unitTestContext, DeviceType::Vulkan);
 }

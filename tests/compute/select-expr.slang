@@ -1,5 +1,4 @@
-//TEST(smoke,compute):COMPARE_COMPUTE: -shaderobj
-//TEST(smoke,compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test IR code generation for the `?:` "select" operator
 

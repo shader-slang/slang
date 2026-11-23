@@ -1,14 +1,9 @@
 // column-major.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -compile-arg -O3 -shaderobj -Xslang -matrix-layout-column-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -shaderobj -Xslang -matrix-layout-column-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -dx12 -shaderobj -Xslang -matrix-layout-column-major
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -Xslang -matrix-layout-column-major
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -emit-spirv-via-glsl -Xslang -matrix-layout-column-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -Xslang -matrix-layout-column-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-mtl -compute -shaderobj -Xslang -matrix-layout-column-major
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=BUF):-compile-arg -O3 -Xslang -matrix-layout-column-major
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-Xslang -matrix-layout-column-major
 
-// This data is in column major layout order.... 
+// This data is in column major layout order....
 //TEST_INPUT:cbuffer(data=[1.0 0.0 0.0 10.0  0.0 1.0 0.0 20.0  0.0 0.0 1.0 30.0  0.0 0.0 0.0 1.0]):name matrixBuffer
 
 ConstantBuffer<float4x4> matrixBuffer;
@@ -27,13 +22,13 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float4 v = float4(1, 2, 3, 1);
 
     float4x4 M1 = matrixBuffer;
-    
+
     float4 r = mul(v, M1);
 
     float4x4 M2 = mul(M1, M1);
 
     float4x4 M3 = float4x4(
-            1.0, 0.0, 0.0, 10.0, 
+            1.0, 0.0, 0.0, 10.0,
             0.0, 1.0, 0.0, 20.0,
             0.0, 0.0, 1.0, 30.0,
             0.0, 0.0, 0.0, 1.0

@@ -3,20 +3,19 @@
 
 // `main` first selects heap resource 0. The nested `loadThenSelectGlobalTexture` call must read that
 // binding before changing the selection to heap resource 1, and the final read must use resource 1.
-// The checks distinguish the two loads and prove that legalization threads both the current value
-// and the `out` update through the helper calls.
+// The checks distinguish the two reads and prove their order: each read is a call to
+// `loadGlobalTexture` with the selected heap index, so the first call must carry 0 and the second 1.
+// The second call carrying 1 also proves the `out` update to `selectedTexture` was threaded through
+// the helper calls: the final read uses the binding the nested helper selected.
 
 //CHECK-LABEL: ; Function main
-//CHECK: %[[ADDRESS0:[A-Za-z0-9_]+]] = OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap %uint_0{{$}}
-//CHECK: %[[TEXTURE0:[A-Za-z0-9_]+]] = OpLoad {{.*}} %[[ADDRESS0]]
-//CHECK: %[[BEFORE:[A-Za-z0-9_]+]] = OpFunctionCall %v4float %loadGlobalTexture %[[TEXTURE0]]
-//CHECK: %[[ADDRESS1:[A-Za-z0-9_]+]] = OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap %uint_1{{$}}
-//CHECK: %[[TEXTURE1:[A-Za-z0-9_]+]] = OpLoad {{.*}} %[[ADDRESS1]]
-//CHECK: %[[AFTER:[A-Za-z0-9_]+]] = OpFunctionCall %v4float %loadGlobalTexture %[[TEXTURE1]]
+//CHECK: %[[BEFORE:[A-Za-z0-9_]+]] = OpFunctionCall %v4float %loadGlobalTexture %uint_0
+//CHECK: %[[AFTER:[A-Za-z0-9_]+]] = OpFunctionCall %v4float %loadGlobalTexture %uint_1
 //CHECK: OpFAdd %v4float %[[BEFORE]] %[[AFTER]]
 //CHECK-LABEL: ; Function loadGlobalTexture
-//CHECK: %[[PARAM:[A-Za-z0-9_]+]] = OpFunctionParameter
-//CHECK: OpImageFetch %v4float %[[PARAM]]
+//CHECK: %[[INDEX:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+//CHECK: OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap %[[INDEX]]
+//CHECK: OpImageFetch %v4float {{.*}} Lod
 
 static Texture2D<float4> selectedTexture;
 

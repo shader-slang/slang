@@ -197,9 +197,9 @@ If you would cite anything else, stop and record a doc-gap finding in
 
 ## Source files you may consult for _verification only_
 
-- `source/slang/slang-ast-decl.h`
-- `source/slang/slang-ast-base.h`
-- `source/slang/slang-parser.cpp`
+- `source/slang/ast/slang-ast-decl.h`
+- `source/slang/ast/slang-ast-base.h`
+- `source/slang/parser/slang-parser.cpp`
 
 You may look at these files to verify that a claim in the doc is
 realizable (e.g. that an `EmptyDecl` is reachable from a particular

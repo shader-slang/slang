@@ -7,12 +7,12 @@
 // shows which derivative ran. Forward-mode calls have no user derivative to honor and keep the
 // synthesized one.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CONCRETE):-cpu -shaderobj -output-using-type -Xslang... -DCONCRETE -X.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=EXISTENTIAL):-cpu -shaderobj -output-using-type -Xslang... -DEXISTENTIAL -X.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=GENERIC):-cpu -shaderobj -output-using-type -Xslang... -DGENERIC -X.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=MIXED):-cpu -shaderobj -output-using-type -Xslang... -DMIXED -X.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=DYNAMIC):-cpu -shaderobj -output-using-type -Xslang... -DDYNAMIC -X.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=FORWARD):-cpu -shaderobj -output-using-type -Xslang... -DFORWARD -X.
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CONCRETE):-output-using-type -Xslang... -DCONCRETE -X.
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=EXISTENTIAL):-output-using-type -Xslang... -DEXISTENTIAL -X.
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=GENERIC):-output-using-type -Xslang... -DGENERIC -X.
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=MIXED):-output-using-type -Xslang... -DMIXED -X.
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=DYNAMIC):-output-using-type -Xslang... -DDYNAMIC -X.
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=FORWARD):-output-using-type -Xslang... -DFORWARD -X.
 
 // `outputBuffer[0]` counts custom-derivative invocations, and the remaining slots hold the
 // derivative from each call path.

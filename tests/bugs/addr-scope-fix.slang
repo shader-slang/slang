@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-vk -slang -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -40,7 +39,7 @@ void func(int x)
         // future use and will try to create a local var for it. This will
         // result a pointer typed var being created, and leads to invalid
         // hlsl/glsl code.
-        // 
+        //
         // The fix is to hoist all always-fold insts to earliest point
         // in the program instead of creating a var for it.
         //

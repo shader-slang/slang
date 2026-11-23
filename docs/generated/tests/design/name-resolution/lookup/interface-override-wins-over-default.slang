@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#interface-requirements-vs-default-implementations
-//META: doc_section_digest=74784468a186f2fede08fe868c02fc5f99f7dcb5531bbffd440daa487e75a556
+//META: doc_section_digest=3898e99e2187a0d73cce97f15bd01da86fa89646d1aab8e2c3a9708277b9c471
 //META: purpose=A conforming type's implementation of a requirement wins over the interface's default implementation of the same requirement.
 //META: intent=functional
 //META: pipeline_stage=check

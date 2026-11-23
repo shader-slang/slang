@@ -8,6 +8,9 @@ const {
   selectAssigneeAndReviewers,
   pickSuggestedReviewer,
   formatAssignmentComment,
+  ignoredReviewerSet,
+  ignoredReviewersToRemove,
+  pickFallbackAssignee,
 } = require("./extract-workflow-js.js").load({
   workflow: ".github/workflows/pr-board-sync.yml",
   block: "assignment",
@@ -125,11 +128,11 @@ test("author shepherd is not auto-requested; top collaborator is suggested", () 
 test("ignored shepherd is not auto-requested; suggestion uses null baseline", () => {
   const { assignee, autoRequestedReviewer, suggestedReviewer } = select(
     [], ["dev2"], {
-      maintainer: "bmillsNV",
-      ignoredReviewers: new Set(["bmillsNV"]),
+      maintainer: "defaultReviewer",
+      ignoredReviewers: new Set(["defaultReviewer"]),
     });
   // No owners in ranking → maintainer fallback, but ignored → no auto-request.
-  assert.strictEqual(assignee, "bmillsNV");
+  assert.strictEqual(assignee, "defaultReviewer");
   assert.strictEqual(autoRequestedReviewer, null);
   assert.strictEqual(suggestedReviewer, "dev2");
 });
@@ -137,7 +140,7 @@ test("ignored shepherd is not auto-requested; suggestion uses null baseline", ()
 test("real existing reviewer clears auto-request but still may suggest", () => {
   const { assignee, autoRequestedReviewer, suggestedReviewer } = select(
     [], ["dev2", "owner1"], {
-      existingReviewers: ["dave"], ignoredReviewers: new Set(["bmillsNV"]),
+      existingReviewers: ["realReviewer"], ignoredReviewers: new Set(["defaultReviewer"]),
     });
   assert.strictEqual(assignee, "owner1");
   assert.strictEqual(autoRequestedReviewer, null);
@@ -148,8 +151,8 @@ test("real existing reviewer clears auto-request but still may suggest", () => {
 test("ignored and bot reviewers do not count as existing", () => {
   const { assignee, autoRequestedReviewer, suggestedReviewer } = select(
     [], ["dev2", "owner1"], {
-      existingReviewers: ["bmillsNV", "copilot[bot]"],
-      botAuthors: ["nv-slang-bot"], ignoredReviewers: new Set(["bmillsNV"]),
+      existingReviewers: ["defaultReviewer", "copilot[bot]"],
+      botAuthors: ["nv-slang-bot"], ignoredReviewers: new Set(["defaultReviewer"]),
     });
   assert.strictEqual(assignee, "owner1");
   assert.strictEqual(autoRequestedReviewer, "owner1");
@@ -259,6 +262,49 @@ test("formatAssignmentComment always notes assignee; suggestion has no @", () =>
     /highest for dev1 among collaborators other than the assignee/,
   );
   assert.doesNotMatch(noSignalBaseline, /than for the auto-requested reviewer/);
+});
+
+test("ignoredReviewerSet lowercases team members and extra logins", () => {
+  const ignored = ignoredReviewerSet(new Set(["DefaultReviewer"]), ["Extra1", " extra2 ", ""]);
+  assert.deepStrictEqual([...ignored].sort(), ["defaultreviewer", "extra1", "extra2"]);
+});
+
+test("ignoredReviewerSet keeps the extra logins when the team is empty or unset", () => {
+  assert.deepStrictEqual([...ignoredReviewerSet(new Set(), ["extra1"])], ["extra1"]);
+  assert.deepStrictEqual([...ignoredReviewerSet(undefined, undefined)], []);
+});
+
+test("ignoredReviewerSet is unknown when the team read failed", () => {
+  assert.strictEqual(ignoredReviewerSet(null, ["extra1"]), null);
+});
+
+test("ignoredReviewersToRemove matches case-insensitively and keeps PR spelling", () => {
+  const ignored = ignoredReviewerSet(["defaultreviewer"], []);
+  assert.deepStrictEqual(
+    ignoredReviewersToRemove(["DefaultReviewer", "owner1", null], ignored),
+    ["DefaultReviewer"]);
+  assert.deepStrictEqual(ignoredReviewersToRemove(undefined, ignored), []);
+});
+
+test("an auto-requested default reviewer does not block requesting the shepherd", () => {
+  const ignoredReviewers = ignoredReviewerSet(new Set(["DefaultReviewer"]), []);
+  const blocked = select([], ["owner1"], { existingReviewers: ["DefaultReviewer"] });
+  assert.strictEqual(blocked.autoRequestedReviewer, null);
+  const { assignee, autoRequestedReviewer } = select([], ["owner1"], {
+    existingReviewers: ["DefaultReviewer"], ignoredReviewers,
+  });
+  assert.strictEqual(assignee, "owner1");
+  assert.strictEqual(autoRequestedReviewer, "owner1");
+});
+
+test("pickFallbackAssignee prefers maintainer, then default reviewer, then login", () => {
+  assert.strictEqual(
+    pickFallbackAssignee(new Set(["maint2", "maint1"]), new Set(["rev1"]), "fb"), "maint1");
+  assert.strictEqual(
+    pickFallbackAssignee(new Set(), new Set(["rev2", "rev1"]), "fb"), "rev1");
+  assert.strictEqual(pickFallbackAssignee(new Set(), new Set(), "fb"), "fb");
+  assert.strictEqual(pickFallbackAssignee(new Set(), new Set(), ""), "");
+  assert.strictEqual(pickFallbackAssignee(null, undefined, undefined), "");
 });
 
 (async () => {

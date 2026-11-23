@@ -1,8 +1,8 @@
-//TEST:SIMPLE(filecheck=CHK):-target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHK_NEG):-target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=SPV):-target spirv -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHK,exit-code=2):-target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHK_NEG,exit-code=2):-target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=HLSL,exit-code=2):-target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=GLSL,exit-code=2):-target glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=SPV,exit-code=2):-target spirv -stage compute -entry computeMain
 
 // TODO: requires changes in parser
 //static_assert(true, "PASS_global");

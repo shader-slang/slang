@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#two-stage-parsing
-//META: doc_section_digest=ddfe5f62e9b1084664029d4e0b1a2903b23b23769c16d58583a7289396a20747
+//META: doc_section_digest=9e6cdcd331c77e6ace71db8f4327394855e85e18930b373da3d6bbea094c0c09
 //META: purpose=Body-parse-time checker knowledge decides `<`: the same token shape reads as a generic application when the base names a generic and as a comparison when the base is an ordinary local.
 //META: intent=functional
 //META: pipeline_stage=parse

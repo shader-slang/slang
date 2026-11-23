@@ -40,7 +40,7 @@ static void writeArrayHeader(ReplayStream& stream, uint64_t count)
     writeUInt64Payload(stream, count);
 }
 
-SLANG_UNIT_TEST(replayStreamRejectsNullDataWithNonzeroSize)
+SLANG_UNIT_TEST(replayStreamRejectsNullDataWithNonzeroSize, NoRenderApi)
 {
 #if SLANG_HAS_EXCEPTIONS
     ScopedEnvVar assertMode("SLANG_ASSERT", "release-assert-only");
@@ -60,7 +60,7 @@ SLANG_UNIT_TEST(replayStreamRejectsNullDataWithNonzeroSize)
 #endif
 }
 
-SLANG_UNIT_TEST(replayStreamRejectsWritePositionOverflow)
+SLANG_UNIT_TEST(replayStreamRejectsWritePositionOverflow, NoRenderApi)
 {
 #if SLANG_HAS_EXCEPTIONS
     ReplayStream stream;
@@ -82,7 +82,7 @@ SLANG_UNIT_TEST(replayStreamRejectsWritePositionOverflow)
 #endif
 }
 
-SLANG_UNIT_TEST(replayStreamRejectsWritePastListIndexLimit)
+SLANG_UNIT_TEST(replayStreamRejectsWritePastListIndexLimit, NoRenderApi)
 {
 #if SLANG_HAS_EXCEPTIONS
     ReplayStream stream;
@@ -104,7 +104,7 @@ SLANG_UNIT_TEST(replayStreamRejectsWritePastListIndexLimit)
 #endif
 }
 
-SLANG_UNIT_TEST(replayStreamRejectsNullWriteWithNonzeroSize)
+SLANG_UNIT_TEST(replayStreamRejectsNullWriteWithNonzeroSize, NoRenderApi)
 {
 #if SLANG_HAS_EXCEPTIONS
     ScopedEnvVar assertMode("SLANG_ASSERT", "release-assert-only");
@@ -125,7 +125,7 @@ SLANG_UNIT_TEST(replayStreamRejectsNullWriteWithNonzeroSize)
 #endif
 }
 
-SLANG_UNIT_TEST(replayStreamRejectsReadSizeOverflow)
+SLANG_UNIT_TEST(replayStreamRejectsReadSizeOverflow, NoRenderApi)
 {
 #if SLANG_HAS_EXCEPTIONS
     uint8_t value = 0;
@@ -147,7 +147,7 @@ SLANG_UNIT_TEST(replayStreamRejectsReadSizeOverflow)
 #endif
 }
 
-SLANG_UNIT_TEST(replayStreamRejectsNullReadWithNonzeroSize)
+SLANG_UNIT_TEST(replayStreamRejectsNullReadWithNonzeroSize, NoRenderApi)
 {
 #if SLANG_HAS_EXCEPTIONS
     ScopedEnvVar assertMode("SLANG_ASSERT", "release-assert-only");
@@ -170,7 +170,7 @@ SLANG_UNIT_TEST(replayStreamRejectsNullReadWithNonzeroSize)
 #endif
 }
 
-SLANG_UNIT_TEST(replayStreamMoveAssignmentReplacesExistingBuffer)
+SLANG_UNIT_TEST(replayStreamMoveAssignmentReplacesExistingBuffer, NoRenderApi)
 {
     uint32_t oldValue = 1;
     ReplayStream target;
@@ -190,7 +190,7 @@ SLANG_UNIT_TEST(replayStreamMoveAssignmentReplacesExistingBuffer)
     SLANG_CHECK(target.atEnd());
 }
 
-SLANG_UNIT_TEST(replayStreamMirrorWriteUsesStreamOffset)
+SLANG_UNIT_TEST(replayStreamMirrorWriteUsesStreamOffset, NoRenderApi)
 {
     String mirrorPath;
     SLANG_CHECK(SLANG_SUCCEEDED(
@@ -223,7 +223,7 @@ SLANG_UNIT_TEST(replayStreamMirrorWriteUsesStreamOffset)
     File::remove(mirrorPath);
 }
 
-SLANG_UNIT_TEST(replayStreamDecoderRejectsHugeArrayCount)
+SLANG_UNIT_TEST(replayStreamDecoderRejectsHugeArrayCount, NoRenderApi)
 {
     // Pin the 1,000,000-element cap at the boundary: count = cap + 1 trips the
     // first guard in validateReplayDecodeArrayElementCount with the cap-specific
@@ -239,7 +239,7 @@ SLANG_UNIT_TEST(replayStreamDecoderRejectsHugeArrayCount)
     SLANG_CHECK(containsString(decoded, "Array element count exceeds decoder limit"));
 }
 
-SLANG_UNIT_TEST(replayStreamDecoderBoundsSkippedArrayDepth)
+SLANG_UNIT_TEST(replayStreamDecoderBoundsSkippedArrayDepth, NoRenderApi)
 {
     // Pin the 64-depth boundary on the skip path. The outer Array[101] places
     // skipValueInStream calls at depth=1 (since decodeValueFromStream starts at
@@ -264,7 +264,7 @@ SLANG_UNIT_TEST(replayStreamDecoderBoundsSkippedArrayDepth)
     SLANG_CHECK(containsString(decoded, "Maximum replay decode nesting depth exceeded"));
 }
 
-SLANG_UNIT_TEST(replayStreamDecoderBoundsDecodedArrayDepth)
+SLANG_UNIT_TEST(replayStreamDecoderBoundsDecodedArrayDepth, NoRenderApi)
 {
     // Pin the 64-depth boundary on the decode path. decodeValueFromStream
     // starts at depth=0, so 65 nested Array[1] headers produce a call at
@@ -282,7 +282,7 @@ SLANG_UNIT_TEST(replayStreamDecoderBoundsDecodedArrayDepth)
     SLANG_CHECK(containsString(decoded, "Maximum replay decode nesting depth exceeded"));
 }
 
-SLANG_UNIT_TEST(replayStreamDecoderAcceptsArraysAtMaxDepth)
+SLANG_UNIT_TEST(replayStreamDecoderAcceptsArraysAtMaxDepth, NoRenderApi)
 {
     // Companion to the boundary test above: 64 nested Array[1] headers reach
     // exactly depth=64 (`recursionDepth > 64` is false). The decode must
@@ -300,7 +300,7 @@ SLANG_UNIT_TEST(replayStreamDecoderAcceptsArraysAtMaxDepth)
     SLANG_CHECK(!containsString(decoded, "ERROR:"));
 }
 
-SLANG_UNIT_TEST(replayStreamDecoderRejectsArrayLargerThanStream)
+SLANG_UNIT_TEST(replayStreamDecoderRejectsArrayLargerThanStream, NoRenderApi)
 {
     // Count fits under the 1M element cap but exceeds the bytes remaining in the
     // stream, so validateReplayDecodeArrayElementCount must reach the
@@ -316,7 +316,7 @@ SLANG_UNIT_TEST(replayStreamDecoderRejectsArrayLargerThanStream)
     SLANG_CHECK(containsString(decoded, "exceeds remaining stream bytes"));
 }
 
-SLANG_UNIT_TEST(replayStreamDecoderRejectsInvalidArrayCountType)
+SLANG_UNIT_TEST(replayStreamDecoderRejectsInvalidArrayCountType, NoRenderApi)
 {
     // The pre-PR code blindly skipped the count's TypeId byte. The new
     // readReplayDecodeArrayElementCount rejects anything other than UInt64;
@@ -332,7 +332,7 @@ SLANG_UNIT_TEST(replayStreamDecoderRejectsInvalidArrayCountType)
     SLANG_CHECK(containsString(decoded, "Array element count has invalid type"));
 }
 
-SLANG_UNIT_TEST(replayStreamDecoderRejectsHugeArrayCountOnSkipPath)
+SLANG_UNIT_TEST(replayStreamDecoderRejectsHugeArrayCountOnSkipPath, NoRenderApi)
 {
     // The decode-path cap test puts the oversized Array[1000001] at top level,
     // which is decode (not skip). Mirror the depth-on-skip-path pattern: outer
@@ -352,7 +352,7 @@ SLANG_UNIT_TEST(replayStreamDecoderRejectsHugeArrayCountOnSkipPath)
     SLANG_CHECK(containsString(decoded, "Array element count exceeds decoder limit"));
 }
 
-SLANG_UNIT_TEST(replayStreamDecoderDecodesValidArray)
+SLANG_UNIT_TEST(replayStreamDecoderDecodesValidArray, NoRenderApi)
 {
     // Happy path: a valid Array of three UInt32 elements must decode cleanly,
     // with the element values visible in the output and no error string. This

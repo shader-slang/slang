@@ -14,7 +14,7 @@ using namespace Slang;
 // Test the compilation API for compiling an entrypoint that uses `Conditional<T>` to
 // represent conditional vertex attribute input that can be specialized away.
 
-SLANG_UNIT_TEST(conditionalVertexInput)
+SLANG_UNIT_TEST(conditionalVertexInput, NoRenderApi)
 {
     const char* userSourceBody = R"(
             struct Vertex<bool hasColor> {

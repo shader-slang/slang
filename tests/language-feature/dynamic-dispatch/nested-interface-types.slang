@@ -1,23 +1,23 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
-interface IBar 
+interface IBar
 {
     float get();
 }
 
-struct Bar : IBar 
+struct Bar : IBar
 {
     float get() {
         return 2;
     }
 };
 
-interface IFoo 
+interface IFoo
 {
     property IBar b;
 }
 
-struct Foo : IFoo 
+struct Foo : IFoo
 {
     IBar b;
 };

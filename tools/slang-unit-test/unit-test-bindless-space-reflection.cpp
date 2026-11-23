@@ -241,7 +241,7 @@ static void _checkBindlessSpaceReflection(
         checkBindlessSpaceLayout();
 }
 
-SLANG_UNIT_TEST(bindlessSpaceReflection)
+SLANG_UNIT_TEST(bindlessSpaceReflection, NoRenderApi)
 {
     const char* userSource = R"(
         RWStructuredBuffer<float> gInput;
@@ -270,7 +270,7 @@ SLANG_UNIT_TEST(bindlessSpaceReflection)
     _checkBindlessSpaceReflection(userSource, _expectReservedBindlessSpaceAt(2), true);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataAtSpaceZero)
+SLANG_UNIT_TEST(bindlessSpaceMetadataAtSpaceZero, NoRenderApi)
 {
     const char* userSource = R"(
         [[vk::binding(0, 1)]]
@@ -305,7 +305,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataAtSpaceZero)
         1);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataWithUnboundedResourceArray)
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithUnboundedResourceArray, NoRenderApi)
 {
     const char* userSource = R"(
         Texture2D<float4> gTextures[];
@@ -322,7 +322,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithUnboundedResourceArray)
     _checkBindlessSpaceReflection(userSource, _expectAnyReservedBindlessSpace(), false);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataWithUnboundedResourceArrayInRequestedSpace)
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithUnboundedResourceArrayInRequestedSpace, NoRenderApi)
 {
     const char* userSource = R"(
         Texture2D<float4> gTextures[] : register(t0, space0);
@@ -355,7 +355,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithUnboundedResourceArrayInRequestedSpace)
         true);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandle)
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandle, NoRenderApi)
 {
     // Reflection still reserves a stable bindless space for descriptor-handle-capable
     // targets, but post-emit metadata reports that no bindless heap path survived.
@@ -365,7 +365,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandle)
         false);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandleBeforeExplicitLayout)
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandleBeforeExplicitLayout, NoRenderApi)
 {
     _checkBindlessSpaceReflection(
         _getNoDescriptorHandleSource(),
@@ -379,7 +379,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandleBeforeExplicitLayout
         true);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataWithDeadDescriptorHandle)
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithDeadDescriptorHandle, NoRenderApi)
 {
     // The source declares a DescriptorHandle in a parameter block, so layout reserves bindless
     // space, but the entry point never uses it and metadata should report no heap use.
@@ -389,7 +389,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithDeadDescriptorHandle)
         false);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutReservedSpace)
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutReservedSpace, NoRenderApi)
 {
     _checkBindlessSpaceReflection(
         _getNoDescriptorHandleSource(),
@@ -403,7 +403,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutReservedSpace)
         true);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataWithDescriptorHandleBeforeExplicitLayout)
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithDescriptorHandleBeforeExplicitLayout, NoRenderApi)
 {
     _checkBindlessSpaceReflection(
         _getTextureHandleSource(),
@@ -417,7 +417,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithDescriptorHandleBeforeExplicitLayout)
         true);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataWithStrippedNameHints)
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithStrippedNameHints, NoRenderApi)
 {
     const char* userSource = R"(
         RWStructuredBuffer<float> gInput;
@@ -452,7 +452,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithStrippedNameHints)
         1);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataWithTexelPointerHeap)
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithTexelPointerHeap, NoRenderApi)
 {
     // Use format id 37 (`r32ui`) so the SPIR-V texel-pointer path validates.
     const char* userSource = R"(
@@ -478,7 +478,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithTexelPointerHeap)
     _checkBindlessSpaceReflection(userSource, _expectReservedBindlessSpaceAt(2), true);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataWithHelperFunctionHandleUse)
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithHelperFunctionHandleUse, NoRenderApi)
 {
     const char* userSource = R"(
         RWStructuredBuffer<float> gOutput;
@@ -506,7 +506,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithHelperFunctionHandleUse)
     _checkBindlessSpaceReflection(userSource, _expectReservedBindlessSpaceAt(2), true);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataHLSLResourceHandle)
+SLANG_UNIT_TEST(bindlessSpaceMetadataHLSLResourceHandle, NoRenderApi)
 {
     _checkBindlessSpaceReflection(
         _getTextureHandleSource(),
@@ -518,7 +518,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataHLSLResourceHandle)
         "sm_6_6");
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataHLSLSamplerHandle)
+SLANG_UNIT_TEST(bindlessSpaceMetadataHLSLSamplerHandle, NoRenderApi)
 {
     _checkBindlessSpaceReflection(
         _getSamplerHandleSource(),
@@ -530,7 +530,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataHLSLSamplerHandle)
         "sm_6_6");
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVDescriptorHeapResourceAndSamplerHandles)
+SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVDescriptorHeapResourceAndSamplerHandles, NoRenderApi)
 {
     _checkBindlessSpaceReflection(
         _getTextureSamplerHandleSource(),
@@ -543,7 +543,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVDescriptorHeapResourceAndSamplerHandle
         "spvDescriptorHeapEXT");
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVDescriptorHeapResourceHandle)
+SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVDescriptorHeapResourceHandle, NoRenderApi)
 {
     _checkBindlessSpaceReflection(
         _getTextureHandleSource(),
@@ -556,7 +556,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVDescriptorHeapResourceHandle)
         "spvDescriptorHeapEXT");
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVDescriptorHeapSamplerHandle)
+SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVDescriptorHeapSamplerHandle, NoRenderApi)
 {
     _checkBindlessSpaceReflection(
         _getSamplerHandleSource(),
@@ -569,7 +569,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVDescriptorHeapSamplerHandle)
         "spvDescriptorHeapEXT");
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVNVResourceHandle)
+SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVNVResourceHandle, NoRenderApi)
 {
     _checkBindlessSpaceReflection(
         _getTextureHandleSource(),
@@ -582,7 +582,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVNVResourceHandle)
         "spvBindlessTextureNV");
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataWGSLDynamicResourceHeap)
+SLANG_UNIT_TEST(bindlessSpaceMetadataWGSLDynamicResourceHeap, NoRenderApi)
 {
     _checkBindlessSpaceReflection(
         _getTextureHandleSource(),
@@ -594,7 +594,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWGSLDynamicResourceHeap)
         nullptr);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataNativeHandleCasts)
+SLANG_UNIT_TEST(bindlessSpaceMetadataNativeHandleCasts, NoRenderApi)
 {
     _checkBindlessSpaceReflection(
         _getTextureHandleSource(),

@@ -1,9 +1,8 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 //TEST(compute):SIMPLE(filecheck=GLSL): -stage compute -entry computeMain -target glsl
 
 // Note: spirv_by_reference is only supported for passing opaque types, so this test won't produce
 // expected result on vulkan.
-//DISABLED_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
 [__NonCopyableType]
 struct MyType

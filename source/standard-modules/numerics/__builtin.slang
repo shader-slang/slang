@@ -134,6 +134,45 @@ public bool __numericsBuiltinAll<let R : int, let C : int, let L : MatrixLayoutM
     return true;
 }
 
+// These adapters call the core `select` overloads without exposing the public numeric wrapper to
+// lookup. The scalar and vector overloads use the corresponding native selection operations.
+[__readNone]
+[__unsafeForceInlineEarly]
+public T __numericsBuiltinSelect<T>(bool condition, T ifTrue, T ifFalse)
+{
+    return ::select(condition, ifTrue, ifFalse);
+}
+
+[__readNone]
+[__unsafeForceInlineEarly]
+public vector<T, N> __numericsBuiltinSelect<T : __BuiltinArithmeticType, let N : int>(
+    vector<bool, N> condition,
+    vector<T, N> ifTrue,
+    vector<T, N> ifFalse)
+{
+    return ::select(condition, ifTrue, ifFalse);
+}
+
+[__readNone]
+[__unsafeForceInlineEarly]
+public matrix<T, R, C, L> __numericsBuiltinSelect<
+    T : __BuiltinArithmeticType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(
+    matrix<bool, R, C, L> condition,
+    matrix<T, R, C, L> ifTrue,
+    matrix<T, R, C, L> ifFalse)
+{
+    // The core matrix overload has no layout parameter. We select logical rows so the result
+    // retains `L`, including when the caller uses an explicit non-default matrix layout.
+    matrix<T, R, C, L> result;
+    [ForceUnroll]
+    for (int row = 0; row < R; ++row)
+        result[row] = __numericsBuiltinSelect(condition[row], ifTrue[row], ifFalse[row]);
+    return result;
+}
+
 #define SLANG_NUMERICS_SCALAR_COMPARISON_ADAPTER(NAME, OP)                            \
     [__readNone] [__unsafeForceInlineEarly]                                     \
     public bool NAME<T : __BuiltinArithmeticType>(T left, T right)              \
@@ -420,6 +459,44 @@ public vector<T, N> __numericInterfaceBuiltinSplitFraction<
     let N : int>(vector<T, N> value, out vector<T, N> integralPart)
 {
     return ::modf(value, integralPart);
+}
+
+/// Returns the fraction from core `modf` and writes the whole part as `int`.
+[__readNone]
+[__unsafeForceInlineEarly]
+public T __numericInterfaceBuiltinSplitFractionWithIntegerPart<T : __BuiltinFloatingPointType>(
+    T value,
+    out int integralPart)
+{
+    return ::modf(value, integralPart);
+}
+
+/// Splits each vector component using the core integer-output `modf` overload.
+[__readNone]
+[__unsafeForceInlineEarly]
+public vector<T, N> __numericInterfaceBuiltinSplitFractionWithIntegerPart<
+    T : __BuiltinFloatingPointType,
+    let N : int>(vector<T, N> value, out vector<int, N> integralPart)
+{
+    return ::modf(value, integralPart);
+}
+
+/// Splits each matrix element, preserving the input layout in both outputs.
+[__readNone]
+[__unsafeForceInlineEarly]
+public matrix<T, R, C, L> __numericInterfaceBuiltinSplitFractionWithIntegerPart<
+    T : __BuiltinFloatingPointType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(matrix<T, R, C, L> value, out matrix<int, R, C, L> integralPart)
+{
+    // The core matrix overload returns a default-layout matrix. We split rows instead so
+    // the returned fractions and integer output both preserve the caller's layout `L`.
+    matrix<T, R, C, L> fractionalPart;
+    [ForceUnroll]
+    for (int row = 0; row < R; ++row)
+        fractionalPart[row] = ::modf(value[row], integralPart[row]);
+    return fractionalPart;
 }
 
 [__readNone]

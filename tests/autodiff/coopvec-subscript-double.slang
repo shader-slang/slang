@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=glsl+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 // Use the CPU target for runtime coverage that the floating-point derivative extensions also
 // specialize correctly for double.

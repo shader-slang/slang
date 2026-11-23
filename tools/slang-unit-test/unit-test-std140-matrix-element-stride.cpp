@@ -29,7 +29,7 @@ slang::VariableLayoutReflection* findParameterByName(
 }
 } // namespace
 
-SLANG_UNIT_TEST(std140Float3x3MatrixElementStrideReflection)
+SLANG_UNIT_TEST(std140Float3x3MatrixElementStrideReflection, NoRenderApi)
 {
     const char* source = R"(
         cbuffer Uniforms

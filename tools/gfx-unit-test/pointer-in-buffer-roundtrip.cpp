@@ -98,12 +98,12 @@ void pointerInBufferRoundtripTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, outputBuffer, std::array{42});
 }
 
-SLANG_UNIT_TEST(pointerInBufferRoundtripVulkan)
+SLANG_UNIT_TEST(pointerInBufferRoundtripVulkan, Vulkan)
 {
     runTestImpl(pointerInBufferRoundtripTestImpl, unitTestContext, DeviceType::Vulkan);
 }
 
-SLANG_UNIT_TEST(pointerInBufferRoundtripMetal)
+SLANG_UNIT_TEST(pointerInBufferRoundtripMetal, Metal)
 {
     runTestImpl(pointerInBufferRoundtripTestImpl, unitTestContext, DeviceType::Metal);
 }

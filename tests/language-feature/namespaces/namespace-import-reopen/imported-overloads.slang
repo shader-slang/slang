@@ -5,7 +5,7 @@
 // call to an imported overload from any body, a nested namespace or a qualified reopen
 // therefore resolves to one overload by argument type and is not reported as ambiguous.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 import reopen_lib;
 

@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 error[E55216]: function-typed value is not supported on this target
   --> tests/diagnostics/func-type-unsupported-result-code.slang:18:29

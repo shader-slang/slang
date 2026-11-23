@@ -35,7 +35,7 @@ struct OutputData
 RWStructuredBuffer<OutputData> outputBuffer;
 
 // CHECK_SPIRV: OpCapability GroupNonUniformPartitioned
-// CHECK_SPIRV: OpExtension "SPV_NV_shader_subgroup_partitioned"
+// CHECK_SPIRV: OpExtension "SPV_EXT_shader_subgroup_partitioned"
 // CHECK_SPIRV: OpGroupNonUniformIAdd{{.*}}PartitionedExclusiveScan
 // CHECK_SPIRV: OpGroupNonUniformIMul{{.*}}PartitionedExclusiveScan
 // CHECK_SPIRV: OpGroupNonUniformBitwiseAnd{{.*}}PartitionedExclusiveScan

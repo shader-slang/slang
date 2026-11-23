@@ -10,10 +10,10 @@
 
 #include "compiler-core/slang-target-builtin-type-layout-info.h"
 #include "core/slang-string.h"
-#include "slang-ast-base.h"
 #include "slang-compiler-fwd.h"
 #include "slang-compiler-options.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
+#include "slang/ast/slang-ast-base.h"
 
 #include <mutex>
 #include <slang.h>

@@ -1,7 +1,5 @@
 // logical-operators-constant-fold.slang
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK):
 
 // Test that logical operators (!, &&, ||) are correctly constant-folded.
 // This test verifies fixes for bugs where !false was folded to false (should be true)

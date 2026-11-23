@@ -148,7 +148,7 @@ static void checkAllApisRejectIndex(slang::IComponentType* linked, SlangInt entr
     }
 }
 
-SLANG_UNIT_TEST(entryPointIndexOutOfRange)
+SLANG_UNIT_TEST(entryPointIndexOutOfRange, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);

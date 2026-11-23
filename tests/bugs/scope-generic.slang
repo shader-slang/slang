@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 struct Test1
 {
@@ -24,7 +24,7 @@ extension Test2
 
     static uint num()
     {
-        return A<2>::num(); 
+        return A<2>::num();
     }
 
     typealias B = A<2>;
@@ -38,9 +38,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     outputBuffer[0] = Test1::num();
     outputBuffer[1] = Test1::B::num();
-    outputBuffer[2] = Test1::A<2>::num(); 
+    outputBuffer[2] = Test1::A<2>::num();
 
-    outputBuffer[3] = Test2::num(); 
+    outputBuffer[3] = Test2::num();
     outputBuffer[4] = Test2::B::num();
-    outputBuffer[5] = Test2::A<2>::num(); 
+    outputBuffer[5] = Test2::A<2>::num();
 }

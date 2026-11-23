@@ -1,5 +1,5 @@
 // gl-33.slang
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test for GitLab issue # 33
 

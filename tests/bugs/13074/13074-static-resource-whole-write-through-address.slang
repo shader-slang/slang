@@ -3,7 +3,7 @@
 // initialization and redirect it to the generated replacement local.
 
 //TEST:SIMPLE: -target cpp -entry computeMain -stage compute -o 13074-static-resource-whole-write-through-address.cpp
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -entry computeMain -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK): -entry computeMain -output-using-type
 
 // CHECK: type: float
 // CHECK-NEXT: {{^}}1.000000{{$}}

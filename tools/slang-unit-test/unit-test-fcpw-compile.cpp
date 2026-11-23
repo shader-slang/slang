@@ -15,7 +15,7 @@ using namespace Slang;
 // Rohan Sawhney, shader code in MIT license.
 // https://github.com/rohan-sawhney/fcpw
 //
-SLANG_UNIT_TEST(fcpwCompile)
+SLANG_UNIT_TEST(fcpwCompile, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(

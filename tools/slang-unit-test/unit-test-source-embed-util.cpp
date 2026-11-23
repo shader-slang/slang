@@ -42,7 +42,7 @@ ArtifactDesc makeDesc(ArtifactKind k, ArtifactPayload p)
 
 // Style catalog must include all enum cases listed in the header so a
 // caller iterating to render help text covers every embed style.
-SLANG_UNIT_TEST(sourceEmbedUtilGetStyleInfosCoversEnum)
+SLANG_UNIT_TEST(sourceEmbedUtilGetStyleInfosCoversEnum, NoRenderApi)
 {
     auto styles = SourceEmbedUtil::getStyleInfos();
     SLANG_CHECK_ABORT(styles.getCount() > 0);
@@ -63,7 +63,7 @@ SLANG_UNIT_TEST(sourceEmbedUtilGetStyleInfosCoversEnum)
 // must be rejected — getPath returns empty, createEmbedded returns
 // E_NOT_IMPLEMENTED. Callers rely on this to skip the embed step
 // when the user picked a non-C target.
-SLANG_UNIT_TEST(sourceEmbedUtilSupportedLanguages)
+SLANG_UNIT_TEST(sourceEmbedUtilSupportedLanguages, NoRenderApi)
 {
     SLANG_CHECK(SourceEmbedUtil::isSupported(SLANG_SOURCE_LANGUAGE_C));
     SLANG_CHECK(SourceEmbedUtil::isSupported(SLANG_SOURCE_LANGUAGE_CPP));
@@ -76,7 +76,7 @@ SLANG_UNIT_TEST(sourceEmbedUtilSupportedLanguages)
 // getPath: if the input path already has a recognized header
 // extension, it's returned verbatim (no double-extension like
 // foo.h.h).
-SLANG_UNIT_TEST(sourceEmbedUtilGetPathPreservesHeaderExt)
+SLANG_UNIT_TEST(sourceEmbedUtilGetPathPreservesHeaderExt, NoRenderApi)
 {
     SourceEmbedUtil::Options opts;
     opts.language = SLANG_SOURCE_LANGUAGE_C;
@@ -90,7 +90,7 @@ SLANG_UNIT_TEST(sourceEmbedUtilGetPathPreservesHeaderExt)
 
 // getPath: non-header input (.spv, .slang, .cpp) gets a `.h`
 // appended. The full input path is preserved as the prefix.
-SLANG_UNIT_TEST(sourceEmbedUtilGetPathAppendsDotH)
+SLANG_UNIT_TEST(sourceEmbedUtilGetPathAppendsDotH, NoRenderApi)
 {
     SourceEmbedUtil::Options opts;
     opts.language = SLANG_SOURCE_LANGUAGE_C;
@@ -103,7 +103,7 @@ SLANG_UNIT_TEST(sourceEmbedUtilGetPathAppendsDotH)
 // getPath: empty input → empty output (callers use this to detect
 // "no path supplied"). Unsupported language → empty regardless of
 // input.
-SLANG_UNIT_TEST(sourceEmbedUtilGetPathEdgeCases)
+SLANG_UNIT_TEST(sourceEmbedUtilGetPathEdgeCases, NoRenderApi)
 {
     SourceEmbedUtil::Options opts;
     opts.language = SLANG_SOURCE_LANGUAGE_C;
@@ -118,7 +118,7 @@ SLANG_UNIT_TEST(sourceEmbedUtilGetPathEdgeCases)
 // Text artifacts (HLSL / GLSL / WGSL source) embed as text by
 // default — preserves human readability when the consumer opens
 // the generated .h.
-SLANG_UNIT_TEST(sourceEmbedUtilDefaultStyleForTextIsText)
+SLANG_UNIT_TEST(sourceEmbedUtilDefaultStyleForTextIsText, NoRenderApi)
 {
     SLANG_CHECK(
         SourceEmbedUtil::getDefaultStyle(makeDesc(ArtifactKind::Source, ArtifactPayload::HLSL)) ==
@@ -135,7 +135,7 @@ SLANG_UNIT_TEST(sourceEmbedUtilDefaultStyleForTextIsText)
 // of 32-bit words; emitting bytes would force consumers to
 // re-pack. This is the contract slangc relies on for `-embed-source
 // -target spirv`.
-SLANG_UNIT_TEST(sourceEmbedUtilDefaultStyleForSpirvIsU32)
+SLANG_UNIT_TEST(sourceEmbedUtilDefaultStyleForSpirvIsU32, NoRenderApi)
 {
     auto spirvBin = makeDesc(ArtifactKind::Executable, ArtifactPayload::SPIRV);
     SLANG_CHECK(SourceEmbedUtil::getDefaultStyle(spirvBin) == SourceEmbedUtil::Style::U32);
@@ -144,7 +144,7 @@ SLANG_UNIT_TEST(sourceEmbedUtilDefaultStyleForSpirvIsU32)
 // Options defaults must remain stable: `slangc -embed-source` with
 // no other flags relies on these. A change here is observable to
 // any caller that constructs a default-initialized Options.
-SLANG_UNIT_TEST(sourceEmbedUtilOptionsDefaults)
+SLANG_UNIT_TEST(sourceEmbedUtilOptionsDefaults, NoRenderApi)
 {
     SourceEmbedUtil::Options opts;
     SLANG_CHECK(opts.style == SourceEmbedUtil::Style::Default);

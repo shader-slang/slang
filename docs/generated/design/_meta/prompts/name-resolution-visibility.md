@@ -24,14 +24,14 @@ rule-based rather than pipeline-shaped.
 The `## Concepts` section must cover, at minimum:
 
 - The `VisibilityModifier` family declared in
-  [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h):
+  [slang-ast-modifier.h](../../../../source/slang/ast/slang-ast-modifier.h):
   `PublicModifier`, `PrivateModifier`, `InternalModifier`, and any
   other concrete subclass present at `source_commit`. Cite the
   declaration site for each.
 - The `DeclVisibility` enum (or equivalent) used internally if present
   in `slang-ast-modifier.h` or `slang-ast-support-types.h`.
 - `ModuleDecl::defaultVisibility` (cite the field in
-  [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h)).
+  [slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h)).
 - The `IgnoreForLookupModifier` (if present at `source_commit`) and
   its role in hiding a decl from lookup entirely.
 
@@ -43,8 +43,8 @@ The `## Rules` section must cover, in this order:
    - `internal`: visible only inside the declaring module.
    - `private`: visible only inside the declaring container.
    Cite the visibility-classification helper in
-   [slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp)
-   or [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+   [slang-check-modifier.cpp](../../../../source/slang/semantic-checking/slang-check-modifier.cpp)
+   or [slang-check-decl.cpp](../../../../source/slang/semantic-checking/slang-check-decl.cpp)
    that maps a `VisibilityModifier` to the internal enum.
 2. **Defaults by language version.** Cite
    `SlangLanguageVersion` (or its actual identifier at `source_commit`)
@@ -58,7 +58,7 @@ The `## Rules` section must cover, in this order:
      considered.
    - Overload resolution, via the `TryCheckOverloadCandidateVisibility`
      step in
-     [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp).
+     [slang-check-overload.cpp](../../../../source/slang/semantic-checking/slang-check-overload.cpp).
    Cite `isDeclVisibleFromScope` (or the actual helper at
    `source_commit`) declared / defined in
    `slang-check-decl.cpp` or `slang-check-modifier.cpp`.
@@ -73,7 +73,7 @@ The `## Rules` section must cover, in this order:
    generic parameters; visibility of synthesized accessors, default
    conformance impls, and other compiler-generated decls. Cite the
    synthesis site in
-   [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp).
+   [slang-check-decl.cpp](../../../../source/slang/semantic-checking/slang-check-decl.cpp).
 
 Include a small mermaid flowchart showing how visibility filtering
 interacts with lookup:
@@ -113,7 +113,7 @@ The `## Edge cases and failure modes` section must cover:
 ## Quality checklist (in addition to the universal one and the family contract)
 
 - [ ] Every named visibility modifier exists in
-      [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h)
+      [slang-ast-modifier.h](../../../../source/slang/ast/slang-ast-modifier.h)
       at `source_commit`.
 - [ ] The default-visibility-by-language-version rule cites the
       actual assignment site.

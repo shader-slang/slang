@@ -32,7 +32,7 @@ static bool argsEqual(const List<String>& actual, std::initializer_list<const ch
 }
 
 // Multiple `DownstreamArgs` entries for the same tool are concatenated in insertion order.
-SLANG_UNIT_TEST(downstreamArgsForSameToolAreConcatenated)
+SLANG_UNIT_TEST(downstreamArgsForSameToolAreConcatenated, NoRenderApi)
 {
     CompilerOptionSet options;
     addDownstreamArgs(options, "nvrtc", "--first");
@@ -47,7 +47,7 @@ SLANG_UNIT_TEST(downstreamArgsForSameToolAreConcatenated)
 
 // `overrideWith` adds the other set's entries after the current ones, without matching or
 // dropping any of them, so arguments given one token per entry survive exactly as given.
-SLANG_UNIT_TEST(downstreamArgsOverrideWithAppends)
+SLANG_UNIT_TEST(downstreamArgsOverrideWithAppends, NoRenderApi)
 {
     CompilerOptionSet target;
     addDownstreamArgs(target, "nvrtc", "-D");
@@ -64,7 +64,7 @@ SLANG_UNIT_TEST(downstreamArgsOverrideWithAppends)
 }
 
 // Merging a set into itself appends a copy of its own entries, including when the list has to grow.
-SLANG_UNIT_TEST(downstreamArgsSelfOverrideWithDoublesTheList)
+SLANG_UNIT_TEST(downstreamArgsSelfOverrideWithDoublesTheList, NoRenderApi)
 {
     const Index kEntryCount = 20;
     CompilerOptionSet options;
@@ -84,7 +84,7 @@ SLANG_UNIT_TEST(downstreamArgsSelfOverrideWithDoublesTheList)
 
 // `inheritFrom` and `copyWithoutLevelLocalOptions` never carry `DownstreamArgs` from one level to
 // another, while other options are still inherited and copied.
-SLANG_UNIT_TEST(downstreamArgsAreNotInheritedOrCopied)
+SLANG_UNIT_TEST(downstreamArgsAreNotInheritedOrCopied, NoRenderApi)
 {
     CompilerOptionSet session;
     addDownstreamArgs(session, "nvrtc", "--gpu-architecture=compute_86");

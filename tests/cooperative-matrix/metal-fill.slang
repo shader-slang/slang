@@ -1,4 +1,4 @@
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 // CHECK: type: float
 // CHECK-COUNT-64: 10.0

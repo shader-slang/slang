@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 public struct ContextND<let N: int>
 {

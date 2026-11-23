@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 // Test that a generic interface method in a generic interface
 // can have a body providing default implementation.
@@ -18,7 +18,7 @@ struct Impl : IFoo<2>
     {
         return 42;
     }
-    
+
     // Using the default implementation for getGreaterVal.
 }
 
@@ -28,7 +28,7 @@ struct Impl2 : IFoo<2>
     {
         return 42;
     }
-    
+
     // overriding default implementation.
     override int getGreaterVal<int x>()
     {

@@ -13,7 +13,7 @@ using namespace Slang;
 
 // Test the compilation API for adding type conformances.
 
-SLANG_UNIT_TEST(typeConformance)
+SLANG_UNIT_TEST(typeConformance, NoRenderApi)
 {
     const char* userSourceBody = R"(
         struct SurfaceInteraction {

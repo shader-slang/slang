@@ -1,8 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
-struct MyStruct: IDifferentiable 
+struct MyStruct: IDifferentiable
 {
     float a;
     int b;
@@ -23,4 +21,4 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 
         outputBuffer[1] = dp2.d.a;
     }
-} 
+}

@@ -213,7 +213,7 @@ static bool _isEqual(RIFF::DataChunkBuilder* chunk, void const* data, Size size)
     return remainingSize == 0;
 }
 
-SLANG_UNIT_TEST(riff)
+SLANG_UNIT_TEST(riff, NoRenderApi)
 {
     const FourCC markThings = SLANG_FOUR_CC('T', 'H', 'I', 'N');
     const FourCC markData = SLANG_FOUR_CC('D', 'A', 'T', 'A');

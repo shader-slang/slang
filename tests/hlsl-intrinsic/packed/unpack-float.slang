@@ -1,11 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -emit-spirv-via-glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -profile cs_6_6 -dx12 -shaderobj -render-feature hardware-device
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -g0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-llvm -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+metal+cpu+wgpu+llvm, filecheck-buffer=BUF):
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=BUF):-profile cs_6_6 -render-feature hardware-device
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUF):-g0
 
 import glsl;
 

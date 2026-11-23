@@ -1,0 +1,775 @@
+"""Test perf_bisect's target selection, time budget and attribution procedure."""
+import datetime
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+import random
+import unittest
+from unittest.mock import patch
+
+import bench
+import perf_bisect
+import trend
+
+LIMITS = {"rel": 1.10, "warn_rel": 1.05, "abs": 2.0}
+
+
+def record(value, workload="minimal", counter="compileInner"):
+    """A valid five-sample record for one workload with one measured timer."""
+    return {"workload": workload, "size": 0, "ok": True, "samples": 5, "warmup": 1,
+            "sampling_strategy": "interleaved", "timer_schema": "detailed",
+            "timers": {counter: bench.stats([value] * 5)}}
+
+
+class TargetSelectionTests(unittest.TestCase):
+    """select_targets over a temporary results tree."""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp(prefix="perf_bisect_targets_"))
+        self.addCleanup(shutil.rmtree, self.root)
+
+    def night(self, label, commit, value):
+        d = self.root / label
+        d.mkdir()
+        (d / "results.json").write_text(json.dumps([record(value)]))
+        (d / "meta.json").write_text(json.dumps({"commit": commit}))
+        return d
+
+    def alert(self, first, rerun, baseline_nights, head="headsha000",
+              workload="minimal", counter="compileInner"):
+        """Write the alerting night with an archived confirmation, then select."""
+        d = self.root / "2026-10-10-head"
+        d.mkdir()
+        (d / "results.json").write_text(json.dumps([record(first, workload, counter)]))
+        (d / "meta.json").write_text(json.dumps({"commit": head}))
+        tier = trend.classify_metric(first / 100.0, first - 100.0, LIMITS["rel"],
+                                     LIMITS["warn_rel"], LIMITS["abs"])
+        change = {"workload": workload, "counter": counter,
+                  "baseline": 100.0, "value": first}
+        plan = {"label": "2026-10-10-head", "runner": "r", "thresholds": LIMITS,
+                "baseline_labels": [label for label, _, _ in baseline_nights],
+                "notes": [], "judged_count": 1,
+                "regressions": [change] if tier == "error" else [],
+                "warnings": [change] if tier == "warning" else []}
+        (d / "confirmation.json").write_text(json.dumps(
+            {"plan": plan, "repeated": [record(rerun, workload, counter)],
+             "status": "complete"}))
+        for label, commit, value in baseline_nights:
+            self.night(label, commit, value)
+        return d
+
+    def select(self, night, **kw):
+        return perf_bisect.select_targets(night, self.root, **kw)
+
+    def test_newest_flat_night_on_another_commit_is_the_first_base(self):
+        d = self.alert(120, 118, [("2026-10-07-a", "aaaa", 100), ("2026-10-08-b", "bbbb", 101),
+                                  ("2026-10-09-c", "cccc", 99)])
+        t = self.select(d)
+        self.assertTrue(t["proceed"])
+        self.assertEqual([b["commit"] for b in t["bases"]], ["cccc", "bbbb", "aaaa"])
+        self.assertEqual(t["head"], "headsha000")
+        self.assertEqual(t["changes"][0]["tier"], "regression")
+
+    def test_a_night_that_already_carries_the_step_is_not_a_base(self):
+        # 10-09 ran a different commit but was already slow: choosing it would
+        # make the endpoints agree, so the base must come from before the step.
+        d = self.alert(120, 118, [("2026-10-07-a", "aaaa", 100), ("2026-10-08-b", "bbbb", 119),
+                                  ("2026-10-09-c", "cccc", 121)])
+        self.assertEqual([b["commit"] for b in self.select(d)["bases"]], ["aaaa"])
+
+    def test_every_baseline_night_on_head_means_nothing_to_bisect(self):
+        d = self.alert(120, 118, [("2026-10-08-x", "headsha000", 100),
+                                  ("2026-10-09-y", "headsha", 100)])
+        t = self.select(d)
+        self.assertFalse(t["proceed"])
+        self.assertIn("same commit as head", t["reason"])
+
+    def test_head_and_bases_must_be_on_master(self):
+        d = self.alert(120, 118, [("2026-10-07-a", "aaaa", 100), ("2026-10-08-b", "bbbb", 100)])
+        on_master = {"headsha000", "aaaa"}.__contains__
+        t = self.select(d, on_master=on_master)
+        self.assertEqual([b["commit"] for b in t["bases"]], ["aaaa"])
+        t = self.select(d, on_master={"aaaa", "bbbb"}.__contains__)
+        self.assertFalse(t["proceed"])
+        self.assertIn("not a master commit", t["reason"])
+
+    def test_a_short_sha_prefix_of_head_is_the_same_commit(self):
+        self.assertTrue(perf_bisect.same_commit("headsha000", "headsha"))
+        self.assertTrue(perf_bisect.same_commit("HEADSHA", "headsha000"))
+        self.assertFalse(perf_bisect.same_commit("headsha000", "headsha001"))
+        self.assertFalse(perf_bisect.same_commit("", "headsha"))
+
+    def test_no_flat_night_means_nothing_to_bisect(self):
+        d = self.alert(120, 118, [("2026-10-09-c", "cccc", 119)])
+        t = self.select(d)
+        self.assertFalse(t["proceed"])
+        self.assertIn("flat", t["reason"])
+
+    def test_a_confirmed_warning_needs_the_warning_tier(self):
+        d = self.alert(107, 106, [("2026-10-09-c", "cccc", 100)])
+        self.assertFalse(self.select(d)["proceed"])
+        t = self.select(d, min_tier="warning")
+        self.assertTrue(t["proceed"])
+        self.assertEqual(t["changes"][0]["tier"], "warning")
+
+    def test_a_cleared_rerun_has_no_targets(self):
+        d = self.alert(120, 101, [("2026-10-09-c", "cccc", 100)])
+        t = self.select(d, min_tier="warning")
+        self.assertFalse(t["proceed"])
+        self.assertIn("no confirmed change", t["reason"])
+
+    def test_known_flaky_counters_are_not_targets(self):
+        d = self.alert(144, 140, [("2026-10-09-c", "cccc", 100)],
+                       workload="api_module_graph", counter="apiGetCode")
+        t = self.select(d)
+        self.assertEqual(t["changes"], [])
+        self.assertFalse(t["proceed"])
+        self.assertIn("known-flaky", t["reason"])
+
+    def test_nights_on_one_commit_give_one_base(self):
+        d = self.alert(120, 118, [("2026-10-07-a", "aaaa", 100), ("2026-10-08-b", "bbbb", 100),
+                                  ("2026-10-09-b", "bbbb", 100)])
+        self.assertEqual([b["label"] for b in self.select(d)["bases"]],
+                         ["2026-10-09-b", "2026-10-07-a"])
+
+
+class TriageTests(unittest.TestCase):
+    """triage over a temporary results tree laid out as <results>/daily/<label>/."""
+
+    RUNNER = "runner-a"
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp(prefix="perf_bisect_triage_"))
+        self.addCleanup(shutil.rmtree, self.root)
+
+    def rec(self, samples, workload="minimal", counter="compileInner"):
+        r = record(1.0, workload, counter)
+        r["timers"] = {counter: bench.stats(samples)}
+        return r
+
+    def night(self, label, commit, samples, runner=RUNNER, **kw):
+        d = self.root / "daily" / label
+        d.mkdir(parents=True)
+        (d / "results.json").write_text(json.dumps([self.rec(samples, **kw)]))
+        (d / "meta.json").write_text(json.dumps({"commit": commit, "runner": runner}))
+        return d
+
+    def alert(self, first, rerun, history, head="headsha000", base=100.0, **kw):
+        """history: [(label, commit, samples)] oldest first; first/rerun: sample lists."""
+        for label, commit, samples in history:
+            self.night(label, commit, samples, **kw)
+        d = self.night("2026-10-10-head", head, first, **kw)
+        workload = kw.get("workload", "minimal")
+        counter = kw.get("counter", "compileInner")
+        value = sorted(first)[len(first) // 2]
+        tier = trend.classify_metric(value / base, value - base, LIMITS["rel"],
+                                     LIMITS["warn_rel"], LIMITS["abs"])
+        change = {"workload": workload, "counter": counter, "baseline": base, "value": value}
+        plan = {"label": "2026-10-10-head", "runner": self.RUNNER, "thresholds": LIMITS,
+                "baseline_labels": [h[0] for h in history], "notes": [], "judged_count": 1,
+                "regressions": [change] if tier == "error" else [],
+                "warnings": [change] if tier == "warning" else []}
+        (d / "confirmation.json").write_text(json.dumps(
+            {"plan": plan, "repeated": [self.rec(rerun, workload, counter)],
+             "status": "complete"}))
+        return perf_bisect.triage(self.root, "2026-10-10-head")
+
+    FLAT = [100.0, 100.5, 101.0, 101.5, 102.0]
+    STEP = [119.0, 120.0, 120.5, 121.0, 122.0]
+
+    def history(self, samples=None, commits=("aaaa", "bbbb", "cccc")):
+        return [(f"2026-10-0{i + 1}-{c}", c, list(samples or self.FLAT))
+                for i, c in enumerate(commits)]
+
+    def test_a_shifted_fastest_sample_is_real(self):
+        result = self.alert(self.STEP, self.STEP, self.history())
+        self.assertEqual(result["verdict"], "real")
+        self.assertEqual(result["counters"][0]["rule"], "min-shifted")
+        self.assertIn("Real or noise: real.", perf_bisect.triage_line(result))
+
+    def test_a_move_below_the_floor_is_unclear(self):
+        # A 60 ms counter: the median rose 10% (6 ms, confirmed), but the fastest
+        # sample rose 3.3% = 1.9 ms, under the 2 ms floor. Too small to call real,
+        # and not evidence of noise either.
+        flat = [58.0, 59.0, 60.0, 61.0, 62.0]
+        tonight = [59.9, 66.0, 66.0, 66.0, 67.0]
+        history = [(f"2026-10-0{i + 1}-{c}", c, list(flat)) for i, c in enumerate("abc")]
+        result = self.alert(tonight, tonight, history, base=60.0)
+        self.assertEqual(result["counters"][0]["rule"], "below-floor")
+        self.assertEqual(result["verdict"], "unclear")
+
+    def test_a_slow_tail_alone_is_noise(self):
+        tail = [100.0, 100.5, 125.0, 126.0, 127.0]
+        result = self.alert(tail, tail, self.history())
+        self.assertEqual((result["verdict"], result["counters"][0]["rule"]),
+                         ("noise", "tail-only"))
+
+    def test_a_bimodal_history_is_noise(self):
+        bimodal = [100.0, 100.5, 101.0, 130.0, 131.0]
+        result = self.alert(self.STEP, self.STEP, self.history(samples=bimodal))
+        self.assertEqual(result["counters"][0]["rule"], "bimodal-history")
+        self.assertEqual(result["verdict"], "noise")
+
+    def test_the_same_code_measured_flat_before_is_noise(self):
+        history = self.history(commits=("aaaa", "bbbb", "headsha"))
+        result = self.alert(self.STEP, self.STEP, history)
+        self.assertEqual(result["counters"][0]["rule"], "same-commit-flat")
+
+    def test_a_new_runner_cannot_be_judged(self):
+        result = self.alert(self.STEP, self.STEP, self.history())
+        for label, commit, _ in self.history():
+            (self.root / "daily" / label / "meta.json").write_text(
+                json.dumps({"commit": commit, "runner": "runner-old"}))
+        result = perf_bisect.triage(self.root, "2026-10-10-head")
+        self.assertEqual((result["verdict"], result["counters"][0]["rule"]),
+                         ("unclear", "runner-changed"))
+
+    def test_other_runners_do_not_count_as_history(self):
+        result = self.alert(self.STEP, self.STEP, self.history(), runner=self.RUNNER)
+        self.assertEqual(result["history_nights"], 3)
+        moved = Path(self.root / "daily" / "2026-10-01-aaaa" / "meta.json")
+        moved.write_text(json.dumps({"commit": "aaaa", "runner": "runner-b"}))
+        again = perf_bisect.triage(self.root, "2026-10-10-head")
+        self.assertEqual((again["history_nights"], again["counters"][0]["rule"]),
+                         (2, "thin-history"))
+        self.assertEqual(again["verdict"], "unclear")
+
+    def test_a_tail_only_counter_beside_a_shifted_one_is_real(self):
+        # Two counters of one workload: compileInner's fastest sample moved,
+        # SemanticChecking only grew a tail. A shared cause makes both real.
+        for i, c in enumerate(("aaaa", "bbbb", "cccc")):
+            d = self.root / "daily" / f"2026-10-0{i + 1}-{c}"
+            d.mkdir(parents=True)
+            r = record(1.0)
+            r["timers"] = {"compileInner": bench.stats(self.FLAT),
+                           "SemanticChecking": bench.stats(self.FLAT)}
+            (d / "results.json").write_text(json.dumps([r]))
+            (d / "meta.json").write_text(json.dumps({"commit": c, "runner": self.RUNNER}))
+        tail = [100.0, 100.5, 125.0, 126.0, 127.0]
+        night = self.root / "daily" / "2026-10-10-head"
+        night.mkdir()
+        tonight = record(1.0)
+        tonight["timers"] = {"compileInner": bench.stats(self.STEP),
+                             "SemanticChecking": bench.stats(tail)}
+        (night / "results.json").write_text(json.dumps([tonight]))
+        (night / "meta.json").write_text(json.dumps({"commit": "headsha000",
+                                                     "runner": self.RUNNER}))
+        changes = [{"workload": "minimal", "counter": c, "baseline": 100.0, "value": v}
+                   for c, v in (("compileInner", 120.5), ("SemanticChecking", 125.0))]
+        plan = {"label": "2026-10-10-head", "runner": self.RUNNER, "thresholds": LIMITS,
+                "baseline_labels": ["2026-10-01-aaaa", "2026-10-02-bbbb", "2026-10-03-cccc"],
+                "notes": [], "judged_count": 2, "regressions": changes, "warnings": []}
+        (night / "confirmation.json").write_text(json.dumps(
+            {"plan": plan, "repeated": [tonight], "status": "complete"}))
+        rules = {r["counter"]: r["rule"]
+                 for r in perf_bisect.triage(self.root, "2026-10-10-head")["counters"]}
+        self.assertEqual(rules, {"compileInner": "min-shifted",
+                                 "SemanticChecking": "sibling-shifted"})
+
+    def test_a_known_flaky_counter_is_skipped_not_noise(self):
+        result = self.alert(self.STEP, self.STEP, self.history(),
+                            workload="api_module_graph", counter="apiGetCode")
+        self.assertEqual((result["verdict"], result["counters"][0]["rule"]),
+                         ("none", "known-flaky"))
+
+    def test_a_night_whose_only_regression_is_flaky_is_judged_by_its_warnings(self):
+        # The 2026-10-07 shape: the one confirmed regression is the known-flaky
+        # counter, and a confirmed warning carries the real step.
+        flaky, real = ("api_module_graph", "apiGetCode"), ("minimal", "compileInner")
+
+        def records(flaky_samples, real_samples):
+            return [self.rec(flaky_samples, *flaky), self.rec(real_samples, *real)]
+
+        for i, c in enumerate(("aaaa", "bbbb", "cccc")):
+            d = self.root / "daily" / f"2026-10-0{i + 1}-{c}"
+            d.mkdir(parents=True)
+            (d / "results.json").write_text(json.dumps(records(self.FLAT, self.FLAT)))
+            (d / "meta.json").write_text(json.dumps({"commit": c, "runner": self.RUNNER}))
+        warn = [106.0, 106.5, 107.0, 107.5, 108.0]
+        night = self.root / "daily" / "2026-10-10-head"
+        night.mkdir()
+        tonight = records(self.STEP, warn)
+        (night / "results.json").write_text(json.dumps(tonight))
+        (night / "meta.json").write_text(json.dumps({"commit": "headsha000",
+                                                     "runner": self.RUNNER}))
+        plan = {"label": "2026-10-10-head", "runner": self.RUNNER, "thresholds": LIMITS,
+                "baseline_labels": ["2026-10-01-aaaa", "2026-10-02-bbbb", "2026-10-03-cccc"],
+                "notes": [], "judged_count": 2,
+                "regressions": [{"workload": flaky[0], "counter": flaky[1],
+                                 "baseline": 100.0, "value": 120.5}],
+                "warnings": [{"workload": real[0], "counter": real[1],
+                              "baseline": 100.0, "value": 107.0}]}
+        (night / "confirmation.json").write_text(json.dumps(
+            {"plan": plan, "repeated": tonight, "status": "complete"}))
+        result = perf_bisect.triage(self.root, "2026-10-10-head")
+        self.assertEqual(result["verdict"], "real")
+        self.assertEqual(perf_bisect.triage_line(result).split("; compared")[0],
+                         "Real or noise: real. 1 of 1 confirmed warnings look real; "
+                         "1 known-flaky regression skipped")
+
+    def test_one_fast_night_does_not_make_a_quiet_night_shifted(self):
+        # Five quiet nights near 100 ms and one unusually fast 96 ms night. Tonight's
+        # 100.5 ms is 4.7% above the lowest minimum but in line with the median.
+        history = [(f"2026-10-0{i + 1}-c{i}", f"c{i}", [m, m + 1, m + 2, m + 3, m + 4])
+                   for i, m in enumerate((100.0, 99.5, 96.0, 100.2, 99.8, 100.1))]
+        quiet = [100.5, 101.0, 112.0, 113.0, 114.0]
+        result = self.alert(quiet, quiet, history)
+        self.assertEqual(result["counters"][0]["rule"], "tail-only")
+
+    def test_a_cleared_night_says_nothing(self):
+        result = self.alert(self.STEP, self.FLAT, self.history())
+        self.assertEqual(result["verdict"], "none")
+        self.assertEqual(perf_bisect.triage_line(result), "")
+
+    def test_the_line_carries_no_text_from_the_data(self):
+        result = {"verdict": "real", "history_nights": "@x", "head": "@evil",
+                  "previous": "[a](b)",
+                  "counters": [{"tier": "regression", "rule": "min-shifted"},
+                               {"tier": "regression", "rule": "@here"},
+                               {"tier": "@x", "rule": "min-shifted"}]}
+        line = perf_bisect.triage_line(result)
+        for fragment in ("@", "](", "evil"):
+            self.assertNotIn(fragment, line)
+        self.assertIn("1 of 1 confirmed regressions", line)
+        self.assertIn("compared with recent nights", line)
+
+    def test_the_line_leads_with_the_regressions_that_raised_the_alert(self):
+        # The 2026-10-16 shape: 4 confirmed regressions, 12 confirmed warnings,
+        # one of them a known-flaky counter, which is skipped, not noise.
+        rows = ([{"tier": "regression", "rule": "min-shifted"}] * 4
+                + [{"tier": "warning", "rule": "min-shifted"}] * 11
+                + [{"tier": "warning", "rule": "known-flaky"}])
+        line = perf_bisect.triage_line({"verdict": "real", "history_nights": 7,
+                                        "head": "e49310561e", "previous": "f2b163c082",
+                                        "counters": rows})
+        self.assertEqual(line, "Real or noise: real. 4 of 4 confirmed regressions look real; "
+                               "11 of 11 confirmed warnings do too (1 "
+                               "known-flaky counter skipped); compared with the last 7 "
+                               "nights; f2b163c082..e49310561e.")
+
+    def test_a_noise_verdict_names_its_rule(self):
+        rows = [{"tier": "regression", "rule": "tail-only"},
+                {"tier": "regression", "rule": "bimodal-history"}]
+        line = perf_bisect.triage_line({"verdict": "noise", "history_nights": 7,
+                                        "head": "e49310561e", "previous": "f2b163c082",
+                                        "counters": rows})
+        self.assertTrue(line.startswith("Real or noise: noise. 0 of 2 confirmed regressions "
+                                        "look real (bimodal-history 1; "
+                                        "tail-only 1); compared with"), line)
+
+    def test_noisy_warnings_do_not_decide_a_red_night(self):
+        result = self.alert(self.STEP, self.STEP, self.history())
+        self.assertEqual(result["verdict"], "real")
+        result["counters"].append({"tier": "warning", "workload": "x", "counter": "y",
+                                   "rule": "tail-only", "verdict": "noise"})
+        line = perf_bisect.triage_line(result)
+        self.assertIn("Real or noise: real. 1 of 1 confirmed regressions", line)
+        self.assertIn("0 of 1 confirmed warnings do too (tail-only 1)", line)
+
+    def test_warnings_lead_when_nothing_worse_confirmed(self):
+        rows = [{"tier": "warning", "rule": "min-shifted"}]
+        line = perf_bisect.triage_line({"verdict": "real", "history_nights": 3,
+                                        "head": "e49310561e", "previous": "f2b163c082",
+                                        "counters": rows})
+        self.assertTrue(line.startswith("Real or noise: real. 1 of 1 confirmed warnings "
+                                        "look real; compared with the last 3 "
+                                        "nights;"), line)
+
+
+class BudgetTests(unittest.TestCase):
+    def at(self, hhmm):
+        h, m = map(int, hhmm.split(":"))
+        return datetime.datetime(2026, 10, 18, h, m, tzinfo=datetime.timezone.utc)
+
+    def test_budget_ends_before_the_next_nightly(self):
+        cases = {"05:32": 360, "22:00": 360, "00:30": 220, "02:30": 100, "03:05": 0,
+                 "04:59": 0}
+        for start, minutes in cases.items():
+            with self.subTest(start=start):
+                self.assertEqual(perf_bisect.budget_minutes(self.at(start), (5, 0)), minutes)
+
+    def test_the_cron_is_read_from_the_nightly_workflow(self):
+        nightly = (Path(__file__).resolve().parents[3] / ".github" / "workflows"
+                   / "nightly-mdl-perf-test.yml")
+        if not nightly.exists():
+            self.skipTest("nightly workflow is not in this checkout")
+        self.assertEqual(perf_bisect.nightly_start(nightly), (5, 0))
+
+
+class FakeLab:
+    """Stand-in for SuiteLab: each commit has one fixed median per counter."""
+
+    def __init__(self, medians, pattern=(1.0,), fail_build=(), fail_measure=()):
+        self.medians, self.pattern = medians, list(pattern)
+        self.fail_build, self.fail_measure = set(fail_build), set(fail_measure)
+        self.built, self.calls = [], 0
+
+    def build(self, sha, timeout=None):
+        self.built.append(sha)
+        if sha in self.fail_build:
+            raise perf_bisect.BuildError(f"{sha}: build failed")
+        return sha
+
+    def measure(self, sha):
+        if sha in self.fail_measure:
+            raise perf_bisect.MeasurementError(f"{sha}: workload failed")
+        # Host noise is a multiplier per measurement call, cycled. Batches order
+        # their slots A B, then B A, so the pattern decides which slot is hit.
+        scale = self.pattern[self.calls % len(self.pattern)]
+        self.calls += 1
+        return {("minimal", "compileInner"): [self.medians[sha] * scale] * 5}
+
+
+def targets(bases=("c0",), head="c8", max_builds=12, deadline=None):
+    return {"source_run": 1, "label": "L", "head": head,
+            "bases": [{"label": f"n-{b}", "commit": b} for b in bases],
+            "changes": [{"tier": "regression", "workload": "minimal",
+                         "counter": "compileInner", "baseline": 100.0, "value": 120.0}],
+            "thresholds": LIMITS, "max_builds": max_builds, "deadline_utc": deadline}
+
+
+def line(n, step_at, before=100.0, after=120.0):
+    """Commits c0..cn where c<step_at> and later carry the step."""
+    shas = [f"c{i}" for i in range(n + 1)]
+    return shas, {s: (after if i >= step_at else before) for i, s in enumerate(shas)}
+
+
+class BisectorTests(unittest.TestCase):
+    def setUp(self):
+        self.out = Path(tempfile.mkdtemp(prefix="perf_bisect_run_"))
+        self.addCleanup(shutil.rmtree, self.out)
+
+    def bisect(self, lab, shas, t=None, **kw):
+        t = t or targets(head=shas[-1])
+        commits = lambda base, head: shas[shas.index(base) + 1:shas.index(head) + 1]
+        return perf_bisect.Bisector(t, lab, commits, self.out, aa_rounds=2, ab_rounds=2,
+                                    **kw).run()
+
+    def saved(self):
+        return json.loads((self.out / "bisect.json").read_text())
+
+    def test_a_single_step_is_named_and_verified_against_its_parent(self):
+        shas, medians = line(8, step_at=5)
+        state = self.bisect(FakeLab(medians), shas)
+        self.assertEqual(state["status"], "culprit")
+        self.assertEqual((state["culprit"], state["parent"]), ("c5", "c4"))
+        self.assertEqual(self.saved()["culprit"], "c5")
+        self.assertLessEqual(state["builds_used"], 2 + 4)
+
+    def test_a_step_on_the_first_commit_after_base_verifies_against_base(self):
+        shas, medians = line(4, step_at=1)
+        state = self.bisect(FakeLab(medians), shas)
+        self.assertEqual((state["status"], state["culprit"], state["parent"]),
+                         ("culprit", "c1", "c0"))
+
+    def test_a_noisy_host_stops_before_any_attribution(self):
+        shas, medians = line(4, step_at=2)
+        # A A2 | A2 A: A is measured 3% slow in both rounds, A2 never.
+        state = self.bisect(FakeLab(medians, pattern=(1.03, 1.0, 1.0, 1.03)), shas)
+        self.assertEqual(state["status"], "unclear")
+        self.assertIn("A/A spread", state["reason"])
+
+    def test_endpoints_that_do_not_step_try_one_more_base(self):
+        shas, medians = line(4, step_at=2)
+        medians["cx"] = 120.0
+        t = targets(bases=("cx", "c0"), head="c4")
+        state = self.bisect(FakeLab(medians), shas, t=t)
+        self.assertEqual(state["status"], "culprit")
+        self.assertEqual(state["base"], "c0")
+
+    def test_a_base_that_does_not_build_falls_back_to_the_next(self):
+        shas, medians = line(4, step_at=2)
+        medians["cx"] = 100.0
+        t = targets(bases=("cx", "c0"), head="c4")
+        state = self.bisect(FakeLab(medians, fail_build={"cx"}), shas, t=t)
+        self.assertEqual((state["status"], state["base"]), ("culprit", "c0"))
+
+    def test_no_targets_means_nothing_is_built(self):
+        lab = FakeLab({})
+        t = targets()
+        t["changes"] = []
+        state = self.bisect(lab, ["c0", "c8"], t=t)
+        self.assertEqual(state["status"], "unclear")
+        self.assertEqual(lab.built, [])
+
+    def test_no_step_between_endpoints_is_not_reproduced(self):
+        shas, medians = line(4, step_at=99)
+        state = self.bisect(FakeLab(medians), shas)
+        self.assertEqual(state["status"], "not-reproduced")
+
+    def test_a_gradual_change_stops_with_an_interval(self):
+        shas = [f"c{i}" for i in range(5)]
+        medians = {"c0": 100.0, "c1": 100.0, "c2": 110.0, "c3": 120.0, "c4": 120.0}
+        state = self.bisect(FakeLab(medians), shas)
+        self.assertEqual(state["status"], "interval")
+        self.assertIsNone(state["culprit"])
+        self.assertIn("ambiguous", state["reason"])
+
+    def test_a_probe_that_does_not_build_is_skipped_for_its_neighbour(self):
+        shas, medians = line(8, step_at=5)
+        state = self.bisect(FakeLab(medians, fail_build={"c4"}), shas)
+        self.assertIn({"commit": "c4", "verdict": "skipped",
+                       "detail": "c4: build failed"}, state["probes"])
+        # c4 is the step's only possible parent and never builds, so the search
+        # ends between c3 and c5 without naming either.
+        self.assertEqual(state["status"], "interval")
+        self.assertEqual((state["interval"]["good"], state["interval"]["bad"]), ("c3", "c5"))
+
+    def test_the_build_budget_ends_the_search_with_an_interval(self):
+        shas, medians = line(16, step_at=9)
+        state = self.bisect(FakeLab(medians), shas, t=targets(head="c16", max_builds=3))
+        self.assertEqual(state["status"], "interval")
+        self.assertIn("build budget", state["reason"])
+        self.assertEqual(state["builds_used"], 3)
+        self.assertTrue(self.saved()["complete"])
+
+    def test_the_deadline_ends_the_search_with_an_interval(self):
+        shas, medians = line(16, step_at=9)
+        now = [1000.0]
+
+        def clock():
+            now[0] += 60.0
+            return now[0]
+
+        deadline = datetime.datetime.fromtimestamp(1000.0 + 40 * 60,
+                                                   datetime.timezone.utc).isoformat()
+        state = self.bisect(FakeLab(medians), shas, t=targets(head="c16", deadline=deadline),
+                            clock=clock)
+        self.assertEqual(state["status"], "interval")
+        self.assertIn("time budget", state["reason"])
+
+    def test_a_deadline_inside_the_last_round_names_no_culprit(self):
+        shas, medians = line(1, step_at=1)
+        now = [0.0]
+        lab = FakeLab(medians)
+        real = lab.measure
+
+        def measure(sha):
+            now[0] += 10.0
+            return real(sha)
+
+        lab.measure = measure
+        # A/A and endpoints take 80 s; verification would end at 120 s.
+        deadline = datetime.datetime.fromtimestamp(115.0, datetime.timezone.utc).isoformat()
+        verified = []
+        real_verify = perf_bisect.Bisector._verify
+
+        def spy(bisector, *args):
+            verified.append(args)
+            return real_verify(bisector, *args)
+
+        with patch.object(perf_bisect.Bisector, "_verify", spy):
+            state = self.bisect(lab, shas, t=targets(head="c1", deadline=deadline),
+                                clock=lambda: now[0])
+        self.assertEqual(len(verified), 1)
+        self.assertEqual(state["status"], "interval")
+        self.assertIsNone(state["culprit"])
+        self.assertIn("time budget", state["reason"])
+        self.assertLessEqual(now[0], 125.0)
+
+    def test_a_killed_run_still_leaves_a_report(self):
+        shas, medians = line(8, step_at=5)
+
+        class Killed(Exception):
+            pass
+
+        lab = FakeLab(medians)
+        real = lab.measure
+
+        def measure(sha):
+            if sha == "c4":
+                raise Killed()
+            return real(sha)
+
+        lab.measure = measure
+        with self.assertRaises(Killed):
+            self.bisect(lab, shas)
+        saved = self.saved()
+        self.assertFalse(saved["complete"])
+        self.assertEqual(saved["interval"]["good"], "c0")
+        self.assertIn("stopped before completion", (self.out / "bisect.md").read_text())
+
+    def test_the_report_carries_shas_and_numbers_only(self):
+        shas = [f"{i:07x}0" for i in range(5)]
+        medians = {s: (120.0 if i >= 2 else 100.0) for i, s in enumerate(shas)}
+        state = self.bisect(FakeLab(medians), shas, t=targets(bases=(shas[0],), head=shas[-1]))
+        text = perf_bisect.render(state)
+        self.assertIn(f"Culprit `{shas[2]}`", text)
+        self.assertNotIn(state["reason"], text)
+
+    def test_injected_text_never_reaches_the_report(self):
+        evil = "@someone [link](https://x.invalid) <img> | ` **bold**"
+        state = {"status": evil, "complete": "yes", "reason": evil, "head": evil,
+                 "base": "abcdef0", "culprit": evil, "parent": evil, "interval": {
+                     "good": evil, "bad": "abcdef1", "commits": evil},
+                 "aa_spread_pct": evil, "builds_used": evil, "max_builds": 12,
+                 "deadline_utc": evil,
+                 "counters": [{"workload": evil, "counter": evil, "followed": evil,
+                               "endpoints": {"base": evil, "head": 1.0}}],
+                 "probes": [{"commit": evil, "verdict": evil, "detail": evil}]}
+        text = perf_bisect.render(state)
+        for fragment in ("@", "](", "<img>", "**bold**", "https://"):
+            self.assertNotIn(fragment, text)
+        self.assertIn("`abcdef0`", text)
+
+
+class SuiteLabTests(unittest.TestCase):
+    def test_paths_are_resolved_before_the_driver_builds(self):
+        work = Path(tempfile.mkdtemp(prefix="perf_bisect_lab_"))
+        self.addCleanup(shutil.rmtree, work)
+        seen = []
+
+        def driver(out_dir):
+            seen.append(out_dir)
+            return os.path.join(out_dir, "api-driver")
+
+        cwd = os.getcwd()
+        os.chdir(work)
+        self.addCleanup(os.chdir, cwd)
+        with patch.object(bench, "build_api_driver", side_effect=driver):
+            lab = perf_bisect.SuiteLab("probe", "snap", "work",
+                                       [("api_session_create", "apiCreateSession")])
+        self.assertTrue(os.path.isabs(seen[0]))
+        self.assertTrue(os.path.isabs(lab.driver))
+
+
+class CliTests(unittest.TestCase):
+    def test_a_setup_failure_still_writes_a_report(self):
+        root = Path(tempfile.mkdtemp(prefix="perf_bisect_cli_"))
+        self.addCleanup(shutil.rmtree, root)
+        t = targets()
+        t["changes"][0]["workload"] = "api_session_create"
+        t["changes"][0]["counter"] = "apiCreateSession"
+        (root / "targets.json").write_text(json.dumps(t))
+        with patch.object(bench, "build_api_driver", return_value=None):
+            perf_bisect.main(["run", "--targets", str(root / "targets.json"),
+                              "--probe", str(root / "probe"), "--snap", str(root / "snap"),
+                              "--work", str(root / "work"), "--out", str(root / "out")])
+        state = json.loads((root / "out" / "bisect.json").read_text())
+        self.assertEqual((state["status"], state["complete"]), ("unclear", True))
+        self.assertIn("setup failed", state["reason"])
+        self.assertTrue((root / "out" / "bisect.md").exists())
+
+
+class NoisyLab(FakeLab):
+    """FakeLab with seeded Gaussian per-sample noise at a fixed coefficient of variation."""
+
+    def __init__(self, medians, cv, seed):
+        super().__init__(medians)
+        self.cv, self.rng = cv, random.Random(seed)
+
+    def measure(self, sha):
+        m = self.medians[sha]
+        return {("minimal", "compileInner"): [self.rng.gauss(m, self.cv * m) for _ in range(5)]}
+
+
+class NoisyBisectTests(unittest.TestCase):
+    def test_host_noise_never_names_a_wrong_culprit(self):
+        # 2.5% per-sample CV, about the host's measured median for primary timers.
+        shas, medians = line(16, step_at=11)
+        commits = lambda base, head: shas[shas.index(base) + 1:shas.index(head) + 1]
+        outcomes = []
+        for seed in range(12):
+            out = Path(tempfile.mkdtemp(prefix="perf_bisect_noisy_"))
+            self.addCleanup(shutil.rmtree, out)
+            state = perf_bisect.Bisector(targets(head="c16", max_builds=40),
+                                         NoisyLab(medians, 0.025, seed), commits, out,
+                                         aa_rounds=4, ab_rounds=4).run()
+            outcomes.append(state["status"])
+            if state["status"] == "culprit":
+                self.assertEqual(state["culprit"], "c11", f"seed {seed}")
+        self.assertIn("culprit", outcomes)
+
+
+class CliOutputTests(unittest.TestCase):
+    """The GITHUB_OUTPUT keys the workflows read: proceed/head (gate), budget
+    (bisect), verdict/line (nightly)."""
+
+    def outputs(self, argv):
+        root = Path(tempfile.mkdtemp(prefix="perf_bisect_out_"))
+        self.addCleanup(shutil.rmtree, root)
+        out = root / "github_output"
+        with patch.dict(os.environ, {"GITHUB_OUTPUT": str(out),
+                                     "GITHUB_STEP_SUMMARY": str(root / "summary")}), \
+                patch("sys.stdout", new_callable=lambda: open(os.devnull, "w")):
+            perf_bisect.main([a.replace("@", str(root)) for a in argv])
+        return dict(l.split("=", 1) for l in out.read_text().splitlines())
+
+    def test_deadline_writes_budget(self):
+        root = Path(tempfile.mkdtemp(prefix="perf_bisect_dl_"))
+        self.addCleanup(shutil.rmtree, root)
+        (root / "t.json").write_text(json.dumps(targets()))
+        (root / "n.yml").write_text('    - cron: "0 5 * * *"\n')
+        keys = self.outputs(["deadline", "--targets", str(root / "t.json"),
+                             "--nightly-workflow", str(root / "n.yml"),
+                             "--now", "2026-10-19T05:32:00+00:00"])
+        self.assertEqual(keys, {"budget": "360"})
+
+    def test_triage_and_targets_write_their_keys(self):
+        t = TriageTests("test_a_shifted_fastest_sample_is_real")
+        t.setUp()
+        self.addCleanup(t.doCleanups)
+        t.alert(t.STEP, t.STEP, t.history())
+        keys = self.outputs(["triage", "--results", str(t.root), "--label", "2026-10-10-head"])
+        self.assertEqual(set(keys), {"verdict", "line"})
+        self.assertEqual(keys["verdict"], "real")
+        keys = self.outputs(["targets", "--night", str(t.root / "daily" / "2026-10-10-head"),
+                             "--nights-root", str(t.root / "daily"), "--out", "@/t.json"])
+        self.assertEqual(set(keys), {"proceed", "head", "base", "reason"})
+        self.assertEqual(keys["proceed"], "true")
+
+
+class FirstParentTests(unittest.TestCase):
+    """first_parent_commits against a real throwaway repository."""
+
+    def setUp(self):
+        if shutil.which("git") is None:
+            self.skipTest("git is not available")
+        self.repo = Path(tempfile.mkdtemp(prefix="perf_bisect_git_"))
+        self.addCleanup(shutil.rmtree, self.repo, True)
+        self.git("init", "-q")
+
+    def git(self, *args):
+        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t",
+                   GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+        return subprocess.run(["git", "-C", str(self.repo), *args], check=True, env=env,
+                              stdout=subprocess.PIPE, text=True).stdout.strip()
+
+    def commit(self, msg):
+        self.git("commit", "-q", "--allow-empty", "-m", msg)
+        return self.git("rev-parse", "HEAD")
+
+    def test_a_merged_branch_counts_as_its_merge_commit(self):
+        base = self.commit("base")
+        trunk = self.git("rev-parse", "--abbrev-ref", "HEAD")
+        self.git("checkout", "-q", "-b", "side")
+        self.commit("side work")
+        self.git("checkout", "-q", trunk)
+        first = self.commit("first")
+        self.git("merge", "-q", "--no-ff", "-m", "merge side", "side")
+        merge = self.git("rev-parse", "HEAD")
+        self.assertEqual(perf_bisect.first_parent_commits(self.repo, base, merge),
+                         [first, merge])
+
+    def test_the_master_check_needs_a_full_sha_on_master(self):
+        a = self.commit("a")
+        self.git("branch", "-f", "fake-master", a)
+        self.git("checkout", "-q", "-b", "side")
+        side = self.commit("side")
+        check = perf_bisect.on_master_check(self.repo, "fake-master")
+        self.assertTrue(check(a))
+        self.assertFalse(check(side))
+        self.assertFalse(check(a[:9]))
+
+    def test_base_must_be_an_ancestor_of_head(self):
+        a = self.commit("a")
+        b = self.commit("b")
+        with self.assertRaisesRegex(ValueError, "not an ancestor"):
+            perf_bisect.first_parent_commits(self.repo, b, a)
+
+
+if __name__ == "__main__":
+    unittest.main()

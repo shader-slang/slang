@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-13T00:00:00+00:00
-//META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#applyvariablescopecorrection
-//META: doc_section_digest=667bcb29fe9fd1cabd43b835844da570f58e1f229c9a8359e2bcc49e1cf326b3
+//META: doc_section_digest=8858923ad48b5247e5ae34b0213cf34cf9e4cf5622823dcd298df8f99107df4e
 //META: purpose=A value defined inside a loop and used after it surfaces in emitted HLSL as a local declaration lifted to the top of the function body, ahead of the loop that computes it.
 //META: intent=functional
 //META: pipeline_stage=legalize
