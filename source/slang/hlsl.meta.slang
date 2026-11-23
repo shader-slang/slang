@@ -21967,8 +21967,10 @@ float3 ObjectRayDirection()
     }
 }
 
-// TODO: optix has an optixGetObjectToWorldTransformMatrix function that returns 12
-// floats by reference.
+// These read the current instance's transform-list state but write nothing, so dead calls can
+// be eliminated without the argument-purity claim that __readNone would make. The HitObject
+// getters and the DXR 1.3 Get*3x4/4x3 forms lower to the same OptiX transform walk, but
+// extending the annotation to them is a separate language-design decision.
 /// Returns the object-to-world transformation matrix (3x4).
 /// @return 3x4 matrix transforming from object to world space
 /// @remarks Includes position and orientation of the current instance

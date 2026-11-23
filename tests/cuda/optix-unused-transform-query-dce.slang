@@ -1,6 +1,13 @@
+// SPDX-FileCopyrightText: The Khronos Group, Inc.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 // Regression test for https://github.com/shader-slang/slang/issues/13262.
 // Slang itself must remove an unused transform query: on CUDA the query expands to an OptiX
 // transform-list walk whose loads are `asm volatile`, so NVRTC keeps it once it is emitted.
+// The unsuffixed ObjectToWorld()/WorldToObject() aliases forward to the annotated 3x4 queries,
+// so their dead calls are eliminated via the propagated NoSideEffect property.
+// The SPIR-V lanes compile at -O0 so spirv-opt stays out of the pipeline and only Slang's own
+// DCE can remove the dead query.
 
 //TEST:SIMPLE(filecheck=CUDA_DEAD): -target cuda -entry closestHitDead -stage closesthit
 //TEST:SIMPLE(filecheck=CUDA_LIVE): -target cuda -entry closestHitLive -stage closesthit
@@ -10,12 +17,17 @@
 //TEST:SIMPLE(filecheck=SPIRV_LIVE): -target spirv-asm -O0 -entry closestHitLive -stage closesthit
 //TEST:SIMPLE(filecheck=HLSL_DEAD): -target hlsl -entry closestHitDead -stage closesthit
 //TEST:SIMPLE(filecheck=HLSL_LIVE): -target hlsl -entry closestHitLive -stage closesthit
+//TEST:SIMPLE(filecheck=GLSL_DEAD): -target glsl -entry closestHitDead -stage closesthit
+//TEST:SIMPLE(filecheck=GLSL_LIVE): -target glsl -entry closestHitLive -stage closesthit
 
 struct Payload
 {
     float value;
 };
 
+// Guards match the emitted symbol names: slangOptixGet*TransformMatrix* helpers and the
+// ObjectToWorld_/WorldToObject_ wrapper specializations on CUDA, the _optix_get_transform_list
+// walk on PTX, the *KHR builtins on SPIR-V, and the raw getter names on HLSL.
 // CUDA_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
 // CUDA_DEAD: __closesthit__closestHitDead
 // CUDA_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
@@ -33,6 +45,10 @@ struct Payload
 // HLSL_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
 // HLSL_DEAD: barycentrics
 // HLSL_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
+
+// GLSL_DEAD-NOT: {{gl_ObjectToWorld|gl_WorldToObject}}
+// GLSL_DEAD: void main()
+// GLSL_DEAD-NOT: {{gl_ObjectToWorld|gl_WorldToObject}}
 [shader("closesthit")]
 void closestHitDead(inout Payload payload, BuiltInTriangleIntersectionAttributes attributes)
 {
@@ -65,6 +81,9 @@ void closestHitDead(inout Payload payload, BuiltInTriangleIntersectionAttributes
 // HLSL_LIVE-DAG: WorldToObject4x3()
 // HLSL_LIVE-DAG: {{ObjectToWorld_[0-9]+}}()
 // HLSL_LIVE-DAG: {{WorldToObject_[0-9]+}}()
+
+// GLSL_LIVE-DAG: gl_ObjectToWorldEXT
+// GLSL_LIVE-DAG: gl_WorldToObjectEXT
 [shader("closesthit")]
 void closestHitLive(inout Payload payload, BuiltInTriangleIntersectionAttributes attributes)
 {
