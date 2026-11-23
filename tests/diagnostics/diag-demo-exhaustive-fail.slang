@@ -1,7 +1,7 @@
 //DISABLE_DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Demo: Exhaustive mode failure - unannotated diagnostics
-// Change DISABLED_DIAGNOSTIC_TEST to DIAGNOSTIC_TEST to run this test and see the error output
+// Change DISABLE_DIAGNOSTIC_TEST to DIAGNOSTIC_TEST to run this test and see the error output
 
 struct S {};
 
