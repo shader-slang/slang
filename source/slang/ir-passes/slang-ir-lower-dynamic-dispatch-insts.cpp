@@ -895,8 +895,6 @@ struct SequentialIDTagLoweringContext : public InstPassBase
     // module can observe the same collision, and one diagnosis per conflicting ID is enough.
     // The add-then-refetch of `diagnosedSequentialIDs` re-fetches the set pointer after the
     // outer Dictionary insert, which can rehash and invalidate the previous pointer.
-    // A null sink only records the collision as diagnosed without reporting it; the sole
-    // caller (slang-emit.cpp) always passes a diagnostic sink.
     void diagnoseDuplicateSequentialID(
         IRInst* interfaceType,
         IRInst* witnessTable,
@@ -908,22 +906,28 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         SLANG_ASSERT(previousWitnessTable);
 
         auto diagnosedSequentialIDs =
-            m_diagnosedDuplicateSequentialIDKeys.tryGetValue(interfaceType);
+            m_diagnosedDuplicateSequentialIDsByInterface.tryGetValue(interfaceType);
         if (!diagnosedSequentialIDs)
         {
-            m_diagnosedDuplicateSequentialIDKeys.add(interfaceType, HashSet<uint32_t>());
+            m_diagnosedDuplicateSequentialIDsByInterface.add(interfaceType, HashSet<uint32_t>());
             diagnosedSequentialIDs =
-                m_diagnosedDuplicateSequentialIDKeys.tryGetValue(interfaceType);
+                m_diagnosedDuplicateSequentialIDsByInterface.tryGetValue(interfaceType);
         }
 
         if (!diagnosedSequentialIDs->add(sequentialID))
             return;
 
+        // The sole caller (slang-emit.cpp) always passes a diagnostic sink; a null sink here
+        // would silently swallow a real collision, so it fails loudly in debug builds and the
+        // branch below only remains as release-build defense.
+        SLANG_ASSERT(m_sink);
         if (!m_sink)
             return;
 
         m_sink->diagnose(Diagnostics::DuplicateTypeConformanceSequentialId{
-            .id = int(sequentialID),
+            // Zero-extend so IDs at the top of the uint32 range print as written instead of
+            // wrapping negative through a 32-bit int.
+            .id = int64_t(sequentialID),
             .interfaceType = interfaceType,
             .location = getDiagnosticPos(witnessTable),
             .previousLocation = getDiagnosticPos(previousWitnessTable),
@@ -944,7 +948,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         //
 
         // We use the result type and the type of the operand
-        auto interfaceType = inst->getOperand(0);
+        auto interfaceType = cast<IRInterfaceType>(inst->getOperand(0));
         auto srcSeqID = inst->getOperand(1);
 
         Dictionary<UInt, UInt> mapping;
@@ -953,8 +957,11 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         // visited more than once — only two *different* tables sharing one ID are a conflict.
         // A conflicting table is skipped entirely; E50105 is an error, so compilation fails
         // anyway rather than silently resolving the collision through the first table's arm.
-        // Only this ID-to-tag direction diagnoses duplicates; the reverse RTTI direction
-        // (`lowerGetSequentialIDFromTag`) deliberately relies on this site to report them.
+        // Duplicate IDs are diagnosed only here — when both colliding witness tables share
+        // one dispatch set like this one. A program that only produces sequential IDs (for
+        // example RTTI bytes consumed host-side) never lowers this site and stays silent;
+        // the reverse RTTI direction (`lowerGetSequentialIDFromTag`) has no diagnosis of its
+        // own and deliberately relies on this site to report collisions.
         Dictionary<uint32_t, IRInst*> witnessTableForSequentialID;
 
         // Map from sequential ID to unique ID
@@ -1116,11 +1123,16 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                 auto interfaceType =
                     cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
                 auto interfaceName = String();
-                if (as<IRInterfaceType>(interfaceType))
+                // Whether this witness table conforms to a real interface (versus a
+                // none-witness) decides the allocation and registration strategy below; the
+                // non-empty mangled name is the same fact in registration form, so the two
+                // `isInterfaceConformance` and `interfaceName.getLength()` tests agree by
+                // construction.
+                const bool isInterfaceConformance = (as<IRInterfaceType>(interfaceType) != nullptr);
+                if (isInterfaceConformance)
                 {
                     // An interface type that participates in dynamic dispatch must carry a
-                    // linkage decoration; the non-empty mangled name below doubles as the
-                    // "is a real interface conformance" predicate at the registration sites.
+                    // linkage decoration.
                     auto interfaceLinkage = interfaceType->findDecoration<IRLinkageDecoration>();
                     SLANG_RELEASE_ASSERT(
                         interfaceLinkage && "An interface type does not have a linkage decoration, "
@@ -1144,7 +1156,10 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                     }
 
                     // If the inst already has a SequentialIDDecoration, make sure the linkage-side
-                    // bookkeeping reflects that explicit ID before moving on.
+                    // bookkeeping reflects that explicit ID before moving on. Decoration values
+                    // are IDs in [0, 2^32-1] by construction: the session-side API validates
+                    // overrides before any decoration is created, so an out-of-range value here
+                    // only arrives from foreign, hand-built IR and is out of contract.
                     if (auto seqDecoration = inst->findDecoration<IRSequentialIDDecoration>())
                     {
                         seqID = uint32_t(seqDecoration->getSequentialID());
@@ -1162,7 +1177,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                             witnessTableMangledName,
                             seqID))
                     {
-                        if (as<IRInterfaceType>(interfaceType))
+                        if (isInterfaceConformance)
                         {
                             seqID = linkage->getFirstFreeTypeConformanceWitnessSequentialID(
                                 interfaceName);
@@ -1181,6 +1196,9 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                         }
                         else
                         {
+                            // A none-witness has no interface, so an occupancy key would be
+                            // meaningless; its sentinel ID is intentionally not recorded as an
+                            // occupied slot.
                             linkage->mapMangledNameToRTTIObjectIndex[witnessTableMangledName] =
                                 seqID;
                         }
@@ -1213,7 +1231,9 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 private:
     Linkage* m_linkage;
     DiagnosticSink* m_sink;
-    Dictionary<IRInst*, HashSet<uint32_t>> m_diagnosedDuplicateSequentialIDKeys;
+    // Per interface type, the set of sequential IDs whose duplicate collision has already
+    // been diagnosed, so repeated collisions across dispatch sites report once.
+    Dictionary<IRInst*, HashSet<uint32_t>> m_diagnosedDuplicateSequentialIDsByInterface;
 };
 
 void lowerSequentialIDTagCasts(IRModule* module, Linkage* linkage, DiagnosticSink* sink)

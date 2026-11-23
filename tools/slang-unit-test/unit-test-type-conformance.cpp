@@ -183,16 +183,16 @@ SLANG_UNIT_TEST(typeConformance, NoRenderApi)
         diffuseIBsdf.writeRef(),
         0,
         diagnosticBlob.writeRef());
+    // The same numeric ID on two different interfaces is legal (occupancy is per
+    // interface), so Mesh:IShape = 0 below may coexist with Diffuse:IBsdf = 0 above.
     session->createTypeConformanceComponentType(
         mesh,
         ishape,
         meshIShape.writeRef(),
-        // The same numeric ID on two different interfaces is legal (occupancy is per
-        // interface), so Mesh:IShape = 0 may coexist with Diffuse:IBsdf = 0. Within one
-        // interface the IDs must be unique: duplicate explicit IDs are now an error (E50105),
-        // so Mesh and Sphere can no longer share 0 the way they did before.
         0,
         diagnosticBlob.writeRef());
+    // Within one interface the IDs must be unique: duplicate explicit IDs are now an error
+    // (E50105), so Sphere takes 2 instead of sharing Mesh's 0 the way it did before.
     session->createTypeConformanceComponentType(
         sphere,
         ishape,
@@ -292,6 +292,10 @@ SLANG_UNIT_TEST(typeConformanceSequentialIDAllocatesFirstFreeSlot, NoRenderApi)
             badConformance.writeRef(),
             -2,
             diagnostics.writeRef()) == SLANG_E_INVALID_ARG);
+#if SLANG_PTR_IS_64
+    // Values above the 32-bit range only exist in the SlangInt parameter on 64-bit hosts, so
+    // the above-range rejection and the inclusive upper-bound acceptance are only testable
+    // there; on a 32-bit host the parameter itself cannot carry them.
     SLANG_CHECK_ABORT(
         session->createTypeConformanceComponentType(
             invalidHitInfo,
@@ -299,6 +303,22 @@ SLANG_UNIT_TEST(typeConformanceSequentialIDAllocatesFirstFreeSlot, NoRenderApi)
             badConformance.writeRef(),
             4294967296LL + 5,
             diagnostics.writeRef()) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK_ABORT(badConformance == nullptr);
+
+    // The inclusive upper bound of the accepted range round-trips through the query API.
+    ComPtr<slang::ITypeConformance> maxConformance;
+    SLANG_CHECK_ABORT(
+        session->createTypeConformanceComponentType(
+            curvesHitInfo,
+            hitInfo,
+            maxConformance.writeRef(),
+            4294967295,
+            diagnostics.writeRef()) == SLANG_OK);
+    uint32_t maxID = 0;
+    SLANG_CHECK_ABORT(
+        session->getTypeConformanceWitnessSequentialID(curvesHitInfo, hitInfo, &maxID) == SLANG_OK);
+    SLANG_CHECK(maxID == 0xFFFFFFFFu);
+#endif
     SLANG_CHECK_ABORT(badConformance == nullptr);
 }
 
@@ -598,8 +618,8 @@ SLANG_UNIT_TEST(typeConformanceImplicitThenExplicitSequentialIDDiagnostic, NoRen
     SLANG_CHECK_ABORT(triangleHitInfo != nullptr);
 
     // Sentinel meaning "no ID written yet", chosen so the `== 0` check below fails if the
-    // query does not write; distinct from the NoneWitness special ID that happens to also
-    // be uint32_t(-1) inside the compiler.
+    // query does not write. It happens to share the numeric value of the NoneWitness special
+    // ID inside the compiler, but the roles are unrelated and the check only tests against 0.
     uint32_t invalidID = uint32_t(-1);
     SLANG_CHECK_ABORT(
         session->getTypeConformanceWitnessSequentialID(invalidHitInfo, hitInfo, &invalidID) ==
@@ -640,4 +660,109 @@ SLANG_UNIT_TEST(typeConformanceImplicitThenExplicitSequentialIDDiagnostic, NoRen
         diagnostics->getBufferSize());
     SLANG_CHECK(diagnosticText.indexOf(toSlice("duplicate type conformance sequential ID")) != -1);
     SLANG_CHECK(diagnosticText.indexOf(toSlice("Sequential ID '0'")) != -1);
+}
+
+// Verifies that occupancy is tracked per interface: the same numeric ID reserved on two
+// different interfaces is legal, and implicit allocation on one interface ignores slots
+// reserved on the other. If the occupancy key ever lost its interface component, both
+// implicit queries below would skip each other's reserved slot 0 and this test fails.
+SLANG_UNIT_TEST(typeConformanceSequentialIDPerInterfaceAllocation, NoRenderApi)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    const char* twoInterfaceSource = R"(
+        interface IFoo
+        {
+            int foo();
+        }
+
+        interface IBar
+        {
+            int bar();
+        }
+
+        struct FooA : IFoo
+        {
+            int dummy;
+            int foo() { return 1; }
+        }
+
+        struct BarB : IBar
+        {
+            int dummy;
+            int bar() { return 2; }
+        }
+
+        struct FooC : IFoo
+        {
+            int dummy;
+            int foo() { return 3; }
+        }
+
+        struct BarD : IBar
+        {
+            int dummy;
+            int bar() { return 4; }
+        }
+    )";
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromSourceString(
+        "twoInterfaceConformance",
+        "twoInterfaceConformance.slang",
+        twoInterfaceSource,
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto layout = module->getLayout();
+    SLANG_CHECK_ABORT(layout != nullptr);
+
+    auto iFoo = layout->findTypeByName("IFoo");
+    auto iBar = layout->findTypeByName("IBar");
+    auto fooA = layout->findTypeByName("FooA");
+    auto barB = layout->findTypeByName("BarB");
+    auto fooC = layout->findTypeByName("FooC");
+    auto barD = layout->findTypeByName("BarD");
+
+    ComPtr<slang::ITypeConformance> fooAConformance;
+    SLANG_CHECK_ABORT(
+        session->createTypeConformanceComponentType(
+            fooA,
+            iFoo,
+            fooAConformance.writeRef(),
+            0,
+            diagnostics.writeRef()) == SLANG_OK);
+    ComPtr<slang::ITypeConformance> barBConformance;
+    SLANG_CHECK_ABORT(
+        session->createTypeConformanceComponentType(
+            barB,
+            iBar,
+            barBConformance.writeRef(),
+            0,
+            diagnostics.writeRef()) == SLANG_OK);
+
+    // Zero-init so a query that fails to write cannot pass the == 1 checks below.
+    uint32_t fooCID = 0;
+    uint32_t barDID = 0;
+    SLANG_CHECK_ABORT(
+        session->getTypeConformanceWitnessSequentialID(fooC, iFoo, &fooCID) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        session->getTypeConformanceWitnessSequentialID(barD, iBar, &barDID) == SLANG_OK);
+
+    // Slot 0 on each interface is taken by its own explicit reservation, so both implicit
+    // allocations land on 1 — each interface's occupancy is independent.
+    SLANG_CHECK(fooCID == 1);
+    SLANG_CHECK(barDID == 1);
 }

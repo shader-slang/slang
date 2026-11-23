@@ -4790,10 +4790,13 @@ struct ISession : public ISlangUnknown
 
         Any explicit sequential-ID reservations made via
         `ISession::createTypeConformanceComponentType(..., conformanceIdOverride, ...)` should be
-        performed before calling this API. If a conflicting explicit ID is reserved after an
-        implicit ID was already allocated for the same slot, code generation diagnoses a duplicate
-        sequential-ID error once both conformances participate in sequential-ID-based dynamic
-        dispatch in the compiled program. This guarantee assumes non-obfuscated linkage names.
+        performed before calling this API. A slot here is one (interface, sequential ID) pair.
+
+        If a conflicting explicit ID is reserved after an implicit ID was already allocated for
+        the same slot, the conflict surfaces as an error at code generation — and only if both
+        conformances participate in sequential-ID-based dynamic dispatch in the compiled program.
+        A program that never dispatches over both can compile while carrying the latent
+        collision. This guarantee assumes non-obfuscated linkage names.
     */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessSequentialID(
         slang::TypeReflection* type,
