@@ -248,7 +248,7 @@ tests/cooperative-vector/subscript-in-func.slang (vk)
 tests/numerics/differentiable-cooperative-vector-runtime.slang (cpu)
 
 # Output no longer matches the test's CHECK lines (mostly Metal, generated capability,
-# and CUDA code-generation tests). (159 tests)
+# and CUDA code-generation tests). (156 tests)
 tests/autodiff/autodiff-higher-order-struct.slang
 tests/autodiff/bwd-fwd-out-projection.slang.1 (cpu)
 tests/autodiff/cuda-expand-param-context-live.slang.3
@@ -310,8 +310,6 @@ tests/generated/capabilities/texture/types/gen-types-metal-wtexture3d.slang
 tests/glsl-intrinsic/point-coord.slang.2
 tests/glsl/layout-qualifier-exprs.slang.1
 tests/hgbc/generic-pack-type-reflection-name.slang
-tests/hgbc/host-integer-bitcast-math.slang.1
-tests/hgbc/validation-error-source-location.slang
 tests/hlsl-intrinsic/matrix-cast-to-vector.slang (dx12)
 tests/hlsl-intrinsic/matrix-cast-to-vector.slang.1 (dx12)
 tests/hlsl-intrinsic/min-max-builtin-arithmetic-shaped.slang.12
@@ -405,7 +403,6 @@ tests/spirv/debug-structured-buffer-member-name.slang
 tests/spirv/debug-var-void-argument.slang
 tests/spirv/descriptor-heap-rw-struct-buffer-load.slang
 tests/spirv/explicit-context-validation-builtin-vertex-glsl.slang
-tests/standard-library/runtime/core/format-specs-string-equality.slang
 tests/vkray/nonstruct-hit-attributes.slang
 tests/wgsl/explicit-binding.slang
 
