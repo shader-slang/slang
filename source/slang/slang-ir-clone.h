@@ -120,6 +120,31 @@ void cloneInstDecorationsAndChildren(
 ///
 IRInst* cloneInst(IRCloneEnv* env, IRBuilder* builder, IRInst* oldInst);
 
+/// Clone the sibling instructions `oldInsts`, in order, using `builder`, register each clone
+/// as the replacement for its original in `env`, and append the clones to `outNewInsts`.
+///
+/// The siblings are cloned in the same two phases that `cloneInstDecorationsAndChildren` uses
+/// for the children of one parent: every instruction is cloned with its operands and registered
+/// before any decorations or children are cloned. We need both phases because decoration
+/// operands are exempt from the rule that a definition precedes its uses in a block (see
+/// `validateIRInstOperands`), so a decoration can refer to a sibling that comes later.
+///
+/// Consider a generic over `T` whose body holds the hoisted type
+/// `DescriptorHandle<RWStructuredBuffer<T>>` decorated with `ReflectionName(%name)`, where
+/// `%name = StringFormat("DescriptorHandle<{}>", ...)` follows the type in the block. If the type
+/// and its decorations were cloned before `%name` had a replacement, the cloned decoration would
+/// keep referring to `%name` inside the original generic, and that reference would keep the
+/// unspecialized generic alive.
+///
+/// Instructions that already have a replacement in `env` are not cloned again; their registered
+/// replacement is appended to `outNewInsts` instead, as `cloneInst` would return it.
+///
+void cloneSiblingInsts(
+    IRCloneEnv* env,
+    IRBuilder* builder,
+    ArrayView<IRInst*> oldInsts,
+    List<IRInst*>& outNewInsts);
+
 /// Clone `oldDecoration` and attach the clone to `newParent`.
 ///
 /// Uses `module` to allocate any new instructions.

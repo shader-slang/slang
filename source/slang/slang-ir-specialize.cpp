@@ -4207,65 +4207,77 @@ IRInst* specializeGenericImpl(
         // instructions only, because parameters were dealt
         // with explicitly at an earlier point.
         //
+        // The block is expected to end with a `return` instruction
+        // for the specialized value that comes out of the abstraction,
+        // and every instruction before it is cloned into the global scope.
+        //
+        List<IRInst*> bodyInsts;
+        IRReturn* returnValInst = nullptr;
         for (auto ii : bb->getOrdinaryInsts())
         {
-            // The last block of the generic is expected to end with
-            // a `return` instruction for the specialized value that
-            // comes out of the abstraction.
-            //
-            // We thus use that cloned value as the result of the
-            // specialization step.
-            //
-            if (auto returnValInst = as<IRReturn>(ii))
-            {
-                auto specializedVal = findCloneForOperand(&env, returnValInst->getVal());
+            returnValInst = as<IRReturn>(ii);
+            if (returnValInst)
+                break;
+            bodyInsts.add(ii);
+        }
 
-                // Clone decorations on the orignal `specialize` inst over to the newly
-                // specialized value.
-                cloneInstDecorationsAndChildren(&env, module, specializeInst, specializedVal);
-                if (context)
-                    context->removeSpecializationDepthDecorations(specializedVal);
+        // We clone the body as one group of siblings rather than one instruction at a time,
+        // because a decoration in the body can refer to an instruction later in the block. For
+        // example, a `DescriptorHandle<RWStructuredBuffer<T>>` type can precede the
+        // `StringFormat` that its `ReflectionName` decoration names; see `cloneSiblingInsts`.
+        //
+        List<IRInst*> clonedInsts;
+        cloneSiblingInsts(&env, builder, bodyInsts.getArrayView(), clonedInsts);
 
-                // Perform IR simplifications to fold constants in this specialized value if it
-                // is a function, so further specializations from the specialized function will
-                // have as simple specialization arguments as possible to avoid creating
-                // specializations that eventually simplified into the same thing.
-                if (context)
-                {
-                    if (auto func = as<IRFunc>(specializedVal))
-                    {
-                        context->tryExpandParameterPack(func);
-                        simplifyFunc(
-                            context->targetProgram,
-                            func,
-                            IRSimplificationOptions::getFast(context->targetProgram));
-                    }
-                }
-                pendingWorkList.add(specializedVal);
-                return specializedVal;
-            }
-
-            // For any instruction other than a `return`, we will
-            // simply clone it completely into the global scope.
-            //
-            IRInst* clonedInst = cloneInst(&env, builder, ii);
-
-            // Any new instructions we create during cloning were
-            // not present when we initially built our work list,
-            // so we need to make sure to consider them now.
-            //
-            // This is important for the cases where one generic
-            // invokes another, because there will be `specialize`
-            // operations nested inside the first generic that refer
-            // to the second.
-            //
-            if (context)
+        // Any new instructions we create during cloning were
+        // not present when we initially built our work list,
+        // so we need to make sure to consider them now.
+        //
+        // This is important for the cases where one generic
+        // invokes another, because there will be `specialize`
+        // operations nested inside the first generic that refer
+        // to the second.
+        //
+        if (context)
+        {
+            for (auto clonedInst : clonedInsts)
             {
                 context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
                     clonedInst,
                     specializationDepth + 1);
                 pendingWorkList.add(clonedInst);
             }
+        }
+
+        // We use the cloned value of the `return` as the result of the specialization step.
+        //
+        if (returnValInst)
+        {
+            auto specializedVal = findCloneForOperand(&env, returnValInst->getVal());
+
+            // Clone decorations on the orignal `specialize` inst over to the newly
+            // specialized value.
+            cloneInstDecorationsAndChildren(&env, module, specializeInst, specializedVal);
+            if (context)
+                context->removeSpecializationDepthDecorations(specializedVal);
+
+            // Perform IR simplifications to fold constants in this specialized value if it
+            // is a function, so further specializations from the specialized function will
+            // have as simple specialization arguments as possible to avoid creating
+            // specializations that eventually simplified into the same thing.
+            if (context)
+            {
+                if (auto func = as<IRFunc>(specializedVal))
+                {
+                    context->tryExpandParameterPack(func);
+                    simplifyFunc(
+                        context->targetProgram,
+                        func,
+                        IRSimplificationOptions::getFast(context->targetProgram));
+                }
+            }
+            pendingWorkList.add(specializedVal);
+            return specializedVal;
         }
     }
 

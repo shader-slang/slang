@@ -411,6 +411,28 @@ void cloneInstDecorationsAndChildren(
     _cloneInstDecorationsAndChildren(subEnv, module, oldInst, newInst);
 }
 
+/// Return whether the decorations and children of `oldInst` should be cloned onto `newInst`,
+/// the result of `cloneInstAndOperands` for `oldInst`.
+///
+/// We skip that second phase in two cases where `newInst` is not a fresh, empty clone. First,
+/// cloning a hoistable inst can return `oldInst` itself, and cloning its decorations onto itself
+/// would never terminate. Second, `cloneInstAndOperands` can return a *different*, pre-existing
+/// hoistable inst via global value numbering (e.g. two witness tables with the same
+/// op/type/operands but different entries, since entries aren't part of the dedup key). That inst
+/// is already fully populated, so grafting the children of `oldInst` onto it would add a
+/// duplicate, unrelated entry instead of merging anything. A freshly created hoistable inst is
+/// empty until its second phase runs, so one that already has decorations or children must be a
+/// pre-existing dedup hit.
+///
+static bool shouldCloneDecorationsAndChildren(IRInst* oldInst, IRInst* newInst)
+{
+    if (newInst == oldInst)
+        return false;
+    if (getIROpInfo(newInst->getOp()).isHoistable() && newInst->getFirstDecorationOrChild())
+        return false;
+    return true;
+}
+
 // The convenience function `cloneInst` just sequences the
 // operations that have already been defined.
 //
@@ -443,29 +465,47 @@ IRInst* cloneInst(IRCloneEnv* env, IRBuilder* builder, IRInst* oldInst)
 
     env->mapOldValToNew.add(oldInst, newInst);
 
-    // For hoistable insts, its possible that the cloned inst is the same
-    // as the original inst.
-    // Skip the decoration/children cloning in that case (which will end up
-    // in an infinite loop)
-    //
-    if (newInst == oldInst)
-        return newInst;
-
-    // `cloneInstAndOperands` may also return a *different*, pre-existing
-    // hoistable inst via global value numbering (e.g. two witness tables with
-    // the same op/type/operands but different entries, since entries aren't
-    // part of the dedup key). That inst is already fully populated, so
-    // grafting `oldInst`'s children onto it here would add a duplicate,
-    // unrelated entry instead of merging anything. Detect this the same way:
-    // a freshly created hoistable inst is empty until populated below, so one
-    // that already has children here must be a pre-existing dedup hit.
-    //
-    if (getIROpInfo(newInst->getOp()).isHoistable() && newInst->getFirstDecorationOrChild())
-        return newInst;
-
-    cloneInstDecorationsAndChildren(env, builder->getModule(), oldInst, newInst);
+    if (shouldCloneDecorationsAndChildren(oldInst, newInst))
+        cloneInstDecorationsAndChildren(env, builder->getModule(), oldInst, newInst);
 
     return newInst;
+}
+
+void cloneSiblingInsts(
+    IRCloneEnv* env,
+    IRBuilder* builder,
+    ArrayView<IRInst*> oldInsts,
+    List<IRInst*>& outNewInsts)
+{
+    SLANG_ASSERT(env);
+    SLANG_ASSERT(builder);
+
+    // The first phase clones each instruction with its operands and registers it, so that every
+    // sibling has a replacement before any decoration refers to it.
+    List<IRCloningOldNewPair> pairs;
+    for (auto oldInst : oldInsts)
+    {
+        SLANG_ASSERT(oldInst);
+
+        IRInst* newInst = nullptr;
+        if (!env->mapOldValToNew.tryGetValue(oldInst, newInst))
+        {
+            newInst = cloneInstAndOperands(env, builder, oldInst);
+            env->mapOldValToNew.add(oldInst, newInst);
+            pairs.add({oldInst, newInst});
+        }
+        outNewInsts.add(newInst);
+    }
+
+    // The second phase clones decorations and children. We check whether `newInst` is still a
+    // fresh clone here rather than in the first phase, so that when two siblings deduplicate to
+    // the same hoistable inst, only the first one populates it, exactly as sequential calls to
+    // `cloneInst` would.
+    for (auto pair : pairs)
+    {
+        if (shouldCloneDecorationsAndChildren(pair.oldInst, pair.newInst))
+            cloneInstDecorationsAndChildren(env, builder->getModule(), pair.oldInst, pair.newInst);
+    }
 }
 
 void cloneDecoration(
