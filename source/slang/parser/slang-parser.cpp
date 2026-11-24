@@ -9175,12 +9175,29 @@ static BaseType _determineIntegerLiteralType(
     bool isDecimalBase,
     IntegerLiteralWidthSuffix widthSuffix,
     IntegerLiteralUnsignedSuffix unsignedSuffix,
+    SourceLanguage sourceLanguage,
     Token* token,
     DiagnosticSink* sink,
     bool* outSignedMinimumIntException)
 {
     const uint64_t rawValue = static_cast<uint64_t>(value);
     *outSignedMinimumIntException = false;
+
+    // GLSL 4.60 section 4.1.3: an unsuffixed literal that fits in 32 bits is an
+    // `int` carrying the raw bit pattern, so a pattern with the sign bit set
+    // denotes a negative value (`0xf1bbcdcb` is -239350325), for decimal and
+    // hexadecimal spellings alike; only a `u`/`U` suffix selects an unsigned
+    // literal. `parseIntegerLiteralExpr` narrows the stored value to the chosen
+    // type, which turns the bit pattern into that negative value. Literals that
+    // do not fit in 32 bits fall through to the Slang rules: GLSL makes those a
+    // compile-time error, but we keep accepting them with the Slang type rather
+    // than rejecting code that used to compile.
+    if (sourceLanguage == SourceLanguage::GLSL &&
+        widthSuffix == IntegerLiteralWidthSuffix::None &&
+        unsignedSuffix == IntegerLiteralUnsignedSuffix::None && (rawValue <= UINT32_MAX))
+    {
+        return BaseType::Int;
+    }
 
     if (isDecimalBase)
     {
@@ -9383,6 +9400,7 @@ static Expr* parseIntegerLiteralExpr(Parser* parser)
             isDecimalBase,
             widthSuffix,
             unsignedSuffix,
+            parser->getSourceLanguage(),
             &token,
             parser->sink,
             &signedMinimumIntException);
@@ -9392,7 +9410,12 @@ static Expr* parseIntegerLiteralExpr(Parser* parser)
         suffixBaseType = BaseType::UInt64;
     }
 
-    constExpr->value = value;
+    // The stored value must fit the chosen suffix type. The GLSL rule above
+    // types some literals `int` whose raw bit pattern has the sign bit set, and
+    // this narrowing is what turns the pattern into the negative value. Every
+    // outcome of the Slang rules already fits its type, so this is a no-op for
+    // Slang sources.
+    constExpr->value = _fixIntegerLiteral(suffixBaseType, value, &token, parser->sink);
     constExpr->suffixType = suffixBaseType;
     constExpr->signedMinimumIntException = signedMinimumIntException;
 

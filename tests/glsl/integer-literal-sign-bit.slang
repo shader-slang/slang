@@ -28,7 +28,11 @@ void main()
 //CHECK_GLSL: buf_0.f_0[1] = float(-1294967296 * buf_0.i_0[0]);
 //CHECK_GLSL: buf_0.i_0[1] = -1;
 //CHECK_GLSL: buf_0.i_0[2] = 1;
-//CHECK_WGSL: i32(-239350325 * i_32_0[0])
-//CHECK_WGSL: i32(-1294967296 * i_32_0[0])
-//CHECK_WGSL: i_32_0[1] = -1;
-//CHECK_WGSL: i_32_0[2] = 1;
+//CHECK_GLSL: buf_0.i_0[3] = -239350325;
+//CHECK_GLSL: buf_0.i_0[4] = -2147483648;
+//CHECK_WGSL: buf_0[i32(0)].f_0[i32(0)] = f32(i32(-239350325) * buf_0[i32(0)].i_0[i32(0)]);
+//CHECK_WGSL: buf_0[i32(0)].f_0[i32(1)] = f32(i32(-1294967296) * n_0);
+//CHECK_WGSL: buf_0[i32(0)].i_0[i32(1)] = i32(-1);
+//CHECK_WGSL: buf_0[i32(0)].i_0[i32(2)] = i32(1);
+//CHECK_WGSL: buf_0[i32(0)].i_0[i32(3)] = i32(-239350325);
+//CHECK_WGSL: buf_0[i32(0)].i_0[i32(4)] = i32(-2147483648);
