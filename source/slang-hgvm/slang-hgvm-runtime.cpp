@@ -29,6 +29,7 @@ InterpreterCore::Desc makeInterpreterCoreDesc(const Desc& desc)
     result.workingDirectory = desc.workingDirectory;
     result.outputSink = desc.outputSink;
     result.hostServices = desc.hostServices;
+    result.debugMessages = desc.debugMessages;
     result.gpuExecution = desc.gpuExecution;
     result.bufferPoolByteLimit = desc.bufferPoolByteLimit;
     result.enableEventTracking = desc.enableEventTracking;

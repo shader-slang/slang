@@ -9,6 +9,13 @@ export interface Settings {
     backend?: "none" | "webgpu";
     /** Virtual search directories. Defaults to ["/"]. */
     searchPaths?: string[];
+    /**
+     * Formats compile errors in the rich layout, which quotes the source line and points at it
+     * with ` --> path:line:column`. Defaults to false, the one-line `path(line): error` layout.
+     */
+    richDiagnostics?: boolean;
+    /** Colors compile errors with ANSI SGR escape sequences. Defaults to false. */
+    diagnosticColor?: boolean;
     /** Optional canvas used by the first Slang-side Window creation. */
     canvas?: HTMLCanvasElement;
     /** Called synchronously after presentation, while the current canvas image can be copied. */

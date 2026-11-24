@@ -71,6 +71,53 @@ Index DebugMap::findSourceRange(uint32_t offset) const
     return first - 1;
 }
 
+const String* DebugMap::findFunctionName(uint32_t offset) const
+{
+    for (const auto& function : m_functions)
+    {
+        if (function.entry <= offset && offset < function.end)
+            return function.name.getLength() ? &function.name : nullptr;
+    }
+    return nullptr;
+}
+
+void DebugMap::appendStackFrames(
+    uint32_t offset,
+    List<DebugStackFrame>& outFrames,
+    const DebugScopeInfo* scope) const
+{
+    DebugStackFrame frame;
+    const List<SourcePosition>* inlineSites = nullptr;
+    if (auto location = findSourceLocation(offset))
+    {
+        static_cast<SourcePosition&>(frame) = *location;
+        inlineSites = &location->inlineSites;
+    }
+    if (scope)
+    {
+        if (scope->functionName.getLength())
+            frame.functionName = scope->functionName;
+        inlineSites = &scope->inlineSites;
+    }
+    if (!frame.functionName.getLength())
+    {
+        if (auto name = findFunctionName(offset))
+            frame.functionName = *name;
+    }
+    // For inner -> outer -> main within one physical call, inner and outer are inlined.
+    // The last reconstructed entry represents the physical call and stays untagged.
+    Index inlineCount = inlineSites ? inlineSites->getCount() : 0;
+    frame.isInlined = inlineCount != 0;
+    outFrames.add(std::move(frame));
+    for (Index i = 0; i < inlineCount; ++i)
+    {
+        DebugStackFrame site;
+        static_cast<SourcePosition&>(site) = (*inlineSites)[i];
+        site.isInlined = i + 1 < inlineCount;
+        outFrames.add(std::move(site));
+    }
+}
+
 HGBCId DebugMap::findRecordType(uint32_t offset) const
 {
     auto type = m_recordTypes.tryGetValue(offset);

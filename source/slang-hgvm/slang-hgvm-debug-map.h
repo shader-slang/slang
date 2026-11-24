@@ -32,6 +32,12 @@ struct SourceLocation : SourcePosition
     List<SourcePosition> inlineSites;
 };
 
+/// Describes one logical stack entry: a physical call, or a call that was inlined into one.
+struct DebugStackFrame : SourcePosition
+{
+    bool isInlined = false;
+};
+
 struct LambdaLocation
 {
     String moduleName;
@@ -125,6 +131,19 @@ public:
     const TypeMetadata* findType(HGBCId typeId) const;
     /// Finds the containing source range, or null for an address without line information.
     const SourceLocation* findSourceLocation(uint32_t recordWordOffset) const;
+    /// Returns the name of the staged function containing the address, or null.
+    const String* findFunctionName(uint32_t recordWordOffset) const;
+    /// Appends the logical stack frames at one staged address to `outFrames`, innermost first.
+    ///
+    /// Consider `outer` calling `inner`, which was inlined into it, from `main`: an address in the
+    /// inlined code yields `inner` (inlined) and then `outer`, the physical call. An address
+    /// without line information still yields its function's name. The debugger passes the scope it
+    /// tracks, which also knows the function and inline sites where the address has no line
+    /// information.
+    void appendStackFrames(
+        uint32_t recordWordOffset,
+        List<DebugStackFrame>& outFrames,
+        const DebugScopeInfo* scope = nullptr) const;
     /// Returns the explicitly registered event type at this exact record address, or zero.
     HGBCId findRecordType(uint32_t recordWordOffset) const;
     /// Returns the specialized entry-point name for a staged pipeline descriptor.

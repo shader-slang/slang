@@ -61,6 +61,8 @@ rhi::DeviceType getDeviceType(const std::string& backend)
 /// Owns the same compiler and interpreter used by the native command-line host.
 struct VM
 {
+    // Declared first so it outlives the device and interpreter that report through it.
+    DebugMessageLog debugMessages;
     ComPtr<slang::IGlobalSession> global;
     RefPtr<HGBCCompiler> compiler;
     RefPtr<Interpreter> interpreter;
@@ -89,6 +91,8 @@ struct VM
             experimental.value.intValue0 = 1;
             deviceDesc.slang.compilerOptionEntries = &experimental;
             deviceDesc.slang.compilerOptionEntryCount = 1;
+            // Kernel compile errors reach HGVM only through this callback; see DebugMessageLog.
+            deviceDesc.debugCallback = &debugMessages;
             check(
                 rhi::getRHI()->createDevice(deviceDesc, device.writeRef()),
                 String("Cannot create the '") + backend.c_str() +
@@ -99,6 +103,7 @@ struct VM
         // Interpreter retains the device and drains its work before releasing it on close.
         desc.device = device;
         desc.workingDirectory = workingDirectory.c_str();
+        desc.debugMessages = &debugMessages;
         interpreter = new Interpreter(desc);
     }
 
@@ -151,7 +156,9 @@ std::shared_ptr<Module> load(const std::shared_ptr<VM>& vm, const std::string& p
             nullptr,
             paths.getBuffer(),
             paths.getCount(),
-            SLANG_DEBUG_INFO_LEVEL_NONE,
+            // Line tables let runtime failures name source lines in their stack trace; staging
+            // drops debug records, so they do not slow execution.
+            SLANG_DEBUG_INFO_LEVEL_MINIMAL,
             SLANG_DIAGNOSTIC_COLOR_NEVER,
             code,
             error),

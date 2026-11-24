@@ -255,10 +255,39 @@ export function createEditor(container, { source, name, filename, files, onRun, 
                 monaco.MarkerSeverity.Info, monaco.MarkerSeverity.Hint][item.severity - 1] ?? monaco.MarkerSeverity.Info,
         })));
     }
+    // A run reports diagnostics from the compilers that built it, which can find errors the
+    // language service does not, such as a kernel that fails to compile for the GPU. Each run owns
+    // its markers, and they describe the code that ran, so any edit clears them.
+    const runOwners = new Set();
+    function clearRunMarkers() {
+        for (const owner of runOwners) monaco.editor.setModelMarkers(model, owner, []);
+        runOwners.clear();
+    }
+    function setRunMarkers(owner, diagnostics) {
+        runOwners.add(owner);
+        monaco.editor.setModelMarkers(model, owner, diagnostics.flatMap(item => {
+            if (item.line < 1 || item.line > model.getLineCount()) return [];
+            // A diagnostic names one column; the marker covers the word there, or the line's
+            // code when the column is past its end.
+            const maxColumn = model.getLineMaxColumn(item.line);
+            const word = item.column < maxColumn &&
+                model.getWordAtPosition({ lineNumber: item.line, column: item.column });
+            const startColumn = word ? word.startColumn :
+                item.column < maxColumn ? item.column : model.getLineFirstNonWhitespaceColumn(item.line) || 1;
+            const endColumn = word ? word.endColumn :
+                item.column < maxColumn ? item.column + 1 : maxColumn;
+            return [{
+                startLineNumber: item.line, startColumn, endLineNumber: item.line, endColumn,
+                message: item.message, code: item.code, source: "Run",
+                severity: item.severity === "warning" ? monaco.MarkerSeverity.Warning : monaco.MarkerSeverity.Error,
+            }];
+        }));
+    }
     const focusListener = editor.onDidFocusEditorText(() => {
         if (!service.ready) void diagnose();
     });
     const changeListener = model.onDidChangeContent(() => {
+        clearRunMarkers();
         onChange?.();
         clearTimeout(timer);
         if (service.ready) timer = setTimeout(diagnose, 300);
@@ -289,6 +318,7 @@ export function createEditor(container, { source, name, filename, files, onRun, 
             void foldDefaults(foldLines);
         },
         setReadOnly: readOnly => editor.updateOptions({ readOnly }),
+        setRunMarkers,
         sourcesChanged() {
             service.workspaceVersion++;
             clearTimeout(timer);

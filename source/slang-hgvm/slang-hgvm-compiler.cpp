@@ -52,7 +52,8 @@ SlangResult HGBCCompiler::compile(
     SlangDiagnosticColor diagnosticColor,
     ComPtr<slang::IBlob>& outCode,
     String& outDiagnostics,
-    bool reportCheckpointIntermediates)
+    bool reportCheckpointIntermediates,
+    bool richDiagnostics)
 {
     outCode = nullptr;
     outDiagnostics = "";
@@ -96,7 +97,7 @@ SlangResult HGBCCompiler::compile(
     // imported demo libraries while tests in unrelated directories cannot collide by module name.
     StringBuilder sessionKey;
     sessionKey << int(debugInfoLevel) << ":" << int(diagnosticColor) << ":"
-               << reportCheckpointIntermediates;
+               << reportCheckpointIntermediates << ":" << richDiagnostics;
     for (const String& searchPath : searchPathStorage)
         sessionKey << ":" << searchPath.getLength() << ":" << searchPath;
     String sessionKeyString = sessionKey.produceString();
@@ -114,7 +115,7 @@ SlangResult HGBCCompiler::compile(
         sessionDesc.fileSystem = m_impl->fileSystem;
         sessionDesc.targetCount = 1;
         sessionDesc.targets = &targetDesc;
-        slang::CompilerOptionEntry compilerOptions[4] = {};
+        slang::CompilerOptionEntry compilerOptions[5] = {};
         compilerOptions[0].name = slang::CompilerOptionName::DiagnosticColor;
         compilerOptions[0].value.kind = slang::CompilerOptionValueKind::Int;
         compilerOptions[0].value.intValue0 = diagnosticColor;
@@ -127,6 +128,9 @@ SlangResult HGBCCompiler::compile(
         compilerOptions[3].name = slang::CompilerOptionName::ReportCheckpointIntermediates;
         compilerOptions[3].value.kind = slang::CompilerOptionValueKind::Int;
         compilerOptions[3].value.intValue0 = reportCheckpointIntermediates;
+        compilerOptions[4].name = slang::CompilerOptionName::EnableRichDiagnostics;
+        compilerOptions[4].value.kind = slang::CompilerOptionValueKind::Int;
+        compilerOptions[4].value.intValue0 = richDiagnostics;
         sessionDesc.compilerOptionEntries = compilerOptions;
         sessionDesc.compilerOptionEntryCount = SLANG_COUNT_OF(compilerOptions);
 

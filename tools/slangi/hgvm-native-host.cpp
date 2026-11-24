@@ -24,34 +24,13 @@ SlangResult fail(String& outError, const char* message)
     return SLANG_FAIL;
 }
 
-struct NativeDebugCallback : rhi::IDebugCallback
+/// Puts the slang-rhi messages that HGVM has not already reported in front of `ioError`.
+///
+/// A pipeline-creation failure includes its own compiler output, so only unrelated messages, such
+/// as a device-creation error, remain here.
+void prependDebugMessages(String& ioError, DebugMessageLog& log)
 {
-    std::string messages;
-
-    void SLANG_MCALL handleMessage(
-        rhi::DebugMessageType type,
-        rhi::DebugMessageSource source,
-        const char* message) override
-    {
-        if (!message || !message[0])
-            return;
-
-        if (source != rhi::DebugMessageSource::Slang)
-        {
-            messages += "[RHI ";
-            messages += type == rhi::DebugMessageType::Error     ? "error"
-                        : type == rhi::DebugMessageType::Warning ? "warning"
-                                                                 : "info";
-            messages += "] ";
-        }
-        messages += message;
-        if (messages.back() != '\n')
-            messages += '\n';
-    }
-};
-
-void prependDebugMessages(String& ioError, const std::string& messages)
-{
+    std::string messages = log.takeAll();
     if (messages.empty())
         return;
 
@@ -649,7 +628,7 @@ rhi::DeviceType getRhiDeviceType(RenderApiType api)
 
 struct NativeHGVMEnvironment::Impl
 {
-    NativeDebugCallback debugCallback;
+    DebugMessageLog debugCallback;
     std::unique_ptr<PlatformScope> platformScope;
     ComPtr<rhi::IDevice> device;
     RefPtr<NativeHostServices> host;
@@ -713,7 +692,7 @@ SlangResult NativeHGVMEnvironment::create(
         String message =
             String("Failed to create the '") + apiName + "' RHI device for native HGVM execution";
         SlangResult result = fail(outError, message.getBuffer());
-        SlangITool::prependDebugMessages(outError, environment->m_impl->debugCallback.messages);
+        SlangITool::prependDebugMessages(outError, environment->m_impl->debugCallback);
         return result;
     }
 
@@ -820,7 +799,7 @@ SlangResult NativeHGVMRuntime::create(
     if (!environment || !environment->m_impl->device || !environment->m_impl->host || !code)
         return fail(outError, "Native HGVM runtime creation requires an environment and code");
 
-    environment->m_impl->debugCallback.messages.clear();
+    environment->m_impl->debugCallback.clear();
     RefPtr<NativeHGVMRuntime> runtime = new NativeHGVMRuntime;
     runtime->m_impl->environment = environment;
     SLANG_RETURN_ON_FAIL(Program::load(
@@ -837,6 +816,7 @@ SlangResult NativeHGVMRuntime::create(
     desc.gpuExecution = gpuExecution;
     desc.hostServices = environment->m_impl->host;
     desc.outputSink = outputSink;
+    desc.debugMessages = &environment->m_impl->debugCallback;
     desc.enableEventTracking = eventSink != nullptr;
     desc.eventSink = eventSink;
     if (enableDebugging)
@@ -867,7 +847,7 @@ DebugSession* NativeHGVMRuntime::getDebugSession() const
 
 void NativeHGVMRuntime::prependDebugMessages(String& ioError) const
 {
-    SlangITool::prependDebugMessages(ioError, m_impl->environment->m_impl->debugCallback.messages);
+    SlangITool::prependDebugMessages(ioError, m_impl->environment->m_impl->debugCallback);
 }
 
 SlangResult executeNativeHGBCProgram(

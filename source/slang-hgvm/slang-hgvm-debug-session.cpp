@@ -608,22 +608,7 @@ List<DebugStackFrame> DebugSession::getStackTrace() const
     {
         uint32_t pc =
             i + 1 == m_callStack.getCount() ? m_address.wordOffset : m_callStack[i + 1].callSite;
-        const auto& scope = m_map->getScope(m_callStack[i].scopeIndex);
-        SourcePosition position;
-        if (auto location = m_map->findSourceLocation(pc))
-            position = *location;
-        if (scope.functionName.getLength())
-            position.functionName = scope.functionName;
-        if (!position.functionName.getLength())
-            for (const auto& function : m_map->getFunctions())
-                if (function.entry <= pc && pc < function.end)
-                    position.functionName = function.name;
-        // For inner -> outer -> main within one physical call, inner and outer are inlined.
-        // The last reconstructed entry represents the physical call and stays untagged.
-        Index inlineCount = scope.inlineSites.getCount();
-        result.add({position, inlineCount != 0});
-        for (Index j = 0; j < inlineCount; ++j)
-            result.add({scope.inlineSites[j], j + 1 < inlineCount});
+        m_map->appendStackFrames(pc, result, &m_map->getScope(m_callStack[i].scopeIndex));
     }
     return result;
 }

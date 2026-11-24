@@ -32,6 +32,8 @@ export async function init(settings = {}) {
         native = new module.WasmVM({
             backend,
             searchPaths: settings.searchPaths ?? ["/"],
+            richDiagnostics: !!settings.richDiagnostics,
+            diagnosticColor: !!settings.diagnosticColor,
         }, host, files);
         checkNativeResult(await native.initialize());
         return createVM(native, host, files);

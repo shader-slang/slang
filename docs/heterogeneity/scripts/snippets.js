@@ -11,6 +11,11 @@
   const mappingURL = new URL("snippet-files.json", document.currentScript.src);
   const filesystemURL = new URL("snippet-filesystem.js", document.currentScript.src);
   const linksURL = new URL("snippet-links.js", document.currentScript.src);
+  const terminalURL = new URL("snippet-terminal.js", document.currentScript.src);
+  // Output stays readable as plain text until the renderer loads, so a failure does not wait on it.
+  let terminal = null;
+  const terminalReady = import(terminalURL.href).then(module => { terminal = module; },
+    error => console.warn("Cannot load the output renderer", error));
   let fileMappings;
   function loadMappings() {
     if (!fileMappings) fileMappings = fetch(mappingURL).then(response => {
@@ -39,6 +44,25 @@
   function sourcesChanged() {
     cellLinks?.cancel();
     for (const cell of cells.values()) cell.sourcesChanged();
+  }
+  // Diagnostics name a cell by its filename, relative to the VM root; standard modules and other
+  // files in directories have no cell to show.
+  function cellFilename(path) {
+    const filename = path.replace(/^\.?\//, "");
+    return !filename.includes("/") && cells.has(filename.replace(/\.slang$/, "")) ? filename : null;
+  }
+  async function revealLocation({ filename, line, column }) {
+    const editor = await cells.get(filename.replace(/\.slang$/, "")).getEditor();
+    await editor.reveal({ startLineNumber: line, startColumn: column });
+  }
+  // Each runnable cell owns the markers of its latest run, which can point into imported cells.
+  function showRunDiagnostics(owner, text, failureMessage) {
+    void terminalReady.then(() => {
+      const diagnostics = text ? terminal?.findDiagnostics(text, cellFilename, { failureMessage }) ?? [] : [];
+      for (const [name, cell] of cells) {
+        void cell.showRunDiagnostics(owner, diagnostics.filter(item => item.filename === `${name}.slang`));
+      }
+    });
   }
   let editorAssets;
   function loadEditor() {
@@ -185,6 +209,10 @@
         editor.sourcesChanged?.();
         updateSourceStatus();
       },
+      async showRunDiagnostics(owner, diagnostics) {
+        await editorReady.catch(() => {});
+        editor.setRunMarkers?.(owner, diagnostics);
+      },
     });
     fallback.addEventListener("input", sourcesChanged);
 
@@ -243,9 +271,23 @@
       result.hidden = false;
     }
 
-    function failure(message) {
+    // Output may carry terminal colors and diagnostic locations; see snippet-terminal.js.
+    let shownOutput = "";
+    function showOutput(text) {
+      shownOutput = text;
+      if (terminal) {
+        output.replaceChildren(terminal.renderTerminal(text, { resolve: cellFilename, reveal: revealLocation }));
+        return;
+      }
+      output.textContent = text.replace(/\x1b\[[0-9;]*m/g, "");
+      if (text) void terminalReady.then(() => { if (terminal && shownOutput === text) showOutput(text); });
+    }
+
+    function failure(message, failureMessage) {
+      const text = transcript + (transcript ? "\n" : "") + message;
       output.hidden = false;
-      output.textContent = transcript + (transcript ? "\n" : "") + message;
+      showOutput(text);
+      showRunDiagnostics(`run:${name}`, text, failureMessage);
       finish("Could not run this example", true);
     }
 
@@ -256,8 +298,9 @@
       transcript = "";
       adapter.textContent = "";
       adapter.hidden = true;
-      output.textContent = "";
+      showOutput("");
       output.hidden = true;
+      showRunDiagnostics(`run:${name}`, "");
       display.replaceChildren();
       display.hidden = true;
       card.classList.remove("snippet-error");
@@ -295,14 +338,15 @@
           if (data.type === "output") {
             transcript = data.text;
             output.hidden = false;
-            output.textContent = transcript;
+            showOutput(transcript);
           }
           if (data.type === "done") {
             output.hidden = !transcript && (!!aspect || data.stopped);
-            output.textContent = transcript || "Program completed without printing output.";
+            showOutput(transcript || "Program completed without printing output.");
+            showRunDiagnostics(`run:${name}`, transcript);
             finish(data.stopped ? "Stopped" : "Finished");
           }
-          if (data.type === "error") failure(data.text);
+          if (data.type === "error") failure(data.text, data.failureMessage);
         };
         if (aspect) {
           const controller = new AbortController();
@@ -366,8 +410,9 @@
       runSources = undefined;
       editor.setValue(original, foldLines);
       transcript = "";
-      output.textContent = "";
+      showOutput("");
       output.hidden = true;
+      showRunDiagnostics(`run:${name}`, "");
       finish("");
       display.replaceChildren();
       display.hidden = true;

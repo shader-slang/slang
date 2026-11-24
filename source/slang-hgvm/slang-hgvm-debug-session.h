@@ -41,12 +41,6 @@ struct DebugBreakpoint
     List<uint32_t> addresses;
 };
 
-/// Describes a logical stack entry reconstructed when the debugger inspects a stop.
-struct DebugStackFrame : SourcePosition
-{
-    bool isInlined = false;
-};
-
 /// Owns a bounded preview or a shallow value with a reference for lazy child inspection.
 /// References are valid only until execution resumes; no storage pointers are exposed.
 struct DebugValueInfo

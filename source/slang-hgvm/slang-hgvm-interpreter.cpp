@@ -5295,10 +5295,55 @@ struct DeviceState
     };
 
     ComPtr<rhi::IDevice> device;
+    /// Receives the device's slang-rhi messages; see `failPipelineCreation`.
+    DebugMessageLog* debugMessages = nullptr;
 #if SLANG_ENABLE_HGVM_EVENT_TRACKING
     RefPtr<EventTracker> eventTracker;
 #endif
     bool synchronousGPUOperations = false;
+
+    /// Returns the position in the slang-rhi message log before a pipeline-creation step.
+    size_t getDebugMessageMark() const
+    {
+        return debugMessages ? debugMessages->getMark() : 0;
+    }
+
+    /// Fails with `summary` followed by the compiler output that explains it.
+    ///
+    /// Consider a dispatch whose kernel uses a float `InterlockedAdd` on D3D12: slang-rhi compiles
+    /// the kernel inside `createComputePipeline` and reports the Slang and DXC errors through the
+    /// device's debug callback, so pipeline creation only returns null. The error therefore
+    /// includes every message logged since `messageMark`, plus any diagnostics a Slang API call
+    /// returned directly, after the summary. Including them consumes them from the log, so the host
+    /// does not print them a second time.
+    [[noreturn]] void failPipelineCreation(
+        std::string summary,
+        size_t messageMark,
+        ISlangBlob* diagnostics = nullptr)
+    {
+        std::string details;
+        if (diagnostics && diagnostics->getBufferSize())
+        {
+            details.assign(
+                static_cast<const char*>(diagnostics->getBufferPointer()),
+                diagnostics->getBufferSize());
+            while (!details.empty() && (details.back() == '\0' || details.back() == '\n'))
+                details.pop_back();
+            details += '\n';
+        }
+        std::string messages = debugMessages ? debugMessages->takeSince(messageMark) : "";
+        if (!details.empty() && messages.find(details) != std::string::npos)
+            details.clear();
+        details += messages;
+        if (!details.empty())
+        {
+            summary += ":\n";
+            summary += details;
+            while (!summary.empty() && summary.back() == '\n')
+                summary.pop_back();
+        }
+        fail(summary);
+    }
     RefPtr<BufferPool> bufferPool;
     ComPtr<rhi::ICommandQueue> commandQueue;
     ComPtr<rhi::IFence> completionFence;
@@ -5389,6 +5434,7 @@ struct DeviceState
         SlangStage stage)
     {
         ComPtr<ISlangBlob> diagnostics;
+        size_t messageMark = getDebugMessageMark();
         ComPtr<slang::IEntryPoint> checkedEntryPoint;
         SlangResult result = entryPoint->module->module->findAndCheckEntryPoint(
             entryPoint->name.getBuffer(),
@@ -5396,7 +5442,13 @@ struct DeviceState
             checkedEntryPoint.writeRef(),
             diagnostics.writeRef());
         if (SLANG_FAILED(result) || !checkedEntryPoint)
-            fail("HGVM failed to check an embedded shader entry point");
+        {
+            failPipelineCreation(
+                std::string("HGVM failed to check embedded shader entry point '") +
+                    entryPoint->name.getBuffer() + "'",
+                messageMark,
+                diagnostics);
+        }
 
         ComPtr<slang::IComponentType> entryPointComponent;
         entryPointComponent = static_cast<slang::IComponentType*>(checkedEntryPoint.get());
@@ -5446,7 +5498,13 @@ struct DeviceState
                 specializedEntryPoint.writeRef(),
                 diagnostics.writeRef());
             if (SLANG_FAILED(result) || !specializedEntryPoint)
-                fail("HGVM failed to specialize an embedded shader entry point");
+            {
+                failPipelineCreation(
+                    std::string("HGVM failed to specialize embedded shader entry point '") +
+                        entryPoint->name.getBuffer() + "'",
+                    messageMark,
+                    diagnostics);
+            }
             entryPointComponent = specializedEntryPoint;
         }
 
@@ -5468,6 +5526,17 @@ struct DeviceState
             fail("HGVM compute dispatch requires an RHI device");
         SLANG_ASSERT(entryPoint && entryPoint->module && slangSession);
         object->entryPoint = entryPoint;
+        size_t messageMark = getDebugMessageMark();
+        auto name = debugMap->findPipelineName(object->descriptorWordOffset);
+        SLANG_RELEASE_ASSERT(name);
+        auto failCompute = [&](const char* what, ISlangBlob* failureDiagnostics)
+        {
+            failPipelineCreation(
+                std::string("HGVM failed to ") + what + " for compute pipeline '" +
+                    name->getBuffer() + "'",
+                messageMark,
+                failureDiagnostics);
+        };
 
         ComPtr<ISlangBlob> diagnostics;
         ComPtr<slang::IComponentType> entryPointComponent =
@@ -5486,23 +5555,21 @@ struct DeviceState
             composite.writeRef(),
             diagnostics.writeRef());
         if (SLANG_FAILED(result) || !composite)
-            fail("HGVM failed to compose an embedded compute program");
+            failCompute("compose the embedded program", diagnostics);
 
         diagnostics.setNull();
         result = composite->link(object->linkedComponent.writeRef(), diagnostics.writeRef());
         if (SLANG_FAILED(result) || !object->linkedComponent)
-            fail("HGVM failed to link an embedded compute program");
+            failCompute("link the embedded program", diagnostics);
 
         diagnostics.setNull();
         object->program =
             device->createShaderProgram(object->linkedComponent, diagnostics.writeRef());
         if (!object->program)
-            fail("HGVM failed to create an embedded compute shader program");
+            failCompute("create the shader program", diagnostics);
 
         rhi::ComputePipelineDesc pipelineDesc = {};
         pipelineDesc.program = object->program;
-        auto name = debugMap->findPipelineName(object->descriptorWordOffset);
-        SLANG_RELEASE_ASSERT(name);
         pipelineDesc.label = name->getBuffer();
         SLANG_HGVM_BEGIN_TIMING(eventTracker.get(), creationStart);
         object->pipeline = device->createComputePipeline(pipelineDesc);
@@ -5517,7 +5584,7 @@ struct DeviceState
                 {{SLANG_STAGE_COMPUTE,
                   {debugMap->getProgramId(), entryPoint->descriptorWordOffset}}}));
         if (!object->pipeline)
-            fail("HGVM failed to create an embedded compute pipeline");
+            failCompute("build the device code", nullptr);
         object->label = *name;
     }
 
@@ -5534,6 +5601,17 @@ struct DeviceState
         if (state.depthStencil.stencilEnable &&
             !rhi::getRHI()->getFormatInfo(state.depthStencil.format).hasStencil)
             fail("HGVM stencil testing requires a stencil-capable attachment format");
+        size_t messageMark = getDebugMessageMark();
+        auto name = debugMap->findPipelineName(object->descriptorWordOffset);
+        SLANG_RELEASE_ASSERT(name);
+        auto failGraphics = [&](const char* what, ISlangBlob* failureDiagnostics)
+        {
+            failPipelineCreation(
+                std::string("HGVM failed to ") + what + " for graphics pipeline '" +
+                    name->getBuffer() + "'",
+                messageMark,
+                failureDiagnostics);
+        };
         auto vertexComponent = specializeEntryPoint(vertex, SLANG_STAGE_VERTEX);
         auto fragmentComponent = specializeEntryPoint(fragment, SLANG_STAGE_FRAGMENT);
         List<slang::IComponentType*> components;
@@ -5550,7 +5628,7 @@ struct DeviceState
                 composite.writeRef(),
                 diagnostics.writeRef())) ||
             !composite)
-            fail("HGVM failed to compose the graphics program");
+            failGraphics("compose the program", diagnostics);
         diagnostics.setNull();
         // Both specialized stages execute in one graphics pipeline. Declare that
         // coexistence explicitly so Vulkan shader offsets and host uploads agree.
@@ -5565,7 +5643,7 @@ struct DeviceState
                 1,
                 constraints.writeRef(),
                 diagnostics.writeRef())))
-            fail("HGVM failed to declare graphics entry-point coexistence");
+            failGraphics("declare entry-point coexistence", diagnostics);
         slang::IComponentType* constrainedParts[] = {composite, constraints};
         ComPtr<slang::IComponentType> constrainedProgram;
         if (SLANG_FAILED(session->createCompositeComponentType(
@@ -5573,21 +5651,19 @@ struct DeviceState
                 2,
                 constrainedProgram.writeRef(),
                 diagnostics.writeRef())))
-            fail("HGVM failed to compose graphics layout constraints");
+            failGraphics("compose layout constraints", diagnostics);
         if (SLANG_FAILED(constrainedProgram->link(
                 object->linkedComponent.writeRef(),
                 diagnostics.writeRef())))
-            fail("HGVM failed to link the graphics program");
+            failGraphics("link the program", diagnostics);
         rhi::ShaderProgramDesc programDesc;
         programDesc.slangGlobalScope = object->linkedComponent;
         if (device->getInfo().deviceType == rhi::DeviceType::Vulkan)
             programDesc.entryPointUniformLayoutGroupIndex = 0;
         object->program = device->createShaderProgram(programDesc, diagnostics.writeRef());
         if (!object->program)
-            fail("HGVM failed to create the graphics shader program");
+            failGraphics("create the shader program", diagnostics);
         rhi::RenderPipelineDesc description;
-        auto name = debugMap->findPipelineName(object->descriptorWordOffset);
-        SLANG_RELEASE_ASSERT(name);
         description.label = name->getBuffer();
         description.program = object->program;
         description.primitiveTopology = state.topology;
@@ -5614,7 +5690,7 @@ struct DeviceState
                      SLANG_STAGE_FRAGMENT,
                      {debugMap->getProgramId(), fragment->descriptorWordOffset}}}));
         if (!object->pipeline)
-            fail("HGVM failed to prepare the graphics pipeline");
+            failGraphics("build the device code", nullptr);
         object->colorFormat = state.colorTarget.format;
         object->depthFormat = state.depthStencil.format;
         object->scissorEnable = state.rasterizer.scissorEnable;
@@ -11340,6 +11416,53 @@ struct InterpreterState
     }
 #endif
 
+    /// Returns `message` followed by the HGVM call stack at a failure, innermost call first.
+    ///
+    /// Consider a host `assert` that fails in `check`, which `main` called:
+    ///
+    ///     assertion failed
+    ///         at assert
+    ///         at check (main.slang:4:5)
+    ///         at main (main.slang:9:5)
+    ///
+    /// The innermost frame reports the record that threw, since a record advances the program
+    /// counter only after it completes. Each caller reports its call record, which ends just before
+    /// the return address saved in its callee's frame header. Every frame is still on the stack
+    /// here, because unwinding starts only after the failure is recorded. Frames without line
+    /// information, such as precompiled standard-module code, report only their function's name.
+    String appendStackTrace(const String& message)
+    {
+        static constexpr Index kMaxFrames = 32;
+        const DebugMap* map = program->debugMap;
+        List<DebugStackFrame> frames;
+        uint32_t pc = programCounter;
+        uint32_t frameOffset = currentFrameOffset;
+        while (map && frames.getCount() <= kMaxFrames)
+        {
+            map->appendStackFrames(pc, frames);
+            FrameHeader frame = readValue<FrameHeader>(Address::makeAbsoluteFrame(frameOffset));
+            if (frame.callerFrameOffset == kInvalidStackOffset)
+                break;
+            pc = frame.returnProgramCounter - 1;
+            frameOffset = frame.callerFrameOffset;
+        }
+
+        StringBuilder trace;
+        trace << message;
+        for (Index i = 0; i < frames.getCount() && i < kMaxFrames; ++i)
+        {
+            const auto& frame = frames[i];
+            trace << "\n    at "
+                  << (frame.functionName.getLength() ? frame.functionName
+                                                     : String("<unknown function>"));
+            if (frame.path.getLength() && frame.line)
+                trace << " (" << frame.path << ":" << frame.line << ":" << frame.column << ")";
+        }
+        if (frames.getCount() > kMaxFrames)
+            trace << "\n    ... more frames";
+        return trace.produceString();
+    }
+
     /// Runs the fast staged-record loop until the root function completes or throws.
     ///
     /// For example, ordinary hello world visits `OpPrint`, `OpReturn`, and `FinishFrameExit`.
@@ -11683,7 +11806,7 @@ struct InterpreterState
                 if (isUnwindingFailure)
                     throw;
                 isUnwindingFailure = true;
-                failureMessage = exception.Message;
+                failureMessage = appendStackTrace(exception.Message);
                 deviceState->abandonPendingCommands();
                 StagedRecord::Function functionRecord = readRecord<StagedRecord::Function>(
                     uint32_t(functionAddress.getUnsignedPayload()));
@@ -13122,6 +13245,7 @@ InterpreterCore::InterpreterCore(const Desc& desc)
     m_impl->stepControl = desc.stepControl;
     m_impl->debugHandler = desc.debugHandler;
     m_impl->deviceState.device = desc.device;
+    m_impl->deviceState.debugMessages = desc.debugMessages;
     m_impl->fileSystem = desc.fileSystem;
     m_impl->workingDirectory = desc.workingDirectory ? desc.workingDirectory : "";
     m_impl->outputSink = desc.outputSink;

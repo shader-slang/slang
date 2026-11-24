@@ -19,6 +19,7 @@ namespace Slang::HGVM
 {
 class IHGVMOutputSink;
 class IHGVMHostServices;
+class DebugMessageLog;
 class IEventSink;
 class SequentialByteWriter;
 struct TextureInfo;
@@ -56,6 +57,7 @@ public:
         const char* workingDirectory = nullptr;
         IHGVMOutputSink* outputSink = nullptr;
         IHGVMHostServices* hostServices = nullptr;
+        DebugMessageLog* debugMessages = nullptr;
         GPUExecutionMode gpuExecution = GPUExecutionMode::Default;
         uint64_t bufferPoolByteLimit = uint64_t(256) * 1024 * 1024;
         bool enableEventTracking = false;

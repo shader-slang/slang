@@ -12,6 +12,8 @@ export async function runSnippet({ source, filename = "main.slang", sources = { 
   let lastOutput = 0;
   let truncated = false;
   let failure;
+  // The first line of the error, without the phase, names the failure in editor markers.
+  let failureMessage;
   const status = (text) => {
     phase = text;
     send({ type: "status", text });
@@ -90,6 +92,9 @@ export async function runSnippet({ source, filename = "main.slang", sources = { 
         libraries,
       ]),
       backend,
+      // The cell renders colors and links each diagnostic location to its source line.
+      richDiagnostics: true,
+      diagnosticColor: true,
       print,
       printErr: print,
       onPresent: canvas ? captureFrame : undefined,
@@ -110,6 +115,7 @@ export async function runSnippet({ source, filename = "main.slang", sources = { 
   } catch (error) {
     if (!signal?.aborted) {
       failure = `${phase}\n${error.message || error}`;
+      failureMessage = String(error.message || error).split("\n")[0];
       if (phase === "Loading slangvm…") {
         failure += "\nThe local runtime assets may be missing. See Contributing to the docs → Runnable snippets.";
       }
@@ -123,6 +129,7 @@ export async function runSnippet({ source, filename = "main.slang", sources = { 
       failure = String(signal.reason?.message || signal.reason);
     }
     if (output) send({ type: "output", text: output });
-    send(failure ? { type: "error", text: failure } : { type: "done", stopped: !!signal?.aborted });
+    send(failure ? { type: "error", text: failure, failureMessage }
+      : { type: "done", stopped: !!signal?.aborted });
   }
 }

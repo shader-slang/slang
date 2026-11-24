@@ -5,6 +5,7 @@
 #include "slang-hgvm-invocation.h"
 
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <slang-com-ptr.h>
 #include <slang-hgbc-container.h>
@@ -208,6 +209,71 @@ namespace StagedRecord
 struct Header;
 }
 
+/// Records slang-rhi debug messages so HGVM can report the ones that explain a failure.
+///
+/// A host installs one log as its device's `rhi::DeviceDesc::debugCallback` and passes the same
+/// log in `Desc::debugMessages`. When slang-rhi cannot build a pipeline, for example because a
+/// kernel's float atomic is unsupported on D3D12, the Slang and downstream-compiler errors it
+/// reported arrive here, and HGVM includes them in its failure message instead of reporting only
+/// that pipeline creation failed. Messages from other sources are prefixed with their severity,
+/// as in `[RHI error] ...`; Slang compiler output is kept unchanged.
+class DebugMessageLog : public rhi::IDebugCallback
+{
+public:
+    SLANG_NO_THROW void SLANG_MCALL handleMessage(
+        rhi::DebugMessageType type,
+        rhi::DebugMessageSource source,
+        const char* message) override
+    {
+        if (!message || !message[0])
+            return;
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (source != rhi::DebugMessageSource::Slang)
+        {
+            m_text += "[RHI ";
+            m_text += type == rhi::DebugMessageType::Error     ? "error"
+                      : type == rhi::DebugMessageType::Warning ? "warning"
+                                                               : "info";
+            m_text += "] ";
+        }
+        m_text += message;
+        if (m_text.back() != '\n')
+            m_text += '\n';
+    }
+
+    /// Returns a position that `takeSince` later uses to select only newer messages.
+    size_t getMark()
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return m_text.size();
+    }
+
+    /// Removes and returns the messages recorded after `mark`, so a later report does not repeat
+    /// them. Earlier messages are kept for the host.
+    std::string takeSince(size_t mark)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (mark >= m_text.size())
+            return std::string();
+        std::string result = m_text.substr(mark);
+        m_text.resize(mark);
+        return result;
+    }
+
+    /// Removes and returns every message that has not been reported yet.
+    std::string takeAll() { return takeSince(0); }
+
+    void clear()
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_text.clear();
+    }
+
+private:
+    std::mutex m_mutex;
+    std::string m_text;
+};
+
 /// Supplies services and configuration used by the HGVM interpreter.
 struct Desc
 {
@@ -221,6 +287,9 @@ struct Desc
     uint64_t bufferPoolByteLimit = uint64_t(256) * 1024 * 1024;
     IHGVMHostServices* hostServices = nullptr;
     IHGVMOutputSink* outputSink = nullptr;
+    /// The log installed as the device's debug callback, if any. Pipeline-creation failures include
+    /// the messages it recorded during that creation. Borrowed for this interpreter's lifetime.
+    DebugMessageLog* debugMessages = nullptr;
     /// Enables host-side events when compiled with SLANG_ENABLE_HGVM_EVENT_TRACKING.
     /// Configuration is fixed for this interpreter's lifetime; the tracker retains the sink.
     bool enableEventTracking = false;

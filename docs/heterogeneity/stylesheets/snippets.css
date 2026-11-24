@@ -177,8 +177,39 @@
   overflow-wrap: anywhere;
 }
 .snippet-error .snippet-result { border-color: #d5a4a4; background: #fff0f0; }
-.snippet-error .snippet-status,
-.snippet-error .snippet-output { color: #8b1c24; }
+.snippet-error .snippet-status { color: #8b1c24; }
+
+/* Terminal colors from compiler diagnostics, chosen for contrast on the white and pale-red
+   result backgrounds. */
+.snippet-output .ansi-bold { font-weight: 700; }
+.snippet-output .ansi-red,
+.snippet-output .ansi-bright-red { color: #b3261e; }
+.snippet-output .ansi-yellow,
+.snippet-output .ansi-bright-yellow { color: #8a5a00; }
+.snippet-output .ansi-green,
+.snippet-output .ansi-bright-green { color: #2f6b1f; }
+.snippet-output .ansi-cyan,
+.snippet-output .ansi-bright-cyan { color: #0f6577; }
+.snippet-output .ansi-blue,
+.snippet-output .ansi-bright-blue { color: #1f4f9a; }
+.snippet-output .ansi-magenta,
+.snippet-output .ansi-bright-magenta { color: #86338a; }
+.snippet-output .ansi-black,
+.snippet-output .ansi-bright-black { color: #5b665b; }
+
+/* A diagnostic location reveals its line in the cell's editor. */
+.md-typeset .snippet-output .snippet-location {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1f5fa8;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.md-typeset .snippet-output .snippet-location:hover { color: #164a85; }
+.md-typeset .snippet-output .snippet-location:focus-visible { outline: 2px solid #386b22; outline-offset: 1px; }
 .md-typeset .snippet-filename {
   padding: 0.35rem 0.65rem;
   background: #edf3ea;

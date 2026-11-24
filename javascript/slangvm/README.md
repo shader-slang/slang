@@ -36,6 +36,15 @@ try {
 }
 ```
 
+`vm.load` rejects with the compiler's diagnostics when a module does not compile, and a kernel
+that fails to compile reports its diagnostics in the rejected call's error. A call that fails at
+runtime rejects with the failure followed by the call stack, innermost call first, one
+`    at function (path:line:column)` line per frame; code without line information, such as the
+precompiled standard modules, gives only `    at function`. By default each
+diagnostic is one `path(line): error N: message` line. Set `richDiagnostics: true` for the rich
+layout, which quotes the source line and points at it with ` --> path:line:column`, and
+`diagnosticColor: true` to color it with ANSI SGR escape sequences for a terminal-style renderer.
+
 ## Execution and ownership
 
 - `init`, `load`, `createWindow`, exported Slang calls, and `close` return Promises.

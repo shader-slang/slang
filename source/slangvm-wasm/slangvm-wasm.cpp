@@ -156,6 +156,9 @@ public:
         if (SLANG_FAILED(status))
             return failure(status, "Cannot create the Slang global session");
         m_compiler = new HGBCCompiler(m_global, m_fileSystem);
+        m_richDiagnostics = getBooleanSetting("richDiagnostics");
+        m_diagnosticColor = getBooleanSetting("diagnosticColor") ? SLANG_DIAGNOSTIC_COLOR_ALWAYS
+                                                                 : SLANG_DIAGNOSTIC_COLOR_NEVER;
 
         val backend = m_settings["backend"];
         if (!backend.isUndefined() && backend.as<std::string>() == "webgpu")
@@ -163,12 +166,22 @@ public:
             rhi::DeviceDesc desc;
             desc.deviceType = rhi::DeviceType::WGPU;
             desc.slang.slangGlobalSession = m_global;
-            slang::CompilerOptionEntry experimental = {};
-            experimental.name = slang::CompilerOptionName::ExperimentalFeature;
-            experimental.value.kind = slang::CompilerOptionValueKind::Int;
-            experimental.value.intValue0 = 1;
-            desc.slang.compilerOptionEntries = &experimental;
-            desc.slang.compilerOptionEntryCount = 1;
+            // Kernel compile errors use the same diagnostic layout and colors as host code, since
+            // both reach the same output.
+            slang::CompilerOptionEntry compilerOptions[3] = {};
+            compilerOptions[0].name = slang::CompilerOptionName::ExperimentalFeature;
+            compilerOptions[0].value.kind = slang::CompilerOptionValueKind::Int;
+            compilerOptions[0].value.intValue0 = 1;
+            compilerOptions[1].name = slang::CompilerOptionName::EnableRichDiagnostics;
+            compilerOptions[1].value.kind = slang::CompilerOptionValueKind::Int;
+            compilerOptions[1].value.intValue0 = m_richDiagnostics;
+            compilerOptions[2].name = slang::CompilerOptionName::DiagnosticColor;
+            compilerOptions[2].value.kind = slang::CompilerOptionValueKind::Int;
+            compilerOptions[2].value.intValue0 = m_diagnosticColor;
+            desc.slang.compilerOptionEntries = compilerOptions;
+            desc.slang.compilerOptionEntryCount = SLANG_COUNT_OF(compilerOptions);
+            // Kernel compile errors reach HGVM only through this callback; see DebugMessageLog.
+            desc.debugCallback = &m_debugMessages;
             status = rhi::getRHI()->createDevice(desc, m_device.writeRef());
             if (SLANG_FAILED(status))
                 return failure(status, "Cannot create the browser WebGPU device");
@@ -182,6 +195,7 @@ public:
         desc.workingDirectory = ".";
         desc.hostServices = m_hostServices;
         desc.outputSink = m_output;
+        desc.debugMessages = &m_debugMessages;
         m_interpreter = new Interpreter(desc);
         return val::object();
     }
@@ -210,10 +224,14 @@ public:
             nullptr,
             searchPaths.getBuffer(),
             searchPaths.getCount(),
-            SLANG_DEBUG_INFO_LEVEL_NONE,
-            SLANG_DIAGNOSTIC_COLOR_NEVER,
+            // Line tables let runtime failures name source lines in their stack trace; staging
+            // drops debug records, so they do not slow execution.
+            SLANG_DEBUG_INFO_LEVEL_MINIMAL,
+            m_diagnosticColor,
             code,
-            error);
+            error,
+            false,
+            m_richDiagnostics);
         if (SLANG_FAILED(status))
         {
             if (m_fileSystem->getLastError().getLength())
@@ -475,14 +493,25 @@ private:
         return true;
     }
 
+    /// Returns a Boolean setting from `init`, which is false when the caller leaves it out.
+    bool getBooleanSetting(const char* name) const
+    {
+        val value = m_settings[name];
+        return !value.isUndefined() && value.as<bool>();
+    }
+
     val m_settings;
     val m_host;
     bool m_busy = false;
     bool m_closed = false;
+    bool m_richDiagnostics = false;
+    SlangDiagnosticColor m_diagnosticColor = SLANG_DIAGNOSTIC_COLOR_NEVER;
     uint32_t m_nextValue = 1;
     uint32_t m_nextWindow = 1;
     ComPtr<slang::IGlobalSession> m_global;
     ComPtr<JavaScriptFileSystem> m_fileSystem;
+    // Declared before the device and interpreter so it outlives every debug callback they make.
+    DebugMessageLog m_debugMessages;
     ComPtr<rhi::IDevice> m_device;
     RefPtr<HGBCCompiler> m_compiler;
     RefPtr<BrowserHostServices> m_hostServices;

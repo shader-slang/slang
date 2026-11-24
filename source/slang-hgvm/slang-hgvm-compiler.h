@@ -23,6 +23,12 @@ public:
         ISlangFileSystemExt* fileSystem = nullptr);
     ~HGBCCompiler();
 
+    /// Compiles `sourcePath` to HGBC, appending compiler messages to `outDiagnostics`.
+    ///
+    /// `richDiagnostics` selects the rich diagnostic layout, which quotes the source line under an
+    /// `error[E…]` header and points at it with ` --> path:line:column`. Without it, diagnostics
+    /// that have no rich form use the one-line `path(line): error N: message` layout, which test
+    /// expectations match.
     SlangResult compile(
         const char* sourcePath,
         const char* entryPointName,
@@ -32,7 +38,8 @@ public:
         SlangDiagnosticColor diagnosticColor,
         Slang::ComPtr<slang::IBlob>& outCode,
         Slang::String& outDiagnostics,
-        bool reportCheckpointIntermediates = false);
+        bool reportCheckpointIntermediates = false,
+        bool richDiagnostics = false);
 
 private:
     struct Impl;

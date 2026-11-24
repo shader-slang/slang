@@ -225,6 +225,7 @@ static void createRayPipeline(
     for (const auto& entry : specialized)
         components.add(entry);
     ComPtr<ISlangBlob> diagnostics;
+    size_t messageMark = device.getDebugMessageMark();
     ComPtr<slang::IComponentType> composite;
     auto session = pipeline->programInstance->slangSession;
     if (SLANG_FAILED(session->createCompositeComponentType(
@@ -232,7 +233,7 @@ static void createRayPipeline(
             components.getCount(),
             composite.writeRef(),
             diagnostics.writeRef())))
-        fail("HGVM failed to compose ray shaders");
+        device.failPipelineCreation("HGVM failed to compose ray shaders", messageMark, diagnostics);
     List<List<SlangInt>> groupIndices;
     for (const auto& group : pipeline->hitGroups)
     {
@@ -263,13 +264,14 @@ static void createRayPipeline(
                 2,
                 constrained.writeRef(),
                 diagnostics.writeRef())))
-            fail("HGVM failed to compose shader-record layout constraints");
+            device.failPipelineCreation(
+                "HGVM failed to compose shader-record layout constraints",
+                messageMark,
+                diagnostics);
         composite = constrained;
     }
     if (SLANG_FAILED(composite->link(pipeline->linkedComponent.writeRef(), diagnostics.writeRef())))
-        fail(
-            std::string("HGVM failed to link a ray program: ") +
-            (diagnostics ? static_cast<const char*>(diagnostics->getBufferPointer()) : ""));
+        device.failPipelineCreation("HGVM failed to link a ray program", messageMark, diagnostics);
 
     auto* layout = pipeline->linkedComponent->getLayout();
     if (layout->getParameterCount())
@@ -325,9 +327,10 @@ static void createRayPipeline(
             programDesc,
             pipeline->program.writeRef(),
             diagnostics.writeRef())))
-        fail(
-            std::string("HGVM failed to create a ray shader program: ") +
-            (diagnostics ? static_cast<const char*>(diagnostics->getBufferPointer()) : ""));
+        device.failPipelineCreation(
+            "HGVM failed to create a ray shader program",
+            messageMark,
+            diagnostics);
 
     List<rhi::HitGroupDesc> groups;
     for (Index i = 0; i < pipeline->hitGroups.getCount(); ++i)
@@ -364,7 +367,9 @@ static void createRayPipeline(
             {},
             getRayPipelineShaders(pipeline)));
     if (!pipeline->pipeline)
-        fail("HGVM failed to create a native ray-tracing pipeline");
+        device.failPipelineCreation(
+            "HGVM failed to build the device code for a ray-tracing pipeline",
+            messageMark);
 }
 
 /// Packs a record through the ordinary shader binder and returns an independent byte snapshot.
