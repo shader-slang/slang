@@ -1523,7 +1523,14 @@ ModuleDecl* ASTSerialReadContext::_readImportedModule(ASTSerializer const& seria
             _sink->diagnose(Diagnostics::ImportFailed{
                 .path = moduleName ? moduleName->text : String(),
                 .location = _requestingSourceLoc});
-        return nullptr;
+
+        // Every declaration that this module imports from the missing one would deserialize as
+        // null, which the AST does not allow. Consider a precompiled `slang/tensor` whose
+        // dependency `slang/numerics` is refused because the experimental feature is disabled:
+        // its `ModuleDecl::mapDeclToCandidateExtensions` is keyed by `slang/numerics` types. We
+        // therefore stop reading the module here, and `Linkage::loadSerializedModule` reports the
+        // module as one that could not be loaded.
+        SLANG_ABORT_COMPILATION("a dependency of a serialized module could not be imported");
     }
     return module->getModuleDecl();
 }
@@ -2110,6 +2117,12 @@ Decl* ASTSerialReadContext::readFossilizedDecl(Fossilized<Decl>* fossilizedDecl)
 
     Decl* decl = nullptr;
     serialize(serializer, decl);
+
+    // The declaration's contents are read by deferred actions, and they can stop the read with
+    // an exception, as `_readImportedModule` does for a dependency that could not be imported.
+    // We run them here rather than in the reader's destructor so that the exception reaches
+    // `Linkage::loadSerializedModule`.
+    reader.flush();
     return decl;
 }
 

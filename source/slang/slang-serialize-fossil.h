@@ -645,11 +645,22 @@ public:
     ///
     Fossil::AnyValPtr readValPtr();
 
+    /// Run the actions deferred by every reader of this reader's context, if this reader is the
+    /// outermost one still active on that context; otherwise the outermost reader runs them.
+    ///
+    /// The outermost reader's destructor runs any actions that remain, but an exception cannot
+    /// escape a destructor. Deferred actions can raise one, as when an AST reader stops at a
+    /// dependency module that could not be imported, so code that reads such data calls
+    /// `flush()` before the reader goes out of scope and lets the exception reach its caller.
     void flush();
 
 private:
     /// The shared context that this reader is using.
     ReadContext& _context;
+
+    /// The value of `std::uncaught_exceptions()` when this reader was constructed, which lets
+    /// the destructor tell whether an exception is propagating through the reader's scope.
+    int _uncaughtExceptionCount = 0;
 
     /// A state that the reader can be in.
     struct State

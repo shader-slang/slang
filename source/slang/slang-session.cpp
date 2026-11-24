@@ -1328,6 +1328,15 @@ RefPtr<Module> Linkage::loadSerializedModule(
         return module;
     }
 #if SLANG_HAS_EXCEPTIONS
+    catch (const AbortCompilationException&)
+    {
+        // Reading stops with this exception after a diagnosed failure, such as a dependency
+        // that could not be imported, so the module fails to load just as a source module whose
+        // parse aborts does in `loadSourceModuleImpl`.
+        mapPathToLoadedModule.remove(mostUniqueIdentity);
+        mapNameToLoadedModules.remove(moduleName);
+        return nullptr;
+    }
     catch (...)
     {
         mapPathToLoadedModule.remove(mostUniqueIdentity);
@@ -2452,6 +2461,10 @@ SlangResult Linkage::loadSerializedModuleContents(
         serializedModuleLoc = sourceView->getRange().begin;
     }
 
+    // The sink is shared by the whole compile, so errors that were reported before this module
+    // started loading, such as an earlier refused import, do not make this load fail.
+    const auto errorCountBefore = sink->getErrorCount();
+
     auto moduleDecl = readSerializedModuleAST(
         this,
         astBuilder,
@@ -2524,7 +2537,7 @@ SlangResult Linkage::loadSerializedModuleContents(
     {
         addSiblingScopeForContainerDecl(m_astBuilder, moduleDecl->ownedScope, fileDecl);
     }
-    if (sink->getErrorCount() != 0)
+    if (sink->getErrorCount() != errorCountBefore)
         return SLANG_FAIL;
     return SLANG_OK;
 }

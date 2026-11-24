@@ -4,6 +4,8 @@
 #include "core/slang-blob.h"
 #include "core/slang-performance-profiler.h"
 
+#include <exception>
+
 namespace Slang
 {
 namespace Fossil
@@ -1149,7 +1151,7 @@ SerialReader::SerialReader(
     ReadContext& context,
     Fossil::AnyValPtr valPtr,
     InitialStateType initialState)
-    : _context(context)
+    : _context(context), _uncaughtExceptionCount(std::uncaught_exceptions())
 {
     // We track the number of active `SerialReader`s that
     // are working with the same `ReadContext`, and will
@@ -1208,16 +1210,29 @@ SerialReader::~SerialReader()
     // `flush()`, which could quickly lead to unbounded
     // recursion.
     //
+    // If an exception is propagating, the objects that the pending actions would fill are being
+    // abandoned along with the read that raised it. Running those actions here could raise a
+    // second exception during unwinding, which terminates the process, so we discard them.
+    //
     if (_context._readerCount == 1)
     {
-        _flush();
+        if (std::uncaught_exceptions() > _uncaughtExceptionCount)
+            _context._deferredActions.clear();
+        else
+            _flush();
     }
     _context._readerCount--;
 }
 
 void SerialReader::flush()
 {
-    _flush();
+    // The same "last one out" rule as in the destructor applies: a nested reader leaves the
+    // shared actions to the outermost reader.
+    //
+    if (_context._readerCount == 1)
+    {
+        _flush();
+    }
 }
 
 void SerialReader::beginVariant(Scope& scope)
