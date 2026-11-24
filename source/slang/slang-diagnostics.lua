@@ -6268,6 +6268,18 @@ err(
     span { loc = "location" }
 )
 
+-- BACKSTOP: reports host-only HGBC bytecode that reached GPU code generation, which would otherwise
+-- crash the emitter. The capability system should reject these calls first, but it currently
+-- misses `[require(hgbc)]` static methods of generic types and requirements reached through
+-- generic interface arguments such as dispatch lambdas. Remove this diagnostic when those
+-- capability-system gaps are fixed.
+err(
+    "host-only-operation-in-device-code",
+    56050,
+    "host-only operation in device code",
+    span { loc = "location", message = "this operation runs only in host code and cannot be compiled for the '~target' device target; it may have been reached through a function or lambda called from a shader" }
+)
+
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 

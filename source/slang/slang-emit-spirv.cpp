@@ -3070,11 +3070,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else if (as<IRSPIRVAsmOperand>(inst))
                     return nullptr;
 
-                String e = "Unhandled global inst in spirv-emit:\n" +
-                           dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
-                SLANG_UNIMPLEMENTED_X(e.begin());
+                diagnoseUnhandledInst(inst);
             }
         }
+    }
+
+    /// Reports an instruction this emitter cannot translate, at the source location that produced
+    /// it, and stops compilation.
+    ///
+    /// Consider `RWStructuredBuffer<float4>::alloc(100)` inside a dispatched lambda: the host-only
+    /// `hgbc_asm` block that implements `alloc` reaches SPIR-V emission, which has no translation
+    /// for it. The C-like emitters report this case as the same `Unimplemented` diagnostic, so
+    /// every backend points at the user's call instead of printing the instruction's IR.
+    [[noreturn]] void diagnoseUnhandledInst(IRInst* inst)
+    {
+        m_sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "unexpected IR opcode during code emit",
+            .location = inst->sourceLoc});
+        SLANG_ABORT_COMPILATION("unexpected IR opcode during SPIR-V emit");
     }
 
     SpvImageFormat getSpvImageFormat(IRTextureTypeBase* type)
@@ -4014,11 +4027,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvOp opCode = _specConstantOpcodeConvert(inst->getOp(), basicType);
         if (opCode == SpvOpUndef)
         {
-            String e = "Unhandled inst in spirv-emit:\n" +
-                       dumpIRToString(
-                           inst,
-                           {IRDumpOptions::Mode::Detailed, IRDumpOptions::Flag::DumpDebugIds});
-            SLANG_UNIMPLEMENTED_X(e.getBuffer());
+            diagnoseUnhandledInst(inst);
         }
 
         Array<SpvInst*, 3> operands;
@@ -5038,11 +5047,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 if (as<IRSPIRVAsmOperand>(inst))
                     return nullptr;
-                String e = "Unhandled local inst in spirv-emit:\n" +
-                           dumpIRToString(
-                               inst,
-                               {IRDumpOptions::Mode::Detailed, IRDumpOptions::Flag::DumpDebugIds});
-                SLANG_UNIMPLEMENTED_X(e.getBuffer());
+                diagnoseUnhandledInst(inst);
             }
         case kIROp_Specialize:
         case kIROp_MissingReturn:
@@ -6085,12 +6090,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else
         {
-            // Couldn't handle
-            String e = "Unhandled local inst in spirv-emit:\n" +
-                       dumpIRToString(
-                           inst,
-                           {IRDumpOptions::Mode::Detailed, IRDumpOptions::Flag::DumpDebugIds});
-            SLANG_UNIMPLEMENTED_X(e.getBuffer());
+            diagnoseUnhandledInst(inst);
         }
     }
 

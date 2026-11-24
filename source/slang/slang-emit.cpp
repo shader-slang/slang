@@ -2921,6 +2921,12 @@ Result linkAndOptimizeIR(
     }
     SLANG_PASS(collectMetadata, targetProgram, *metadata);
 
+    // BACKSTOP: runs even with minimum optimizations, because a surviving host-only block crashes
+    // device emission. Remove with `checkHostOnlyInstsInDeviceCode` once the capability system
+    // rejects these uses.
+    if (target != CodeGenTarget::HGBC)
+        SLANG_PASS(checkHostOnlyInstsInDeviceCode, codeGenContext->getTargetReq(), sink);
+
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 

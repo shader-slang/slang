@@ -1,5 +1,6 @@
 #include "slang-ir-check-unsupported-inst.h"
 
+#include "core/slang-type-text-util.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
@@ -280,6 +281,90 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
                 sink->diagnose(Diagnostics::StringTypeNotSupportedOnKernelTarget{.location = loc});
             }
         }
+    }
+}
+
+// BACKSTOP: chooses where to report a host-only block that reached device code.
+//
+// A block inlined from an early-inlined method such as `RWStructuredBuffer<T>::alloc` carries its
+// call site's location. A block inlined from another library method, such as
+// `RWStructuredBuffer<T>.readBack`, keeps the location inside the library's source file, while
+// its result is used in the shader's own code. When the block and the first use of its result are
+// in different source files, the use is the line the shader author wrote.
+static SourceLoc getHostOnlyBlockReportLoc(IRInst* block, DiagnosticSink* sink)
+{
+    SourceLoc blockLoc = block->sourceLoc;
+    SourceLoc useLoc = findFirstUseLoc(block);
+    if (!blockLoc.isValid())
+        return useLoc;
+    if (!useLoc.isValid())
+        return blockLoc;
+    auto sourceManager = sink->getSourceManager();
+    auto blockView = sourceManager ? sourceManager->findSourceViewRecursively(blockLoc) : nullptr;
+    auto useView = sourceManager ? sourceManager->findSourceViewRecursively(useLoc) : nullptr;
+    if (blockView && useView && blockView->getSourceFile() != useView->getSourceFile())
+        return useLoc;
+    return blockLoc;
+}
+
+// BACKSTOP: lists the calls that lead from a shader to a host-only block.
+//
+// Synthesized callers, such as the witness thunk that adapts a lambda to `IFunc`, have no source
+// location; they are skipped so that every note points at code the author wrote.
+static void diagnoseHostOnlyBlockCallers(IRInst* block, DiagnosticSink* sink)
+{
+    static const int kMaxDepth = 8;
+    IRInst* inst = block;
+    for (int depth = 0; depth < kMaxDepth; ++depth)
+    {
+        IRFunc* func = getParentFunc(inst);
+        if (!func)
+            return;
+        IRCall* caller = nullptr;
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            if (auto call = as<IRCall>(use->getUser()))
+            {
+                caller = call;
+                break;
+            }
+        }
+        if (!caller)
+            return;
+        if (caller->sourceLoc.isValid())
+            sink->diagnose(Diagnostics::SeeCallOfFuncIr{.inst = func, .location = caller->sourceLoc});
+        inst = caller;
+    }
+}
+
+// BACKSTOP: see the declaration in slang-ir-check-unsupported-inst.h for why this exists and
+// when it can be removed.
+//
+// Consider a `Grid.dispatch` lambda that calls `RWStructuredBuffer<uint>::alloc(4)`. `alloc` is
+// implemented with an `hgbc_asm` block, which only the HGBC host target can lower. Because the
+// capability system does not reject the call, the inlined `HGBCAsm` instruction survives into the
+// compute kernel, and the SPIR-V emitter would abort on it. Reporting it here names the call's
+// source line instead.
+void checkHostOnlyInstsInDeviceCode(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
+{
+    auto targetName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target->getTarget()));
+    List<IRInst*> workList;
+    workList.add(module->getModuleInst());
+    while (workList.getCount())
+    {
+        IRInst* inst = workList.getLast();
+        workList.removeLast();
+        if (inst->getOp() == kIROp_HGBCAsm)
+        {
+            sink->diagnose(Diagnostics::HostOnlyOperationInDeviceCode{
+                .target = targetName,
+                .location = getHostOnlyBlockReportLoc(inst, sink)});
+            diagnoseHostOnlyBlockCallers(inst, sink);
+            // The block's own operands are bytecode, not further device code.
+            continue;
+        }
+        for (auto child : inst->getChildren())
+            workList.add(child);
     }
 }
 
