@@ -11555,15 +11555,16 @@ struct InterpreterState
         const DebugMap* map = program->debugMap;
         List<DebugStackFrame> frames;
         uint32_t pc = programCounter;
-        uint32_t frameOffset = currentFrameOffset;
-        while (map && frames.getCount() <= kMaxFrames)
+        uint8_t* frame = currentFrame;
+        while (map && frame && frames.getCount() <= kMaxFrames)
         {
             map->appendStackFrames(pc, frames);
-            FrameHeader frame = readValue<FrameHeader>(Address::makeAbsoluteFrame(frameOffset));
-            if (frame.callerFrameOffset == kInvalidStackOffset)
+            FrameHeader header;
+            std::memcpy(&header, frame, sizeof(header));
+            if (!header.callerFrame)
                 break;
-            pc = frame.returnProgramCounter - 1;
-            frameOffset = frame.callerFrameOffset;
+            pc = header.returnProgramCounter - 1;
+            frame = header.callerFrame;
         }
 
         StringBuilder trace;
