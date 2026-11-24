@@ -1,109 +1,59 @@
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry hlslMain -stage compute
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry spirvMain -stage compute -emit-spirv-directly
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry inferredMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=HLSL_ONLY,non-exhaustive):-target spirv -entry hlslMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=SPIRV_ONLY,non-exhaustive):-target hlsl -entry spirvMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=INFERRED,non-exhaustive):-target spirv -entry inferredMain -stage compute
+// non-exhaustive: capability errors also include declaration/use notes.
 
-// Unused cases do not restrict the enum type or functions that accept it.
-enum TargetValue
+enum Mode
 {
-    [require(hlsl)]
-    hlslOnly = 1,
-    [require(spirv)]
-    spirvOnly = 2,
-    portable = 3,
-    nextPortable,
+    [require(hlsl)] A = 0,
+    [require(spirv)] B = 1,
+    // Equal numeric values do not make these declarations share requirements.
+    [require(spirv)] sameValueAsA = 0,
+    derived = int(A) + 2,
+    // An implicit numeric initializer does not reference the preceding case.
+    portable,
 }
 
-enum NarrowValue : uint8_t
+int consume(Mode value)
 {
-    [require(hlsl)]
-    zero = 0,
-}
-
-enum GenericValue<T>
-{
-    [require(hlsl)]
-    hlslOnly = 5,
-}
-
-int consume(TargetValue value)
-{
-    TargetValue copy = value;
+    Mode copy = value;
     return int(copy);
 }
 
-// Logical operations do not require the arbitrary integer-construction contract.
-TargetValue combine(TargetValue value)
+int readDerived()
 {
-    value |= value;
-    value &= value;
-    value ^= value;
-    return ~value;
-}
-
-int selectForTarget()
-{
-    __target_switch
-    {
-    case hlsl:
-        let value = TargetValue.hlslOnly;
-        return int(value);
-    case spirv:
-        let value = TargetValue.spirvOnly;
-        return int(value);
-    default:
-        return int(TargetValue.portable);
-    }
+    // Both this helper and the derived case infer A's requirement.
+    return int(Mode.derived);
 }
 
 RWStructuredBuffer<int> outputBuffer;
 
-// HLSL: void hlslMain
+// HLSL: RWStructuredBuffer
 [numthreads(1, 1, 1)]
 void hlslMain()
+//HLSL_ONLY: entrypoint 'hlslMain' uses features that are not available
 {
-    outputBuffer[0] = consume(TargetValue.hlslOnly);
-    outputBuffer[1] = consume(TargetValue.portable);
-    outputBuffer[2] = TargetValue.hlslOnly == TargetValue.portable;
-    outputBuffer[3] = bool(TargetValue.hlslOnly);
-    outputBuffer[4] = consume(TargetValue(1));
-    static const int hlslTag = 1;
-    outputBuffer[5] = consume((TargetValue)(hlslTag + 0));
-    outputBuffer[6] = consume(TargetValue.nextPortable);
-    outputBuffer[7] = consume(combine(TargetValue.portable));
-    outputBuffer[8] = selectForTarget();
-    // Match the checked value after conversion to the underlying tag type.
-    outputBuffer[9] = int(NarrowValue(256));
-    outputBuffer[10] = int(GenericValue<float>(5));
+    outputBuffer[0] = consume(Mode.A);
+    // Computing B's numeric value does not reference B.
+    outputBuffer[1] = consume(Mode(int(Mode.A) + 1));
 }
 
 // SPIRV: OpEntryPoint GLCompute
 [numthreads(1, 1, 1)]
 void spirvMain()
+//SPIRV_ONLY: entrypoint 'spirvMain' uses features that are not available
 {
-    outputBuffer[0] = consume(TargetValue.spirvOnly);
-    outputBuffer[1] = consume(TargetValue.portable);
-    outputBuffer[2] = TargetValue.spirvOnly == TargetValue.portable;
-    outputBuffer[3] = bool(TargetValue.spirvOnly);
-    outputBuffer[4] = consume(TargetValue(2));
-    outputBuffer[5] = consume((TargetValue)(1 + 1));
-    outputBuffer[6] = consume(TargetValue.nextPortable);
-    outputBuffer[7] = consume(combine(TargetValue.portable));
-    outputBuffer[8] = selectForTarget();
+    outputBuffer[0] = consume(Mode.B);
+    outputBuffer[1] = consume(Mode.sameValueAsA);
+    outputBuffer[2] = consume(Mode.portable);
 }
 
-// Ordinary enums retain duplicate tags, aliases, and direct/generic integer construction.
-enum Ordinary { zero = 0, aliasZero = zero, one, duplicateOne = 1 }
-
-T fromInteger<T : ILogical>(int value)
+[numthreads(1, 1, 1)]
+void inferredMain()
+//INFERRED: entrypoint 'inferredMain' uses features that are not available
 {
-    return T(value);
-}
-
-T fromTag<T : __EnumType>(T.__Tag value)
-{
-    return T(value);
-}
-
-Ordinary ordinaryCasts(int value)
-{
-    return Ordinary(value) | fromInteger<Ordinary>(value) | fromTag<Ordinary>(value);
+    outputBuffer[0] = readDerived();
 }

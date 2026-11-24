@@ -22,8 +22,9 @@ struct Bindful
 }
 
 static const Bindful gItems[2] = {
-    {1u, (DescriptorHandle<RWStructuredBuffer<uint> >)uint2(3u, 4u)},
-    {2u, (DescriptorHandle<RWStructuredBuffer<uint> >)uint2(5u, 6u)},
+    // CUDA handles use the uint64 constructor; the uint2 constructor requires another target.
+    {1u, (DescriptorHandle<RWStructuredBuffer<uint> >)uint64_t(0x0000000400000003)},
+    {2u, (DescriptorHandle<RWStructuredBuffer<uint> >)uint64_t(0x0000000600000005)},
 };
 
 RWStructuredBuffer<uint> outBuf;

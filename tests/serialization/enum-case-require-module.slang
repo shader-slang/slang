@@ -2,34 +2,18 @@
 
 public enum Mode
 {
-    [require(hlsl)] hlslMode = 0,
-    [require(spirv)] spirvMode = 1,
+    [require(hlsl)] A = 0,
+    [require(spirv)] B = 1,
 }
 
-public int readValue<let V : Mode>() { return int(V); }
+public int readValue<let V : Mode>() { return 7; }
 
-public int readDefault<let V : Mode = Mode.hlslMode>() { return int(V); }
-
-public struct Holder<let V : Mode>
+public struct Holder<let V : int>
 {
-    int value;
-}
-
-// The unused type parameter still introduces the selected default's requirements.
-public int readTypeDefault<T = Holder<Mode.hlslMode>>() { return 1; }
-
-public int readSymbolic<let tag : int>() { return int(Mode(tag + 1)); }
-
-public int readSymbolicCancelled<let tag : int>() { return int(Mode(tag)) * 0; }
-
-public struct Wrapper<let tag : int>
-{
-    public Holder<Mode(tag)> field;
     public int payload;
 }
 
-__target_intrinsic(hlsl, "int")
-public struct NativeWrapper<let tag : int>
-{
-    public Holder<Mode(tag)> field;
-}
+// Both the inferred requirement and the case's explicit requirement must survive serialization.
+public typealias HlslAlias = Holder<int(Mode.A) * 0>;
+
+public int fromTag<let N : int>() { return int(Mode(N)); }

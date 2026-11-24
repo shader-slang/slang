@@ -32,15 +32,6 @@ struct IRCapabilitySet : IRInst
 };
 
 FIDDLE()
-struct IRCheckEnumCast : IRInst
-{
-    FIDDLE(leafInst())
-
-    UInt getCaseCount() { return getOperandCount() - 2; }
-    IREnumCaseInfo* getCase(UInt index) { return (IREnumCaseInfo*)getOperand(index + 2); }
-};
-
-FIDDLE()
 struct IRDecoration : IRInst
 {
     FIDDLE(baseInst())

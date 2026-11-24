@@ -23,7 +23,7 @@ void computeMain()
     a.v = float3x3(1, 2, 3, 4, 5, 6, 7, 8, 9);
     Box<float3x3> b = a;
 //CHK:                ^ type mismatch in expression
-//CHK:                ^ expected an expression of type 'Box<float3x3>', got 'Box<matrix<float,3,3,MatrixLayoutMode.RowMajor>>'
+//CHK:                ^ expected an expression of type 'Box<matrix<float,3,3>>', got 'Box<matrix<float,3,3,MatrixLayoutMode.RowMajor>>'
 
     Box<column_major float3x3> c = a;
 //CHK:                             ^ type mismatch in expression
@@ -41,5 +41,5 @@ float callPick()
 {
     float2x3 plain = {};
     return pick(plain);
-//CHK:         ^ ambiguous call to 'pick' with arguments of type (float2x3)
+//CHK:         ^ ambiguous call to 'pick' with arguments of type (matrix<float,2,3>)
 }

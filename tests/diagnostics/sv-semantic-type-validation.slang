@@ -25,7 +25,7 @@
 // Test 1: Wrong vector size for SV_VertexID
 // SV_VertexID requires uint (scalar), not uint2 (vector)
 float4 vsWrongVectorSize(uint2 vertexId : SV_VertexID) : SV_Position
-//CHECK1:                      ^^^^^^^^ type 'uint2' is not valid for system value semantic 'SV_VertexID'; expected 'uint'
+//CHECK1:                      ^^^^^^^^ type 'vector<uint,2>' is not valid for system value semantic 'SV_VertexID'; expected 'uint'
 {
     return float4(float(vertexId.x), 0, 0, 1);
 }
@@ -139,7 +139,7 @@ float4 vsClipDistanceInt(uint id: SV_VertexID, out int cd[4]: SV_ClipDistance) :
 // Test 16: uint2 is rejected for SV_InstanceID on every target, before Metal's base_instance rewrite
 [shader("vertex")]
 float4 vsVectorInstanceID(uint2 id: SV_InstanceID) : SV_Position
-//CHECK16:                      ^^ type 'uint2' is not valid for system value semantic 'SV_InstanceID'; expected 'uint'
+//CHECK16:                      ^^ type 'vector<uint,2>' is not valid for system value semantic 'SV_InstanceID'; expected 'uint'
 {
     return float4(0, 0, 0, 1);
 }

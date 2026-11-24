@@ -1,26 +1,12 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
-// non-exhaustive: overload resolution also emits candidate notes.
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute -warnings-as-errors all
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage compute -emit-spirv-directly -warnings-as-errors all
 
-enum TargetValue
+// Case requirements do not impose restrictions or warnings on integer conversions.
+enum Mode
 {
-    [require(hlsl)]
-    hlslOnly = 0,
-    [require(spirv)]
-    spirvOnly = 1,
-}
-
-TargetValue castRuntime(int value)
-{
-    return TargetValue(value);
-//CHECK: enum integer conversion may require case capabilities
-//CHECK: enum cast requires a compile-time constant case
-}
-
-TargetValue castUnknownConstant()
-{
-    return (TargetValue)42;
-//CHECK: enum integer conversion may require case capabilities
-//CHECK: enum cast has no matching case
+    [require(hlsl)] A = 0,
+    [require(spirv)] B = 1,
+    [require(spirv)] duplicate = 0,
 }
 
 T fromInteger<T : ILogical>(int value)
@@ -28,44 +14,32 @@ T fromInteger<T : ILogical>(int value)
     return T(value);
 }
 
-TargetValue castGeneric(int value)
+int fromGenericTag<let N : int>()
 {
-    return fromInteger<TargetValue>(value);
-//CHECK: type argument 'TargetValue' does not conform to the required interface 'ILogical'
+    return int(Mode(N));
 }
 
-T fromTag<T : __EnumType>(T.__Tag value)
+struct Holder<let value : int>
 {
-    return T(value);
+    int payload;
 }
 
-TargetValue castGenericTag(int value)
-{
-    return fromTag<TargetValue>(value);
-//CHECK: type argument 'TargetValue' does not conform to the required interface '__EnumType'
-}
+// This declaration references Mode, but no enum case. Substitution needs no case check.
+typealias Alias<let N : int> = Holder<int(Mode(N)) * 0>;
 
-// Ordinary enums retain both direct and generic integer construction.
-enum Ordinary { zero, one }
+RWStructuredBuffer<int> outputBuffer;
 
-Ordinary ordinaryCasts(int value)
+// HLSL: void main
+// SPIRV: OpEntryPoint GLCompute
+[numthreads(1, 1, 1)]
+void main(uint3 threadID : SV_DispatchThreadID)
 {
-    Ordinary direct = Ordinary(value);
-    Ordinary logical = fromInteger<Ordinary>(value);
-    Ordinary tagged = fromTag<Ordinary>(value);
-    return direct | logical | tagged;
-}
-
-// The runtime restriction also applies when the target supports every declared case.
-enum HlslValue
-{
-    [require(hlsl)]
-    supported = 0,
-}
-
-HlslValue castRuntimeOnSupportedTarget(int value)
-{
-    return HlslValue(value);
-//CHECK: enum integer conversion may require case capabilities
-//CHECK: enum cast requires a compile-time constant case
+    outputBuffer[0] = int(Mode(0));
+    outputBuffer[1] = int(Mode(1));
+    outputBuffer[2] = int(Mode(42));
+    outputBuffer[3] = int(Mode(int(threadID.x)));
+    outputBuffer[4] = int(fromInteger<Mode>(int(threadID.x)));
+    outputBuffer[5] = fromGenericTag<0>() + fromGenericTag<1>() + fromGenericTag<42>();
+    Alias<42> value = { 7 };
+    outputBuffer[6] = value.payload;
 }

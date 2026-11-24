@@ -2567,11 +2567,6 @@ struct ForwardDiffTranslationContext
 
     InstPair translateInstImpl(IRBuilder* builder, IRInst* origInst)
     {
-        // Specialization checks remain obligations of the differentiated callable, but they
-        // produce no differential value. Preserve them with the ordinary primal clone.
-        if (isEnumRequirementCheck(origInst))
-            return translateNonDiffInst(builder, origInst);
-
         // Handle common SSA-style operations
         switch (origInst->getOp())
         {

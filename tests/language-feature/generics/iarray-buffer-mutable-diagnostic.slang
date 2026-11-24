@@ -11,5 +11,5 @@ float test()
 {
     return readAt<float, RWBuffer<float>>(values, 0);
 //CHECK:   ^^^^^^ type argument doesn't conform to interface
-//CHECK:   ^^^^^^ type argument 'RWBuffer<float, 0>' does not conform to the required interface 'IArray<float>'
+//CHECK:   ^^^^^^ type argument 'RWBuffer<float>' does not conform to the required interface 'IArray<float>'
 }

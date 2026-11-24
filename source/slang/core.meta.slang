@@ -210,12 +210,8 @@ interface IArithmetic : IComparable
     __init(This value);
 }
 
-//@ hidden:
-
-// Logical operations on existing values do not require integer construction. In particular,
-// enums with capability-restricted cases can combine their values without implementing the
-// arbitrary-integer constructor promised by ILogical.
-interface __LogicalType : IComparable
+/// Represents types that provide logical operations.
+interface ILogical : IComparable
 {
     /// Shifts the bits of this value to the left by the specified number of positions.
     __builtin_requirement($((int)BuiltinRequirementKind::Shl))
@@ -252,13 +248,7 @@ interface __LogicalType : IComparable
     /// Performs a logical NOT operation on this value, returning the logical negation.
     __builtin_requirement($((int)BuiltinRequirementKind::Not))
     This not();
-}
 
-//@ public:
-
-/// Represents types that provide logical operations and integer construction.
-interface ILogical : __LogicalType
-{
     __builtin_requirement($((int)BuiltinRequirementKind::InitLogicalFromInt))
     __init(int val);
 }
@@ -986,41 +976,17 @@ interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat, IFloatingPoint
 
 //@ hidden:
 
-// Provides the tag type and operations shared by all enums, without integer constructors.
-// Enums with capability-restricted cases conform directly to this interface. Ordinary enums
-// conform to __EnumType below, which inherits this interface and adds __init(int) through
-// ILogical, as well as __init(__Tag).
-//
-// A restricted enum can still be constructed from a matching compile-time constant. Consider:
-//
-//     enum MyEnum { [require(hlsl)] A = 0x01 }
-//     MyEnum named = MyEnum.A;     // Requires hlsl.
-//     MyEnum cast = MyEnum(0x01);  // Requires hlsl and emits a warning.
-//
-// The compiler handles MyEnum(0x01) as a builtin cast, without calling an interface constructor.
-// The constant must match exactly one case; the cast carries that case's capability requirements
-// and warns that the numeric spelling introduces them. A value that depends on a generic parameter
-// is validated after specialization. Runtime integers and constants without a matching case are
-// rejected. Omitting integer constructors from this interface prevents generic code from bypassing
-// these checks through a constructor promised by its constraint.
+// A type resulting from an `enum` declaration.
 [builtin]
-__magic_type(RestrictedEnumType)
-interface __RestrictedEnumType : __LogicalType
+__magic_type(EnumTypeType)
+interface __EnumType : ILogical
 {
     // The type of tags for this `enum`
     //
     // Note: using `__Tag` instead of `Tag` to avoid any
     // conflict if a user had an `enum` case called `Tag`
     associatedtype __Tag : __BuiltinIntegerType;
-};
 
-// Preserve the integer-construction contract of __EnumType for ordinary enums. An enum with
-// capability-restricted cases cannot implement this contract: a runtime integer does not identify
-// which case's requirements the caller must satisfy.
-[builtin]
-__magic_type(EnumTypeType)
-interface __EnumType : __RestrictedEnumType, ILogical
-{
     __builtin_requirement($((int)BuiltinRequirementKind::InitLogicalFromInt))
     __init(__Tag value);
 };
@@ -1363,7 +1329,7 @@ $}
         // the needed features in our type system to implement
         // that constraint right now.
         //
-        __generic<T:__RestrictedEnumType>
+        __generic<T:__EnumType>
         __intrinsic_op($(kIROp_IntCast))
         __init(T value);
 
@@ -1749,7 +1715,7 @@ extension bool : IRangedValue
     __intrinsic_op($(kIROp_CastPtrToBool))
     __init($(fullPtrType) ptr);
 
-    __generic<T : __RestrictedEnumType>
+    __generic<T : __EnumType>
     __implicit_conversion($(kConversionCost_IntegerTruncate))
     [__unsafeForceInlineEarly]
     __init(T v)
@@ -3039,8 +3005,7 @@ __generic<ToType, let N : int> extension vector<ToType,N>
     // decides which element types a source can splat into, and supplies the `constraint+` cost.
     // A user-defined conversion such as `float.__init(float3)` therefore does not make `float3`
     // implicitly convertible to `float4`, and an enum source always splats its tag value. The enum
-    // splat is a separate overload because `__RestrictedEnumType` does not refine
-    // `__BuiltinScalarType`.
+    // splat is a separate overload because `__EnumType` does not refine `__BuiltinScalarType`.
     __implicit_conversion(constraint+)
     [__unsafeForceInlineEarly]
     [__readNone]
@@ -3054,7 +3019,7 @@ __generic<ToType, let N : int> extension vector<ToType,N>
     [__unsafeForceInlineEarly]
     [__readNone]
     [TreatAsDifferentiable]
-    __init<FromType : __RestrictedEnumType>(FromType value) where ToType(FromType) implicit
+    __init<FromType : __EnumType>(FromType value) where ToType(FromType) implicit
     {
         this = __builtin_cast<vector<ToType,N>>(vector<FromType,N>(value));
     }
@@ -3698,11 +3663,11 @@ void endInvocationInterlock();
 
 //@ hidden:
 
-__generic<E : __RestrictedEnumType>
+__generic<E : __EnumType>
 __intrinsic_op($(kIROp_Eql))
 bool operator==(E left, E right);
 
-__generic<E : __RestrictedEnumType>
+__generic<E : __EnumType>
 __intrinsic_op($(kIROp_Neq))
 bool operator!=(E left, E right);
 
@@ -3884,14 +3849,14 @@ __prefix T operator +(T v0)
     return v0;
 }
 
-__generic<T : __LogicalType>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
 T operator &(T v0, T v1)
 {
     return v0.bitAnd(v1);
 }
-__generic<T : __LogicalType>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
 T operator &&(T v0, T v1)
@@ -3951,35 +3916,35 @@ vector<bool, N> or<let N : int>(vector<bool, N> v, bool b)
     return or(v, vector<bool, N>(b));
 }
 
-__generic<T : __LogicalType>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
 T operator |(T v0, T v1)
 {
     return v0.bitOr(v1);
 }
-__generic<T : __LogicalType>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
 T operator ||(T v0, T v1)
 {
     return v0.or(v1);
 }
-__generic<T : __LogicalType>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
 T operator ^(T v0, T v1)
 {
     return v0.bitXor(v1);
 }
-__generic<T : __LogicalType>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
 __prefix T operator ~(T v0)
 {
     return v0.bitNot();
 }
-__generic<T : __LogicalType>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
 __prefix T operator !(T v0)
@@ -3987,7 +3952,7 @@ __prefix T operator !(T v0)
     return v0.not();
 }
 
-__generic<T : __LogicalType>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
 T operator &=(in out T v0, T v1)
@@ -3995,7 +3960,7 @@ T operator &=(in out T v0, T v1)
     v0 = v0 & v1;
     return v0;
 }
-__generic<T : __LogicalType>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
 T operator |=(in out T v0, T v1)
@@ -4003,7 +3968,7 @@ T operator |=(in out T v0, T v1)
     v0 = v0 | v1;
     return v0;
 }
-__generic<T : __LogicalType>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
 T operator ^=(in out T v0, T v1)
@@ -4013,26 +3978,26 @@ T operator ^=(in out T v0, T v1)
 }
 
 // The operator overloads defined above already allows Enum types to be used
-// in logical operators, but we still provide overloads for enum types and map
+// in logical operators, but we still provide overloads for __EnumTypes and map
 // them directly to intrinsic op to allow constant propagation at AST level to
 // work on enum types.
 
-__generic<T : __RestrictedEnumType>
+__generic<T : __EnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitAnd))
 T operator &(T v0, T v1);
 
-__generic<T : __RestrictedEnumType>
+__generic<T : __EnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitOr))
 T operator |(T v0, T v1);
 
-__generic<T : __RestrictedEnumType>
+__generic<T : __EnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitXor))
 T operator ^(T v0, T v1);
 
-__generic<T : __RestrictedEnumType>
+__generic<T : __EnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitNot))
 __prefix T operator ~(T v0);

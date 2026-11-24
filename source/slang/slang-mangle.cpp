@@ -373,9 +373,6 @@ void emitType(ManglingContext* context, Type* type)
 
 void emitVal(ManglingContext* context, Val* val)
 {
-    // Source obligations do not change a value's linkage identity.
-    if (auto checkedValue = as<IntValWithRequirements>(val))
-        val = checkedValue->getValue();
     if (auto type = dynamicCast<Type>(val))
     {
         emitType(context, type);

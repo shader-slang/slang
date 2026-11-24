@@ -98,16 +98,6 @@ Type* SharedASTBuilder::getEnumTypeType()
     return m_enumTypeType;
 }
 
-Type* SharedASTBuilder::getRestrictedEnumType()
-{
-    if (!m_restrictedEnumType)
-    {
-        auto decl = findMagicDecl("RestrictedEnumType");
-        m_restrictedEnumType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(decl));
-    }
-    return m_restrictedEnumType;
-}
-
 Type* SharedASTBuilder::getDynamicType()
 {
     if (!m_dynamicType)
@@ -568,9 +558,6 @@ NodeBase* ASTBuilder::createByNodeType(ASTNodeType nodeType)
     return syntaxClass.createInstance(this);
 }
 
-// Construct source types without resolving their arguments. The returned subtype is fixed
-// by the builtin declaration, so callers use dynamicCast rather than as(Type*): the latter
-// canonicalizes and would erase requirements carried by folded array sizes or type arguments.
 Type* ASTBuilder::getSpecializedBuiltinType(Type* typeParam, char const* magicTypeName)
 {
     auto declRef = getBuiltinDeclRef(magicTypeName, typeParam);
@@ -709,12 +696,12 @@ ExplicitRefType* ASTBuilder::getExplicitRefType(Type* valueType)
 OptionalType* ASTBuilder::getOptionalType(Type* valueType)
 {
     auto rsType = getSpecializedBuiltinType(valueType, "OptionalType");
-    return dynamicCast<OptionalType>(rsType);
+    return as<OptionalType>(rsType);
 }
 
 PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, char const* ptrTypeName)
 {
-    return dynamicCast<PtrTypeBase>(getSpecializedBuiltinType(valueType, ptrTypeName));
+    return as<PtrTypeBase>(getSpecializedBuiltinType(valueType, ptrTypeName));
 }
 
 PtrTypeBase* ASTBuilder::getPtrType(
@@ -744,7 +731,7 @@ PtrTypeBase* ASTBuilder::getPtrType(
     SLANG_RELEASE_ASSERT(subtypeWitness);
 
     Val* args[] = {valueType, accessQualifier, addrSpace, dataLayoutType, subtypeWitness};
-    return dynamicCast<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
+    return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
 }
 
 PtrTypeBase* ASTBuilder::getPtrType(
@@ -756,72 +743,12 @@ PtrTypeBase* ASTBuilder::getPtrType(
 {
     Type* typeOfAccessQualifier = getMagicEnumType("AccessQualifier");
     Type* typeOfAddressSpace = getMagicEnumType("AddressSpace");
-    return dynamicCast<PtrTypeBase>(getPtrType(
+    return as<PtrTypeBase>(getPtrType(
         valueType,
         getIntVal(typeOfAccessQualifier, (IntegerLiteralValue)accessQualifier),
         getIntVal(typeOfAddressSpace, (IntegerLiteralValue)addrSpace),
         dataLayoutType,
         ptrTypeName));
-}
-
-ConstantIntVal* ASTBuilder::getIntVal(Type* type, IntegerLiteralValue value)
-{
-    // A constant without a type cannot be lowered to IR, and integer folding cannot know
-    // its width, so every producer must know the type of the value it creates.
-    SLANG_RELEASE_ASSERT(type);
-#if _DEBUG
-    // In release builds SLANG_ASSERT can be an optimizer assumption, so check the range only
-    // in debug builds instead of making an out-of-range value undefined behavior.
-    SLANG_ASSERT(isValueInRangeOfConstantType(type, value));
-#endif
-    if (auto enumRef = isDeclRefTypeOf<EnumDecl>(type->getCanonicalType());
-        enumRef && enumRef.getDecl()->hasCapabilityRestrictedCases)
-    {
-        for (auto caseDecl : enumRef.getDecl()->getMembersOfType<EnumCaseDecl>())
-        {
-            IntegerLiteralValue tag;
-            if (tryGetConstantIntVal(caseDecl->tagVal, tag) && tag == value)
-                return getOrCreate<EnumCaseIntVal>(
-                    type->getCanonicalType(),
-                    value,
-                    getMemberDeclRef(enumRef, caseDecl));
-        }
-    }
-    return getOrCreate<ConstantIntVal>(type, value);
-}
-
-IntVal* ASTBuilder::getIntValWithRequirements(IntVal* value, ConstArrayView<Val*> requirements)
-{
-    if (!value || requirements.getCount() == 0)
-        return value;
-    List<Val*> combined;
-    HashSet<Val*> seen;
-    for (auto requirement : requirements)
-    {
-        if (auto cast = as<TypeCastIntVal>(requirement))
-        {
-            auto enumRef = isDeclRefTypeOf<EnumDecl>(cast->getType()->getCanonicalType());
-            SLANG_RELEASE_ASSERT(enumRef && enumRef.getDecl()->hasCapabilityRestrictedCases);
-        }
-        else
-            SLANG_RELEASE_ASSERT(
-                as<DeclRefBase>(requirement) || as<EnumCaseIntVal>(requirement) ||
-                as<Type>(requirement));
-        if (seen.add(requirement))
-            combined.add(requirement);
-    }
-    if (auto wrapped = as<IntValWithRequirements>(value))
-    {
-        value = wrapped->getValue();
-        for (auto requirement : wrapped->getRequirements())
-            if (seen.add(requirement))
-                combined.add(requirement);
-    }
-    // A named enum constant already carries its only requirement in its canonical value.
-    if (auto enumCase = as<EnumCaseIntVal>(value);
-        enumCase && combined.getCount() == 1 && combined[0] == enumCase->getDeclRef().declRefBase)
-        return value;
-    return getOrCreate<IntValWithRequirements>(value->getType(), value, combined.getArrayView());
 }
 
 /// Return the constant `size` converted to `int`, the type in which array, vector and matrix
@@ -855,7 +782,7 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
         }
     }
     Val* args[] = {elementType, elementCount};
-    return dynamicCast<ArrayExpressionType>(
+    return as<ArrayExpressionType>(
         getSpecializedBuiltinType(makeArrayView(args), "ArrayExpressionType"));
 }
 
@@ -866,32 +793,30 @@ ConstantBufferType* ASTBuilder::getConstantBufferType(
 {
     Val* args[] = {elementType, layoutType, layoutWitness};
 
-    return dynamicCast<ConstantBufferType>(
+    return as<ConstantBufferType>(
         getSpecializedBuiltinType(makeArrayView(args), "ConstantBufferType"));
 }
 
 ParameterBlockType* ASTBuilder::getParameterBlockType(Type* elementType)
 {
-    return dynamicCast<ParameterBlockType>(
-        getSpecializedBuiltinType(elementType, "ParameterBlockType"));
+    return as<ParameterBlockType>(getSpecializedBuiltinType(elementType, "ParameterBlockType"));
 }
 
 HLSLSizedStructuredBufferType* ASTBuilder::getStructuredBufferType(Type* elementType)
 {
-    return dynamicCast<HLSLSizedStructuredBufferType>(
+    return as<HLSLSizedStructuredBufferType>(
         getSpecializedBuiltinType(elementType, "HLSLSizedStructuredBufferType"));
 }
 
 HLSLSizedRWStructuredBufferType* ASTBuilder::getRWStructuredBufferType(Type* elementType)
 {
-    return dynamicCast<HLSLSizedRWStructuredBufferType>(
+    return as<HLSLSizedRWStructuredBufferType>(
         getSpecializedBuiltinType(elementType, "HLSLSizedRWStructuredBufferType"));
 }
 
 SamplerStateType* ASTBuilder::getSamplerStateType()
 {
-    return dynamicCast<SamplerStateType>(
-        getSpecializedBuiltinType(nullptr, "HLSLStructuredBufferType"));
+    return as<SamplerStateType>(getSpecializedBuiltinType(nullptr, "HLSLStructuredBufferType"));
 }
 
 VectorExpressionType* ASTBuilder::getVectorType(Type* elementType, IntVal* elementCount)
@@ -902,7 +827,7 @@ VectorExpressionType* ASTBuilder::getVectorType(Type* elementType, IntVal* eleme
         elementCount = convertConstantSizeToInt(this, elementCountConstantInt);
     }
     Val* args[] = {elementType, elementCount};
-    return dynamicCast<VectorExpressionType>(
+    return as<VectorExpressionType>(
         getSpecializedBuiltinType(makeArrayView(args), "VectorExpressionType"));
 }
 
@@ -922,14 +847,14 @@ MatrixExpressionType* ASTBuilder::getMatrixType(
         colCount = convertConstantSizeToInt(this, colCountConstantInt);
     }
     Val* args[] = {elementType, rowCount, colCount, layout};
-    return dynamicCast<MatrixExpressionType>(
+    return as<MatrixExpressionType>(
         getSpecializedBuiltinType(makeArrayView(args), "MatrixExpressionType"));
 }
 
 DifferentialPairType* ASTBuilder::getDifferentialPairType(Type* valueType, Witness* diffTypeWitness)
 {
     Val* args[] = {valueType, diffTypeWitness};
-    return dynamicCast<DifferentialPairType>(
+    return as<DifferentialPairType>(
         getSpecializedBuiltinType(makeArrayView(args), "DifferentialPairType"));
 }
 
@@ -938,7 +863,7 @@ DifferentialPtrPairType* ASTBuilder::getDifferentialPtrPairType(
     Witness* diffRefTypeWitness)
 {
     Val* args[] = {valueType, diffRefTypeWitness};
-    return dynamicCast<DifferentialPtrPairType>(
+    return as<DifferentialPtrPairType>(
         getSpecializedBuiltinType(makeArrayView(args), "DifferentialPtrPairType"));
 }
 
@@ -997,7 +922,7 @@ MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
                                : (SLANG_UNEXPECTED("Unhandled mesh output modifier"), nullptr);
 
     Val* args[] = {elementType, maxElementCount};
-    return dynamicCast<MeshOutputType>(getSpecializedBuiltinType(makeArrayView(args), declName));
+    return as<MeshOutputType>(getSpecializedBuiltinType(makeArrayView(args), declName));
 }
 
 Type* ASTBuilder::getDifferentiableInterfaceType()
@@ -1113,13 +1038,13 @@ TupleType* ASTBuilder::getTupleType(ArrayView<Type*> types)
     {
         if (isTypePack(types[0]))
         {
-            return dynamicCast<TupleType>(getSpecializedBuiltinType(types[0], "TupleType"));
+            return as<TupleType>(getSpecializedBuiltinType(types[0], "TupleType"));
         }
     }
 
     // Otherwise, we need to create a ConcreteTypePack to hold the types.
     auto typePack = getTypePack(types);
-    return dynamicCast<TupleType>(getSpecializedBuiltinType(typePack, "TupleType"));
+    return as<TupleType>(getSpecializedBuiltinType(typePack, "TupleType"));
 }
 
 TypeType* ASTBuilder::getTypeType(Type* type)

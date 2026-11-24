@@ -766,9 +766,7 @@ static DeclRef<GenericVariadicPackCountConstraintDecl> _findDeclaredPackCountCon
 
         auto declaredExpectedCount =
             getPackCountConstraintExpectedCount(astBuilder, constraintDeclRef);
-        // A countof expression can retain source type requirements. Compare its canonical
-        // integer value when forwarding the proof, while keeping those requirements on the source.
-        if (areValsEqual(declaredExpectedCount, expectedCount))
+        if (declaredExpectedCount == expectedCount)
             return constraintDeclRef;
     }
 
@@ -1665,10 +1663,14 @@ private:
         if (!substArg)
             return ConstraintSolvingState::Failed;
 
+        // Canonicalize the substituted answer before comparing or storing it so
+        // repeated retries of the same default do not look like progress.
+        substArg = substArg->resolve();
+        if (auto substArgType = as<Type>(substArg))
+            substArg = substArgType->getCanonicalType();
+
         // A default constraint can be woken multiple times. If it recomputes the
         // same argument, report `Done` so dependents are not needlessly woken.
-        // `equals` compares canonical values; keep the substituted value itself
-        // so source requirements on the selected default remain available.
         auto& argInfo = m_argInfo[constraint.decl];
         if (auto previousDefaultArg = argInfo.getSubstitutedDefaultArg())
         {

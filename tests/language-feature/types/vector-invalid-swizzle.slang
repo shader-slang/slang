@@ -14,9 +14,9 @@ void computeMain()
 
     float2 bad1 = v.st;
 //CHECK:            ^^ error E30027
-//CHECK:            ^^ 'st' is not a member of 'float4'.
+//CHECK:            ^^ 'st' is not a member of 'vector<float,4>'.
 
     float bad2 = v.q;
 //CHECK:           ^ error E30027
-//CHECK:           ^ 'q' is not a member of 'float4'.
+//CHECK:           ^ 'q' is not a member of 'vector<float,4>'.
 }

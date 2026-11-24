@@ -92,9 +92,9 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     Texture1D<int> t1 = tex;
 //CHK:                  ^^^ type mismatch in expression
-//CHK:                  ^^^ expected an expression of type 'Texture1D<int, 0, 0>', got 'Texture1D<float, 0, 0>'
+//CHK:                  ^^^ expected an expression of type 'Texture1D<int>', got 'Texture1D<float>'
 
     Texture2D<float> t2 = tex;
 //CHK:                    ^^^ type mismatch in expression
-//CHK:                    ^^^ expected an expression of type 'Texture2D<float, 0, 0>', got 'Texture1D<float, 0, 0>'
+//CHK:                    ^^^ expected an expression of type 'Texture2D<float>', got 'Texture1D<float>'
 }

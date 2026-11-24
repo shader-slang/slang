@@ -18,7 +18,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // The error must be located: a caret under 'matrixBuffer' with the detail.
     float4 M = matrixBuffer;
 //CHK:         ^^^^^^^^^^^^ type mismatch in expression
-//CHK:         ^^^^^^^^^^^^ expected an expression of type 'float4', got 'matrix<float,4,4>'
+//CHK:         ^^^^^^^^^^^^ expected an expression of type 'vector<float,4>', got 'matrix<float,4,4>'
 
     float4 r = mul(v, M);
 

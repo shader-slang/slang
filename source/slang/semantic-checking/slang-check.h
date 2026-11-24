@@ -43,12 +43,5 @@ OrderedDictionary<Type*, List<Type*>> getCanonicalGenericConstraints2(
 // General utility function to collect all referenced declarations from a syntax node
 void collectReferencedDecls(SemanticsVisitor* context, NodeBase* node, HashSet<Decl*>& outDecls);
 
-// Retain source obligations before folding discards a checked expression or type operand.
-void collectFoldedOperandRequirements(
-    SemanticsVisitor* context,
-    NodeBase* node,
-    SubstitutionSet substitutions,
-    List<Val*>& requirements);
-
 void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef);
 } // namespace Slang

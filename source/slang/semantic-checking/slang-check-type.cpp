@@ -52,9 +52,7 @@ Type* SemanticsVisitor::ExtractTypeFromTypeRepr(Expr* typeRepr)
 {
     if (!typeRepr)
         return nullptr;
-    // Checked type expressions have a TypeType directly. Read its source type without
-    // canonicalizing away requirements on folded generic arguments or array dimensions.
-    if (auto typeType = dynamicCast<TypeType>(typeRepr->type.type))
+    if (auto typeType = as<TypeType>(typeRepr->type))
     {
         return typeType->getType();
     }
@@ -138,7 +136,7 @@ Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
         expr = resolveOverloadedExpr(overloadedExpr, LookupMask::type);
     }
 
-    if (const auto typeType = dynamicCast<TypeType>(expr->type.type); typeType)
+    if (const auto typeType = as<TypeType>(expr->type); typeType)
     {
         return expr;
     }
@@ -164,7 +162,7 @@ Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
 Type* SemanticsVisitor::ExpectAType(Expr* expr)
 {
     auto typeRepr = ExpectATypeRepr(expr);
-    if (auto typeType = dynamicCast<TypeType>(typeRepr->type.type))
+    if (auto typeType = as<TypeType>(typeRepr->type))
     {
         return typeType->getType();
     }
@@ -221,7 +219,7 @@ Val* SemanticsVisitor::ExtractGenericArgVal(
         // assume that if it is overloaded, we want a type
         exp = resolveOverloadedExpr(overloadedExpr, LookupMask::type);
     }
-    if (auto typeType = dynamicCast<TypeType>(exp->type.type))
+    if (auto typeType = as<TypeType>(exp->type))
     {
         return typeType->getType();
     }
@@ -286,7 +284,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
     {
         expr = maybeResolveOverloadedExpr(expr, LookupMask::type, diagSink);
 
-        if (auto typeType = dynamicCast<TypeType>(expr->type.type))
+        if (auto typeType = as<TypeType>(expr->type))
         {
             type = typeType->getType();
         }

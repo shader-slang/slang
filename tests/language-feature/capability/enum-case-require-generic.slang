@@ -1,234 +1,195 @@
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry namedMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry castMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry typeMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry staticMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry staticGenericMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry partialMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry defaultTypeMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry defaultMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry bareTypeMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry resultMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry aliasMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry modifiedTypeMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry defaultFieldMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry defaultConstructorMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry defaultParameterMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry arrayMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry forwardStaticValueMain -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry forwardAliasMain -stage compute
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry overrideMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry hlslMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry overloadMain -stage compute -emit-spirv-directly
 //DIAGNOSTIC_TEST:SIMPLE(diag=NAMED,non-exhaustive):-target spirv -entry namedMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=CAST,non-exhaustive):-target spirv -entry castMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=TYPE,non-exhaustive):-target spirv -entry typeMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=STATIC,non-exhaustive):-target spirv -entry staticMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=STATIC_GENERIC,non-exhaustive):-target spirv -entry staticGenericMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=PARTIAL,non-exhaustive):-target spirv -entry partialMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=DEFAULT_TYPE,non-exhaustive):-target spirv -entry defaultTypeMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=DEFAULT,non-exhaustive):-target spirv -entry defaultMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=BARE_TYPE,non-exhaustive):-target spirv -entry bareTypeMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=RESULT,non-exhaustive):-target spirv -entry resultMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CANCELLED,non-exhaustive):-target spirv -entry cancelledMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=ALIAS,non-exhaustive):-target spirv -entry aliasMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=MODIFIED_TYPE,non-exhaustive):-target spirv -entry modifiedTypeMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=DEFAULT_FIELD,non-exhaustive):-target spirv -entry defaultFieldMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=DEFAULT_CONSTRUCTOR,non-exhaustive):-target spirv -entry defaultConstructorMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=DEFAULT_PARAMETER,non-exhaustive):-target spirv -entry defaultParameterMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=ARRAY,non-exhaustive):-target spirv -entry arrayMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=FORWARD_STATIC,non-exhaustive):-target spirv -entry forwardStaticValueMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=SIZE,non-exhaustive):-target spirv -entry sizeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=MEMBER,non-exhaustive):-target spirv -entry memberMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=PARTIAL,non-exhaustive):-target spirv -entry partialMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=OVERLOADED,non-exhaustive):-target spirv -entry overloadedMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=PARAMETER,non-exhaustive):-target spirv -entry parameterMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=RESULT,non-exhaustive):-target spirv -entry resultMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=GLOBAL,non-exhaustive):-target spirv -entry globalMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC_MEMBER,non-exhaustive):-target spirv -entry genericMemberMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=PARENT_MEMBER,non-exhaustive):-target spirv -entry parentMemberMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=FORWARD_ALIAS,non-exhaustive):-target spirv -entry forwardAliasMain -stage compute
-// non-exhaustive: accepted constant casts warn, and capability errors include provenance notes.
+// non-exhaustive: capability errors also include declaration/use notes.
 
 enum Mode
 {
-    [require(hlsl)] hlslMode = 0,
-    [require(spirv)] spirvMode = 1,
+    [require(hlsl)] A = 0,
+    [require(spirv)] B = 1,
 }
 
-int readValue<let V : Mode>() { return int(V); }
+// The source argument requires A even though the generic body never reads V.
+int readValue<let V : Mode>() { return 7; }
+int readInt<let V : int>() { return V; }
+int readPartial<let V : Mode, T>(T value) { return 7; }
 
-int readPartial<let V : Mode, T>(T unused) { return int(V); }
+int readOverloaded<let V : Mode>(int value) { return value; }
+[require(hlsl)]
+int readOverloaded<let V : Mode>(float value) { return int(value); }
 
-int readDefault<let V : Mode = Mode.hlslMode>() { return int(V); }
-
-int readParameter(Mode mode = Mode.hlslMode) { return int(mode); }
-
-struct Holder<let V : Mode = Mode.hlslMode>
+struct Holder<let V : Mode>
 {
-    int value;
-    static int read() { return int(V); }
-    static int readGeneric<T>() { return int(V); }
+    int payload;
+    static int read() { return 9; }
+    static int readGeneric<T>() { return 11; }
 }
 
-struct DefaultHolder<T, let V : Mode = Mode.hlslMode>
+struct Container
 {
-    T value;
+    static int read<let V : Mode>() { return 13; }
 }
 
-Holder<Mode.hlslMode> makeHolder() { return { 0 }; }
+// The body need not mention A for its signature to contribute A's requirement.
+int readHolder(Holder<Mode.A> value) { return value.payload; }
+Holder<Mode.A> makeHolder() { return { 7 }; }
 
-typealias HlslHolder = Holder<Mode.hlslMode>;
+// The reference contributes a requirement even though the stored constant is zero.
+static const int hlslConstant = int(Mode.A) * 0;
 
-int readModified(no_diff Holder<Mode.hlslMode> holder) { return holder.value; }
-
-struct FieldDefault
+struct IntegerHolder<let V : int>
 {
-    Mode value = Mode.hlslMode;
+    int payload;
 }
+
+// The alias infers its requirement before folding discards the reference to A.
+typealias HlslAlias = IntegerHolder<int(Mode.A) * 0>;
+
+int readForwardAlias()
+{
+    // The alias is declared later; its source reference to A must be checked before use.
+    Selected<1> value = { 7 };
+    return value.payload;
+}
+
+[require(hlsl)]
+int selectValue<T>(T value) { return 0; }
+int selectValue(int value) { return value; }
 
 RWStructuredBuffer<int> outputBuffer;
 
-// HLSL: RWStructuredBuffer
 [numthreads(1, 1, 1)]
 void namedMain()
 //NAMED: entrypoint 'namedMain' uses features that are not available
 {
-    outputBuffer[0] = readValue<Mode.hlslMode>();
+    outputBuffer[0] = readValue<Mode.A>();
 }
 
 [numthreads(1, 1, 1)]
-void castMain()
-//CAST: entrypoint 'castMain' uses features that are not available
+void cancelledMain()
+//CANCELLED: entrypoint 'cancelledMain' uses features that are not available
 {
-    outputBuffer[0] = readValue<Mode(0)>();
-}
-
-[numthreads(1, 1, 1)]
-void typeMain()
-//TYPE: entrypoint 'typeMain' uses features that are not available
-{
-    Holder<Mode.hlslMode> holder = { 0 };
-    outputBuffer[0] = holder.value;
-}
-
-[numthreads(1, 1, 1)]
-void staticMain()
-//STATIC: entrypoint 'staticMain' uses features that are not available
-{
-    outputBuffer[0] = Holder<Mode.hlslMode>.read();
-}
-
-[numthreads(1, 1, 1)]
-void staticGenericMain()
-//STATIC_GENERIC: entrypoint 'staticGenericMain' uses features that are not available
-{
-    outputBuffer[0] = Holder<Mode.hlslMode>.readGeneric<int>();
-}
-
-[numthreads(1, 1, 1)]
-void partialMain()
-//PARTIAL: entrypoint 'partialMain' uses features that are not available
-{
-    outputBuffer[0] = readPartial<Mode.hlslMode>(0);
-}
-
-[numthreads(1, 1, 1)]
-void defaultTypeMain()
-//DEFAULT_TYPE: entrypoint 'defaultTypeMain' uses features that are not available
-{
-    DefaultHolder<int> holder = { 0 };
-    outputBuffer[0] = holder.value;
-}
-
-[numthreads(1, 1, 1)]
-void defaultMain()
-//DEFAULT: entrypoint 'defaultMain' uses features that are not available
-{
-    outputBuffer[0] = readDefault();
-}
-
-[numthreads(1, 1, 1)]
-void bareTypeMain()
-//BARE_TYPE: entrypoint 'bareTypeMain' uses features that are not available
-{
-    Holder holder = { 0 };
-    outputBuffer[0] = holder.value;
-}
-
-[numthreads(1, 1, 1)]
-void resultMain()
-//RESULT: entrypoint 'resultMain' uses features that are not available
-{
-    outputBuffer[0] = makeHolder().value;
+    outputBuffer[0] = readInt<int(Mode.A) * 0>();
 }
 
 [numthreads(1, 1, 1)]
 void aliasMain()
 //ALIAS: entrypoint 'aliasMain' uses features that are not available
 {
-    HlslHolder holder = { 0 };
-    outputBuffer[0] = holder.value;
+    outputBuffer[0] = readInt<sizeof(HlslAlias)>();
 }
 
 [numthreads(1, 1, 1)]
-void modifiedTypeMain()
-//MODIFIED_TYPE: entrypoint 'modifiedTypeMain' uses features that are not available
+void sizeMain()
+//SIZE: entrypoint 'sizeMain' uses features that are not available
 {
-    outputBuffer[0] = readModified({ 0 });
+    outputBuffer[0] = readInt<sizeof(Holder<Mode.A>)>();
 }
 
 [numthreads(1, 1, 1)]
-void defaultFieldMain()
-//DEFAULT_FIELD: entrypoint 'defaultFieldMain' uses features that are not available
+void memberMain()
+//MEMBER: entrypoint 'memberMain' uses features that are not available
 {
-    FieldDefault value = {};
-    outputBuffer[0] = int(value.value);
+    outputBuffer[0] = Holder<Mode.A>.read();
 }
 
 [numthreads(1, 1, 1)]
-void defaultConstructorMain()
-//DEFAULT_CONSTRUCTOR: entrypoint 'defaultConstructorMain' uses features that are not available
+void partialMain()
+//PARTIAL: entrypoint 'partialMain' uses features that are not available
 {
-    FieldDefault value = FieldDefault();
-    outputBuffer[0] = int(value.value);
+    outputBuffer[0] = readPartial<Mode.A>(0);
 }
 
 [numthreads(1, 1, 1)]
-void defaultParameterMain()
-//DEFAULT_PARAMETER: entrypoint 'defaultParameterMain' uses features that are not available
+void overloadedMain()
+//OVERLOADED: entrypoint 'overloadedMain' uses features that are not available
 {
-    outputBuffer[0] = readParameter();
+    outputBuffer[0] = readOverloaded<Mode.A>(1);
 }
 
 [numthreads(1, 1, 1)]
-void arrayMain()
-//ARRAY: entrypoint 'arrayMain' uses features that are not available
+void parameterMain()
+//PARAMETER: entrypoint 'parameterMain' uses features that are not available
 {
-    float values[int(Mode.hlslMode) + 1] = { 1.0 };
-    outputBuffer[0] = int(values[0]);
+    outputBuffer[0] = readHolder({ 7 });
 }
 
 [numthreads(1, 1, 1)]
-void forwardStaticValueMain()
-//FORWARD_STATIC: entrypoint 'forwardStaticValueMain' uses features that are not available
+void resultMain()
+//RESULT: entrypoint 'resultMain' uses features that are not available
 {
-    outputBuffer[0] = Later.value;
+    outputBuffer[0] = makeHolder().payload;
+}
+
+[numthreads(1, 1, 1)]
+void globalMain()
+//GLOBAL: entrypoint 'globalMain' uses features that are not available
+{
+    outputBuffer[0] = hlslConstant;
+}
+
+[numthreads(1, 1, 1)]
+void genericMemberMain()
+//GENERIC_MEMBER: entrypoint 'genericMemberMain' uses features that are not available
+{
+    outputBuffer[0] = Container.read<Mode.A>();
+}
+
+[numthreads(1, 1, 1)]
+void parentMemberMain()
+//PARENT_MEMBER: entrypoint 'parentMemberMain' uses features that are not available
+{
+    outputBuffer[0] = Holder<Mode.A>.readGeneric<int>();
 }
 
 [numthreads(1, 1, 1)]
 void forwardAliasMain()
 //FORWARD_ALIAS: entrypoint 'forwardAliasMain' uses features that are not available
 {
-    LaterHolder holder = { 0 };
-    outputBuffer[0] = holder.value;
+    outputBuffer[0] = readForwardAlias();
 }
 
-struct Later
+// HLSL: void hlslMain
+[numthreads(1, 1, 1)]
+void hlslMain()
 {
-    static const int value = int(Mode.hlslMode);
+    outputBuffer[0] = readValue<Mode.A>();
+    outputBuffer[1] = readInt<int(Mode.A) * 0>();
+    outputBuffer[2] = readInt<sizeof(HlslAlias)>();
+    outputBuffer[3] = readInt<sizeof(Holder<Mode.A>)>();
+    outputBuffer[4] = Holder<Mode.A>.read();
+    outputBuffer[5] = readPartial<Mode.A>(0);
+    outputBuffer[6] = readOverloaded<Mode.A>(1);
+    outputBuffer[7] = readHolder({ 7 });
+    outputBuffer[8] = makeHolder().payload;
+    outputBuffer[9] = hlslConstant;
+    outputBuffer[10] = Container.read<Mode.A>();
+    outputBuffer[11] = Holder<Mode.A>.readGeneric<int>();
+    outputBuffer[12] = readForwardAlias();
 }
-
-typealias LaterHolder = Holder<Mode.hlslMode>;
 
 // SPIRV: OpEntryPoint GLCompute
 [numthreads(1, 1, 1)]
-void overrideMain()
+void overloadMain()
 {
-    // An unused HLSL default must not restrict an explicit SPIR-V specialization.
-    outputBuffer[0] = readDefault<Mode.spirvMode>();
-    Holder<Mode.spirvMode> holder = { 0 };
-    outputBuffer[1] = holder.value;
-    FieldDefault value = { Mode.spirvMode };
-    outputBuffer[2] = int(value.value);
-    outputBuffer[3] = readParameter(Mode.spirvMode);
-    FieldDefault constructed = FieldDefault(Mode.spirvMode);
-    outputBuffer[4] = int(constructed.value);
+    // Only the selected overload contributes requirements.
+    outputBuffer[0] = selectValue(1);
+    outputBuffer[1] = readValue<Mode.B>();
+    // Retain the source generic argument without visiting the unselected float overload.
+    outputBuffer[2] = readOverloaded<Mode.B>(1);
 }
+
+// The generic parameter can disappear from the numeric value without removing A's requirement.
+typealias Selected<let N : int> = IntegerHolder<int(Mode.A) * N * 0>;

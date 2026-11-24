@@ -762,6 +762,25 @@ inline SubstExpr<Expr> getArg(SubstExpr<InvokeExpr> expr, Index index)
     return substituteExpr(expr.getSubsts(), expr.getExpr()->arguments[index]);
 }
 
+/// Returns the checked operand of an explicit cast that no longer needs a conversion.
+///
+/// An explicit cast with a type-valued callee retains the source target after its operand has
+/// already been converted. For example, `Holder<Mode.A>(value)` keeps the reference to `Mode.A`
+/// even when `value` already has the target type. A cast that calls a conversion function has a
+/// function-valued callee instead and must still perform that call.
+inline Expr* getIdentityCastOperand(Expr* expr)
+{
+    auto castExpr = as<ExplicitCastExpr>(expr);
+    if (!castExpr || !castExpr->checked || !castExpr->type || !castExpr->functionExpr ||
+        !as<TypeType>(castExpr->functionExpr->type))
+        return nullptr;
+
+    SLANG_RELEASE_ASSERT(castExpr->arguments.getCount() == 1);
+    auto operand = castExpr->arguments[0];
+    SLANG_RELEASE_ASSERT(operand->type && operand->type->equals(castExpr->type));
+    return operand;
+}
+
 inline DeclRef<Decl> getDeclRef(ASTBuilder* astBuilder, SubstExpr<DeclRefExpr> expr)
 {
     return substituteDeclRef(expr.getSubsts(), astBuilder, expr.getExpr()->declRef);

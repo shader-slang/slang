@@ -541,10 +541,8 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                     // or this reference is ill-formed.
                     ensureDecl(valParamRef, DeclCheckState::DefinitionChecked);
                     ConstantFoldingCircularityInfo newCircularityInfo(valParamRef, nullptr);
-                    auto defaultExpr =
-                        valParamRef.substitute(m_astBuilder, valParamRef.getDecl()->initExpr);
                     auto defaultVal = tryConstantFoldExpr(
-                        defaultExpr,
+                        valParamRef.substitute(m_astBuilder, valParamRef.getDecl()->initExpr),
                         ConstantFoldingKind::CompileTime,
                         &newCircularityInfo);
                     if (!defaultVal)
@@ -1471,14 +1469,19 @@ Expr* SemanticsVisitor::createGenericDeclRef(
     DeclRef<Decl> innerDeclRef =
         m_astBuilder->getGenericAppDeclRef(baseGenericRef, genSubst->getArgs());
 
-    auto base = GetBaseExpr(baseExpr);
-
-    return ConstructDeclRefExpr(
+    auto result = ConstructDeclRefExpr(
         innerDeclRef,
-        base,
+        GetBaseExpr(baseExpr),
         innerDeclRef.getName(),
         originalExpr->loc,
         originalExpr);
+
+    // Keep the checked generic arguments when selecting a member as well as a free
+    // declaration. Consider `Container.read<int(Mode.A) * 0>()`: the semantic argument
+    // is zero, but capability checking must still see the reference to Mode.A in the
+    // original application. ConstructDeclRefExpr already retains this for VarExpr.
+    result->originalExpr = originalExpr;
+    return result;
 }
 
 Expr* SemanticsVisitor::CompleteOverloadCandidate(
@@ -1658,7 +1661,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
         {
         case OverloadCandidate::Flavor::Func:
             {
-                InvokeExpr* callExpr = as<InvokeExpr>(context.originalExpr);
+                AppExprBase* callExpr = as<InvokeExpr>(context.originalExpr);
                 if (!callExpr)
                 {
                     callExpr = m_astBuilder->create<InvokeExpr>();
@@ -3570,6 +3573,47 @@ bool SemanticsVisitor::findBinaryOperatorForCompoundAssignment(
     return true;
 }
 
+/// Retains the checked source target when an explicit conversion replaces its invocation.
+///
+/// Consider `Holder<Mode.A>(value)`, where `value` has type `Holder<Mode(0)>` and `Mode.A` is zero.
+/// Coercion correctly returns `value` because the types are equal, but the explicit reference to
+/// `Mode.A` still belongs to the checked source. A type-valued explicit cast retains that reference
+/// alongside the already-converted operand without changing its type or value category.
+static Expr* retainExplicitCastSource(
+    ASTBuilder* astBuilder,
+    InvokeExpr* sourceExpr,
+    Expr* typeExpr,
+    Expr* checkedExpr)
+{
+    // A newly selected constructor already has a checked invocation on which to retain the
+    // source target. An invocation returned unchanged by an identity coercion belongs to the
+    // operand, so its original callee must remain intact.
+    if (auto invokeExpr = as<InvokeExpr>(checkedExpr);
+        invokeExpr &&
+        !(sourceExpr->arguments.getCount() == 1 && checkedExpr == sourceExpr->arguments[0]))
+    {
+        invokeExpr->originalFunctionExpr = typeExpr;
+        invokeExpr->argumentDelimeterLocs = sourceExpr->argumentDelimeterLocs;
+        invokeExpr->loc = sourceExpr->loc;
+        return invokeExpr;
+    }
+
+    if (as<ErrorType>(checkedExpr->type))
+        return checkedExpr;
+
+    // The converted expression owns the result type. Coercion can intentionally keep a
+    // different operand type, as it does when converting a string literal to NativeString.
+    SLANG_RELEASE_ASSERT(as<TypeType>(typeExpr->type) && checkedExpr->type);
+    auto castExpr = astBuilder->create<ExplicitCastExpr>();
+    castExpr->loc = sourceExpr->loc;
+    castExpr->argumentDelimeterLocs = sourceExpr->argumentDelimeterLocs;
+    castExpr->functionExpr = typeExpr;
+    castExpr->arguments.add(checkedExpr);
+    castExpr->type = checkedExpr->type;
+    castExpr->checked = true;
+    return castExpr;
+}
+
 Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 {
     OverloadResolveContext context;
@@ -3663,28 +3707,8 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                                             &collectedErrorsSink,
                                             &conversionCost,
                                             nullptr);
-                if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
-                {
-                    resultInvokeExpr->originalFunctionExpr = expr->functionExpr;
-                    resultInvokeExpr->argumentDelimeterLocs = expr->argumentDelimeterLocs;
-                    resultInvokeExpr->loc = expr->loc;
-                }
                 if (coerceResult)
-                    return resultExpr;
-                if (auto enumDeclRef = isDeclRefTypeOf<EnumDecl>(targetType);
-                    enumDeclRef && enumHasCapabilityRestrictedCases(enumDeclRef.getDecl()) &&
-                    collectedErrorsSink.getErrorCount())
-                {
-                    // The enum conversion has explained why this tag cannot identify a case.
-                    // Preserve that diagnostic instead of trying aggregate initialization,
-                    // which cannot supply a case and would hide the actionable error.
-                    ComPtr<ISlangBlob> blob;
-                    collectedErrorsSink.getBlobIfNeeded(blob.writeRef());
-                    getSink()->diagnoseRaw(
-                        Severity::Error,
-                        static_cast<char const*>(blob->getBufferPointer()));
-                    return CreateErrorExpr(expr);
-                }
+                    return retainExplicitCastSource(m_astBuilder, expr, funcExpr, resultExpr);
                 typeOverloadChecked = true;
             }
         }
@@ -4105,7 +4129,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 }
                 return CreateErrorExpr(typeExpr);
             }
-            return outExpr;
+            return retainExplicitCastSource(m_astBuilder, expr, typeExpr, outExpr);
         }
     }
 

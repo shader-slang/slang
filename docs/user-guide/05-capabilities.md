@@ -93,82 +93,44 @@ public void myFunc()
 
 ## Capabilities of Enum Cases
 
-An enum case can declare a capability requirement with `[require(...)]`. Referencing the case
-contributes that requirement to the enclosing declaration, just like calling a function with a
-capability requirement. Other cases do not restrict the enum type itself, so code can accept,
-copy, compare, and return enum values without requiring every case's capabilities.
+An enum case can declare a capability requirement with `[require(...)]`. Referencing that case
+contributes its requirement to the enclosing declaration, just like referencing a function with
+such a requirement. Case requirements do not restrict the enum type itself.
 
 ```csharp
-enum BackendValue
+enum Mode
 {
-    [require(hlsl)]
-    direct3D = 0,
-
-    [require(spirv)]
-    vulkan = 1,
+    [require(hlsl)] A = 0,
+    [require(spirv)] B = 1,
 }
 
-int consume(BackendValue value)
-{
-    return int(value);
-}
+int consume(Mode value) { return int(value); }
 
-[require(hlsl)]
-int useDirect3D()
+int useA()
 {
-    return consume(BackendValue.direct3D); // Requires hlsl, but not spirv.
+    return consume(Mode.A); // Infers a requirement for hlsl.
 }
 ```
 
-If any case declares a capability requirement, every case in that enum must have a distinct
-numeric value, including cases without an attribute. This rule applies to explicitly assigned
-values, references to other cases, and automatically assigned values. Duplicate values are an
-error in the enum declaration even if the enum is unused. Enums without case requirements
-continue to allow duplicate values and aliases.
+As with functions, an explicit requirement on a public declaration must cover the requirements of
+its references. Internal declarations combine their declared and inferred requirements. Declarations
+without explicit requirements infer them from their references. These checks happen in the frontend,
+including for case references in generic arguments, type expressions, and initializers.
+For example, `use<Mode.A>()`, `sizeof(Box<Mode.A>)`, and `int(Mode.A) * 0` all require `hlsl`.
+Folding a constant expression does not remove the requirement introduced by its source reference.
+A reference in a parameter or generic parameter default contributes to the declaration's requirements
+even when a caller supplies an explicit argument instead of using that default.
 
-A case whose initializer references another case also inherits that case's requirements. For
-example, `derived = int(direct3D) + 2` has a distinct value and inherits `direct3D`'s requirement.
-Automatically assigning an integer tag to a case does not introduce a reference to the previous
-case.
+Requirements follow declarations, not numeric values. `Mode(int(Mode.A) + 1)` requires `hlsl`
+because it references `A`; computing the numeric value of `B` does not introduce `B`'s requirement.
+Similarly, integer conversions such as `Mode(0)`, `Mode(42)`, and `Mode(runtimeValue)` do not
+reference any case and follow the ordinary enum conversion rules, without additional warnings
+or restrictions. A conversion depending on a generic integer parameter also needs no deferred
+case lookup after specialization.
 
-If any case declares a capability requirement, integer-to-enum conversion requires a compile-time
-constant whose value, after conversion to the enum's underlying tag type, matches exactly one
-declared case. The conversion carries that case's requirements: `BackendValue(0)` and
-`(BackendValue)0` require `hlsl`, just like `BackendValue.direct3D`. Every integer-to-enum
-conversion to such an enum produces a warning, including conversions that are later rejected,
-because the numeric spelling hides the case requirement. Use the named case directly to make
-that requirement visible and avoid the warning.
-
-A runtime integer cannot identify the case at compile time, so `BackendValue(runtimeValue)` is
-an error. A constant with no matching case is also an error. Conversion in the other direction,
-such as `int(value)`, remains available.
-
-A compile-time expression that depends on a generic value parameter can be converted before
-its concrete value is known. The compiler validates the resulting tag and the selected case's
-requirements after specialization. For example:
-
-```csharp
-BackendValue fromTag<let tag : int>()
-{
-    return BackendValue(tag + 0); // Warns; validated when specialized.
-}
-```
-
-`fromTag<0>()` requires `hlsl`, `fromTag<1>()` requires `spirv`, and `fromTag<2>()` is an error
-because no case has value `2`. Simplifying an expression such as `int(BackendValue(tag)) * 0`
-does not remove the conversion's validation or its requirement.
-
-Such enums also do not automatically conform to `ILogical` or the internal `__EnumType`
-interface, whose contracts include integer construction. This prevents generic functions
-constrained by those interfaces from bypassing the restriction. Enums without explicit case
-requirements retain their integer constructors and these conformances.
-
-Requirements also follow case references in generic arguments and in default expressions when
-those defaults are selected. Supplying an explicit argument does not acquire requirements from
-the unused default.
-
-These rules check source case references and builtin integer conversions. They do not change
-zero initialization of enum storage, bitwise operations, or values loaded from memory.
+Cases may have equal numeric values and different requirements. A case initializer that explicitly
+references another case inherits that case's requirements. Automatically assigning the next
+integer value does not introduce a reference to the preceding case.
 
 ## Capabilities Between Subtype and Supertype
 
