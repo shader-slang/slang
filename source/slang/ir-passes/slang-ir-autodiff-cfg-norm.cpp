@@ -42,7 +42,6 @@ struct BreakableRegionInfo
 {
     IRVar* keepRunningVar;
     IRBlock* breakBlock;
-    IRBlock* headerBlock;
 };
 
 struct CFGNormalizationContext
@@ -164,38 +163,12 @@ struct CFGNormalizationPass
         return false;
     }
 
-    void _moveVarsToRegionHeader(BreakableRegionInfo* region, IRBlock* block)
-    {
-        for (auto child = block->getFirstChild(); child;)
-        {
-            auto nextChild = child->getNextInst();
-
-            if (as<IRVar>(child))
-            {
-                if (auto loopInst = as<IRLoop>(region->headerBlock->getTerminator()))
-                {
-                    // In order to avoid introducing unnecessary loop state, we'll move vars
-                    // to the loop's target (first loop block) instead of the loop header.
-                    // (unless the var is already in the header or target)
-                    //
-                    if (block != region->headerBlock && block != loopInst->getTargetBlock())
-                        child->insertBefore(loopInst->getTargetBlock()->getTerminator());
-                }
-                else
-                    child->insertBefore(region->headerBlock->getTerminator());
-            }
-
-            child = nextChild;
-        }
-    }
-
     RegionEndpoint getNormalizedRegionEndpoint(
         BreakableRegionInfo* parentRegion,
         IRBlock* entryBlock,
         List<IRBlock*> afterBlocks)
     {
         IRBlock* currentBlock = entryBlock;
-        _moveVarsToRegionHeader(parentRegion, currentBlock);
 
         // By default a region starts off with the 'base' control flow
         // and not in the 'break' control flow
@@ -456,8 +429,6 @@ struct CFGNormalizationPass
                 SLANG_UNEXPECTED("Unhandled control flow inst");
                 break;
             }
-
-            _moveVarsToRegionHeader(parentRegion, currentBlock);
         }
 
         // Resolve all intermediate after-blocks
@@ -513,7 +484,6 @@ struct CFGNormalizationPass
             {
                 BreakableRegionInfo info;
                 info.breakBlock = as<IRLoop>(branchInst)->getBreakBlock();
-                info.headerBlock = as<IRBlock>(branchInst->getParent());
 
                 // Emit var into parent block.
                 builder.setInsertBefore(as<IRBlock>(branchInst->getParent())->getTerminator());
@@ -660,7 +630,6 @@ struct CFGNormalizationPass
                 // SLANG_UNEXPECTED("Switch-case normalization not implemented yet.");
                 BreakableRegionInfo info;
                 info.breakBlock = as<IRSwitch>(branchInst)->getBreakLabel();
-                info.headerBlock = as<IRBlock>(branchInst->getParent());
 
                 // Emit var into parent block.
                 builder.setInsertBefore(as<IRBlock>(branchInst->getParent())->getTerminator());
@@ -754,9 +723,10 @@ void normalizeCFG(
         }
     }
 
-    // After CFG normalization, there may be invalid uses of var/ssa values where the def
-    // no longer dominate the use. We fix these up by going through the IR and create temp
-    // vars for such uses.
+    // Normalization can leave a var or SSA value that no longer dominates all of its uses.
+    // `legalizeDefUse` repairs exactly those uses (moving vars to the common dominator of
+    // their uses, and cloning or spilling other values). It is the only place vars move,
+    // because a var's type can be computed in the function body and must stay above the var.
     sortBlocksInFunc(func);
     legalizeDefUse(func, targetProgram);
 
