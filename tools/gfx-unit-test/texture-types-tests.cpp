@@ -682,13 +682,13 @@ void renderTargetTestImpl(IDevice* device, UnitTestContext* context)
     }
 }
 
-SLANG_UNIT_TEST(shaderAndUnorderedAccessTests)
+SLANG_UNIT_TEST(shaderAndUnorderedAccessTests, D3D12 | Vulkan)
 {
     runTestImpl(shaderAndUnorderedTestImpl, unitTestContext, DeviceType::D3D12);
     runTestImpl(shaderAndUnorderedTestImpl, unitTestContext, DeviceType::Vulkan);
 }
 
-SLANG_UNIT_TEST(renderTargetTests)
+SLANG_UNIT_TEST(renderTargetTests, D3D12 | Vulkan)
 {
     runTestImpl(renderTargetTestImpl, unitTestContext, DeviceType::D3D12);
     runTestImpl(renderTargetTestImpl, unitTestContext, DeviceType::Vulkan);

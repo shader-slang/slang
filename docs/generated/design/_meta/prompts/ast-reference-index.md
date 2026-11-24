@@ -26,7 +26,7 @@ Audience: a developer who just opened
    roots (`NodeBase`, `SyntaxNode`, `DeclBase`, `Decl`,
    `ModifiableSyntaxNode`, `Stmt`, `Expr`, `Modifier`, `Val`, `Type`)
    exactly as declared in
-   [../../../../source/slang/slang-ast-base.h](../../../../source/slang/slang-ast-base.h).
+   [../../../../source/slang/ast/slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h).
    Each node in the diagram that has a dedicated family page should
    point at it via a sibling bullet list under the diagram (do not
    use mermaid `click`).

@@ -4,10 +4,7 @@
 // pass different initial values to shared code. This tests the IRParam/IRVar
 // lowering for case grouping.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // Verify HLSL output preserves case grouping structure for SM 6.0
 //TEST:SIMPLE(filecheck=CHECK-HLSL): -target hlsl -profile cs_6_0 -entry computeMain -stage compute

@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 //TEST_INPUT:ubuffer(data=[3 7 8 10], stride=4):name=inputBuffer
 RWStructuredBuffer<uint> inputBuffer;

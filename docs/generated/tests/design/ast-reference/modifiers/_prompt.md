@@ -185,8 +185,8 @@ in `README.md`.
 
 ## Source files you may consult for _verification only_
 
-- `source/slang/slang-ast-modifier.h`
-- `source/slang/slang-parser.cpp`
+- `source/slang/ast/slang-ast-modifier.h`
+- `source/slang/parser/slang-parser.cpp`
 
 You may look at these to verify that a claim in the doc is
 realizable (e.g. that `groupshared` is spelled `groupshared`,

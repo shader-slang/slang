@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#declref-family
-//META: doc_section_digest=2ed6a2b41efd5c08d91ec6e84e54e1f2fbb418408ef8fd51d45ba3b049e93c89
+//META: doc_section_digest=f5940ad19edabc1d30b4557e70c9c750ecca37f72902e5ab3221b5f0e0f6f564
 //META: purpose=A generic decl-ref with its arguments applied is identified by the argument list, so the same generic decl applied to different arguments denotes distinct types and cross-assignment is rejected.
 //META: intent=negative
 //META: pipeline_stage=check

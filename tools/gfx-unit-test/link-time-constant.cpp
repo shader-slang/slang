@@ -130,12 +130,12 @@ void linkTimeConstantTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, numbersBuffer, std::array{2.0f});
 }
 
-SLANG_UNIT_TEST(linkTimeConstantD3D12)
+SLANG_UNIT_TEST(linkTimeConstantD3D12, D3D12)
 {
     runTestImpl(linkTimeConstantTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(linkTimeConstantVulkan)
+SLANG_UNIT_TEST(linkTimeConstantVulkan, Vulkan)
 {
     runTestImpl(linkTimeConstantTestImpl, unitTestContext, DeviceType::Vulkan);
 }

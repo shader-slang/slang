@@ -1,8 +1,7 @@
 //TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayCompute.slang -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayCompute.slang -emit-spirv-directly -stage compute -entry computeMain -target spirv-assembly
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -source-language glsl -vk -compute -output-using-type -render-feature ray-query -entry computeMain
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -source-language glsl -vk -compute -output-using-type -render-feature ray-query -emit-spirv-directly -entry computeMain
+//TEST:COMPARE_COMPUTE(targets=all-dx12, filecheck-buffer=BUF): -source-language glsl -output-using-type -render-feature ray-query -entry computeMain
 
 // note: the referenced input data is in render-test-main kVertexData; 1 triangle at {(0,0,0.5),(0,1,0.5),(1,0,0.5)}
 //TEST_INPUT: set scene = AccelerationStructure
@@ -22,7 +21,7 @@ bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
         for (int j = 0; j < M; j++)
         {
             if (
-                lhs[i][j] 
+                lhs[i][j]
                 !=
                 rhs[i][j]
                 )

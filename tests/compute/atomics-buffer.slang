@@ -1,21 +1,16 @@
 // atomics-buffer.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-// Doesn't work on VK - GLSL output doesn't replace InterlockedAdd.  
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -shaderobj
+// TODO: Remove `glsl` from the targets when https://github.com/shader-slang/slang/issues/14592 is fixed. The Vulkan validation layer
+// rejects the buffer view (VUID-VkBufferViewCreateInfo-range-00929).
+//TEST:COMPARE_COMPUTE(targets=all-vk-glsl-metal-cuda-cpu-wgpu-llvm):
+// Doesn't work on VK - GLSL output doesn't replace InterlockedAdd.
 // Cannot work on CUDA, as outputBuffer becomes a CUsurfObject - which do not appear to have atomics available.
 // If the buffer was a StructuredBuffer this would work on CUDA.
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
 // Atomics not available on CPU currently
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
 // RWBuffer does not work with the GFX backend as expected with Metal
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 // Not supported in WGSL: Use of traditional atomics intrinsics (InterlockedXXX functions)
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 // Not supported in LLVM: atomics are not currently available
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -llvm
 
 //METALLIB: @computeMain
 

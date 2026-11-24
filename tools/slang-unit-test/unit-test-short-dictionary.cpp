@@ -6,7 +6,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(shortDictionary)
+SLANG_UNIT_TEST(shortDictionary, NoRenderApi)
 {
     // Stays within the inline capacity: every entry should be findable, and a lookup for a key
     // that was never added should miss.

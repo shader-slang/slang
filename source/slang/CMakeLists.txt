@@ -6,7 +6,7 @@ set(SLANG_FIDDLE_INPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(SLANG_FIDDLE_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/fiddle")
 
 file(
-    GLOB SLANG_FIDDLE_INPUT_FILE_NAMES
+    GLOB_RECURSE SLANG_FIDDLE_INPUT_FILE_NAMES
     CONFIGURE_DEPENDS
     RELATIVE "${SLANG_FIDDLE_INPUT_DIR}"
     "*.h"
@@ -18,7 +18,7 @@ list(
     PREPEND "${SLANG_FIDDLE_INPUT_DIR}/"
     OUTPUT_VARIABLE SLANG_FIDDLE_INPUTS
 )
-glob_append(SLANG_FIDDLE_LUA_INPUTS "*.lua")
+file(GLOB_RECURSE SLANG_FIDDLE_LUA_INPUTS CONFIGURE_DEPENDS "*.lua")
 
 list(
     TRANSFORM SLANG_FIDDLE_INPUT_FILE_NAMES
@@ -26,6 +26,20 @@ list(
     OUTPUT_VARIABLE SLANG_FIDDLE_OUTPUTS
 )
 list(TRANSFORM SLANG_FIDDLE_OUTPUTS PREPEND "${SLANG_FIDDLE_OUTPUT_DIR}/")
+
+# Fiddle mirrors each input's relative path below the output directory. We create
+# the corresponding directories because `slang-fiddle` does not create parents
+# when writing its generated files.
+set(SLANG_FIDDLE_OUTPUT_DIRS "${SLANG_FIDDLE_OUTPUT_DIR}")
+foreach(slang_fiddle_output IN LISTS SLANG_FIDDLE_OUTPUTS)
+    get_filename_component(
+        slang_fiddle_output_dir
+        "${slang_fiddle_output}"
+        DIRECTORY
+    )
+    list(APPEND SLANG_FIDDLE_OUTPUT_DIRS "${slang_fiddle_output_dir}")
+endforeach()
+list(REMOVE_DUPLICATES SLANG_FIDDLE_OUTPUT_DIRS)
 
 #
 # slang-fiddle is a many-input / many-output generator that uses
@@ -44,7 +58,7 @@ set(SLANG_FIDDLE_STAMP "${SLANG_FIDDLE_OUTPUT_DIR}/.fiddle.stamp")
 add_custom_command(
     OUTPUT ${SLANG_FIDDLE_STAMP}
     BYPRODUCTS ${SLANG_FIDDLE_OUTPUTS}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_FIDDLE_OUTPUT_DIR}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_FIDDLE_OUTPUT_DIRS}
     COMMAND
         slang-fiddle -i "${SLANG_FIDDLE_INPUT_DIR}/" -o
         "${SLANG_FIDDLE_OUTPUT_DIR}/" ${SLANG_FIDDLE_INPUT_FILE_NAMES}
@@ -73,7 +87,8 @@ target_include_directories(
 # Skip optimization in MSVC Debug builds to avoid /RTC1 conflicts.
 # GCC/Clang don't have this issue, so they get size optimization in all configs.
 string(
-    CONCAT RICH_DIAG_SIZE_OPT_FLAGS
+    CONCAT
+    RICH_DIAG_SIZE_OPT_FLAGS
     "$<$<NOT:"
     "$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:MSVC>>"
     ">:"
@@ -86,6 +101,26 @@ set_source_files_properties(
     PROPERTIES
         SKIP_PRECOMPILE_HEADERS ON
         COMPILE_OPTIONS "${RICH_DIAG_SIZE_OPT_FLAGS}"
+)
+
+# MSVC can exceed the COFF section limit for this translation unit in optimized
+# ARM64 builds. Use the extended object format to accommodate its generated code.
+set_property(
+    SOURCE semantic-checking/slang-check-decl.cpp
+    APPEND
+    PROPERTY COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:MSVC>:/bigobj>"
+)
+
+# mimalloc-new-delete.h defines the aligned operator new/delete overloads only when __cplusplus
+# reports C++17 or later, which MSVC does only with /Zc:__cplusplus. We set the option on this file
+# alone because it changes the __cplusplus checks in every header a file includes, such as
+# slang-common.h. The file also skips the precompiled header, which is built without the option,
+# because MSVC expects a file that uses a precompiled header to be compiled with consistent options.
+set_source_files_properties(
+    slang-mimalloc.cpp
+    PROPERTIES
+        SKIP_PRECOMPILE_HEADERS ON
+        COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:MSVC>:/Zc:__cplusplus>"
 )
 
 #
@@ -438,7 +473,8 @@ if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED" AND SLANG_ENABLE_SLANG_PROXY)
     # Create a minimal C++ source file (some linkers require at least one source)
     set(SLANG_PROXY_STUB_CPP "${CMAKE_CURRENT_BINARY_DIR}/slang-proxy-stub.cpp")
     file(
-        WRITE "${SLANG_PROXY_STUB_CPP}"
+        WRITE
+        "${SLANG_PROXY_STUB_CPP}"
         "// Minimal stub file for slang.dll proxy\n"
         "// All exports are forwarded to slang-compiler.dll via the .def file\n"
     )
@@ -452,7 +488,8 @@ if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED" AND SLANG_ENABLE_SLANG_PROXY)
         "${CMAKE_CURRENT_BINARY_DIR}/generate-def-wrapper-$<CONFIG>.cmake"
     )
     file(
-        GENERATE OUTPUT "${DEF_GEN_WRAPPER}"
+        GENERATE OUTPUT
+        "${DEF_GEN_WRAPPER}"
         CONTENT
             "
 set(DLL_PATH \"$<TARGET_FILE:slang>\")

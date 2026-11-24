@@ -1,15 +1,15 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-5
-remediated_at: 2026-08-04T14:10:00Z
+remediator_model: claude-sonnet-5-5
+remediated_at: 2026-11-02T21:21:30Z
 target_doc: pipeline/04c-layout-ir.md
 review_report: ../../reviews/pipeline/04c-layout-ir.md.review.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_before: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
 actions:
-  fixed: 0
+  fixed: 5
   rejected_bogus: 0
-  rejected_out_of_scope: 1
+  rejected_out_of_scope: 0
   deferred: 0
   escalated: 0
 ---
@@ -18,10 +18,14 @@ actions:
 
 ## Summary
 
-The review raised a single major finding, and it concerns the front-matter `watched_paths_digest`. That field is owned by the operator's `mark-fresh` run, not by remediation, so the finding is rejected as out of scope. No fix, rejection-as-bogus, deferral, or escalation was recorded, and the target document was not edited.
+All five findings were verified against the current source and fixed with minimal edits. The capability-atom claim, the construction flow diagram, the IR instruction class, the layout decoration wording, and the contradictory manifest sentence were corrected. Front-matter `generated_at` and `watched_paths_digest` were refreshed.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | rejected-out-of-scope | The digest value the reviewer computes is correct, but `docs/generated/design/_meta/prompts/_remediate.md` lines 97-100 reserve `generated_at`, `source_commit`, and `watched_paths_digest` for the operator's `regenerate.py mark-fresh` run and state "Do not edit those three fields yourself." Since no other finding required an edit, `mark-fresh` will not be rerun for this page and the digest stays as recorded. | — |
+| F-001 | fixed | `source/slang/slang-lower-to-ir.cpp:16564-16575` iterates all atom sets and filters by atom value only, with no target gate. | Step 6 note and the caveat bullet now say only SPIR-V/Metal-version atoms are forwarded regardless of target; removed tool guidance. |
+| F-002 | fixed | `source/slang/slang-parameter-binding.cpp:4853-4868` guards binding with `!m_layout`, latches on error-count delta, and rejects on `m_layoutHasErrors`. | Flow diagram adds `m_layout` gate, latch node, and `m_layoutHasErrors` gate; line 260 prose aligned. |
+| F-003 | fixed | `source/slang/slang-lower-to-ir.cpp:11375` calls `createGlobalParam`. | Step 1: `IRGlobalVar` -> `IRGlobalParam`. |
+| F-004 | fixed | `source/slang/slang-lower-to-ir.cpp:16528-16531` decorates the module with an `IRVarLayout`. | Wording now says an `IRVarLayout` whose type layout is the parameter-group or struct layout. |
+| F-005 | fixed | `docs/generated/design/_meta/manifest.yaml:241` lists `slang-type-layout.cpp`. | Replaced the contradictory sentence with a statement that the file is watched. |

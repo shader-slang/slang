@@ -13,8 +13,8 @@
 // be annotated below, so the absence of annotations asserts that compiling this entry
 // point is completely silent.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry mainGlobal
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry mainGlobal
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target spirv -entry mainGlobal
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target hlsl -entry mainGlobal
 
 Texture2D<float4> gTexture;
 RWTexture2D<float4> gRwTexture;

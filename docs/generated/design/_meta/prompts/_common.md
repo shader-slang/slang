@@ -41,7 +41,7 @@ Everything below the closing `---` is the body of the document.
 - Use Markdown headings (`#`, `##`, ...). The first heading must be `#`
   and is the document title.
 - When you cite a source file, use a markdown link with the
-  workspace-relative path, e.g. `[slang-parser.cpp](../../../../source/slang/slang-parser.cpp)`.
+  workspace-relative path, e.g. `[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp)`.
   Every such link must resolve at `source_commit`.
 - When you reference a sibling LLM-generated doc, link relatively, e.g.
   `[../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md)`.
@@ -122,14 +122,14 @@ the following sections, in order:
 
 1. `# <Family> Reference` title.
 2. `## Source` — one paragraph linking the header that owns the family
-   (e.g. [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h)) plus,
+   (e.g. [slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h)) plus,
    for families that correspond to parsed syntax, the relevant parser
    entry points in
-   [slang-parser.cpp](../../../../source/slang/slang-parser.cpp).
+   [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp).
 3. `## Family hierarchy` — a brief mermaid or bullet diagram showing the
    abstract intermediate classes inside the family. Cite the base class
    relationships declared in
-   [slang-ast-base.h](../../../../source/slang/slang-ast-base.h).
+   [slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h).
 4. `## Nodes` — a single table with one row per concrete (FIDDLE-declared)
    class in the family, columns:
 
@@ -233,7 +233,7 @@ copying the per-class field lists already covered in
 
 The pages under `docs/generated/design/ir-reference/` are an exhaustive
 per-family catalog of every opcode declared in
-[../../../../source/slang/slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua).
+[../../../../source/slang/ir/slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua).
 They sit between the narrative survey in
 [../cross-cutting/ir-instructions.md](../cross-cutting/ir-instructions.md)
 (which covers schema, flag bits, module versioning, and the "add an
@@ -251,10 +251,10 @@ produce a document with the following sections, in order:
 2. `## Source` — one paragraph identifying the Lua entry range that
    owns the family (cite line numbers when they materially help), the
    matching `IRFoo` wrappers in
-   [../../../../source/slang/slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h),
+   [../../../../source/slang/ir/slang-ir-insts.h](../../../../source/slang/ir/slang-ir-insts.h),
    and the `slang-lower-to-ir.cpp` visitor(s) that produce these
    opcodes. Include
-   [../../../../source/slang/slang-ir.h](../../../../source/slang/slang-ir.h)
+   [../../../../source/slang/ir/slang-ir.h](../../../../source/slang/ir/slang-ir.h)
    when the family relies on infrastructure declared there (op flags,
    `IRBuilder` helpers).
 3. `## Family hierarchy` — a brief mermaid `flowchart TD` mirroring
@@ -268,7 +268,7 @@ produce a document with the following sections, in order:
    | Column | Content |
    | --- | --- |
    | Opcode | Backtick-wrapped Lua entry name; this is also the `kIROp_<name>` enum tag. |
-   | C++ wrapper | The `IRFoo` struct name, written **with** the `IR` prefix (`IRNameHintDecoration`, not `NameHintDecoration`). Do **not** use an em-dash here: no opcode is wrapper-less, so an em-dash column carries no information. One page in a past round had an em-dash in all 64 rows. Every opcode ends up with a wrapper, but fiddle does not generate all of them — `getAllOtherInstStructsData()` in [../../../../source/slang/slang-ir.h.lua](../../../../source/slang/slang-ir.h.lua) (near line 152) opens with `if not Slang["IR" .. struct_name] then`, so it *skips* any opcode whose struct is already hand-written in `slang-ir-insts.h` and emits a struct only for the remainder. Mark which are hand-written (a footnote marker such as `‡` works) and state the count in the prose. |
+   | C++ wrapper | The `IRFoo` struct name, written **with** the `IR` prefix (`IRNameHintDecoration`, not `NameHintDecoration`). Do **not** use an em-dash here: no opcode is wrapper-less, so an em-dash column carries no information. One page in a past round had an em-dash in all 64 rows. Every opcode ends up with a wrapper, but fiddle does not generate all of them — `getAllOtherInstStructsData()` in [../../../../source/slang/ir/slang-ir.h.lua](../../../../source/slang/ir/slang-ir.h.lua) (near line 152) opens with `if not Slang["IR" .. struct_name] then`, so it *skips* any opcode whose struct is already hand-written in `slang-ir-insts.h` and emits a struct only for the remainder. Mark which are hand-written (a footnote marker such as `‡` works) and state the count in the prose. |
    | Operands | Compact comma-separated operand names from the Lua entry, e.g. `elementType, count`. Use `(variadic)` for variadic ops and `—` for nullary. A Lua entry that declares `min_operands = N` but gives **no** operand names is common; write `(N unnamed)` for it — do not invent names, and do not fall back to `(variadic)`, which means something different. Where the C++ accessor in `slang-ir-insts.h` reveals what an unnamed operand actually is, you may name it and mark the cell with `†`, explaining the marker in a legend; that is strictly more useful than `(N unnamed)` and is allowed. Pages previously invented `(variadic, min=N)` and other spellings for this case, which produced avoidable review findings. |
    | Flags | One-letter codes joined without separators: `H` hoistable, `P` parent, `G` global. Blank when none apply. |
    | AST origin | **Name the actual producer.** For an opcode lowered from the AST, that is the AST class plus the `visit*` in `slang-lower-to-ir.cpp` that produces it (`VarDecl`, `BinaryExpr` (`+`), ...). For an opcode introduced by a pass, name the pass or function (e.g. `lowerTypeLayout`, the forward-mode autodiff pass, the PyTorch binding pass). For an opcode that **nothing in `source/` constructs**, write **no producer at HEAD** and say so in the summary. The old catch-alls `(synthesized)` and a bare `—` are retired: they hid real distinctions and made unproduced opcodes indistinguishable from pass-produced ones. Verify a producer exists before naming one — an intrinsic-declared opcode (`__intrinsic_op`) has no `visit*` at all. |
@@ -461,7 +461,7 @@ target pages by link; it never copies their content.
 The page `docs/generated/design/pipeline/04b-pre-link-passes.md`
 documents the ordered, per-translation-unit IR pass sequence that
 runs inside `generateIRForTranslationUnit`
-([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+([slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
 line 15386 at the time of writing -- re-derive it, this citation has
 drifted by ~1000 lines before) **before** the module IR is cached on the
 `Module` and pulled into `linkAndOptimizeIR` by `linkIR`. The
@@ -479,7 +479,7 @@ page must produce a document with:
    target-agnostic — the same passes run for every shader
    target.
 2. `## Source` — direct links to
-   [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+   [slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
    `generateIRForTranslationUnit` (line ~14386) and the cited
    pass-implementation files.
 3. `## High-level phase diagram` — one Mermaid `flowchart TD`
@@ -541,7 +541,7 @@ page must produce a document with:
      and how it relates to the link step later inside
      `linkAndOptimizeIR`.
    - `SpecializedComponentTypeIRGenContext::process` — pointer to
-     [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+     [slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
      line ~14783; note that it produces a small
      "specialized component" IR module and does **not** run the
      mandatory-optimization passes.

@@ -1,8 +1,6 @@
 // static-const-array.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -slang -compute -output-using-type -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0  0 0 0 0], stride=4):out, name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -21,7 +19,7 @@ float test(int inVal, int index)
 {
     matrix<float, 2, 3> mat = kArray[index] + kMatrix;
     mat[0] =+ kVector;
-    
+
     float2 a = { inVal, inVal + 1};
     float3 v = mul(a, mat);
     return v.x + v.y + v.z;

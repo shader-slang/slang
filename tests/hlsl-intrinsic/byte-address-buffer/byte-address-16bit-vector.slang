@@ -4,16 +4,13 @@
 // byte-address buffers works as expected, on targets
 // that support it.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm):
 
 // Note: disabled on D3D12 because some of the CI services don't have
 // a recent enough build of dxc to support generic load/store.
 //
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_2 -render-features half -shaderobj
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute -profile cs_6_2 -render-features half -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -llvm -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk):-profile cs_6_2 -render-features half
 
 // Unavailable on D3D and fxc-based targets, because fxc doesn't
 // support loading anything besides `uint` from a byte-address

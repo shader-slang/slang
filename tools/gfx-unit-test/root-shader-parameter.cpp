@@ -114,12 +114,12 @@ void rootShaderParameterTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, buffers[8], std::array{10 - 1 + 2 - 3 + 4 + 5 - 6 + 7});
 }
 
-SLANG_UNIT_TEST(rootShaderParameterD3D12)
+SLANG_UNIT_TEST(rootShaderParameterD3D12, D3D12)
 {
     runTestImpl(rootShaderParameterTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(rootShaderParameterVulkan)
+SLANG_UNIT_TEST(rootShaderParameterVulkan, Vulkan)
 {
     runTestImpl(rootShaderParameterTestImpl, unitTestContext, DeviceType::Vulkan);
 }

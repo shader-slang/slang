@@ -56,7 +56,7 @@ const RttiInfo* rtti()
 // Integer round-trip: setInt then getInt64 must reproduce the same
 // value, for every integer width supported by GetRttiInfo. The
 // serializer relies on this round-trip.
-SLANG_UNIT_TEST(rttiUtilIntRoundTrip)
+SLANG_UNIT_TEST(rttiUtilIntRoundTrip, NoRenderApi)
 {
     int32_t i32 = 0;
     SLANG_CHECK(SLANG_SUCCEEDED(RttiUtil::setInt(42, rtti<int32_t>(), &i32)));
@@ -78,7 +78,7 @@ SLANG_UNIT_TEST(rttiUtilIntRoundTrip)
 }
 
 // Negative values round-trip through signed types.
-SLANG_UNIT_TEST(rttiUtilIntRoundTripNegative)
+SLANG_UNIT_TEST(rttiUtilIntRoundTripNegative, NoRenderApi)
 {
     int32_t i32 = 0;
     SLANG_CHECK(SLANG_SUCCEEDED(RttiUtil::setInt(-1, rtti<int32_t>(), &i32)));
@@ -92,7 +92,7 @@ SLANG_UNIT_TEST(rttiUtilIntRoundTripNegative)
 
 // Float round-trip via setFromDouble / asDouble. The serializer
 // uses these to read/write JSON numbers into typed storage.
-SLANG_UNIT_TEST(rttiUtilFloatRoundTrip)
+SLANG_UNIT_TEST(rttiUtilFloatRoundTrip, NoRenderApi)
 {
     float f = 0.0f;
     SLANG_CHECK(SLANG_SUCCEEDED(RttiUtil::setFromDouble(3.5, rtti<float>(), &f)));
@@ -107,7 +107,7 @@ SLANG_UNIT_TEST(rttiUtilFloatRoundTrip)
 
 // Cross-typed reads — int → double (used when reading an int field
 // into a JSON number) must produce the same numeric value.
-SLANG_UNIT_TEST(rttiUtilAsDoubleFromInt)
+SLANG_UNIT_TEST(rttiUtilAsDoubleFromInt, NoRenderApi)
 {
     int32_t i = 7;
     SLANG_CHECK(RttiUtil::asDouble(rtti<int32_t>(), &i) == 7.0);
@@ -118,7 +118,7 @@ SLANG_UNIT_TEST(rttiUtilAsDoubleFromInt)
 // asBool: bool is identity; integers follow C truthiness (non-zero
 // → true). The serializer uses this to read JSON bools into either
 // `bool` or `int` storage.
-SLANG_UNIT_TEST(rttiUtilAsBoolSemantics)
+SLANG_UNIT_TEST(rttiUtilAsBoolSemantics, NoRenderApi)
 {
     bool t = true, f = false;
     SLANG_CHECK(RttiUtil::asBool(rtti<bool>(), &t));
@@ -133,7 +133,7 @@ SLANG_UNIT_TEST(rttiUtilAsBoolSemantics)
 // `isDefault(Normal)` — true exactly when the value equals the
 // type's default-init. Used by the serializer to omit default-
 // valued fields, so it must precisely match what zero-init produces.
-SLANG_UNIT_TEST(rttiUtilIsDefaultNormal)
+SLANG_UNIT_TEST(rttiUtilIsDefaultNormal, NoRenderApi)
 {
     int32_t zero = 0, one = 1;
     SLANG_CHECK(RttiUtil::isDefault(RttiDefaultValue::Normal, rtti<int32_t>(), &zero));
@@ -156,7 +156,7 @@ SLANG_UNIT_TEST(rttiUtilIsDefaultNormal)
 // canZeroInit must be a TRUE statement: when it returns true, an
 // all-zero buffer reinterpreted as T must equal a default-
 // constructed T. The serializer skips ctor calls when this holds.
-SLANG_UNIT_TEST(rttiUtilCanZeroInitImpliesZeroIsDefault)
+SLANG_UNIT_TEST(rttiUtilCanZeroInitImpliesZeroIsDefault, NoRenderApi)
 {
     SLANG_CHECK(RttiUtil::canZeroInit(rtti<int32_t>()));
     SLANG_CHECK(RttiUtil::canZeroInit(rtti<float>()));
@@ -181,7 +181,7 @@ SLANG_UNIT_TEST(rttiUtilCanZeroInitImpliesZeroIsDefault)
 // IS a valid copy for T (the destination becomes equal to the
 // source). For heap-owning types it must return false — memcpy
 // would alias the heap buffer and double-free at dtor.
-SLANG_UNIT_TEST(rttiUtilCanMemCpyImpliesMemcpyIsValid)
+SLANG_UNIT_TEST(rttiUtilCanMemCpyImpliesMemcpyIsValid, NoRenderApi)
 {
     SLANG_CHECK(RttiUtil::canMemCpy(rtti<int32_t>()));
     SLANG_CHECK(RttiUtil::canMemCpy(rtti<float>()));
@@ -203,7 +203,7 @@ SLANG_UNIT_TEST(rttiUtilCanMemCpyImpliesMemcpyIsValid)
 // hasDtor must be a TRUE statement: when it returns false,
 // skipping ~T() is safe (no resources leak). Used by the serializer
 // to skip dtor calls on POD-only field arrays.
-SLANG_UNIT_TEST(rttiUtilHasDtorPredicate)
+SLANG_UNIT_TEST(rttiUtilHasDtorPredicate, NoRenderApi)
 {
     SLANG_CHECK(!RttiUtil::hasDtor(rtti<int32_t>()));
     SLANG_CHECK(!RttiUtil::hasDtor(rtti<float>()));
@@ -218,7 +218,7 @@ SLANG_UNIT_TEST(rttiUtilHasDtorPredicate)
 // getDefaultTypeFuncs returns a valid triple for POD types — the
 // serializer uses it as a fallback when no type-funcs map has been
 // registered for the type. The triple must be invokable.
-SLANG_UNIT_TEST(rttiUtilDefaultTypeFuncsAreInvokable)
+SLANG_UNIT_TEST(rttiUtilDefaultTypeFuncsAreInvokable, NoRenderApi)
 {
     auto funcs = RttiUtil::getDefaultTypeFuncs(rtti<int32_t>());
     SLANG_CHECK(funcs.isValid());
@@ -241,7 +241,7 @@ SLANG_UNIT_TEST(rttiUtilDefaultTypeFuncsAreInvokable)
 
 // RttiUtil::copyArray on POD types performs bit-copy via the
 // default funcs; dst becomes element-wise equal to src.
-SLANG_UNIT_TEST(rttiUtilCopyArrayPodIsBitwiseCopy)
+SLANG_UNIT_TEST(rttiUtilCopyArrayPodIsBitwiseCopy, NoRenderApi)
 {
     int32_t src[5] = {1, 2, 3, 4, 5};
     int32_t dst[5] = {0, 0, 0, 0, 0};
@@ -257,7 +257,7 @@ SLANG_UNIT_TEST(rttiUtilCopyArrayPodIsBitwiseCopy)
 // dstList.getCount(), the new buffer must be sized by srcCount (the inner
 // element count), not by the outer loop variable.  The pre-fix code used the
 // outer count, which under-allocates whenever the inner list is larger.
-SLANG_UNIT_TEST(rttiUtilListCopyArrayGrowPath)
+SLANG_UNIT_TEST(rttiUtilListCopyArrayGrowPath, NoRenderApi)
 {
     // typeMap only needs int32_t funcs — ListFuncs::copyArray for List<int32_t>
     // looks up int32_t element funcs when growing a list's buffer.

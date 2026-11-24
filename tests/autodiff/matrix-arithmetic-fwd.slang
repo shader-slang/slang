@@ -1,7 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute  -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -35,7 +32,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     float2x2 l = float2x2(1.0, 2.0, 3.0, 4.0);
     float2x2 r = float2x2(10.0, 11.0, 12.0, 13.0);
     float2x2 d = float2x2(1.0, 0.0, 1.0, 1.0);
-    
+
     //float2x2 epsilon = d * 0.001f;
     //outputBuffer[1] = (h(l + epsilon, r + epsilon) - h(l - epsilon, r - epsilon)) / (epsilon[0][0] * 2.0));
 

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#expand-and-each
-//META: doc_section_digest=2ed1d49e883342d68fe0358df77216d1a1dde882fd28ceba41c00abeda91bbec
+//META: doc_section_digest=b0c56c5045e656ca5e7dc8064189fa241646d7b924e02fd2f3b06ed86e75e378
 //META: purpose=An `expand` statement over a variadic pack lowers to an `Expand` inst that owns its pattern body as child blocks rather than as an ordinary operand list.
 //META: intent=functional
 //META: pipeline_stage=lower

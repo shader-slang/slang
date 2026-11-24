@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -dx12 -profile cs_6_6 -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -cuda -profile cs_6_6 -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda, filecheck-buffer=BUF):-profile cs_6_6 -output-using-type
 
 // This is to support 64-bit `Interlocked*` functions defined for HLSL SM6.6
 // https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_Int64_and_Float_Atomics.html

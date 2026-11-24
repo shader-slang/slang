@@ -1,13 +1,11 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 // This test checks to ensure that expressions of the form FieldExtract(MakeStruct(...))
-// are handled correctly in the presence of differentiation. 
-// Such expressions are often optimized out, and the non-differentiability of the struct 
+// are handled correctly in the presence of differentiation.
+// Such expressions are often optimized out, and the non-differentiability of the struct
 // type can be accidentally overlooked.
 //
 

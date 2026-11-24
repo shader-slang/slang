@@ -4,7 +4,7 @@
 // body scope for `Foo`. Code in the earlier `Foo` body finds the imported members of `Foo`,
 // and so does the body of `NewB`.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 import reopen_lib;
 

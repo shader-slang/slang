@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -line-directive-mode none -O0 -validate-ir
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -Xslang -O0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -Xslang -O3
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda, filecheck-buffer=CHECK):-output-using-type -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type -Xslang -O3
 
 // Only lanes 0 and 2 call `writeActiveLaneCount`, so each must observe two active lanes.
 // We keep the kernel body separate to verify that its ordinary device clone receives the caller's

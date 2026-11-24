@@ -1,9 +1,9 @@
 // Test FFLayer eval() with contiguous parameter storage.
 //
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_TENSORVIEW=0
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-dx12 -compute -shaderobj -profile cs_6_6 -xslang -experimental-feature -output-using-type -xslang -DTEST_TENSORVIEW=0
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_TENSORVIEW=0
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_TENSORVIEW=0
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUFFER):-xslang -experimental-feature -output-using-type -xslang -DTEST_TENSORVIEW=0
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=BUFFER):-profile cs_6_6 -xslang -experimental-feature -output-using-type -xslang -DTEST_TENSORVIEW=0
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUFFER):-output-using-type -xslang -experimental-feature -xslang -DTEST_TENSORVIEW=0
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_TENSORVIEW=0
 //
 // Compile-only test for TorchTensorViewAddress (CUDA target):
 //TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_TENSORVIEW=1 -experimental-feature

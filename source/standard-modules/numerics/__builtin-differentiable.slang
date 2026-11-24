@@ -15,6 +15,25 @@ module __builtin_differentiable;
 [__readNone]
 [Differentiable]
 [__unsafeForceInlineEarly]
+public T __differentiableNumericsSelect<T : __BuiltinFloatingPointType>(
+    no_diff bool condition, T ifTrue, T ifFalse)
+{
+    return ::select(condition, ifTrue, ifFalse);
+}
+
+[__readNone]
+[Differentiable]
+[__unsafeForceInlineEarly]
+public vector<T, N> __differentiableNumericsSelect<
+    T : __BuiltinFloatingPointType, let N : int>(
+    no_diff vector<bool, N> condition, vector<T, N> ifTrue, vector<T, N> ifFalse)
+{
+    return ::select(condition, ifTrue, ifFalse);
+}
+
+[__readNone]
+[Differentiable]
+[__unsafeForceInlineEarly]
 public TDestination __differentiableNumericsConstructFromFloatingPoint<
     TDestination : __BuiltinFloatingPointType,
     TSource : __BuiltinFloatingPointType>(TSource value)

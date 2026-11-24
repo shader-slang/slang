@@ -23,7 +23,7 @@ using namespace Slang;
 // Gated on `SLANG_HAS_EXCEPTIONS`: with exceptions disabled `SLANG_UNIMPLEMENTED_X` panics and
 // exits the process instead of throwing, so there is no exception for the boundary to contain.
 #if SLANG_HAS_EXCEPTIONS
-SLANG_UNIT_TEST(precompileForTargetContainsEmissionException)
+SLANG_UNIT_TEST(precompileForTargetContainsEmissionException, NoRenderApi)
 {
     const char* moduleSource = R"SLANG(
         module nested;

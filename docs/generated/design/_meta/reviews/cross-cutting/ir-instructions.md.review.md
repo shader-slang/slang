@@ -1,45 +1,47 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T08:20:31+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T08:21:16Z
 target_doc: cross-cutting/ir-instructions.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 32a6f83c708fb280660629cff147cc6b41bd0816fc7f889340630eb73cb6b9f1
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: 70e71f05715d4cfb8c9d7012181f6823a6a06933c58c0925647a008f9c72bb91
+source_commit: 801b9e6e57d41f5cef1a5d54c0eeff9e0db4fee6
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: partial
-  style_consistency: pass
+  completeness: pass
+  style_consistency: partial
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 7
+finding_count: 4
 severity_breakdown:
-  critical: 0
-  major: 2
-  minor: 5
-  nit: 0
+  critical: 1
+  major: 0
+  minor: 2
+  nit: 1
 ---
 
 # Review report for cross-cutting/ir-instructions.md
 
 ## Summary
-The page is well linked and broadly source-aligned, but it has two material accuracy problems: several decoration wrappers are presented as Lua opcode names, and module-local hoistable deduplication is described as if one instruction identity spans modules. Five smaller issues affect operand shapes, HLSL spelling, workflow attribution, and one required decorations-contract note.
+
+The document covers the required sections and generally matches the implementation. Its most important error conflates native vector spelling with padded buffer storage, incorrectly extending Metal’s native-vector padding behavior to every other target. Three smaller findings concern the stable-name checker, a definition’s location, and oversized table notes.
 
 ## Items checked
-- Reviewed the target, `_common.md`, its per-document prompt, `regenerate.py show` output, all four resolved watched files, and dependency `architecture/overview.md` at commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
-- Verified all four explicit line-number citations: `slang-ir.cpp:9888`, `slang-ir-insts.lua:1453`, `slang-lower-to-ir.cpp:6592`, and `slang-ir-lower-expand-type.cpp:107`.
-- Resolved all 63 markdown links (32 unique targets) at the recorded commit; none dangle, and every generated-doc target exists.
-- Spot-checked more than 10 factual claims, including schema defaults and inheritance, generated wrappers, flag values, `Vec`/`Mat`/`Ptr` operands, work-graph record count, generic `return_val` behavior, the two `yield` producers, module versions, stable-name counts, serialization conversion, and the stable-name checker workflow.
-- Recomputed the watched-path digest exactly and ran the document lint successfully; the front matter has every required field.
+
+- Reviewed against the **current working tree**, which the operator states equals the document’s source commit for all of `source/`; no files were written.
+- Read `_review.md`, `_common.md`, and the document-specific prompt obtained through `regenerate.py show`; checked required sections, table columns, audience, and the 48 KB cap. The document is 31,201 bytes.
+- Checked all nine explicit line-number citations: `slang-ir.cpp` lines 4078, 4291, 7605, 9985; `slang-lower-to-ir.cpp` lines 6049, 6314; `slang-ir-insts.lua` line 1457; `slang-ir-lower-expand-type.cpp` line 107; and `slang-ir-insts.h` line 2861.
+- Spot-checked more than 15 claims, including wrapper generation, schema defaults, flag mapping, pointer and texture operands, opcode masking, intrinsic producers, array initialization, generic returns, expand yields, unused `emitAlloca`, set canonicalization, module-owned deduplication, module version 37, and optional debug-function parent scopes.
+- Verified stable-name serialization, all 882 stable-name assignments and maximum ID 909, and both checker workflows.
+- Resolved all 70 Markdown links, covering 33 distinct destinations; confirmed linked generated pages have manifest entries. Consulted the architecture dependency only for cross-reference context.
+- Checked required front-matter keys and formats, relative-link style, and Liquid safety.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `### Decorations`, lines 244-248; `## Decorations`, lines 321-325 | The catalog calls `NameHintDecoration`, `KeepAliveDecoration`, `TargetIntrinsicDecoration`, and `EntryPointDecoration` opcodes, but these are `struct_name` values; the Lua opcodes are `nameHint`, `keepAlive`, `targetIntrinsic`, and `entryPoint`. Some listed operand names likewise differ from the schema. | `source/slang/slang-ir-insts.lua:1793-1795`, `1827`, `2087-2093`, and `2157-2159` declare the lowercase opcode keys and wrapper names. | Put the lowercase Lua keys in the Opcode column, retain the decoration names in `struct_name`, use the source operand spellings, and call the `*Decoration` names C++ wrappers in the prose. |
-| F-002 | minor | `### Value instructions`, line 192 | The `constexprAdd` through `constexprEnumCast` row says the operands are variadic, but every opcode in that range has a fixed one-, two-, or three-operand schema. | `source/slang/slang-ir-insts.lua:3408-3437` declares explicit fixed operand lists for every `constexpr*` opcode. | Replace `(variadic)` with a compact fixed-arity summary such as `1-3 fixed operands; see Lua entries`. |
-| F-003 | minor | `### Resource and shader-IO opcodes`, line 262 | The wave row labels `waveGetActiveMask`, `waveMaskBallot`, and related examples variadic, although the named examples are nullary and binary respectively. | `source/slang/slang-ir-insts.lua:1631-1635` declares `waveGetActiveMask = {}` and `waveMaskBallot` with `mask, condition`. | State that operand shape varies by opcode, or list the two shown shapes explicitly. |
-| F-004 | major | `## Hoistable / global / deduplicated values`, lines 308-317 | The statement that one built-in requirement-key instruction is returned “regardless of which ... module asks” overstates identity across modules. Deduplication is owned by an `IRModule`; separately resident modules have separate arenas and deduplication maps. | `source/slang/slang-ir-insts.h:3176-3183` binds each builder to its module's context; `source/slang/slang-ir.h:2012-2021` says the context is owned by `IRModule`; `source/slang/slang-ir.cpp:2865-2869` performs lookup in that context's map. | Scope the guarantee to repeated requests in one destination `IRModule`, and explain that imported instructions are deduplicated after entering that module rather than sharing pointer identity across modules. |
-| F-005 | minor | `### Decorations`, line 250 | The node-launch row says HLSL emission re-spells the mode as a named constant, but the emitter writes it as a quoted attribute string. | `source/slang/slang-emit-hlsl.cpp:589-591` emits `[NodeLaunch(\"`, the stored string, then `\")]`. | Change “HLSL named constant” to “quoted HLSL attribute string.” |
-| F-006 | minor | `## Adding a new opcode`, lines 390-395 | The page says `check-inst-version-changes.sh` comments on a PR. The script explicitly makes no API call; it writes an artifact that a privileged `workflow_run` job consumes and posts. | `extras/check-inst-version-changes.sh:20-23` describes the split, and lines `156-169` write `pr-number.txt` and `comment-body.txt`. | Attribute artifact creation to the script and PR comment posting to the consuming workflow. |
-| F-007 | minor | `## Decorations`, lines 319-333 | The required prompt asks for a cautious note about the planned migration toward decorations-as-instructions, but this section omits it. This needs qualification because the current source already defines decorations as instructions while the older design note still describes that as future work. | `docs/generated/design/_meta/prompts/cross-cutting-ir-instructions.md:58-60` requires the note; `docs/design/ir.md:61` contains the older plan; `source/slang/slang-ir-insts.h:34-39` currently defines `IRDecoration : IRInst`. | Add one sentence distinguishing the historical design-note wording from the current implementation, without presenting the stale plan as an active roadmap. |
+| F-001 | critical | Type instructions, line 179 | The `MetalPackedVec` row says every other target “keeps the padded vector,” explicitly including HLSL. Native `float3` spelling does not imply padded structured-buffer storage. The unconditional SPIR-V stride claim also omits supported layout options. This can mislead readers implementing buffer ABI layouts. | `source/slang/slang-ir-lower-buffer-element-type.cpp:2501` selects natural layout for non-Khronos, non-LLVM targets; line 2541 selects natural layout with scalar-layout options. `source/slang/slang-ir-layout.cpp:681` computes natural vector layout as `IRSizeAndAlignment(element.size * count, element.alignment)`, giving three floats size 12 and alignment 4. | Retain the Metal packed-versus-local distinction. Remove “every other target keeps the padded vector”; state that HLSL retains `float3` spelling without implying 16-byte storage, and qualify SPIR-V `ArrayStride 16` as the default layout case rather than a universal result. |
+| F-002 | minor | Adding a new opcode, lines 439–440 | Saying `check` “verifies that the two files are a bijection” overstates its acceptance criteria. Retired stable-name entries are permitted, so successful checking does not establish a bijection. | `extras/check-ir-stable-names.lua:229` reports extra entries as `WARNING`; line 276 returns failure only when `has_errors` is set. Missing names and duplicate IDs set that flag; extra entries do not. | Say that `check` requires every live opcode to have a stable name and all IDs to be unique, while allowing retired entries with warnings. |
+| F-003 | minor | Decorations, lines 354–356 | The prose locates the `IRDecoration` wrapper in `slang-ir.h`, which only forward-declares it. | `source/slang/slang-ir.h:140` contains `struct IRDecoration;`; its definition, `struct IRDecoration : IRInst`, is in `source/slang/slang-ir-insts.h:35`. | Change the definition-site link to `slang-ir-insts.h`. |
+| F-004 | nit | Instruction families, especially lines 179, 193, 201, 224 | Several Notes cells contain extended explanations and examples rather than the required short phrase. The `MetalPackedVec` and `generic` rows are particularly difficult to scan as catalog entries. | `docs/generated/design/_meta/prompts/cross-cutting-ir-instructions.md`, Required structure item 4: “The `Notes` column is one short phrase.” | Condense these cells to brief summaries and links. Place any essential retained explanation in prose following the existing tables, without adding new sections. |

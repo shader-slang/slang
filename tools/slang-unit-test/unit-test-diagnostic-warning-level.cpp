@@ -37,7 +37,7 @@ bool emitted(DiagnosticSink& sink, const DiagnosticInfo& info)
 } // namespace
 
 // Default state: Default and Extra groups are emitted; All and Pedantic are suppressed.
-SLANG_UNIT_TEST(warningLevelDefaultGating)
+SLANG_UNIT_TEST(warningLevelDefaultGating, NoRenderApi)
 {
     DiagnosticSink sink;
 
@@ -49,7 +49,7 @@ SLANG_UNIT_TEST(warningLevelDefaultGating)
 
 // Enabling a group is additive and affects only that group. Both groups exercised here are
 // off by default (All and Pedantic), so enabling one must not enable the other.
-SLANG_UNIT_TEST(warningLevelEnableIsAdditive)
+SLANG_UNIT_TEST(warningLevelEnableIsAdditive, NoRenderApi)
 {
     DiagnosticSink sink;
     sink.enableWarningLevel(WarningLevel::All);
@@ -64,7 +64,7 @@ SLANG_UNIT_TEST(warningLevelEnableIsAdditive)
 
 // An explicit per-id enable (e.g. -W<name>) force-enables a grouped warning even when its
 // group is off, and a per-id disable (-Wno-<name>) suppresses one even when the group is on.
-SLANG_UNIT_TEST(warningLevelPerIdOverrideWins)
+SLANG_UNIT_TEST(warningLevelPerIdOverrideWins, NoRenderApi)
 {
     DiagnosticSink sink;
 
@@ -82,7 +82,7 @@ SLANG_UNIT_TEST(warningLevelPerIdOverrideWins)
 
 // Treat-warnings-as-errors runs after group gating: a suppressed grouped warning stays
 // suppressed (does not become an error), but once its group is enabled it becomes an error.
-SLANG_UNIT_TEST(warningLevelWarningsAsErrorsInteraction)
+SLANG_UNIT_TEST(warningLevelWarningsAsErrorsInteraction, NoRenderApi)
 {
     DiagnosticSink sink;
     sink.setFlag(DiagnosticSink::Flag::TreatWarningsAsErrors);
@@ -106,7 +106,7 @@ SLANG_UNIT_TEST(warningLevelWarningsAsErrorsInteraction)
 // A child sink built from a parent inherits the parent's enabled warning groups. Sinks are
 // spun up per-translation-unit / per-module from a parent sink via the parent-copying ctor,
 // so an opt-in group enabled on the parent must carry over to nested/downstream compilations.
-SLANG_UNIT_TEST(warningLevelInheritedFromParentSink)
+SLANG_UNIT_TEST(warningLevelInheritedFromParentSink, NoRenderApi)
 {
     DiagnosticSink parent;
     parent.enableWarningLevel(WarningLevel::All);
@@ -124,7 +124,7 @@ SLANG_UNIT_TEST(warningLevelInheritedFromParentSink)
 
 // Out-of-range group values (only reachable via a bogus int cast through the public
 // WarningLevel option) must not trigger an out-of-range shift / undefined behavior.
-SLANG_UNIT_TEST(warningLevelOutOfRangeIsSafe)
+SLANG_UNIT_TEST(warningLevelOutOfRangeIsSafe, NoRenderApi)
 {
     DiagnosticSink sink;
     const auto bogus = (WarningLevel)9999;

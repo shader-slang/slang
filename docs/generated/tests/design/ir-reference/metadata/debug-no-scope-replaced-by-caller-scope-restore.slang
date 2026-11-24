@@ -2,8 +2,8 @@
 //META: model=claude-opus-5-5[1m]
 //META: generated_at=2026-09-27T12:30:00+00:00
 //META: source_commit=6eb89786ca882d71049c8568638e247f60864b6f
-//META: doc_ref=docs/generated/design/ir-reference/metadata.md#debugscope
-//META: doc_section_digest=ca7fb4545f10893ab3c9d211926e944ee94d03a581ab401070eaed7fe9f324b8
+//META: doc_ref=docs/generated/design/ir-reference/metadata.md#debugscope-and-debugnoscope
+//META: doc_section_digest=8849ab9e5ff9cbb66329b5cf029a66c4b8bf64c0c450f4968378a12e13634ef1
 //META: purpose=An inlined region is closed by a DebugScope that restores the caller's function scope with no inlining-context operand, not by DebugNoScope.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

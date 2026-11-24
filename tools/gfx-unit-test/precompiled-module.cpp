@@ -131,12 +131,12 @@ void precompiledModuleTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, numbersBuffer, std::array{3.0f, 3.0f, 3.0f, 3.0f});
 }
 
-SLANG_UNIT_TEST(precompiledModuleD3D12)
+SLANG_UNIT_TEST(precompiledModuleD3D12, D3D12)
 {
     runTestImpl(precompiledModuleTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(precompiledModuleVulkan)
+SLANG_UNIT_TEST(precompiledModuleVulkan, Vulkan)
 {
     runTestImpl(precompiledModuleTestImpl, unitTestContext, DeviceType::Vulkan);
 }

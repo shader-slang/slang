@@ -2,8 +2,7 @@
 //TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 //TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target hlsl
 //TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl/float16_types.slang -stage compute -entry computeMain -target cuda
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=all-wgpu, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 
 #version 450
 
@@ -74,9 +73,9 @@ void computeMain()
     // CHECK_SPV: OpTypeFloat 16
 
     // CHECK_HLSL: vector<half,4>
-    // CHECK_HLSL: matrix<half,int(4),int(4)>
-    // CHECK_HLSL: matrix<half,int(3),int(4)>
-    // CHECK_HLSL: matrix<half,int(2),int(3)>
+    // CHECK_HLSL: matrix<half,4L,4L>
+    // CHECK_HLSL: matrix<half,3L,4L>
+    // CHECK_HLSL: matrix<half,2L,3L>
 
     // CHECK_CUDA: __half4
     // CHECK_CUDA: makeMatrix<__half, 4, 4>

@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE:-vk -compute -profile cs_6_2 -render-features half -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cuda -compute -render-features half -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk):-profile cs_6_2 -render-features half
+//TEST:COMPARE_COMPUTE(targets=cuda):-render-features half
 
 //Disable on Dx12 for now - because writing to structured buffer produces unexpected results
 //TEST_DISABLED(compute):COMPARE_COMPUTE:-dx12 -compute -profile cs_6_2 -render-features half -shaderobj
@@ -18,15 +18,15 @@ RWStructuredBuffer<Thing> outputBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
-    
+
     float v = float(tid);
-    
+
     float base = v* 4.0f;
-    
+
     Thing thing;
     thing.pos = tid;
-    thing.color = half4(float4(base, base + 1.0f, base + 2.0f, base + 3.0f));    
+    thing.color = half4(float4(base, base + 1.0f, base + 2.0f, base + 3.0f));
     thing.radius = v;
-    
+
     outputBuffer[tid] = thing;
 }

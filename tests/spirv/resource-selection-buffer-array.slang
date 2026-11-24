@@ -1,14 +1,15 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry main -O0 -validate-ir
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry main -validate-ir
 
-// Check that storage-buffer array selections keep their variable-pointer representation
-// without acquiring a nonuniform descriptor-indexing requirement.
+// Check that a selection between elements of one storage-buffer array becomes a single access
+// through a selected index, like a texture-array selection, so that the module needs no variable
+// pointers. The selected index can differ between invocations, so it is marked nonuniform.
 
-// CHECK-NOT: NonUniform
-// CHECK: OpCapability VariablePointersStorageBuffer
-// CHECK-NOT: NonUniform
-// CHECK: OpMemoryModel
-// CHECK-NOT: NonUniform
+// CHECK-NOT: VariablePointers
+// CHECK: OpCapability StorageBufferArrayNonUniformIndexing
+// CHECK-NOT: VariablePointers
+// CHECK: OpDecorate {{.*}} NonUniform
+// CHECK-NOT: VariablePointers
 // CHECK: OpFunctionEnd
 
 cbuffer Ubo { uint i; uint j; uint condition; };

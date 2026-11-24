@@ -1,5 +1,5 @@
 //TEST:COMPILE: tests/serialization/effective-this-param-info-module.slang -o tests/serialization/effective-this-param-info-module.slang-module
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=BUF): -slang -compute -xslang -r -xslang tests/serialization/effective-this-param-info-module.slang-module -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF): -xslang -r -xslang tests/serialization/effective-this-param-info-module.slang-module
 //TEST:SIMPLE(filecheck=IR): -r tests/serialization/effective-this-param-info-module.slang-module -no-codegen -dump-ir
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer

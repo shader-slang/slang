@@ -3,17 +3,17 @@
 //META: generated_at=2026-09-11T00:00:00+00:00
 //META: source_commit=25a5bb130ef0e46a222896f37119b4b5408d2d40
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#unqualified-lookup
-//META: doc_section_digest=ce74e751abd83caf10326ac968c3af12829a5d0d24575d5595ca7f1148931ff5
+//META: doc_section_digest=d1c02da07b357c8b41134fbb13a153c9451e991db3087032b3d340a5ddfdfa75
 //META: purpose=The attribute that makes a method's implicit `this` mutable is spelled [__ref] with two leading underscores; a bare [ref] is an unknown attribute and leaves `this` immutable.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Step 5 of unqualified lookup updates `thisParameterMode` from the container
-// it just left, and for a `FunctionDeclBase` the third modifier it consults is
-// `RefAttribute`. That attribute's only surface is
+// The doc says `[mutating]` and `[__ref]` matter to the checker's `this`
+// computation (the effective this-parameter information of a
+// `FunctionDeclBase`), not to lookup. `RefAttribute`'s only surface is
 // `attribute_syntax [__ref] : RefAttribute;` in the core module, so the
-// two-underscore spelling is the one that selects the arm. `Mutable` below
+// two-underscore spelling is the one that makes `this` writable. `Mutable` below
 // carries no annotation, and exhaustive mode is what turns that silence into
 // an assertion: assigning to a member from inside a `[__ref]` method is legal
 // precisely because `this` became mutable. The bare `[ref]` spelling is not

@@ -1,9 +1,7 @@
 // scope.slang
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
-// Confirm that scoping on enums and types works 
+// Confirm that scoping on enums and types works
 
 struct Thing
 {

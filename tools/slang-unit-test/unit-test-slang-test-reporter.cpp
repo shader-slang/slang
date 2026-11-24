@@ -7,7 +7,7 @@ using namespace Slang;
 // A sub-reporter (the per-worker reporter used by parallel runs) must receive the same
 // Options-derived display configuration as the main reporter, so that verbosity, dump-on-failure,
 // hide-ignored, output mode, and the expected-failure list all take effect on every worker.
-SLANG_UNIT_TEST(slangTestReporterInitFromOptions)
+SLANG_UNIT_TEST(slangTestReporterInitFromOptions, NoRenderApi)
 {
     Options options;
     options.outputMode = TestOutputMode::TeamCity;
@@ -43,7 +43,7 @@ SLANG_UNIT_TEST(slangTestReporterInitFromOptions)
 
 // A `PendingRetry` that no retry ever redeems must become a counted failure after reconciliation.
 // This is the exact bug: the deferred failure must not vanish.
-SLANG_UNIT_TEST(slangTestReporterReconcileFailsUnredeemedRetry)
+SLANG_UNIT_TEST(slangTestReporterReconcileFailsUnredeemedRetry, NoRenderApi)
 {
     TestReporter reporter;
     // Keeps the reporter's writes off test-server's JSON-RPC channel.
@@ -69,7 +69,7 @@ SLANG_UNIT_TEST(slangTestReporterReconcileFailsUnredeemedRetry)
 // A `PendingRetry` that a later final result redeems must NOT be counted as a failure: a flaky test
 // that passes on retry is a pass. This guards against over-correcting the bug above into counting
 // every retried test as failed.
-SLANG_UNIT_TEST(slangTestReporterReconcileKeepsRedeemedRetry)
+SLANG_UNIT_TEST(slangTestReporterReconcileKeepsRedeemedRetry, NoRenderApi)
 {
     TestReporter reporter;
     // Keeps the reporter's writes off test-server's JSON-RPC channel.
@@ -94,7 +94,7 @@ SLANG_UNIT_TEST(slangTestReporterReconcileKeepsRedeemedRetry)
 // a test on the expected-failure list is still downgraded to `ExpectedFail` and does not break the
 // run. This pins the promise made in `reconcilePendingRetries()` that the expected-failure gate
 // still applies to a reconciled deferral.
-SLANG_UNIT_TEST(slangTestReporterReconcileHonorsExpectedFailure)
+SLANG_UNIT_TEST(slangTestReporterReconcileHonorsExpectedFailure, NoRenderApi)
 {
     TestReporter reporter;
     // Keeps the reporter's writes off test-server's JSON-RPC channel.
@@ -114,7 +114,7 @@ SLANG_UNIT_TEST(slangTestReporterReconcileHonorsExpectedFailure)
 // because the retry pass runs on a fresh set of threads. After `consolidateWith()` unions both
 // sets, the merged reporter must see the retry as redeemed rather than failed -- this is why the
 // pending/final sets are tracked separately and reconciled only after consolidation.
-SLANG_UNIT_TEST(slangTestReporterConsolidateThenReconcile)
+SLANG_UNIT_TEST(slangTestReporterConsolidateThenReconcile, NoRenderApi)
 {
     const String command("slang-unit-test-tool/probeCrossThread.internal");
 
@@ -146,7 +146,7 @@ SLANG_UNIT_TEST(slangTestReporterConsolidateThenReconcile)
 // A retry that runs and fails again reports a final `Fail`, which redeems the deferral. The failure
 // must be counted exactly once: `reconcilePendingRetries()` must not also synthesize a second
 // failure for the same test. This is the ordinary "flaky test stays broken" path.
-SLANG_UNIT_TEST(slangTestReporterReconcileCountsRetriedFailureOnce)
+SLANG_UNIT_TEST(slangTestReporterReconcileCountsRetriedFailureOnce, NoRenderApi)
 {
     TestReporter reporter;
     // Keeps the reporter's writes off test-server's JSON-RPC channel.
@@ -169,7 +169,7 @@ SLANG_UNIT_TEST(slangTestReporterReconcileCountsRetriedFailureOnce)
 
 // The cross-sub-reporter counterpart of the unredeemed case: a deferral recorded by one worker that
 // no worker ever redeems must, after `consolidateWith()`, still be reconciled into a failure.
-SLANG_UNIT_TEST(slangTestReporterConsolidateUnredeemedReconcilesToFailure)
+SLANG_UNIT_TEST(slangTestReporterConsolidateUnredeemedReconcilesToFailure, NoRenderApi)
 {
     const String command("slang-unit-test-tool/probeCrossThreadUnredeemed.internal");
 
@@ -200,7 +200,7 @@ SLANG_UNIT_TEST(slangTestReporterConsolidateUnredeemedReconcilesToFailure)
 // test server died), was deferred, and the retry reported it ignored -- so it left the failure
 // count and landed in the ignored tally, and the run reported only the two unrelated file-test
 // failures. Under -hide-ignored it would not have been counted at all.
-SLANG_UNIT_TEST(slangTestReporterIgnoredRetryDoesNotRedeemDeferral)
+SLANG_UNIT_TEST(slangTestReporterIgnoredRetryDoesNotRedeemDeferral, NoRenderApi)
 {
     TestReporter reporter;
     // Keeps the reporter's writes off test-server's JSON-RPC channel.
@@ -224,7 +224,7 @@ SLANG_UNIT_TEST(slangTestReporterIgnoredRetryDoesNotRedeemDeferral)
 
 // The same, with the ignore hidden from the output: -hide-ignored is what made the earlier
 // behaviour leave no trace at all, since the redeeming ignore was never counted either.
-SLANG_UNIT_TEST(slangTestReporterHiddenIgnoredRetryStillLeavesAFailure)
+SLANG_UNIT_TEST(slangTestReporterHiddenIgnoredRetryStillLeavesAFailure, NoRenderApi)
 {
     TestReporter reporter;
     reporter.m_suppressConsoleOutput = true;
@@ -248,7 +248,7 @@ SLANG_UNIT_TEST(slangTestReporterHiddenIgnoredRetryStillLeavesAFailure)
 // `adjustResult()` looks up. Keying off the bare test name instead never matches, so every
 // known-failing unit test gets pushed through a retry that can only reach the same result. This
 // pins the key so that regression cannot come back silently.
-SLANG_UNIT_TEST(slangTestReporterExpectedFailureKeysOnCommand)
+SLANG_UNIT_TEST(slangTestReporterExpectedFailureKeysOnCommand, NoRenderApi)
 {
     TestReporter reporter;
     // Keeps the reporter's writes off test-server's JSON-RPC channel.
@@ -271,7 +271,7 @@ SLANG_UNIT_TEST(slangTestReporterExpectedFailureKeysOnCommand)
 // Reconciliation is terminal: it clears both halves of the pending/redeemed pair, so calling it a
 // second time cannot synthesize the same failure twice. Without that, a reporter reused after
 // reconciliation would carry stale redeemers.
-SLANG_UNIT_TEST(slangTestReporterReconcileIsIdempotent)
+SLANG_UNIT_TEST(slangTestReporterReconcileIsIdempotent, NoRenderApi)
 {
     TestReporter reporter;
     // Keeps the reporter's writes off test-server's JSON-RPC channel.
@@ -300,7 +300,7 @@ SLANG_UNIT_TEST(slangTestReporterReconcileIsIdempotent)
 // Each uses a string the surrounding slang-test run cannot itself produce, so a leak is
 // attributable to this reporter rather than to the harness reporting on the test.
 
-SLANG_UNIT_TEST(slangTestReporterSuiteMarkerSuppressionKeepsAccounting)
+SLANG_UNIT_TEST(slangTestReporterSuiteMarkerSuppressionKeepsAccounting, NoRenderApi)
 {
     TestReporter reporter;
     reporter.m_suppressConsoleOutput = true;
@@ -319,7 +319,7 @@ SLANG_UNIT_TEST(slangTestReporterSuiteMarkerSuppressionKeepsAccounting)
     SLANG_CHECK(reporter.m_passedTestCount == 1);
 }
 
-SLANG_UNIT_TEST(slangTestReporterSummarySuppressionKeepsAccounting)
+SLANG_UNIT_TEST(slangTestReporterSummarySuppressionKeepsAccounting, NoRenderApi)
 {
     TestReporter reporter;
     reporter.m_suppressConsoleOutput = true;
@@ -346,7 +346,7 @@ SLANG_UNIT_TEST(slangTestReporterSummarySuppressionKeepsAccounting)
 // had not enabled -- the connection died, the retry reached the test, and the test skipped itself
 // because it was never applicable. Counting that as a test failure blames a dead connection on
 // whichever test was next in the queue.
-SLANG_UNIT_TEST(slangTestReporterIgnoredRedeemsDispatchFailure)
+SLANG_UNIT_TEST(slangTestReporterIgnoredRedeemsDispatchFailure, NoRenderApi)
 {
     TestReporter reporter;
     reporter.m_suppressConsoleOutput = true;
@@ -372,7 +372,7 @@ SLANG_UNIT_TEST(slangTestReporterIgnoredRedeemsDispatchFailure)
 
 // The same shape without a dispatch failure is still a failure: there the test ran and failed, so a
 // retry that skips it refutes nothing.
-SLANG_UNIT_TEST(slangTestReporterIgnoredDoesNotRedeemRealFailure)
+SLANG_UNIT_TEST(slangTestReporterIgnoredDoesNotRedeemRealFailure, NoRenderApi)
 {
     TestReporter reporter;
     reporter.m_suppressConsoleOutput = true;
@@ -391,7 +391,7 @@ SLANG_UNIT_TEST(slangTestReporterIgnoredDoesNotRedeemRealFailure)
 
 // A dispatch failure that no retry ever resolves is still a failure -- the run must not go green
 // having never obtained a result, which is the sibling bug #11751.
-SLANG_UNIT_TEST(slangTestReporterUnresolvedDispatchFailureStillFails)
+SLANG_UNIT_TEST(slangTestReporterUnresolvedDispatchFailureStillFails, NoRenderApi)
 {
     TestReporter reporter;
     reporter.m_suppressConsoleOutput = true;
@@ -410,7 +410,7 @@ SLANG_UNIT_TEST(slangTestReporterUnresolvedDispatchFailureStillFails)
 // are written in that form. Building the key in one place is what stops the bare test name being
 // used by mistake -- a mistake with no visible symptom, since the lookup simply never matches and
 // the only cost is a retry that cannot change the outcome.
-SLANG_UNIT_TEST(slangTestReporterUnitTestKeyIsTheExpectedFailureKey)
+SLANG_UNIT_TEST(slangTestReporterUnitTestKeyIsTheExpectedFailureKey, NoRenderApi)
 {
     const String key = makeUnitTestKey(
         UnownedStringSlice("slang-unit-test-tool"),
@@ -432,7 +432,7 @@ SLANG_UNIT_TEST(slangTestReporterUnitTestKeyIsTheExpectedFailureKey)
 // another, and only consolidation brings them together. Deciding redemption when the result is
 // recorded cannot work here -- the reporter seeing the ignore has never heard of the dispatch
 // failure -- which is why reconcilePendingRetries() decides it instead.
-SLANG_UNIT_TEST(slangTestReporterDispatchFailureRedeemedAcrossSubReporters)
+SLANG_UNIT_TEST(slangTestReporterDispatchFailureRedeemedAcrossSubReporters, NoRenderApi)
 {
     const String command("gfx-unit-test-tool/probeCrossPassDispatch.internal");
 
@@ -465,7 +465,7 @@ SLANG_UNIT_TEST(slangTestReporterDispatchFailureRedeemedAcrossSubReporters)
 
 // The same topology without a dispatch failure still fails: there the test ran and failed on worker
 // A, and a skip on worker B refutes nothing.
-SLANG_UNIT_TEST(slangTestReporterIgnoredAcrossSubReportersStillFails)
+SLANG_UNIT_TEST(slangTestReporterIgnoredAcrossSubReportersStillFails, NoRenderApi)
 {
     const String command("gfx-unit-test-tool/probeCrossPassRanAndFailed.internal");
 
@@ -490,7 +490,7 @@ SLANG_UNIT_TEST(slangTestReporterIgnoredAcrossSubReportersStillFails)
 
 // The diagnostic itself. Every other test here suppresses console output, so without this the
 // string a maintainer actually reads when a run goes red is never produced under test.
-SLANG_UNIT_TEST(slangTestReporterUnredeemedRetryDiagnosticNamesTheTest)
+SLANG_UNIT_TEST(slangTestReporterUnredeemedRetryDiagnosticNamesTheTest, NoRenderApi)
 {
     const String command("slang-unit-test-tool/probeDiagnostic.internal");
     const String message = TestReporter::describeUnredeemedRetry(command);
@@ -504,7 +504,7 @@ SLANG_UNIT_TEST(slangTestReporterUnredeemedRetryDiagnosticNamesTheTest)
 // Dispatch failures are summed across sub-reporters, not overwritten. One contribution each from
 // two workers has to merge to two: with a single contributor an accumulation and an assignment are
 // indistinguishable, and under -server-count > 1 more than one connection can die in a run.
-SLANG_UNIT_TEST(slangTestReporterDispatchFailureCountsAccumulate)
+SLANG_UNIT_TEST(slangTestReporterDispatchFailureCountsAccumulate, NoRenderApi)
 {
     const String first("gfx-unit-test-tool/probeDispatchA.internal");
     const String second("gfx-unit-test-tool/probeDispatchB.internal");
@@ -529,7 +529,7 @@ SLANG_UNIT_TEST(slangTestReporterDispatchFailureCountsAccumulate)
 
 // A dispatch failure whose retry reaches the test and gets a real verdict: the connection dying is
 // still tallied, and the verdict is the test's result like any other.
-SLANG_UNIT_TEST(slangTestReporterDispatchFailureRedeemedByVerdict)
+SLANG_UNIT_TEST(slangTestReporterDispatchFailureRedeemedByVerdict, NoRenderApi)
 {
     TestReporter reporter;
     reporter.m_suppressConsoleOutput = true;
@@ -550,7 +550,7 @@ SLANG_UNIT_TEST(slangTestReporterDispatchFailureRedeemedByVerdict)
 // Reconciliation clears the dispatch-failure names along with the other tracking state, so a stale
 // key cannot redeem a later unrelated ignore -- but the tally survives, because outputSummary()
 // reads it afterwards.
-SLANG_UNIT_TEST(slangTestReporterReconcileKeepsDispatchTallyAndClearsKeys)
+SLANG_UNIT_TEST(slangTestReporterReconcileKeepsDispatchTallyAndClearsKeys, NoRenderApi)
 {
     TestReporter reporter;
     reporter.m_suppressConsoleOutput = true;

@@ -88,7 +88,7 @@ void clearTextureTestImpl(IDevice* device, UnitTestContext* context)
     }
 }
 
-SLANG_UNIT_TEST(clearTextureTestVulkan)
+SLANG_UNIT_TEST(clearTextureTestVulkan, Vulkan)
 {
     runTestImpl(clearTextureTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
 }

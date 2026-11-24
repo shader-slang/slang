@@ -14,7 +14,7 @@ using namespace Slang;
 // Test that separate debug info is generated when requested and contains the
 // correct instructions.
 
-SLANG_UNIT_TEST(separateDebug)
+SLANG_UNIT_TEST(separateDebug, NoRenderApi)
 {
     // Source for a basic slang shader to compile to spirv.
     const char* userSourceBody = R"(

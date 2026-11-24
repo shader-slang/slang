@@ -47,7 +47,7 @@ and how `legalizeIRForMetal` and `MetalSourceEmitter` cooperate.
 - **Phase C — Metal legalization, lowering, phi elimination.**
   Anchored at `legalizeIRForMetal` (line ~1942 of
   `slang-emit.cpp`, defined at line 250 of
-  [slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp)).
+  [slang-ir-metal-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-metal-legalize.cpp)).
   Other Metal-specific passes:
   `legalizeEntryPointVaryingParamsForMetal` (called from inside
   `legalizeIRForMetal`),
@@ -113,7 +113,7 @@ Cover at least:
   separate `legalizeEmptyTypes` invocation later).
 - `eliminatePhis` with default options. Do **not** write that this
   contrasts with SPIR-V: the defaults in
-  [slang-ir-eliminate-phis.h](../../../../source/slang/slang-ir-eliminate-phis.h)
+  [slang-ir-eliminate-phis.h](../../../../source/slang/ir-passes/slang-ir-eliminate-phis.h)
   (lines 13-14) are `eliminateCompositeTypedPhiOnly = false` and
   `useRegisterAllocation = true`, and the direct-SPIR-V branch assigns
   those same two values, so there is no difference to contrast.

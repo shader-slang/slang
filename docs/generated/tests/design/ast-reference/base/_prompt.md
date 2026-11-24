@@ -128,8 +128,8 @@ that `Modifier` really derives from `SyntaxNode`). You may **not**
 mine them for behavioral claims that the doc does not make, and you
 may **not** write tests that probe internal class identity.
 
-- `source/slang/slang-ast-base.h`
-- `source/slang/slang-ast-support-types.h`
+- `source/slang/ast/slang-ast-base.h`
+- `source/slang/ast/slang-ast-support-types.h`
 
 ## Test directives
 

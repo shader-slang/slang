@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#generic-specialization-and-constraints
-//META: doc_section_digest=9f957015017e5369dca04b3ddeac3c5f9b0cfdeca3888bbec30602504004bdac
+//META: doc_section_digest=8c569fc3a505737867c26481a28d0bae31f23172e453102fec283d0fdcde62bf
 //META: purpose=A conformer whose associated type does not satisfy the interface-level constraint is rejected, because the constraint requirement is re-checked as a subtype relation after `This` is replaced by the conforming type.
 //META: intent=negative
 //META: pipeline_stage=check

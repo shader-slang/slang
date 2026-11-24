@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_RENDER_COMPUTE: -mtl -shaderobj
-//DISABLE_TEST(compute):COMPARE_RENDER_COMPUTE: -llvm -shaderobj
+//TEST:COMPARE_RENDER_COMPUTE(targets=all-llvm):
 //TEST_INPUT: Texture2D(size=4, content = one):name tex
 //TEST_INPUT: Sampler:name samp
 //TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name outputBuffer

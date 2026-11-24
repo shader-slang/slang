@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=SPIRV):-stage compute -entry computeMain -target spirv
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=vk+dx11+dx12+wgpu, filecheck-buffer=CHECK):-output-using-type
 
 // Ensure SPIRV emits coherent operations here
 // SPIRV: MakePointerVisible

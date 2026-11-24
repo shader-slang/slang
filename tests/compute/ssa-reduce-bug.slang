@@ -1,6 +1,5 @@
 // ssa-reduce-bug.slang
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -slang -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 //TEST_INPUT:ubuffer(data=[0 3 1 2 6 4 7 6], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;

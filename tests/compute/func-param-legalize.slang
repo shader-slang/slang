@@ -1,7 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -shaderobj -cuda
+//TEST:COMPARE_COMPUTE(targets=all-llvm):
 // Not supported in LLVM: textures are not currently available
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-llvm -shaderobj
 
 struct Param
 {
@@ -30,7 +28,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     p.samplerState = samplerState;
     p.base = -0.5;
 	float4 outVal = run(p);
-	
+
     outputBuffer[0] = outVal.x;
 	outputBuffer[1] = outVal.y;
 	outputBuffer[2] = outVal.z;

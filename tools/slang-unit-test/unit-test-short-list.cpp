@@ -16,7 +16,7 @@ static bool _checkArrayView(ArrayView<T> v0, ArrayView<T> v1)
     return true;
 }
 
-SLANG_UNIT_TEST(shortList)
+SLANG_UNIT_TEST(shortList, NoRenderApi)
 {
     {
         ShortList<String, 4> shortList = {"a", "b", "c"};

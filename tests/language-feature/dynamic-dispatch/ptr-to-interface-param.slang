@@ -2,9 +2,7 @@
 // through it. This tests that IFoo* survives parameter passing and that
 // CastInterfaceToTaggedUnionPtr correctly rewrites the load at the call site.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=CHECK): -output-using-type
 
 interface IFoo
 {

@@ -1,5 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Regression test for shader-slang/slang#11075: generic code that names `IComparable` or
 // `IArithmetic` next to `IFloat` or `IInteger` also reaches the concrete vector overloads. Overload

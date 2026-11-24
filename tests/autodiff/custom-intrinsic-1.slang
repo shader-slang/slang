@@ -1,6 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -36,7 +34,7 @@ namespace myintrinsiclib
             __mul_p_d(myexp(dpx.p), dpx.d));
     }
 
-    
+
     // Sine
     __generic<T : __BuiltinFloatingPointType>
     [ForwardDerivative(d_mysin<T>)]
@@ -141,7 +139,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         outputBuffer[0] = f(dpa.p);        // Expect: 7.389056
         outputBuffer[1] = __fwd_diff(f)(dpa).d; // Expect: 7.389056
 
-        // g() needs additional handling of  IRMakeDifferentialPair(PtrType). This needs to 
+        // g() needs additional handling of  IRMakeDifferentialPair(PtrType). This needs to
         // generate a new var, load from the individual vars and store into the pair var.
 
         //outputBuffer[2] = g(dpa.p);        // Expect: 1.381773

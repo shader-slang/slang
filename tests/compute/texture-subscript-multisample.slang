@@ -1,9 +1,8 @@
-//TEST:SIMPLE(filecheck=METAL_ERROR): -target metal -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL_ERROR,exit-code=2): -target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METALLIB,exit-code=2): -target metallib -entry computeMain -stage compute
 // Metal currently lacks multisampled texture write support.
 // Due to this, Metal compute test is disabled
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -mtl
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF): -output-using-type
 
 //METAL_ERROR: error[E41404]: cannot write to multisampled texture
 //METALLIB: error[E41404]: cannot write to multisampled texture

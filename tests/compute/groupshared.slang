@@ -1,11 +1,8 @@
 // groupshared.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE(targets=all-cpu-llvm):-shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda):
 // Not supported in LLVM: barriers are not currently available
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX: -llvm -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out, name=gBuffer
 RWStructuredBuffer<int> gBuffer;

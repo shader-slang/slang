@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 //TEST:SIMPLE(filecheck=REPORT): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none -report-checkpoint-intermediates
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
@@ -13,9 +11,9 @@ struct A : IDifferentiable
 
 // Check that the intermediate context of B.eval does not have any arrays.
 // This will fail if the induction variable is not properly detected, or
-// if the various loop restructuring passes accidentally introduce additional 
+// if the various loop restructuring passes accidentally introduce additional
 // loop state.
-// 
+//
 
 // REPORT: checkpointing context of {{[0-9]+}} bytes associated with: '{{.*}}eval'
 // REPORT-NOT: FixedArray<int

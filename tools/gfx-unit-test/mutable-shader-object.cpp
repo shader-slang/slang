@@ -101,22 +101,22 @@ void mutableShaderObjectTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, numbersBuffer, std::array{3.0f, 4.0f, 5.0f, 6.0f});
 }
 
-// SLANG_UNIT_TEST(mutableShaderObjectCPU)
+// SLANG_UNIT_TEST(mutableShaderObjectCPU, NoRenderApi)
 //{
 //     runTestImpl(mutableShaderObjectTestImpl, unitTestContext, Slang::RenderApiFlag::CPU);
 // }
 
-SLANG_UNIT_TEST(mutableShaderObjectD3D11)
+SLANG_UNIT_TEST(mutableShaderObjectD3D11, D3D11)
 {
     runTestImpl(mutableShaderObjectTestImpl, unitTestContext, DeviceType::D3D11);
 }
 
-SLANG_UNIT_TEST(mutableShaderObjectD3D12)
+SLANG_UNIT_TEST(mutableShaderObjectD3D12, D3D12)
 {
     runTestImpl(mutableShaderObjectTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(mutableShaderObjectVulkan)
+SLANG_UNIT_TEST(mutableShaderObjectVulkan, Vulkan)
 {
     runTestImpl(mutableShaderObjectTestImpl, unitTestContext, DeviceType::Vulkan);
 }

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cpp -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target cpp -entry computeMain -stage compute
 
 // This test checks initialization across loops. The C++ target can represent local resource
 // storage, so the expected analysis diagnostics are not replaced by a target-legality error.

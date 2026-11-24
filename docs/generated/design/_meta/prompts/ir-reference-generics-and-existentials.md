@@ -35,7 +35,7 @@ Relevant Lua entries are scattered: `specialize`, `lookupWitness` /
   - **Witness facts** (`thisTypeWitness`, `TypeEqualityWitness`).
 - The `AST origin` column for these opcodes typically cites
   expressions and decls in
-  [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp):
+  [slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp):
   `lowerGenericApp`, `lowerWitnessLookup`,
   `lowerExistentialMake*` / `lowerExistentialExtract*`,
   `lowerCastToInterface`. Several of these opcodes are produced only
@@ -81,4 +81,4 @@ Cover at least:
       the tables.
 - [ ] Hierarchy diagram groups the four categories above.
 - [ ] At least one row cites
-      [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
+      [slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp).

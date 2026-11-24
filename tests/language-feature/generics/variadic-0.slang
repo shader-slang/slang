@@ -1,7 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu -shaderobj -output-using-type -render-features half
+//TEST:COMPARE_COMPUTE(targets=all-wgpu, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=CHECK): -output-using-type -render-features half
 
 //TEST:SIMPLE(filecheck=CHECK): -target glsl
 // CHECK-NOT: NullDifferential

@@ -1,10 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -output-using-type -dx12 -profile cs_6_6
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -mtl -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=BUF):-output-using-type -profile cs_6_6
 
 // Slang removes parentheses characters for the bitwise operators when they are not needed.
 // DXC prints warning messages even when the expression is correct.

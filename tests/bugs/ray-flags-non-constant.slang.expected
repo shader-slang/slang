@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 error[E39999]: expression does not evaluate to a compile-time constant
   --> tests/bugs/ray-flags-non-constant.slang:11:14

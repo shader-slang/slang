@@ -140,9 +140,9 @@ spelling in IR dumps generally matches the Lua entry key (lowercase
 camelCase or special-case for some such as `rwstructuredBufferGetElementPtr`,
 `ifElse`, `unconditionalBranch`).
 
-- `source/slang/slang-ir-insts.lua` — canonical opcode list.
-- `source/slang/slang-ir-insts.h` — C++ wrapper structs.
-- `source/slang/slang-ir.h`, `.cpp` — `IRInst` + builder.
+- `source/slang/ir/slang-ir-insts.lua` — canonical opcode list.
+- `source/slang/ir/slang-ir-insts.h` — C++ wrapper structs.
+- `source/slang/ir/slang-ir.h`, `.cpp` — `IRInst` + builder.
 
 ## Test directives
 

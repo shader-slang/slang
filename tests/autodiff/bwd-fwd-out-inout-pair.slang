@@ -1,5 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Regression coverage for https://github.com/shader-slang/slang/issues/11160.
 // A differentiated out/inout value can itself be a DifferentialPair. Both fields of its

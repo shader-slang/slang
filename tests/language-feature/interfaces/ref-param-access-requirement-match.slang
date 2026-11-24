@@ -2,8 +2,7 @@
 // parameter has `RefReadWrite`; a requirement is satisfied by a method whose
 // parameter uses the same mode (shader-slang/slang#13339).
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -entry computeMain -stage compute -dump-ir -o -
 
 // Every `read`, including the dynamic-dispatch wrappers built from it, keeps a

@@ -1,5 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-mtl -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+metal+cuda):-output-using-type
 
 //TEST_INPUT: ubuffer(data=[0]):name=buffer
 RWByteAddressBuffer buffer;

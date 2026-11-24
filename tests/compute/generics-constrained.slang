@@ -1,11 +1,10 @@
-//TEST(smoke,compute):COMPARE_COMPUTE: -shaderobj
-//TEST(smoke,compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Use interface constraints on a generic parameter
 
 interface Helper
 {
-	float getHelp();	
+	float getHelp();
 }
 
 struct A : Helper
@@ -18,7 +17,7 @@ struct A : Helper
 		// but the front-end isn't handling references through `this`
 		// properly yet.
 		return a;
-	}	
+	}
 };
 
 __generic<T : Helper>

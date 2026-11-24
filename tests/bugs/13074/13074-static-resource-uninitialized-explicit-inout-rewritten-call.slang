@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -O0 -target hlsl -entry main -stage compute -validate-ir
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -O0 -target hlsl -entry main -stage compute -validate-ir
 
 Texture2D<float4> textures[1];
 RWStructuredBuffer<float4> output;

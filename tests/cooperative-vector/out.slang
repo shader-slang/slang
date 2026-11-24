@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-render-feature cooperative-vector -output-using-type
 
 // CHECK: type: float
 // CHECK-NEXT: 2.000000

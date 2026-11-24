@@ -47,8 +47,8 @@ changes every caller at once.
 
 ```mermaid
 flowchart LR
-  ci["ci.yml"] --> build & test & suites & san
-  sccache["sccache-populate.yml"] --> build
+  ci["ci.yml"] --> build & test & suites & san & static
+  sccache["sccache-populate.yml"] --> build & static
   ncov["nightly-slang-coverage-test.yml"] --> cov
   nsan["nightly-slang-sanitizer-test.yml"] --> san
   copts["cmake-options.yml"] --> coptbuild
@@ -57,6 +57,7 @@ flowchart LR
   test["ci-slang-test.yml / -container<br>ci-rhi-test.yml / -container"]
   suites["ci-falcor-test.yml<br>ci-falcor-perf-test.yml<br>ci-slang-regression-test.yml<br>ci-mdl-benchmark-test.yml<br>ci-materialx-regression-test.yml"]
   san["ci-slang-sanitizer.yml"]
+  static["ci-slang-static.yml"]
   cov["ci-slang-coverage-test.yml"]
   coptbuild["cmake-options-build.yml / -container"]
 ```
@@ -85,6 +86,7 @@ flowchart LR
 
   subgraph after["After CI"]
     cirun["ci.yml"] -->|workflow_run| post["check-ir-version.yml<br>ci-retry-yielded-bot.yml"]
+    perfnight["nightly-mdl-perf-test.yml"] -->|workflow_run| bisect["claude-perf-bisect.yml"]
   end
 ```
 
@@ -100,6 +102,9 @@ flowchart LR
 | `repository_dispatch` | Triggered by a slash command relayed from a PR comment.                                                                                                                                           |
 | `schedule`            | Cron-driven.                                                                                                                                                                                      |
 | `workflow_dispatch`   | Run manually from the Actions tab.                                                                                                                                                                |
+
+`claude-perf-bisect.yml` is the one `workflow_run` workflow that builds code: it
+builds merged master commits after a scheduled nightly, never PR code.
 
 ## 1. PR gates
 
@@ -126,6 +131,7 @@ is deleted right after — so check the workflow's own run list, not the PR.
 | `ci.yml`                          | yes    | yes         | Build + test umbrella; aggregates into one gate job.                                                  |
 | `check-formatting.yml`            | yes    | yes         | Checks formatting; comment `/format` to auto-fix.                                                     |
 | `check-python-core.yml`           | yes    | yes         | Compile-checks the repo's Python scripts.                                                             |
+| `check-generated-tests.yml`       | yes    | yes         | Verifies the tests in `tests/generated` match their generators in `extras/test-generators`.           |
 | `check-workflow-scripts.yml`      | yes    | yes         | Unit-tests the JavaScript the board-sync workflows embed.                                             |
 | `ci-slangpy-trigger-test.yml`     | yes    | yes         | Runs SlangPy's CI against this change.                                                                |
 | `check-actionlint.yml`            | yes    | no          | Lints the workflow YAML in this directory.                                                            |
@@ -215,6 +221,7 @@ No trigger of their own; see the first diagram for who calls them. The
 | `ci-slang-test.yml`, `ci-slang-test-container.yml`             | Run `slang-test` for one platform.       |
 | `ci-rhi-test.yml`, `ci-rhi-test-container.yml`                 | Run the slang-rhi test suite.            |
 | `ci-slang-sanitizer.yml`                                       | Sanitizer-instrumented build and test.   |
+| `ci-slang-static.yml`                                          | Static-library build and unit tests.     |
 | `ci-slang-coverage-test.yml`                                   | Instrumented build plus coverage report. |
 | `ci-falcor-test.yml`                                           | Compile Falcor's shaders.                |
 | `ci-falcor-perf-test.yml`                                      | Falcor compiler perf test.               |
@@ -243,6 +250,7 @@ not compete for the same runners.
 | `nightly-slang-sascha-test.yml`    | nightly                            | Compiles the Sascha Willems Vulkan sample shaders.                   |
 | `nightly-slang-vkglcts-test.yml`   | nightly                            | Runs the Vulkan CTS with Slang as the shader compiler.               |
 | `nightly-mdl-perf-test.yml`        | nightly                            | Compile-performance suite for the MDL workloads.                     |
+| `claude-perf-bisect.yml`           | after a red perf nightly           | Shadow bisect of a confirmed compile-perf change.                    |
 | `ci-analytics.yml`                 | daily                              | Collects CI run statistics and publishes them.                       |
 | `pr-sweep-nightly.yml`             | nightly                            | Board-sync backstop over every open PR.                              |
 | `cmake-options.yml`                | weekly                             | Builds the matrix of non-default CMake option combinations.          |
@@ -276,11 +284,12 @@ issue, comment, and review events rather than to a PR's code.
 `slash-command-dispatch.yml` turns an allow-listed comment into a
 `repository_dispatch`. Each regenerator rebuilds its file in a job that has no
 secrets and uploads the change as the `regen-patch` artifact. The shared
-`slash-regenerate-publish.yml` then pushes `<command>/pr-<N>` to this repository with a
-GitHub App token and comments on the PR with a compare link. A maintainer opens
-the PR from that link, because the App is not installed on contributor forks and
-cannot open a PR there. If the PR changes `.github/`, the branch is not pushed
-and the comment points to the patch instead.
+`slash-regenerate-publish.yml` then pushes `<command>/pr-<N>` to this repository with the
+`GITHUB_TOKEN` and comments on the PR with a compare link. A maintainer opens
+the PR from that link, because `GITHUB_TOKEN` cannot push to a contributor's
+fork. If the PR changes `.github/workflows/`, the branch is not pushed, because
+`GITHUB_TOKEN` cannot push workflow files, and the comment points to the patch
+instead.
 `slash-cleanup.yml` deletes the pushed branches when the PR closes.
 
 | Workflow                           | Command                   | Regenerates                        |

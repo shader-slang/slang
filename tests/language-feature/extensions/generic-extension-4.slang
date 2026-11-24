@@ -1,6 +1,6 @@
 // Test that multiple functions from different extensions are properly linked through their respective witness table.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 interface IValuableImpl
 {
 	int getValue();
@@ -48,7 +48,7 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain()
 {
 	uint i = 0;
-	float f = float(i) / float(10);	
+	float f = float(i) / float(10);
 
 	// CHECK: 0
 	outputBuffer[0] = i.getImpl().getValue();

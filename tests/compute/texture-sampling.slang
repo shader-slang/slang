@@ -1,8 +1,5 @@
-//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type
-//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -vk
-//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -mtl
+//TEST(compute):COMPARE_RENDER_COMPUTE(targets=all-cuda-wgpu-llvm): -shaderobj -output-using-type
 // Not supported in LLVM: textures are not currently available
-//DISABLE_TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -llvm
 
 
 //TEST_INPUT: Texture1D(size=4, content = one):name=t1D
@@ -16,7 +13,6 @@
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 // There is no texture_1d_array type in WGSL https://github.com/shader-slang/slang/issues/5223
 // Not supported in WGSL: 1D array texture not supported in WGSL
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 
 Texture1D t1D;
 Texture2D t2D;
@@ -103,9 +99,9 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
     val += t2D.Sample(samplerState, uv);
     val += t3D.Sample (samplerState, float3(uv, 0.5));
     val += t1dArray.Sample(samplerState, float2(uv.x, 0.0));
-    
+
     val += t2dArray.Sample(samplerState, float3(uv, 0.0));
-    
+
     val += tCubeArray.Sample(samplerState, float4(uv, 0.5, 0.0));
     val += tCube.Sample(samplerState, float3(uv, 0.5));
 

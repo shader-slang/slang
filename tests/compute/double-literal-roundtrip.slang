@@ -4,10 +4,8 @@
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -O0
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -O3
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -Xslang -O0
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -Xslang -O3
+//TEST:COMPARE_COMPUTE(targets=all-metal-wgpu, filecheck-buffer=CHECK):-output-using-type -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=all-metal-wgpu, filecheck-buffer=CHECK):-output-using-type -Xslang -O3
 
 // The host supplies exact IEEE binary64 words independently of source literal parsing.
 // Each lane compares runtime-loaded data to its source literal, so constant folding cannot
@@ -79,8 +77,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK: 8021
 
 // Check the complete spelling, not just the exponent: scientific notation with too
-// few significant digits would still lose bits. GLSL also needs its double suffix.
-// HLSL: == 1.5258789076710855e-05;
-// HLSL: == -1.5258789076710855e-05;
+// few significant digits would still lose bits. Both targets need their double suffix.
+// HLSL: == 1.5258789076710855e-05L;
+// HLSL: == -1.5258789076710855e-05L;
 // GLSL: == 1.5258789076710855e-05LF;
 // GLSL: == -1.5258789076710855e-05LF;

@@ -30,6 +30,9 @@ typedef __PTRDIFF_TYPE__ ptrdiff_t;
 typedef __SIZE_TYPE__ size_t;
 typedef __SIZE_TYPE__ rsize_t;
 
+// Byte-address buffer accesses use the memcpy symbol supplied by the LLVM runtime.
+extern "C" void* memcpy(void* destination, const void* source, size_t size);
+
 // typedef __WCHAR_TYPE__ wchar_t;
 
 #if defined(__need_NULL)

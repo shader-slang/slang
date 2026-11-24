@@ -143,12 +143,12 @@ void linkTimeTypeMultiUseGenericTestImpl(IDevice* device, UnitTestContext* conte
     compareComputeResult(device, numbersBuffer, std::array{50});
 }
 
-SLANG_UNIT_TEST(linkTimeTypeMultiUseGenericD3D12)
+SLANG_UNIT_TEST(linkTimeTypeMultiUseGenericD3D12, D3D12)
 {
     runTestImpl(linkTimeTypeMultiUseGenericTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(linkTimeTypeMultiUseGenericVulkan)
+SLANG_UNIT_TEST(linkTimeTypeMultiUseGenericVulkan, Vulkan)
 {
     runTestImpl(linkTimeTypeMultiUseGenericTestImpl, unitTestContext, DeviceType::Vulkan);
 }

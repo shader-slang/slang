@@ -24,7 +24,7 @@ static void encodeByteAsOctalBuggy(char c, char* buf, size_t bufSize)
     snprintf(buf, bufSize, "\\%03o", c);
 }
 
-SLANG_UNIT_TEST(slangEmbedOctalEscape)
+SLANG_UNIT_TEST(slangEmbedOctalEscape, NoRenderApi)
 {
     char buf[32];
 

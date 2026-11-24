@@ -1,7 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-dx11 -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test dynamic dispatch code gen for generic-typed return values.
 [anyValueSize(8)]

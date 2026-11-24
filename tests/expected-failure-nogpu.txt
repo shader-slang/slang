@@ -1,0 +1,10 @@
+# RecordReplay tests require a GPU
+slang-unit-test-tool/replayRecord_triangle.internal
+slang-unit-test-tool/replayRecord_ray_tracing.internal
+slang-unit-test-tool/replayRecord_ray_tracing_pipeline.internal
+slang-unit-test-tool/replayRecord_autodiff_texture.internal
+slang-unit-test-tool/replayRecord_gpu_printing.internal
+
+# CUDA tests require a GPU
+slang-unit-test-tool/cudaCodeGenBug.internal
+gfx-unit-test-tool/neuralSlangNetworkConverterCUDA.internal

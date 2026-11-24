@@ -27,6 +27,7 @@ struct RenderApiFlag
 {
     enum Enum
     {
+        NoRenderApi = 0, ///< No render API
         Vulkan = 1 << int(RenderApiType::Vulkan),
         D3D12 = 1 << int(RenderApiType::D3D12),
         D3D11 = 1 << int(RenderApiType::D3D11),

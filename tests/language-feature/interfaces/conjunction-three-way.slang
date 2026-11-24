@@ -3,7 +3,7 @@
 // Test that three or more interfaces can be combined with `&`
 // and the conjunction is correctly flattened.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 interface IAlpha
 {

@@ -4,8 +4,7 @@
 // the same buffer. How many times the side effect runs inside a derivative
 // function is not guaranteed, so only the derivatives are checked.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;

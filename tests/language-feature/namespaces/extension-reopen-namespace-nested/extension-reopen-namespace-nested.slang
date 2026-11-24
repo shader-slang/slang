@@ -15,7 +15,7 @@
 // load-bearing: the bug only reproduces when `outer::repro` is reopened across
 // separate files.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 module nested_reopen_ns;
 

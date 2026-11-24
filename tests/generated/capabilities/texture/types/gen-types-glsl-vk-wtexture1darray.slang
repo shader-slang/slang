@@ -12,8 +12,8 @@
 
 // Negative test disabled, see https://github.com/shader-slang/slang/issues/8908
 //TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target glsl -profile glsl_420
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -vk -emit-spirv-via-glsl
-//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE): -restrictive-capability-check -entry fragMain -stage fragment -target glsl -profile glsl_410
+//TEST:COMPARE_COMPUTE(targets=glsl, filecheck-buffer=POSITIVE_RESULT):
+//DISABLE_TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target glsl -profile glsl_410
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -25,13 +25,10 @@ WTexture1DArray<float4> texHandle;
 void fragMain()
 {
 // POSITIVE-NOT: {{(error|warning).*}}:
-// POSITIVE: result code = 0
-// POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: main
 // POSITIVE-NOT: {{(error|warning).*}}:
 
-// Expect either a compilation error or warning 41012 for upgraded profile to support functionality
-// NEGATIVE: {{error[E[[:digit:]]+]}}:
+//NEGATIVE: error
 
     int ret = 0;
     texHandle.Store(int2(0, 0), float4(0, 0, 0, 0));

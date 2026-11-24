@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-wgpu
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Note: disabled on CPU target until we can fill
 // in a more correct/complete `String` and `getStringHash`
@@ -18,7 +16,7 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain(
     uint3 tid   : SV_DispatchThreadID)
 {
-    int value = doSomethingElse() + getStringHash("Hello \t\n\0x083 World");   
+    int value = doSomethingElse() + getStringHash("Hello \t\n\0x083 World");
     outputBuffer[tid.x] = value;
 }
 

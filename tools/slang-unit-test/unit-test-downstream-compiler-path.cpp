@@ -9,7 +9,10 @@ using namespace Slang;
 // only needs the downstream shared library to load, not a device. Availability of any given
 // pass-through varies by machine, so each case below is gated the same way the codegen tests gate
 // their pass-throughs.
-SLANG_UNIT_TEST(getDownstreamCompilerPath)
+// The test checks NVRTC when the machine has it, and checks the other compilers on every machine.
+// Only the jobs that have a GPU have NVRTC, and the jobs that have none cover more platforms, so
+// the test declares all APIs and runs in every job.
+SLANG_UNIT_TEST(getDownstreamCompilerPath, AllOf)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -110,6 +113,13 @@ SLANG_UNIT_TEST(getDownstreamCompilerPath)
                 SharedLibrary::findSymbolAddressByName(handle, "glslang_compile_1_2") != nullptr ||
                 SharedLibrary::findSymbolAddressByName(handle, "glslang_compile_1_3") != nullptr;
             SLANG_CHECK(anyCompileSymbol);
+            // Both link callers treat a missing `glslang_freeLinkResult` as an older library and
+            // skip the free, so dropping the export would silently bring back the link-result leak.
+            SLANG_CHECK(
+                SharedLibrary::findSymbolAddressByName(handle, "glslang_linkSPIRV") != nullptr);
+            SLANG_CHECK(
+                SharedLibrary::findSymbolAddressByName(handle, "glslang_freeLinkResult") !=
+                nullptr);
             SharedLibrary::unload(handle);
         }
     }

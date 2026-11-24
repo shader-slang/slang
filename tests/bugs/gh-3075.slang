@@ -1,7 +1,7 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11 -profile sm_5_0 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12):-profile sm_6_0 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx11):-profile sm_5_0 -output-using-type
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute  -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk):-output-using-type
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 
 RWStructuredBuffer<int> outputBuffer;

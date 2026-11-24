@@ -122,11 +122,23 @@ public:
     }
 
     /// True if a test with the requiredFlags can in principal run (it may not be possible if the
-    /// API is not available though)
-    bool canRunTestWithRenderApiFlags(Slang::RenderApiFlags requiredFlags);
+    /// API is not available though).
+    ///
+    /// A test that needs no render API (requiredFlags is 0) is a compile test. It cannot run with
+    /// `-compile-test false`, unless the caller passes
+    /// `isNeededByGpuTests`. The caller does so for a test line that a GPU job needs although the
+    /// line uses no API: a COMPILE line that prepares the input of a test that uses an API, or a
+    /// line that uses a tool that only a machine with a GPU has.
+    bool canRunTestWithRenderApiFlags(
+        Slang::RenderApiFlags requiredFlags,
+        bool isNeededByGpuTests = false);
 
-    /// True if can run unit tests
-    bool canRunUnitTests() const { return options.apiOnly == false; }
+    /// True if a unit test that uses the render APIs in `usedApis` can in principal run.
+    ///
+    /// A unit test can use several APIs one after another, so it can run when at least one of them
+    /// is enabled, and it skips the others by itself. A unit test that uses no API is a compile
+    /// test, so it cannot run with `-compile-test false`.
+    bool canRunUnitTestUsingRenderApis(Slang::RenderApiFlags usedApis);
 
     /// How many requests this thread's test server has been asked to serve, counting the one
     /// about to be sent. Reset whenever the connection is (re)created, so it is the age of the

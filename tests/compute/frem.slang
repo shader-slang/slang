@@ -1,8 +1,8 @@
 // frem.slang
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE:-vk -shaderobj -emit-spirv-directly -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cpu):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk):-output-using-type
 
 // Test uses of floating-point `%` operator.
 

@@ -1,4 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-wgpu-llvm, filecheck-buffer=BUF):-output-using-type
 
 //TEST_INPUT: Texture2D(size=4, content = zero):name tex1
 Texture2D<float4> tex1;

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target cuda -entry computeMain -stage compute
 
 Texture2D<float> texture;
 

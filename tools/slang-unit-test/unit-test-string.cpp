@@ -124,7 +124,7 @@ static bool _areApproximatelyEqual(
     return _calcULPDistance(a, b) <= ulpsEpsilon;
 }
 
-SLANG_UNIT_TEST(string)
+SLANG_UNIT_TEST(string, NoRenderApi)
 {
     {
         UnownedStringSlice checkLines[] = {UnownedStringSlice::fromLiteral("")};
@@ -477,7 +477,7 @@ SLANG_UNIT_TEST(string)
         }
 
         // failure tests
-        constexpr auto parseInt64FailCases = std::to_array<const char*>({
+        constexpr const char* parseInt64FailCases[] = {
             // no digits to parse
             "",
             "-",
@@ -505,7 +505,7 @@ SLANG_UNIT_TEST(string)
             // also within the int64_t range.
             "20496382304121724020",
             "25000000000000000000",
-        });
+        };
 
         for (const auto* input : parseInt64FailCases)
         {

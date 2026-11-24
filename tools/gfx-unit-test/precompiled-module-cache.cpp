@@ -217,12 +217,12 @@ void precompiledModuleCacheTestImpl(IDevice* device, UnitTestContext* context)
     SLANG_CHECK(!upToDate); // The module should not be up-to-date because the source has changed.
 }
 
-SLANG_UNIT_TEST(precompiledModuleCacheD3D12)
+SLANG_UNIT_TEST(precompiledModuleCacheD3D12, D3D12)
 {
     runTestImpl(precompiledModuleCacheTestImpl, unitTestContext, DeviceType::D3D12, {});
 }
 
-SLANG_UNIT_TEST(precompiledModuleCacheVulkan)
+SLANG_UNIT_TEST(precompiledModuleCacheVulkan, Vulkan)
 {
     runTestImpl(precompiledModuleCacheTestImpl, unitTestContext, DeviceType::Vulkan, {});
 }
