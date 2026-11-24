@@ -1131,8 +1131,11 @@ private:
 
 public:
     // Solve the generic application and return the substituted inner decl-ref.
-    DeclRef<Decl> solve()
+    DeclRef<Decl> solve(List<Decl*>* outDefaultedGenericParams)
     {
+        if (outDefaultedGenericParams)
+            outDefaultedGenericParams->clear();
+
         // Start with a clean overload cost for this candidate. The caller owns
         // the storage, but the solver owns the full computation: ordinary
         // inference can add type-promotion cost, and final witness arguments can
@@ -1165,6 +1168,26 @@ public:
         // contributes the conversion cost chosen by `isSubtype()`.
         addUnconstrainedGenericParamCost();
         m_outBaseCost += m_context.typePromotionCost + computeFinalWitnessCost();
+
+        // Record only defaults that survive the completed solve. Consider
+        // `read<T = Box<int(Mode.A) * 0>>(T value)`: inference from `value` can replace
+        // the default, and its folded type cannot tell us whether Mode.A was used.
+        // The final argument state supplies that distinction without changing the
+        // canonical arguments stored in the resulting declaration reference.
+        if (outDefaultedGenericParams)
+        {
+            for (auto genericDecl : m_genericDecls)
+            {
+                for (auto member : genericDecl->getDirectMemberDecls())
+                {
+                    if (getArgState(member) != ArgState::DefaultGenericArg)
+                        continue;
+                    SLANG_RELEASE_ASSERT(
+                        as<GenericTypeParamDecl>(member) || as<GenericValueParamDecl>(member));
+                    outDefaultedGenericParams->add(member);
+                }
+            }
+        }
 
         // The final decl-ref uses the current argument arrays: ordinary
         // arguments first, then witness arguments. Returning the inner decl-ref
@@ -3476,8 +3499,12 @@ DeclRef<Decl> SemanticsVisitor::trySolveGenericArguments(
     GenericInferenceContext&& inferenceContext,
     DeclRef<GenericDecl> genericDeclRef,
     ArrayView<Val*> providedOrdinaryArgs,
-    ConversionCost& outBaseCost)
+    ConversionCost& outBaseCost,
+    List<Decl*>* outDefaultedGenericParams)
 {
+    if (outDefaultedGenericParams)
+        outDefaultedGenericParams->clear();
+
     // The solver reads generic members while collecting ordinary constraints,
     // default generic arguments, and witness constraints. The generic
     // declaration must therefore be ready for lookup before the solver starts
@@ -3500,10 +3527,9 @@ DeclRef<Decl> SemanticsVisitor::trySolveGenericArguments(
             return DeclRef<Decl>();
     }
 
-    // The caller only needs the final substituted inner decl-ref and the output
-    // cost. All work-list state, current arguments, and witness arguments remain
-    // encapsulated in the solver object.
-    return solver.solve();
+    // Selected default parameters are optional call-site provenance;
+    // all semantic arguments and work-list state stay encapsulated in the solver.
+    return solver.solve(outDefaultedGenericParams);
 }
 
 bool SemanticsVisitor::TryUnifyVals(

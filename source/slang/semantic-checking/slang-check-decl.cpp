@@ -33,6 +33,8 @@ static Val* _getNonEmptyConstraintPackVal(
     ASTBuilder* astBuilder,
     DeclRef<NonEmptyPackConstraintDecl> const& constraintDeclRef);
 
+static void cacheDefaultArgumentCapabilities(SemanticsVisitor* visitor, Decl* rootDecl);
+
 /// Return the outermost declaration in a synthesized declaration's generic wrapper chain.
 ///
 /// Witness synthesis can wrap an inner callable or type in one or more cloned `GenericDecl`s. The
@@ -1223,7 +1225,53 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->functionExpr);
         for (auto arg : expr->arguments)
             dispatchIfNotNull(arg);
+        visitDefaultArgumentExpressions(expr);
     }
+
+    // Visit the ordinary defaults that this call actually uses. Consider
+    // `int use(Mode m = Mode.A)`: use() references Mode.A, while use(Mode(1)) does not.
+    // A checked invocation retains only supplied arguments; addDirectCallArgs in IR
+    // lowering obtains the omitted arguments from the selected callable's parameters.
+    // Follow that same signature here, before lowering, so the caller's requirements
+    // include the checked default expressions without restricting every use of `use`.
+    void visitDefaultArgumentExpressions(InvokeExpr* expr)
+    {
+        // Failed overload resolution keeps the original invocation with ErrorType.
+        // Its missing arguments can be required parameters, so no defaults were selected.
+        if (IsErrorExpr(expr))
+            return;
+        auto callee = as<DeclRefExpr>(expr->functionExpr);
+        if (!callee)
+            return;
+        auto callable = callee->declRef.template as<CallableDecl>();
+        if (!callable)
+            return;
+        auto parameters = getParametersForCallableSignature(getASTBuilder(), callable);
+        for (Index i = expr->arguments.getCount(); i < parameters.getCount(); ++i)
+            static_cast<VisitorType*>(this)->visitDefaultArgument(parameters[i].getDecl());
+    }
+
+    // Visit a selected default's checked source. Defaults can refer back to themselves
+    // through calls, as in `int f(int x = f()) { return x; }`. This is a graph walk,
+    // not recursive expansion of the default. Stop back edges while collecting references;
+    // lowering retains responsibility for diagnosing unbounded expansion. Remove each
+    // parameter on return so another use can be analyzed in its own target context.
+    void visitDefaultArgument(Decl* param)
+    {
+        if (!activeDefaultArguments.add(param))
+            return;
+        if (auto typeParam = as<GenericTypeParamDecl>(param))
+            visitTypeExp(typeParam->initType);
+        else
+        {
+            auto valueParam = as<VarDeclBase>(param);
+            SLANG_RELEASE_ASSERT(valueParam && valueParam->initExpr);
+            dispatchIfNotNull(valueParam->initExpr);
+        }
+        activeDefaultArguments.remove(param);
+    }
+
+    HashSet<Decl*> activeDefaultArguments;
 
     // A fast-path builtin operator (e.g. `getClock() + 1`) is a `BuiltinOperatorExpr`, not an
     // `InvokeExpr`, so it needs its own recursion into the operands -- otherwise decl references
@@ -1274,6 +1322,11 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitDeclRefExpr(DeclRefExpr* expr)
     {
         visitGenericArgumentExpressions(expr);
+        // The solver records default selection before folding erases case references.
+        // Only the selected reference carries this list, so unused overloads and
+        // explicitly supplied or inferred arguments do not contribute their defaults.
+        for (auto param : expr->defaultedGenericParams)
+            static_cast<VisitorType*>(this)->visitDefaultArgument(param);
         if (visitingTypeSource && as<TypeType>(expr->type))
         {
             // Canonicalization also erases aliases. Their own requirements belong to
@@ -1601,7 +1654,6 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
     void visitDeclGroup(DeclGroup*) {}
     void checkVarDeclCommon(VarDeclBase* varDecl);
     void visitContainerDecl(ContainerDecl* decl);
-    void visitGenericDecl(GenericDecl* decl);
     void visitEnumCaseDecl(EnumCaseDecl* decl);
     void visitTypeDefDecl(TypeDefDecl* decl);
 
@@ -5922,6 +5974,18 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
         //
         ensureAllDeclsRec(moduleDecl, s);
         ensureRegisteredSynthesizedDecls(s);
+    }
+
+    // Default expressions can refer back to their own callable. Cache their requirements
+    // after declaration contracts are complete so `int f(int value = f())` does not
+    // re-enter capability checking for its parameter while checking f's contract.
+    // Failed modules are not serialized and may still contain unchecked error recovery syntax.
+    if (getSink()->getErrorCount() == 0 &&
+        !getOptionSet().getBoolOption(CompilerOptionName::IgnoreCapabilities))
+    {
+        cacheDefaultArgumentCapabilities(this, moduleDecl);
+        for (Index i = 0; i < getShared()->getSynthesizedDeclRootCount(); ++i)
+            cacheDefaultArgumentCapabilities(this, getShared()->getSynthesizedDeclRoot(i));
     }
 
     // Once we have completed the above loop, all declarations not
@@ -22756,6 +22820,22 @@ struct CapabilityDeclReferenceVisitor
         if (decl)
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
     }
+    // Module serialization keeps canonical types rather than their source expressions.
+    // A selected default such as `T = Box<int(Mode.A) * 0>` therefore uses its saved
+    // requirement summary after import. While the defining module is being checked,
+    // summaries are not ready yet and we visit the checked source instead.
+    void visitDefaultArgument(Decl* param)
+    {
+        if (auto modifier = param->findModifier<DefaultArgumentCapabilityModifier>())
+        {
+            auto loc =
+                Base::sourceLocStack.getCount() ? Base::sourceLocStack.getLast() : param->loc;
+            handleProcessFunc(param, modifier->capabilityRequirements, loc);
+        }
+        else
+            Base::visitDefaultArgument(param);
+    }
+
     // Collect the capabilities of the individual conformances in a type-pack proof.
     // Consider this example:
     //
@@ -23146,6 +23226,57 @@ void visitReferencedDecls(
         visitor.dispatchIfNotNull(decl);
 }
 
+// Save default requirements while checked source is still available. Consider this example:
+//
+//     enum Mode { [require(hlsl)] A = 0 }
+//     struct Box<let N : int> {}
+//     int read<T = Box<int(Mode.A) * 0>>() { return 7; }
+//
+// The type default serializes as Box<0>, so an imported read() cannot recover Mode.A from
+// its semantic type. Preserve the requirements on the parameter, separately from its
+// declaration contract, so read<int>() remains unrestricted. This runs after the module's
+// capability phase; nested default expressions can use either an already-published summary
+// or their checked source, without starting a new declaration-checking phase.
+static void cacheDefaultArgumentCapabilities(SemanticsVisitor* semantics, Decl* rootDecl)
+{
+    bool hasDefault = false;
+    if (auto typeParam = as<GenericTypeParamDecl>(rootDecl))
+        hasDefault = typeParam->initType.type != nullptr;
+    else if (as<ParamDecl>(rootDecl) || as<GenericValueParamDecl>(rootDecl))
+        hasDefault = as<VarDeclBase>(rootDecl)->initExpr != nullptr;
+
+    if (hasDefault && !rootDecl->findModifier<DefaultArgumentCapabilityModifier>())
+    {
+        CapabilitySet capabilities;
+        CapabilityDeclReferenceVisitor visitor(
+            [&](SyntaxNode*, const CapabilitySetVal* nodeCaps, SourceLoc)
+            { capabilities.join(nodeCaps); },
+            [](DiagnosticCategory) {},
+            nullptr,
+            *semantics);
+        visitor.sourceLocStack.add(rootDecl->loc);
+        visitor.visitDefaultArgument(rootDecl);
+
+        // Collecting an unused default must not propagate requirements onto the parameter
+        // or diagnose target conflicts at its declaration. Consumers apply this summary
+        // only when a call actually selects the default.
+        auto modifier = semantics->getASTBuilder()->create<DefaultArgumentCapabilityModifier>();
+        modifier->capabilityRequirements = capabilities.freeze(semantics->getASTBuilder());
+        addModifier(rootDecl, modifier);
+    }
+
+    if (auto containerDecl = as<ContainerDecl>(rootDecl))
+    {
+        for (auto member : containerDecl->getDirectMemberDecls())
+        {
+            if (!as<ScopeDecl>(member))
+                cacheDefaultArgumentCapabilities(semantics, member);
+        }
+    }
+    if (auto genericDecl = as<GenericDecl>(rootDecl))
+        cacheDefaultArgumentCapabilities(semantics, genericDecl->inner);
+}
+
 CapabilitySet getDeclRefCapabilityRequirements(
     SemanticsVisitor* visitor,
     DeclRef<Decl> declRef,
@@ -23208,12 +23339,11 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         *this);
     visitor.sourceLocStack.add(varDecl->loc);
     visitor.visitTypeExp(varDecl->type);
-    // Parameter defaults reference declarations regardless of which arguments a caller
-    // supplies. Global and static initializers also belong to their declaration; locals
-    // are analyzed in their enclosing statement's target-switch context.
-    if (as<ParamDecl>(varDecl) ||
-        (as<VarDecl>(varDecl) && !isLocalVar(varDecl) &&
-         (isGlobalDecl(varDecl) || varDecl->hasModifier<HLSLStaticModifier>())))
+    // Global and static initializers belong to their declaration. Parameter defaults
+    // are visited only at calls that omit the argument; locals are analyzed in their
+    // enclosing statement's target-switch context.
+    if (as<VarDecl>(varDecl) && !isLocalVar(varDecl) &&
+        (isGlobalDecl(varDecl) || varDecl->hasModifier<HLSLStaticModifier>()))
         visitor.dispatchIfNotNull(varDecl->initExpr);
     varDecl->inferredCapabilityRequirements = capabilities.freeze(getASTBuilder());
 }
@@ -23287,33 +23417,6 @@ void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
 {
     // Any potential child must get it's capabilities from `getDeclaredCapabilitySet`.
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl).freeze(getASTBuilder());
-}
-
-void SemanticsDeclCapabilityVisitor::visitGenericDecl(GenericDecl* decl)
-{
-    // A default such as `let M : Mode = Mode.hlslMode` references the case in the
-    // generic declaration, even when an application supplies another argument. Analyze
-    // the parameters here; the inner declaration owns its signature and body separately.
-    auto capabilities = getDeclaredCapabilitySet(decl);
-    CapabilityDeclReferenceVisitor visitor(
-        [this,
-         decl,
-         &capabilities](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc loc)
-        { _propagateRequirement(this, capabilities, decl, node, nodeCaps, loc); },
-        [this, decl](DiagnosticCategory category)
-        { _propagateSeeDefinitionOf(this, decl, category); },
-        decl->findModifier<RequireCapabilityAttribute>(),
-        *this);
-    visitor.sourceLocStack.add(decl->loc);
-    for (auto member : decl->getDirectMemberDecls())
-    {
-        if (auto typeParam = as<GenericTypeParamDecl>(member))
-            visitor.visitTypeExp(typeParam->initType);
-        else if (auto valueParam = as<VarDeclBase>(member);
-                 valueParam && isGenericParam(valueParam))
-            visitor.dispatchIfNotNull(valueParam->initExpr);
-    }
-    decl->inferredCapabilityRequirements = capabilities.freeze(getASTBuilder());
 }
 
 void SemanticsDeclCapabilityVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
@@ -23419,22 +23522,6 @@ void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extension
 
 void SemanticsDeclCapabilityVisitor::checkDeclaredCapabilityRequirements(Decl* decl)
 {
-    if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
-    {
-        // The generic wrapper owns default arguments, so its requirements also belong
-        // to the inner declaration's contract. Its checker never visits the inner body.
-        ensureDecl(genericDecl, DeclCheckState::CapabilityChecked);
-        CapabilitySet capabilities{decl->inferredCapabilityRequirements};
-        _propagateRequirement(
-            this,
-            capabilities,
-            decl,
-            genericDecl,
-            genericDecl->inferredCapabilityRequirements,
-            decl->loc);
-        decl->inferredCapabilityRequirements = capabilities.freeze(getASTBuilder());
-    }
-
     auto declaredCaps = getDeclaredCapabilitySet(decl);
     if (declaredCaps.isEmpty())
         return;

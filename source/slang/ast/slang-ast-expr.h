@@ -35,6 +35,16 @@ class DeclRefExpr : public Expr
     // The original expr before DeclRef resolution.
     Expr* originalExpr = nullptr;
 
+    // The generic parameters whose defaults were selected for this reference. Consider:
+    //     enum Mode { [require(hlsl)] A = 0 }
+    //     int read<let N : int = int(Mode.A) * 0>() { return N; }
+    // For read(), the resolved argument is zero, but using the default still references
+    // Mode.A. The generic solver records the parameters after inference finishes.
+    // Capability checking visits their checked defaults or uses their saved requirement
+    // summaries. Explicit or inferred arguments leave their parameters out of this list.
+    // This is source provenance only; declRef remains the specialized semantic identity.
+    FIDDLE() List<Decl*> defaultedGenericParams;
+
     // The scope in which to perform lookup
     Scope* scope = nullptr;
 };

@@ -302,6 +302,7 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     OverloadCandidate& candidate)
 {
     auto genericDeclRef = candidate.item.declRef.as<GenericDecl>();
+    candidate.defaultedGenericParams.clear();
 
     // All generic arguments, except array sizes, need to be at least a link-time constant.
     // Exception: array sizes can also be a specialization constant.
@@ -476,6 +477,7 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                         return false;
                     }
                     checkedArgs.add(substType);
+                    candidate.defaultedGenericParams.add(typeParamRef.getDecl());
                     continue;
                 }
             }
@@ -551,6 +553,7 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                         return false;
                     }
                     checkedArgs.add(defaultVal);
+                    candidate.defaultedGenericParams.add(valParamRef.getDecl());
                     continue;
                 }
             }
@@ -1218,13 +1221,16 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         inferenceContext.genericDecl = genericDeclRef.getDecl();
 
         ConversionCost solveCost = kConversionCost_None;
+        List<Decl*> defaultedGenericParams;
         auto solved = trySolveGenericArguments(
             _Move(inferenceContext),
             genericDeclRef,
             providedOrdinaryArgs.getArrayView().arrayView,
-            solveCost);
+            solveCost,
+            &defaultedGenericParams);
         if (solved)
         {
+            candidate.defaultedGenericParams = _Move(defaultedGenericParams);
             auto solvedArgs =
                 tryGetGenericArguments(SubstitutionSet(solved), genericDeclRef.getDecl());
             candidate.subst =
@@ -1484,6 +1490,21 @@ Expr* SemanticsVisitor::createGenericDeclRef(
     return result;
 }
 
+// Record selected default parameters on the specialized reference. Consider
+// `read<let N : int = int(Mode.A) * 0>()`: the semantic argument is zero, but the selected
+// default still references Mode.A. The solver reports the parameter separately so explicit
+// or inferred arguments do not inherit the unused default's requirements.
+static void retainDefaultedGenericParams(
+    Expr* calleeExpr,
+    List<Decl*> const& defaultedGenericParams)
+{
+    if (defaultedGenericParams.getCount() == 0)
+        return;
+    auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(calleeExpr));
+    SLANG_RELEASE_ASSERT(declRefExpr);
+    declRefExpr->defaultedGenericParams = defaultedGenericParams;
+}
+
 Expr* SemanticsVisitor::CompleteOverloadCandidate(
     OverloadResolveContext& context,
     OverloadCandidate& candidate)
@@ -1679,6 +1700,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 if (IsErrorExpr(baseExpr))
                     return CreateErrorExpr(callExpr);
 
+                retainDefaultedGenericParams(baseExpr, candidate.defaultedGenericParams);
                 callExpr->type = QualType(candidate.resultType);
 
                 // A call may yield an l-value, and we should take a look at the candidate to be
@@ -1741,6 +1763,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
 
         case OverloadCandidate::Flavor::Expr:
             {
+                retainDefaultedGenericParams(candidate.exprVal, candidate.defaultedGenericParams);
                 AppExprBase* callExpr = as<InvokeExpr>(context.originalExpr);
                 if (!callExpr)
                 {
@@ -1779,7 +1802,11 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 return expr;
             }
 
-            return createGenericDeclRef(baseExpr, context.originalExpr, candidate.subst);
+            {
+                auto result = createGenericDeclRef(baseExpr, context.originalExpr, candidate.subst);
+                retainDefaultedGenericParams(result, candidate.defaultedGenericParams);
+                return result;
+            }
             break;
 
         default:
@@ -2589,7 +2616,8 @@ void SemanticsVisitor::AddFuncOverloadCandidate(
     LookupResultItem item,
     DeclRef<CallableDecl> funcDeclRef,
     OverloadResolveContext& context,
-    ConversionCost baseCost)
+    ConversionCost baseCost,
+    ArrayView<Decl*> defaultedGenericParams)
 {
     auto funcDecl = funcDeclRef.getDecl();
     ensureDecl(funcDecl, DeclCheckState::CanUseFuncSignature);
@@ -2621,6 +2649,7 @@ void SemanticsVisitor::AddFuncOverloadCandidate(
         candidate.flavor = OverloadCandidate::Flavor::Func;
         candidate.item = item;
         candidate.resultType = getResultType(m_astBuilder, funcDeclRef);
+        candidate.defaultedGenericParams.addRange(defaultedGenericParams);
 
         AddOverloadCandidate(context, candidate, baseCost);
     }
@@ -2653,6 +2682,7 @@ void SemanticsVisitor::AddFuncOverloadCandidate(
         candidate.resultType = resolvedFuncType->getResultType();
         candidate.exprVal = funcExpr;
         candidate.item = item;
+        candidate.defaultedGenericParams.addRange(defaultedGenericParams);
 
         AddOverloadCandidate(context, candidate, baseCost);
     }
@@ -2918,8 +2948,12 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     ArrayView<Val*> providedOrdinaryArgs,
     ConversionCost& outBaseCost,
     List<QualType>* innerParameterTypes,
-    GenericArgumentInferenceFailure* outFailure)
+    GenericArgumentInferenceFailure* outFailure,
+    List<Decl*>* outDefaultedGenericParams)
 {
+    if (outDefaultedGenericParams)
+        outDefaultedGenericParams->clear();
+
     // The call site may have already provided some ordinary generic arguments,
     // such as the `int` in `foo<int>(x)`. The remaining ordinary arguments and
     // all witness arguments are inferred from the value-level arguments in
@@ -3051,7 +3085,8 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
         _Move(inferenceContext),
         genericDeclRef,
         providedOrdinaryArgs,
-        outBaseCost);
+        outBaseCost,
+        outDefaultedGenericParams);
 }
 
 LookupResult SemanticsVisitor::lookupConstructorsInType(Type* type, Scope* sourceScope)
@@ -3171,13 +3206,15 @@ void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
 
     // Try to infer generic arguments, based on the context
     GenericArgumentInferenceFailure genericInferenceFailure;
+    List<Decl*> defaultedGenericParams;
     DeclRef<Decl> innerRef = inferGenericArguments(
         genericDeclRef,
         context,
         providedOrdinaryArgs,
         baseCost,
         nullptr,
-        &genericInferenceFailure);
+        &genericInferenceFailure,
+        &defaultedGenericParams);
 
     if (innerRef)
     {
@@ -3187,7 +3224,11 @@ void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
         LookupResultItem innerItem;
         innerItem.breadcrumbs = genericItem.breadcrumbs;
         innerItem.declRef = innerRef;
-        AddDeclRefOverloadCandidates(innerItem, context, baseCost);
+        AddDeclRefOverloadCandidates(
+            innerItem,
+            context,
+            baseCost,
+            defaultedGenericParams.getArrayView());
     }
     else
     {
@@ -3212,7 +3253,8 @@ void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
 void SemanticsVisitor::AddDeclRefOverloadCandidates(
     LookupResultItem item,
     OverloadResolveContext& context,
-    ConversionCost baseCost)
+    ConversionCost baseCost,
+    ArrayView<Decl*> defaultedGenericParams)
 {
     if (auto funcAliasDeclRef = item.declRef.as<FuncAliasDecl>())
     {
@@ -3224,11 +3266,16 @@ void SemanticsVisitor::AddDeclRefOverloadCandidates(
         LookupResultItem innerItem;
         innerItem.breadcrumbs = item.breadcrumbs;
         innerItem.declRef = aliasFuncDeclRef;
-        AddFuncOverloadCandidate(innerItem, aliasFuncDeclRef, context, baseCost);
+        AddFuncOverloadCandidate(
+            innerItem,
+            aliasFuncDeclRef,
+            context,
+            baseCost,
+            defaultedGenericParams);
     }
     else if (auto funcDeclRef = item.declRef.as<CallableDecl>())
     {
-        AddFuncOverloadCandidate(item, funcDeclRef, context, baseCost);
+        AddFuncOverloadCandidate(item, funcDeclRef, context, baseCost, defaultedGenericParams);
     }
     else if (auto aggTypeDeclRef = item.declRef.as<AggTypeDecl>())
     {
@@ -3408,18 +3455,22 @@ void SemanticsVisitor::AddHigherOrderOverloadCandidates(
             // Try to infer generic arguments, based on the updated context.
             OverloadResolveContext subContext = context;
             ConversionCost baseCost1 = kConversionCost_None;
+            List<Decl*> defaultedGenericParams;
             DeclRef<Decl> innerRef = inferGenericArguments(
                 baseFuncGenericDeclRef,
                 context,
                 ArrayView<Val*>(),
                 baseCost1,
-                &paramTypes);
+                &paramTypes,
+                nullptr,
+                &defaultedGenericParams);
 
             if (!innerRef)
                 return;
 
             OverloadCandidate candidate;
             candidate.flavor = OverloadCandidate::Flavor::Expr;
+            candidate.defaultedGenericParams = _Move(defaultedGenericParams);
             if (innerRef)
             {
                 diffFuncType = as<FuncType>(innerRef.substitute(m_astBuilder, diffFuncType));

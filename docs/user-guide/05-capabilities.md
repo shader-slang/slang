@@ -118,8 +118,28 @@ without explicit requirements infer them from their references. These checks hap
 including for case references in generic arguments, type expressions, and initializers.
 For example, `use<Mode.A>()`, `sizeof(Box<Mode.A>)`, and `int(Mode.A) * 0` all require `hlsl`.
 Folding a constant expression does not remove the requirement introduced by its source reference.
-A reference in a parameter or generic parameter default contributes to the declaration's requirements
-even when a caller supplies an explicit argument instead of using that default.
+A reference in a parameter or generic parameter default contributes its requirement only when the
+default is used. Supplying an explicit argument, or inferring a generic argument from the call,
+does not introduce the unused default's requirement. For example:
+
+```csharp
+int consumeDefault(Mode value = Mode.A) { return int(value); }
+int readDefault<let V : Mode = Mode.A>() { return 7; }
+
+int useDefaults()
+{
+    return consumeDefault() + readDefault(); // Requires hlsl.
+}
+
+int supplyArguments()
+{
+    return consumeDefault(Mode(1)) + readDefault<Mode(1)>(); // No case requirement.
+}
+```
+
+When only some arguments are supplied, each omitted argument contributes the requirement of its
+selected default. A default such as `int(Mode.A) * 0` still requires `hlsl` when used, even though
+its value folds to zero.
 
 Requirements follow declarations, not numeric values. `Mode(int(Mode.A) + 1)` requires `hlsl`
 because it references `A`; computing the numeric value of `B` does not introduce `B`'s requirement.
