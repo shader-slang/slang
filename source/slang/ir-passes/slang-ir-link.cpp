@@ -1218,6 +1218,23 @@ IRFunc* specializeIRForEntryPoint(
         //
         auto specializedClone = specializeGeneric(clonedSpec);
 
+        // Specialization fails when the entry point is specialized with an interface type, as
+        // `-specialize IFoo` does for `computeMain<T : IFoo>`, because there is then no witness
+        // table for the constraint. We report that the way the specialization pass reports
+        // other generics specialized with an existential type, and `linkAndOptimizeIR` stops
+        // on the error.
+        //
+        if (!specializedClone)
+        {
+            if (auto sink = context->shared->sink)
+            {
+                sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+                    .generic = getText(entryPoint->getName()),
+                    .location = entryPoint->getFuncDecl()->getNameLoc()});
+            }
+            return nullptr;
+        }
+
         // One special case we need to be aware of is that there
         // might be decorations attached to the `specialize`
         // instruction, which we then want to copy over to the
@@ -2331,11 +2348,16 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         auto entryPointMangledName = program->getEntryPointMangledName(entryPointIndex);
         auto nameOverride = program->getEntryPointNameOverride(entryPointIndex);
         auto entryPoint = program->getEntryPoint(entryPointIndex).get();
-        irEntryPoints.add(specializeIRForEntryPoint(
-            context,
-            entryPointMangledName,
-            entryPoint,
-            nameOverride.getUnownedSlice()));
+
+        // An entry point that cannot be specialized has been reported and is left out.
+        if (auto irEntryPoint = specializeIRForEntryPoint(
+                context,
+                entryPointMangledName,
+                entryPoint,
+                nameOverride.getUnownedSlice()))
+        {
+            irEntryPoints.add(irEntryPoint);
+        }
     }
 
     // Layout information for global shader parameters is also required,
