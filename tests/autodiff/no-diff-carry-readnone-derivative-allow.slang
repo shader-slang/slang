@@ -8,7 +8,7 @@
 // against the carry-set gate treating `[PreferRecompute]` in any form as a
 // purity signal.
 
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl -stage compute -entry main
 
 // CHECK: error[E41031]
 // CHECK: derivative is lost

@@ -9,7 +9,7 @@
 // result into a no_diff slot must still fire E41031. Only a real `[__readNone]`
 // contract lets the carry-set gate trust a derivative variant.
 
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl -stage compute -entry main
 
 // CHECK: error[E41031]
 // CHECK: derivative is lost

@@ -5,7 +5,7 @@
 // `BackwardDerivativePropagate` association of
 // `isReadNoneCalleeAndAllDerivatives` can reject the call.
 
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main -experimental-feature
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl -stage compute -entry main -experimental-feature
 
 // CHECK: error[E41031]
 // CHECK: derivative is lost
