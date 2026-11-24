@@ -10,6 +10,7 @@
 #include "core/slang-stream.h"
 #include "slang-hgvm-buffer-pool.h"
 #include "slang-hgvm-debug-map.h"
+#include "slang-hgvm-frame-stack.h"
 #include "slang-hgvm-image-io.h"
 #include "slang-hgvm-resource.h"
 #include "slang-hgvm-staged-record-builder.h"
@@ -349,23 +350,6 @@ struct BoxObject final : HeapObject, OwnedPayload
     RefPtr<RefObject> typeScope;
     Address payloadTypeAddress;
 };
-
-/// Stores the fixed-width interpreter representation of every source-language `String`.
-///
-/// Consider the literal `"hello"`: `literalBytes` points into immutable instruction storage,
-/// `byteCount` is five, and `owner` is null. The result of `format("{}", value)` instead leaves
-/// `literalBytes` invalid and owns a `StringObject`. Keeping both cases in the same trivial value
-/// lets calls, returns, aggregate construction, loads, and stores copy exactly 24 bytes.
-struct StringValue
-{
-    Address literalBytes;
-    uint32_t byteCount = 0;
-    Address owner;
-};
-
-static_assert(sizeof(StringValue) == 24);
-static_assert(offsetof(StringValue, owner) == 16);
-static_assert(std::is_trivially_copyable_v<StringValue>);
 
 /// Owns the variable-sized bytes produced by a runtime string operation.
 ///
@@ -957,6 +941,75 @@ struct SharedStagingContext : RefObject
     }
 };
 
+/// Owns one program's string and binary literal bytes at host addresses that never move.
+///
+/// Consider `print("hello")` in a program staged before a second, larger program. The instruction
+/// storage shared by both programs may reallocate while the second program stages, but the five
+/// bytes of `"hello"` stay at the native address recorded in the first program's `StringValue`.
+/// A borrowed pointer to literal bytes therefore stays valid until the VM closes. Every literal is
+/// followed by one NUL byte that its byte count excludes, so a string literal can be borrowed as a
+/// C string without copying.
+class LiteralSegment
+{
+public:
+    LiteralSegment() = default;
+    LiteralSegment(const LiteralSegment&) = delete;
+    LiteralSegment& operator=(const LiteralSegment&) = delete;
+
+    ~LiteralSegment()
+    {
+        for (const Chunk& chunk : m_chunks)
+            ::operator delete(chunk.base, std::align_val_t(kLiteralAlignment));
+    }
+
+    /// Copies `byteSize` bytes and a terminating NUL into the segment and returns their address.
+    const uint8_t* append(const void* data, size_t byteSize)
+    {
+        size_t requiredSize = byteSize + 1;
+        if (m_chunks.getCount() == 0 ||
+            requiredSize > m_chunks.getLast().size - m_chunks.getLast().used)
+        {
+            Chunk chunk;
+            chunk.size = requiredSize > kChunkSize ? requiredSize : kChunkSize;
+            chunk.base = static_cast<uint8_t*>(
+                ::operator new(chunk.size, std::align_val_t(kLiteralAlignment)));
+            m_chunks.add(chunk);
+        }
+        Chunk& chunk = m_chunks.getLast();
+        uint8_t* result = chunk.base + chunk.used;
+        if (byteSize)
+            std::memcpy(result, data, byteSize);
+        result[byteSize] = 0;
+        size_t alignedSize = (requiredSize + kLiteralAlignment - 1) & ~(kLiteralAlignment - 1);
+        chunk.used = alignedSize < chunk.size - chunk.used ? chunk.used + alignedSize : chunk.size;
+        return result;
+    }
+
+    /// Returns whether `[address, address + byteSize)` lies inside one literal chunk.
+    bool containsRange(const void* address, size_t byteSize) const
+    {
+        auto start = static_cast<const uint8_t*>(address);
+        for (const Chunk& chunk : m_chunks)
+            if (start >= chunk.base && start <= chunk.base + chunk.used &&
+                byteSize <= size_t(chunk.base + chunk.used - start))
+                return true;
+        return false;
+    }
+
+private:
+    /// Literal bytes start at 16-byte boundaries so binary literals can hold any scalar data.
+    static constexpr size_t kLiteralAlignment = 16;
+    static constexpr size_t kChunkSize = 64 * 1024;
+
+    struct Chunk
+    {
+        uint8_t* base = nullptr;
+        size_t size = 0;
+        size_t used = 0;
+    };
+    List<Chunk> m_chunks;
+};
+
 /// Owns one program's indexes into the VM's shared immutable staged records.
 ///
 /// Consider two calls to the same HGBC `main`: both use the same words in shared storage, while
@@ -965,6 +1018,8 @@ class StagedProgram : public RefObject
 {
 public:
     RefPtr<HGVM::Program> sourceProgram;
+    /// Holds the bytes of this program's string and binary literals until the VM closes.
+    LiteralSegment literals;
     RefPtr<DebugMap> debugMap;
     RefPtr<SharedStagingContext> staging;
     std::unordered_map<HGBCId, Address> typeBindings;
@@ -1190,17 +1245,18 @@ struct RayPipelineObject : RefObject
     throw Exception(message.c_str());
 }
 
-static constexpr uint32_t kInvalidStackOffset = 0xffffffffu;
 static constexpr uint32_t kInvalidProgramCounter = 0xffffffffu;
 
-/// Stores execution-only traversal data at the start of every byte-stack frame.
+/// Stores execution-only traversal data at the start of every frame.
 ///
-/// Consider the root `main`: its caller and return PCs are invalid. A nested call stores `main`'s
-/// frame offset, return PC, function address, and result destination in the same fixed header.
+/// Consider the root `main`: its caller frame is null and its return PC is invalid. A nested call
+/// stores `main`'s frame base, return PC, function address, and result destination in the same
+/// fixed header. `previousStackTop` is the `FrameStack` top before this frame was pushed, which
+/// frame exit restores.
 struct FrameHeader
 {
-    uint32_t callerFrameOffset = kInvalidStackOffset;
-    uint32_t previousStackTop = 0;
+    uint8_t* callerFrame = nullptr;
+    uint8_t* previousStackTop = nullptr;
     uint32_t returnProgramCounter = kInvalidProgramCounter;
     Address callerFunctionAddress;
     Address returnDestinationAddress;
@@ -1209,7 +1265,7 @@ struct FrameHeader
 /// Assigns aligned relative-frame addresses without depending on a particular scalar width.
 ///
 /// For example, allocating `UInt8` followed by `Float64` consumes one byte, alignment padding, and
-/// eight bytes; both addresses remain valid if the stack backing allocation later relocates.
+/// eight bytes. The returned addresses are relative to whichever frame base executes them.
 class FrameLayoutBuilder
 {
 public:
@@ -2408,18 +2464,20 @@ private:
     ///
     /// Consider an embedded module name: its ordinary String address names a 24-byte value so it
     /// can participate in calls, but module realization needs the original UTF-8 bytes directly.
-    /// The validator has already established that embedded descriptors use literal operands.
+    /// The validator has already established that embedded descriptors use literal operands, and
+    /// string and binary literal bytes live in the program's `LiteralSegment`.
     const StagedValueInfo& getLiteralPayload(HGBCId valueId) const
     {
         const StagedValueInfo& value = getValue(valueId);
-        SLANG_ASSERT(value.literalPayloadAddress.getKind() == AddressKind::InstructionAbsolute);
+        SLANG_ASSERT(value.literalPayloadAddress.getKind() == AddressKind::Native);
         return value;
     }
 
     /// Appends one literal descriptor and its separately aligned immutable data.
     ///
-    /// For example, a `Float64` literal will eventually request eight-byte alignment, while a large
-    /// binary payload remains outside the fixed descriptor's traversable word count.
+    /// For example, a `Float64` literal requests eight-byte alignment in the instruction storage,
+    /// where staged operands read it. A binary literal is data that a program may address, so its
+    /// bytes go to the program's `LiteralSegment` and keep a stable native address instead.
     void appendLiteral(
         const HGBC::Record& sourceRecord,
         ValueKind kind,
@@ -2428,8 +2486,17 @@ private:
         uint32_t byteSize,
         uint32_t byteAlignment)
     {
-        uint32_t dataProgramCounter = m_builder->appendAlignedBytes(data, byteSize, byteAlignment);
-        Address dataAddress = Address::makeAbsoluteInstruction(dataProgramCounter);
+        Address dataAddress;
+        if (kind == ValueKind::Binary)
+        {
+            dataAddress = Address::fromNativePointer(m_program->literals.append(data, byteSize));
+        }
+        else
+        {
+            uint32_t dataProgramCounter =
+                m_builder->appendAlignedBytes(data, byteSize, byteAlignment);
+            dataAddress = Address::makeAbsoluteInstruction(dataProgramCounter);
+        }
         m_builder->emitLiteral(
             sourceRecord.opcode,
             dataAddress,
@@ -2457,15 +2524,16 @@ private:
     ///
     /// Consider passing `"hello"` to a helper: the argument copy reads the 24-byte value appended
     /// here, not the five raw characters. The value's null `owner` makes retain and release no-ops,
-    /// while embedded-module staging can still use the separately recorded literal payload.
+    /// while embedded-module staging can still use the separately recorded literal payload. The
+    /// characters themselves live NUL-terminated in the program's `LiteralSegment`, so the value
+    /// holds their native address.
     void appendStringLiteral(const HGBC::Record& sourceRecord)
     {
         SLANG_RELEASE_ASSERT(sourceRecord.payload.size() <= std::numeric_limits<uint32_t>::max());
         uint32_t payloadByteSize = uint32_t(sourceRecord.payload.size());
 
-        uint32_t payloadProgramCounter =
-            m_builder->appendAlignedBytes(sourceRecord.payload.data(), payloadByteSize, 1);
-        Address payloadAddress = Address::makeAbsoluteInstruction(payloadProgramCounter);
+        Address payloadAddress = Address::fromNativePointer(
+            m_program->literals.append(sourceRecord.payload.data(), payloadByteSize));
         StringValue value;
         value.literalBytes = payloadAddress;
         value.byteCount = payloadByteSize;
@@ -7238,11 +7306,13 @@ struct InterpreterState
     // Interpreter runtime state
     //
 
-    /// Linear stack for frame-local storage. Function calls just bump the pointer
-    List<uint8_t, AlignedAllocator<kStorageBaseAlignment>> stack;
+    /// Borrows the execution context's frame stack. Calls push frames on it and frame exit pops
+    /// them; a pushed frame never moves, so native addresses of frame slots stay valid until the
+    /// frame exits.
+    FrameStack* frameStack = nullptr;
 
-    /// Offset for translating frame-relative addresses into absolute offsets.
-    uint32_t currentFrameOffset = 0;
+    /// Base of the current frame, which staged `FrameRelative` operands are relative to.
+    uint8_t* currentFrame = nullptr;
 
     /// Names the current function record for instruction-relative addresses, returns, and failure
     /// unwinding. Calls save and restore it in `FrameHeader`.
@@ -7270,7 +7340,7 @@ struct InterpreterState
     struct DebugCall
     {
         DebugCallId id;
-        uint32_t frameOffset;
+        uint8_t* frame;
         uint32_t function;
     };
     struct DebugMemoryRegion
@@ -7288,7 +7358,7 @@ struct InterpreterState
     void enterDebugCall(DebugInstructionAddress site, Address callee)
     {
         DebugCallId id{++*nextDebugCallId};
-        debugCalls.add({id, currentFrameOffset, uint32_t(callee.getUnsignedPayload())});
+        debugCalls.add({id, currentFrame, uint32_t(callee.getUnsignedPayload())});
         debugHandler->onFunctionEnter(site, id);
     }
 
@@ -7319,7 +7389,7 @@ struct InterpreterState
         for (const auto& call : debugCalls)
             if (auto roots = program->debugOwnedSlots.tryGetValue(call.function))
                 for (auto root : *roots)
-                    visit(stack.getBuffer() + call.frameOffset + root.getUnsignedPayload());
+                    visit(call.frame + root.getUnsignedPayload());
         for (Index i = 0; i < pending.getCount(); ++i)
         {
             auto object = pending[i];
@@ -7373,19 +7443,27 @@ struct InterpreterState
         switch (address.value >> kAddressTagShift)
         {
         case uint64_t(AddressKind::FrameRelative):
-            base = stack.getBuffer() + call->frameOffset;
+            base = call->frame;
             extent = readRecord<StagedRecord::Function>(call->function).frameSize;
-            break;
-        case uint64_t(AddressKind::FrameAbsolute):
-            base = stack.getBuffer();
-            extent = uint64_t(stack.getCount());
             break;
         case uint64_t(AddressKind::InstructionAbsolute):
             baseOffset *= sizeof(uint32_t);
             base = program->staging->storage.getBuffer();
             extent = program->staging->storage.getByteSize();
             break;
-        case uint64_t(AddressKind::Heap):
+        case uint64_t(AddressKind::Native):
+            if (uint64_t(offset) + size <= kAddressPayloadMask - baseOffset)
+            {
+                // Program addresses of locals and literals are native pointers into live frames
+                // or the program's literal segment, which outlive this stopped callback.
+                auto bytes = reinterpret_cast<const uint8_t*>(uintptr_t(baseOffset)) + offset;
+                if (frameStack->containsLiveRange(bytes, size) ||
+                    program->literals.containsRange(bytes, size))
+                {
+                    std::memcpy(data, bytes, size);
+                    return true;
+                }
+            }
             collectDebugHeap();
             for (const auto& region : debugMemory)
             {
@@ -7618,22 +7696,16 @@ struct InterpreterState
         AddressKind addressKind = address.getKind();
         switch (addressKind)
         {
-        case AddressKind::Heap:
-            writeBase = address.getHeapPointer();
+        case AddressKind::Native:
+            writeBase = address.getNativePointer();
             readBase = writeBase;
             storageSize = std::numeric_limits<size_t>::max();
             break;
         case AddressKind::FrameRelative:
-            byteOffset = size_t(currentFrameOffset) + size_t(address.getUnsignedPayload());
-            readBase = stack.getBuffer();
-            writeBase = stack.getBuffer();
-            storageSize = size_t(stack.getCount());
-            break;
-        case AddressKind::FrameAbsolute:
             byteOffset = size_t(address.getUnsignedPayload());
-            readBase = stack.getBuffer();
-            writeBase = stack.getBuffer();
-            storageSize = size_t(stack.getCount());
+            readBase = currentFrame;
+            writeBase = currentFrame;
+            storageSize = std::numeric_limits<size_t>::max();
             break;
         case AddressKind::InstructionRelative:
         case AddressKind::InstructionAbsolute:
@@ -7805,7 +7877,7 @@ struct InterpreterState
     {
         if (!handle)
             fail("HGVM class field access through a null object");
-        if (handle.getKind() != AddressKind::Heap)
+        if (handle.getKind() != AddressKind::Native)
             fail("HGVM class value does not contain a heap address");
         HeapObject* object = handle.getObject();
         if (!object || object->kind != HeapObjectKind::Class)
@@ -7820,7 +7892,7 @@ struct InterpreterState
     {
         if (!handle)
             fail("HGVM runtime array access through a null object");
-        if (handle.getKind() != AddressKind::Heap)
+        if (handle.getKind() != AddressKind::Native)
             fail("HGVM runtime array value does not contain a heap address");
         HeapObject* object = handle.getObject();
         if (!object || object->kind != HeapObjectKind::RuntimeArray)
@@ -7844,8 +7916,9 @@ struct InterpreterState
     /// Resolves either branch of the fixed-width source-language String representation.
     ///
     /// Consider a helper receiving `"literal"` on one call and `format("{}", 3)` on another. The
-    /// first value resolves immutable instruction bytes; the second borrows its managed object's
-    /// immutable `std::string`. Call execution copied the same 24-byte value in both cases.
+    /// first value borrows NUL-terminated literal-segment bytes; the second borrows its managed
+    /// object's immutable `std::string`. Call execution copied the same 24-byte value in both
+    /// cases.
     std::string_view readStringView(Address address)
     {
         StringValue value = readValue<StringValue>(address);
@@ -7860,10 +7933,10 @@ struct InterpreterState
 
         if (!value.byteCount)
             return {};
-        SLANG_ASSERT(value.literalBytes.getKind() == AddressKind::InstructionAbsolute);
-        AddressRef<const char> bytes =
-            resolveAddress<const char>(value.literalBytes, value.byteCount);
-        return std::string_view(bytes.get(), value.byteCount);
+        SLANG_ASSERT(value.literalBytes.getKind() == AddressKind::Native);
+        auto bytes = static_cast<const char*>(value.literalBytes.getNativePointer());
+        SLANG_ASSERT(bytes[value.byteCount] == 0);
+        return std::string_view(bytes, value.byteCount);
     }
 
     /// Resolves a const address directly to its concrete in-place object and realizes it if needed.
@@ -8299,21 +8372,19 @@ struct InterpreterState
     /// any HGBC operand metadata.
     void advance(const StagedRecord::Header& header) { programCounter += header.recordWordCount; }
 
-    /// Materializes one variable's canonical absolute-frame address.
+    /// Materializes one variable's native address.
     ///
-    /// For example, relative storage offset 24 in a frame beginning at byte 64 becomes absolute
-    /// address 88. Later operations can pass that eight-byte address without retaining frame-local
-    /// interpretation rules.
+    /// For example, relative storage offset 24 in a frame based at host address `0x1000` becomes
+    /// native address `0x1018`. Later operations, including callees that receive it as an `inout`
+    /// argument, use that eight-byte address directly because the frame never moves while live.
     void executeVar(const StagedRecord::Header& header)
     {
         SLANG_ASSERT(
             header.recordWordCount == StagedRecord::getRecordWordCount<StagedRecord::Var>());
         const auto& record = readRecord<StagedRecord::Var>(programCounter);
-        uint64_t absoluteOffset = uint64_t(currentFrameOffset) + record.storageByteOffset;
-        SLANG_ASSERT(absoluteOffset < kFramePayloadLimit);
         writeValue(
             record.header.resultAddress,
-            Address::makeAbsoluteFrame(uint32_t(absoluteOffset)));
+            Address::fromNativePointer(currentFrame + record.storageByteOffset));
         advance(header);
     }
 
@@ -8327,6 +8398,7 @@ struct InterpreterState
             header.recordWordCount == StagedRecord::getRecordWordCount<StagedRecord::Load>());
         const auto& record = readRecord<StagedRecord::Load>(programCounter);
         Address sourceAddress = readValue<Address>(record.pointerAddress);
+        SLANG_ASSERT(sourceAddress.getKind() == AddressKind::Native);
         copyBytes(record.header.resultAddress, sourceAddress, record.byteSize);
         advance(header);
     }
@@ -8363,6 +8435,7 @@ struct InterpreterState
             header.recordWordCount == StagedRecord::getRecordWordCount<StagedRecord::Store>());
         const auto& record = readRecord<StagedRecord::Store>(programCounter);
         Address destinationAddress = readValue<Address>(record.pointerAddress);
+        SLANG_ASSERT(destinationAddress.getKind() == AddressKind::Native);
         copyBytes(destinationAddress, record.valueAddress, record.byteSize);
         advance(header);
     }
@@ -8385,6 +8458,7 @@ struct InterpreterState
             baseAddress = classHandle;
         }
         Address fieldAddress = baseAddress.addByteOffset(record.fieldByteOffset);
+        SLANG_ASSERT(fieldAddress.getKind() == AddressKind::Native);
         writeValue(record.header.resultAddress, fieldAddress);
         advance(header);
     }
@@ -8465,7 +8539,7 @@ struct InterpreterState
             RuntimeArrayObject* object =
                 getRuntimeArrayObject(handle, record.runtimeArrayTypeAddress);
             SLANG_ASSERT(object->elementByteStride == record.elementByteStride);
-            baseAddress = Address::fromHeapPointer(object->payload);
+            baseAddress = Address::fromNativePointer(object->payload);
             elementCount = object->elementCount;
         }
         else
@@ -8478,6 +8552,7 @@ struct InterpreterState
             record.elementByteStride,
             elementCount);
         Address elementAddress = baseAddress.addByteOffset(byteOffset);
+        SLANG_ASSERT(elementAddress.getKind() == AddressKind::Native);
         writeValue(record.header.resultAddress, elementAddress);
         advance(header);
     }
@@ -10299,7 +10374,7 @@ struct InterpreterState
     {
         if (!handle)
             fail("HGVM cannot extract an empty box");
-        SLANG_RELEASE_ASSERT(handle.getKind() == AddressKind::Heap);
+        SLANG_RELEASE_ASSERT(handle.getKind() == AddressKind::Native);
         HeapObject* object = handle.getObject();
         SLANG_RELEASE_ASSERT(object->kind == HeapObjectKind::Box);
         auto box = static_cast<BoxObject*>(object);
@@ -11133,18 +11208,15 @@ struct InterpreterState
         advance(header);
     }
 
-    /// Converts an embedded caller-frame destination to its canonical absolute address.
+    /// Converts an embedded current-frame operand to the native address of the same slot.
     ///
-    /// For example, a call result slot at relative offset 40 in a caller frame beginning at byte
-    /// 64 becomes absolute-frame address 104 before it is saved in the callee's frame header.
-    Address getAbsoluteFrameAddress(Address address) const
+    /// For example, a call result slot at relative offset 40 in a caller frame based at host
+    /// address `0x1000` becomes native address `0x1028` before it is saved in the callee's frame
+    /// header, where the callee's return writes through it.
+    Address getNativeFrameAddress(Address address) const
     {
-        if (address.getKind() == AddressKind::FrameAbsolute)
-            return address;
         SLANG_ASSERT(address.getKind() == AddressKind::FrameRelative);
-        uint64_t byteOffset = uint64_t(currentFrameOffset) + address.getUnsignedPayload();
-        SLANG_ASSERT(byteOffset < kFramePayloadLimit);
-        return Address::makeAbsoluteFrame(uint32_t(byteOffset));
+        return Address::fromNativePointer(currentFrame + address.getUnsignedPayload());
     }
 
     /// Enters one staged direct function without using the native C++ call stack.
@@ -11192,17 +11264,82 @@ struct InterpreterState
         advance(header);
     }
 
+    /// Returns the source name of the function whose staged record is at `function`.
+    ///
+    /// The debug map records every function body as `[entryProgramCounter, exitProgramCounter)`
+    /// even without debug information, so the name comes from the range whose entry matches.
+    String getFunctionName(Address function)
+    {
+        const auto& record =
+            readRecord<StagedRecord::Function>(uint32_t(function.getUnsignedPayload()));
+        for (const auto& range : program->debugMap->getFunctions())
+            if (range.entry == record.entryProgramCounter)
+                return range.name.getLength() ? range.name : String("<unnamed>");
+        return "<unknown>";
+    }
+
+    /// Fails the invocation because pushing a frame for `callee` would exceed the frame-stack
+    /// limit, reporting the active call chain innermost first.
+    ///
+    /// Consider unbounded `recurse(n + 1)` called from `main`: the message lists `recurse`
+    /// once with its repeat count and then `main`, instead of one line per frame. Unwinding then
+    /// runs every active frame's exit block exactly as for any other failure.
+    [[noreturn]] void failStackOverflow(Address callee)
+    {
+        struct ChainEntry
+        {
+            String name;
+            uint64_t count;
+        };
+        static constexpr Index kMaxChainEntries = 16;
+        List<ChainEntry> chain;
+        uint64_t omittedFrames = 0;
+        auto addFrame = [&](Address function)
+        {
+            String name = getFunctionName(function);
+            if (chain.getCount() && chain.getLast().name == name)
+                ++chain.getLast().count;
+            else if (chain.getCount() < kMaxChainEntries)
+                chain.add({name, 1});
+            else
+                ++omittedFrames;
+        };
+        addFrame(callee);
+        Address function = functionAddress;
+        for (uint8_t* frame = currentFrame; frame;)
+        {
+            addFrame(function);
+            FrameHeader header;
+            std::memcpy(&header, frame, sizeof(header));
+            function = header.callerFunctionAddress;
+            frame = header.callerFrame;
+        }
+
+        StringBuilder message;
+        message << "HGVM stack overflow: the call to '" << chain[0].name
+                << "' exceeds the frame stack limit of " << uint64_t(frameStack->getByteLimit())
+                << " bytes\ncall chain, innermost first:";
+        for (const ChainEntry& entry : chain)
+        {
+            message << "\n  " << entry.name;
+            if (entry.count > 1)
+                message << " (" << entry.count << " frames)";
+        }
+        if (omittedFrames)
+            message << "\n  ... " << omittedFrames << " more frames";
+        fail(message.produceString().getBuffer());
+    }
+
     /// Copies a parameter into a freshly zeroed frame and acquires its owning references.
     /// Both host invocations and VM calls use the staged parameter transfer description.
     void initializeParameter(
-        uint32_t frameOffset,
+        uint8_t* frame,
         const StagedRecord::Parameter& parameter,
         const void* source)
     {
         SLANG_ASSERT(parameter.header.resultAddress.getKind() == AddressKind::FrameRelative);
-        uint64_t offset = frameOffset + parameter.header.resultAddress.getUnsignedPayload();
-        SLANG_ASSERT(offset < kFramePayloadLimit);
-        Address destination = Address::makeAbsoluteFrame(uint32_t(offset));
+        Address destination =
+            Address::fromNativePointer(frame + parameter.header.resultAddress.getUnsignedPayload());
         auto storage = resolveAddress<uint8_t>(destination, parameter.transferByteSize);
         std::memcpy(storage.get(), source, parameter.transferByteSize);
         for (uint32_t leafOffset : parameter.getManagedLeafOffsets())
@@ -11239,38 +11376,21 @@ struct InterpreterState
             callee.frameAlignment && !(callee.frameAlignment & (callee.frameAlignment - 1)));
         SLANG_ASSERT(callee.frameAlignment <= kStorageBaseAlignment);
 
-        uint32_t callerStackTop = uint32_t(stack.getCount());
-        uint64_t calleeFrameOffset = (uint64_t(callerStackTop) + callee.frameAlignment - 1) &
-                                     ~uint64_t(callee.frameAlignment - 1);
-        uint64_t calleeStackTop = calleeFrameOffset + callee.frameSize;
-        if (calleeStackTop >= kFramePayloadLimit ||
-            calleeStackTop > std::numeric_limits<Index>::max())
-        {
-            fail("HGVM call stack exceeds its address limit");
-        }
-
-        uint32_t returnProgramCounter = programCounter + header.recordWordCount;
-        Address returnDestinationAddress;
-        if (record.header.resultAddress.value)
-            returnDestinationAddress = getAbsoluteFrameAddress(record.header.resultAddress);
-
-        // Grow before resolving any caller or callee stack address because List growth can move
-        // its native allocation. Geometric capacity growth avoids reallocating the complete stack
-        // at every newly reached call depth. All staged logical addresses remain valid across a
-        // move, and the explicit memset below initializes only the active callee frame.
-        stack.growToCount(Index(calleeStackTop));
-        std::memset(stack.getBuffer() + size_t(calleeFrameOffset), 0, callee.frameSize);
+        uint8_t* callerStackTop = frameStack->getTop();
+        uint8_t* calleeFrame = frameStack->push(callee.frameSize, callee.frameAlignment);
+        if (!calleeFrame)
+            failStackOverflow(record.functionAddress);
+        std::memset(calleeFrame, 0, callee.frameSize);
 
         FrameHeader calleeHeader;
-        calleeHeader.callerFrameOffset = currentFrameOffset;
+        calleeHeader.callerFrame = currentFrame;
         calleeHeader.previousStackTop = callerStackTop;
-        calleeHeader.returnProgramCounter = returnProgramCounter;
+        calleeHeader.returnProgramCounter = programCounter + header.recordWordCount;
         calleeHeader.callerFunctionAddress = functionAddress;
-        calleeHeader.returnDestinationAddress = returnDestinationAddress;
-        std::memcpy(
-            stack.getBuffer() + size_t(calleeFrameOffset),
-            &calleeHeader,
-            sizeof(calleeHeader));
+        if (record.header.resultAddress.value)
+            calleeHeader.returnDestinationAddress =
+                getNativeFrameAddress(record.header.resultAddress);
+        std::memcpy(calleeFrame, &calleeHeader, sizeof(calleeHeader));
 
         const StagedRecord::Parameter* parameterPointer = callee.getFirstParameter();
         for (uint32_t parameterIndex = 0; parameterIndex < callee.parameterCount; ++parameterIndex)
@@ -11282,12 +11402,12 @@ struct InterpreterState
                 StagedRecord::getRecordWordCount<StagedRecord::Parameter>());
             auto source =
                 resolveAddress<const uint8_t>(argumentAddress, parameter.transferByteSize);
-            initializeParameter(uint32_t(calleeFrameOffset), parameter, source.get());
+            initializeParameter(calleeFrame, parameter, source.get());
             if (parameterIndex + 1 < callee.parameterCount)
                 parameterPointer = parameter.getNext();
         }
 
-        currentFrameOffset = uint32_t(calleeFrameOffset);
+        currentFrame = calleeFrame;
         if (debugHandler)
             enterDebugCall(
                 {program->debugMap->getProgramId(), programCounter},
@@ -11370,23 +11490,22 @@ struct InterpreterState
                 header.recordWordCount ==
                 StagedRecord::getRecordWordCount<StagedRecord::FinishFrameExit>());
             {
-                FrameHeader frame =
-                    readValue<FrameHeader>(Address::makeAbsoluteFrame(currentFrameOffset));
-                SLANG_ASSERT(Index(frame.previousStackTop) <= stack.getCount());
-                stack.unsafeShrinkToCount(Index(frame.previousStackTop));
+                FrameHeader frame;
+                std::memcpy(&frame, currentFrame, sizeof(frame));
+                frameStack->popTo(frame.previousStackTop);
                 if (debugHandler)
                 {
                     debugHandler->onFunctionExit();
                     debugCalls.removeLast();
                 }
-                if (frame.callerFrameOffset == kInvalidStackOffset)
+                if (!frame.callerFrame)
                 {
                     if (isUnwindingFailure && !cancelled)
                         throw Exception(failureMessage.getBuffer());
                     status = Status::Completed;
                     return;
                 }
-                currentFrameOffset = frame.callerFrameOffset;
+                currentFrame = frame.callerFrame;
                 functionAddress = frame.callerFunctionAddress;
                 if (isUnwindingFailure)
                 {
@@ -13168,6 +13287,33 @@ SlangResult Value::getScalarData(ScalarType type, void* destination, size_t size
     return SLANG_OK;
 }
 
+/// Owns the execution resources of one thread of HGVM execution.
+///
+/// Consider a host that calls `main` and later `update`: both invocations run on the same context,
+/// push their frames on its `FrameStack`, and record themselves as its active invocation while
+/// they run. Keeping this state in a context rather than in the interpreter lets each thread own
+/// a context of its own once the VM runs on several threads; today the interpreter has one.
+struct ExecutionContext
+{
+    /// Returns the context's frame stack, creating it on first use.
+    FrameStack& getFrameStack()
+    {
+        if (!frameStack)
+            frameStack =
+                createFrameStack(frameStackKind, frameStackByteLimit, frameStackSegmentSize);
+        return *frameStack;
+    }
+
+    FrameStackKind frameStackKind = FrameStackKind::Default;
+    size_t frameStackByteLimit = 0;
+    size_t frameStackSegmentSize = 0;
+    std::unique_ptr<FrameStack> frameStack;
+
+    /// The invocation currently executing on this context, or null between invocations. Debugger
+    /// queries made from a stopped callback inspect this invocation.
+    InterpreterState* activeState = nullptr;
+};
+
 /// Owns staged programs and the services shared by sequential HGVM invocations.
 ///
 /// For example, the second invocation of the same source `main` finds its `Program*` in `programs`
@@ -13176,7 +13322,7 @@ struct InterpreterCore::Impl
 {
     RefPtr<VMControlBlock> lifetime = new VMControlBlock;
     RefPtr<SharedStagingContext> staging = new SharedStagingContext;
-    InterpreterState* activeState = nullptr;
+    ExecutionContext mainContext;
     uint64_t nextDebugCallId = 0;
     IStepControl* stepControl = nullptr;
     IDebugHandler* debugHandler = nullptr;
@@ -13252,6 +13398,9 @@ InterpreterCore::InterpreterCore(const Desc& desc)
     m_impl->hostServices = desc.hostServices;
     m_impl->deviceState.synchronousGPUOperations =
         desc.gpuExecution == GPUExecutionMode::Synchronous;
+    m_impl->mainContext.frameStackKind = desc.frameStackKind;
+    m_impl->mainContext.frameStackByteLimit = desc.frameStackByteLimit;
+    m_impl->mainContext.frameStackSegmentSize = desc.frameStackSegmentSize;
 #if SLANG_ENABLE_HGVM_EVENT_TRACKING
     m_impl->deviceState.eventTracker =
         new EventTracker(desc.enableEventTracking, desc.eventSink, desc.device, this);
@@ -13549,7 +13698,8 @@ SlangResult InterpreterCore::execute(
     ConstArrayView<uint32_t> resultManagedLeafOffsets,
     String& outError)
 {
-    if (m_impl->activeState)
+    ExecutionContext& executionContext = m_impl->mainContext;
+    if (executionContext.activeState)
     {
         outError = "HGVM does not support reentrant invocation";
         return SLANG_FAIL;
@@ -13560,14 +13710,25 @@ SlangResult InterpreterCore::execute(
         RefPtr<ProgramInstance> programInstance = static_cast<ProgramInstance*>(context);
         RefPtr<StagedProgram> program = programInstance->program;
 
+        // Every frame this invocation pushes is popped when it ends, including on failure, so
+        // the context's stack is empty again for the next invocation.
+        FrameStack& frameStack = executionContext.getFrameStack();
+        struct FrameStackScope
+        {
+            FrameStack& stack;
+            uint8_t* top;
+            ~FrameStackScope() { stack.popTo(top); }
+        } frameStackScope{frameStack, frameStack.getTop()};
+
         InterpreterState state;
         // Keep the borrowed execution state valid only inside this synchronous invocation.
         struct ActiveStateScope
         {
             InterpreterState*& active;
             ~ActiveStateScope() { active = nullptr; }
-        } activeScope{m_impl->activeState};
-        m_impl->activeState = &state;
+        } activeScope{executionContext.activeState};
+        executionContext.activeState = &state;
+        state.frameStack = &frameStack;
         state.program = program;
         state.programInstance = programInstance;
         state.outputSink = m_impl->outputSink;
@@ -13582,31 +13743,37 @@ SlangResult InterpreterCore::execute(
         const auto& functionRecord = state.readRecord<StagedRecord::Function>(
             uint32_t(state.functionAddress.getUnsignedPayload()));
 
-        // The host owns a result slot before the root frame. Normal return lowering writes
-        // through rootHeader.returnDestinationAddress, and normal frame exit preserves the prefix.
-        // Logical frame addresses remain valid even if a nested call reallocates the stack.
+        // The host owns a result slot pushed before the root frame. Normal return lowering writes
+        // through rootHeader.returnDestinationAddress, and normal frame exit preserves the slot.
         SLANG_RELEASE_ASSERT(functionRecord.frameAlignment <= kStorageBaseAlignment);
         SLANG_RELEASE_ASSERT(functionRecord.frameSize >= sizeof(FrameHeader));
-        uint64_t prefixSize = (uint64_t(result.size) + functionRecord.frameAlignment - 1) &
-                              ~uint64_t(functionRecord.frameAlignment - 1);
-        if (prefixSize >= kFramePayloadLimit)
-            fail("HGVM call result exceeds its address limit");
-        uint32_t rootOffset = uint32_t(prefixSize);
-        uint64_t stackSize = prefixSize + functionRecord.frameSize;
-        if (stackSize >= kFramePayloadLimit || stackSize > std::numeric_limits<Index>::max())
-            fail("HGVM call stack exceeds its address limit");
-        state.stack.setCount(Index(stackSize));
-        std::memset(state.stack.getBuffer(), 0, size_t(stackSize));
+        uint8_t* resultSlot = nullptr;
+        if (result.size)
+        {
+            resultSlot = frameStack.push(result.size, kStorageBaseAlignment);
+            if (!resultSlot)
+                fail("HGVM call result exceeds the frame stack limit");
+            std::memset(resultSlot, 0, result.size);
+        }
+        uint8_t* rootStackTop = frameStack.getTop();
+        uint8_t* rootFrame =
+            frameStack.push(functionRecord.frameSize, functionRecord.frameAlignment);
+        if (!rootFrame)
+            fail("HGVM root frame exceeds the frame stack limit");
+        std::memset(rootFrame, 0, functionRecord.frameSize);
 
-        // Ordinary return lowering owns this prefix before the root frame exits. Keep it
+        // Ordinary return lowering owns the result slot before the root frame exits. Keep it
         // guarded through backend submission as well: a late failure must release the result.
-        // Resolve its bytes at cleanup because nested calls may grow and relocate the stack.
         struct RootResultScope
         {
-            InterpreterState& state;
+            uint8_t* slot;
             ConstArrayView<uint32_t> offsets;
-            ~RootResultScope() { releaseManagedFields(state.stack.getBuffer(), offsets); }
-        } rootResult{state, resultManagedLeafOffsets};
+            ~RootResultScope()
+            {
+                if (slot)
+                    releaseManagedFields(slot, offsets);
+            }
+        } rootResult{resultSlot, resultManagedLeafOffsets};
 
         // A graphics definition is independent of host resources and branches. Prepare every
         // specialization before the first host instruction, including the binding converters.
@@ -13628,17 +13795,17 @@ SlangResult InterpreterCore::execute(
             }
 
         FrameHeader rootHeader;
-        rootHeader.previousStackTop = rootOffset;
-        if (result.size)
-            rootHeader.returnDestinationAddress = Address::makeAbsoluteFrame(0);
-        std::memcpy(state.stack.getBuffer() + rootOffset, &rootHeader, sizeof(rootHeader));
-        state.currentFrameOffset = rootOffset;
+        rootHeader.previousStackTop = rootStackTop;
+        if (resultSlot)
+            rootHeader.returnDestinationAddress = Address::fromNativePointer(resultSlot);
+        std::memcpy(rootFrame, &rootHeader, sizeof(rootHeader));
+        state.currentFrame = rootFrame;
         SLANG_RELEASE_ASSERT(functionRecord.parameterCount == arguments.getCount());
         const auto* parameter = functionRecord.getFirstParameter();
         for (Index i = 0; i < arguments.getCount(); ++i)
         {
             SLANG_RELEASE_ASSERT(parameter->transferByteSize == arguments[i].size);
-            state.initializeParameter(rootOffset, *parameter, arguments[i].data);
+            state.initializeParameter(rootFrame, *parameter, arguments[i].data);
             if (i + 1 < arguments.getCount())
                 parameter = parameter->getNext();
         }
@@ -13661,8 +13828,8 @@ SlangResult InterpreterCore::execute(
         {
             // Move the root slot's owning references into the already allocated native value.
             // No retain is needed: clearing the source transfers, rather than duplicates, them.
-            std::memcpy(result.data, state.stack.getBuffer(), result.size);
-            std::memset(state.stack.getBuffer(), 0, result.size);
+            std::memcpy(result.data, resultSlot, result.size);
+            std::memset(resultSlot, 0, result.size);
         }
         return SLANG_OK;
     }
@@ -13697,8 +13864,8 @@ bool InterpreterCore::readDebugMemory(
     void* data,
     uint32_t size)
 {
-    return m_impl && m_impl->activeState &&
-           m_impl->activeState->readDebugMemory(call, address, offset, data, size);
+    return m_impl && m_impl->mainContext.activeState &&
+           m_impl->mainContext.activeState->readDebugMemory(call, address, offset, data, size);
 }
 
 bool InterpreterCore::getDebugObject(
@@ -13708,7 +13875,7 @@ bool InterpreterCore::getDebugObject(
     Address& data,
     uint32_t& count)
 {
-    auto state = m_impl ? m_impl->activeState : nullptr;
+    auto state = m_impl ? m_impl->mainContext.activeState : nullptr;
     auto object = state ? state->findDebugObject(call, address) : nullptr;
     if (!object)
         return false;
@@ -13727,7 +13894,7 @@ bool InterpreterCore::getDebugObject(
         auto array = static_cast<RuntimeArrayObject*>(object);
         if (!state->findLocalType(array->typeAddress, type))
             return false;
-        data = Address::fromHeapPointer(array->payload);
+        data = Address::fromNativePointer(array->payload);
         count = array->elementCount;
         return true;
     }
@@ -13736,7 +13903,7 @@ bool InterpreterCore::getDebugObject(
         auto box = static_cast<BoxObject*>(object);
         if (!state->findLocalType(box->payloadTypeAddress, type))
             return false;
-        data = Address::fromHeapPointer(box->payload);
+        data = Address::fromNativePointer(box->payload);
         count = 0;
         return true;
     }
@@ -13745,7 +13912,7 @@ bool InterpreterCore::getDebugObject(
 
 bool InterpreterCore::getDebugBufferInfo(DebugCallId call, Address object, DebugBufferInfo& info)
 {
-    auto state = m_impl ? m_impl->activeState : nullptr;
+    auto state = m_impl ? m_impl->mainContext.activeState : nullptr;
     return state && state->getDebugBufferInfo(call, object, info);
 }
 
@@ -13761,7 +13928,7 @@ SlangResult InterpreterCore::readDebugBufferElements(
     error = {};
     try
     {
-        auto state = m_impl ? m_impl->activeState : nullptr;
+        auto state = m_impl ? m_impl->mainContext.activeState : nullptr;
         if (!state)
             fail("Buffer inspection requires stopped execution.");
         state->readDebugBufferElements(call, object, start, count, bytes);
@@ -13777,7 +13944,7 @@ SlangResult InterpreterCore::readDebugBufferElements(
 
 bool InterpreterCore::getDebugTextureInfo(DebugCallId call, Address address, TextureInfo& info)
 {
-    auto state = m_impl ? m_impl->activeState : nullptr;
+    auto state = m_impl ? m_impl->mainContext.activeState : nullptr;
     auto object = state ? state->findDebugObject(call, address) : nullptr;
     if (!object || object->kind != HeapObjectKind::Texture2D)
         return false;
@@ -13795,7 +13962,7 @@ SlangResult InterpreterCore::exportDebugTextureMip(
     error = {};
     try
     {
-        auto state = m_impl ? m_impl->activeState : nullptr;
+        auto state = m_impl ? m_impl->mainContext.activeState : nullptr;
         auto object = state ? state->findDebugObject(call, address) : nullptr;
         if (!object || object->kind != HeapObjectKind::Texture2D)
             fail("Cannot read this texture (null or no longer live).");
@@ -13821,7 +13988,7 @@ bool InterpreterCore::getDebugObjectProperties(
     List<DebugObjectProperty>& properties)
 {
     properties.clear();
-    auto state = m_impl ? m_impl->activeState : nullptr;
+    auto state = m_impl ? m_impl->mainContext.activeState : nullptr;
     auto object = state ? state->findDebugObject(call, address) : nullptr;
     if (!object || object->kind != expectedKind)
         return false;
@@ -13896,7 +14063,7 @@ bool InterpreterCore::readDebugString(
     uint32_t offset,
     String& text)
 {
-    auto state = m_impl ? m_impl->activeState : nullptr;
+    auto state = m_impl ? m_impl->mainContext.activeState : nullptr;
     StringValue value;
     if (!state || !state->readDebugMemory(call, address, offset, &value, sizeof(value)))
         return false;
@@ -13908,7 +14075,7 @@ bool InterpreterCore::readDebugString(
         if (!object || object->kind != HeapObjectKind::String)
             return false;
         const auto& string = static_cast<StringObject*>(object)->bytes;
-        bytes = Address::fromHeapPointer(const_cast<char*>(string.data()));
+        bytes = Address::fromNativePointer(const_cast<char*>(string.data()));
         count = uint32_t(string.size());
     }
     char buffer[256];

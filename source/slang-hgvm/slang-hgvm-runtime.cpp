@@ -36,6 +36,9 @@ InterpreterCore::Desc makeInterpreterCoreDesc(const Desc& desc)
     result.eventSink = desc.eventSink;
     result.stepControl = desc.stepControl;
     result.debugHandler = desc.debugHandler;
+    result.frameStackKind = desc.frameStackKind;
+    result.frameStackByteLimit = desc.frameStackByteLimit;
+    result.frameStackSegmentSize = desc.frameStackSegmentSize;
     return result;
 }
 

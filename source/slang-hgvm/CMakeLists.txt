@@ -40,6 +40,8 @@ slang_add_target(
         ${CMAKE_CURRENT_SOURCE_DIR}/slang-hgvm.h
         ${CMAKE_CURRENT_SOURCE_DIR}/slang-hgvm-resource.h
         ${CMAKE_CURRENT_SOURCE_DIR}/slang-hgvm-buffer-pool.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/slang-hgvm-frame-stack.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/slang-hgvm-frame-stack.h
         ${CMAKE_CURRENT_SOURCE_DIR}/slang-hgvm-interpreter.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/slang-hgvm-interpreter.h
         ${CMAKE_CURRENT_SOURCE_DIR}/slang-hgvm-types.h

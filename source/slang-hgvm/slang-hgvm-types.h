@@ -5,7 +5,9 @@
 #include "slang-hgvm-events.h"
 #include "slang-hgvm-invocation.h"
 
+#include <cstddef>
 #include <limits>
+#include <type_traits>
 
 namespace Slang::HGVM
 {
@@ -19,18 +21,20 @@ static constexpr uint32_t kInvalidInstructionWordOffset = 0xffffffffu;
 
 struct HeapObject;
 
-/// Identifies which interpreter-owned storage contains a logical address.
+/// Identifies how the payload of an `Address` locates its bytes.
 ///
+/// `Native` is the only kind a program value of an address type (`Ptr`, `Out`, `InOut`, `Ref`,
+/// `BorrowIn`) may have: its payload is a raw host address that stays valid for the lifetime of
+/// the storage it names. The other kinds appear only as staged operands and internal VM handles.
 /// Consider `absoluteInstruction(12)`: its kind is `InstructionAbsolute`, and its payload names
-/// word 12 in the VM's shared staging storage rather than a native C++ pointer.
+/// word 12 in the VM's shared staging storage rather than a host pointer.
 enum class AddressKind : uint8_t
 {
-    Heap = 0x00,
+    Native = 0x00,
     FrameRelative = 0x01,
-    FrameAbsolute = 0x02,
-    ConstHeap = 0x03,
-    InstructionRelative = 0x04,
-    InstructionAbsolute = 0x05,
+    ConstHeap = 0x02,
+    InstructionRelative = 0x03,
+    InstructionAbsolute = 0x04,
     Invalid = 0xfe,
     Forbidden = 0xff,
 };
@@ -38,20 +42,19 @@ enum class AddressKind : uint8_t
 /// Stores one logical interpreter address with its address space in the high byte.
 ///
 /// For example, `Address::makeAbsoluteInstruction(12)` stores the instruction tag in bits 63:56
-/// and word offset 12 in bits 55:0. A heap address instead has a zero tag and stores the complete
-/// supported native user pointer in the payload.
+/// and word offset 12 in bits 55:0. A native address instead has a zero tag and stores the
+/// complete host pointer in the payload, so its eight bytes equal the pointer value itself.
 struct Address
 {
     uint64_t value = 0;
 
     enum class Tag : uint8_t
     {
-        Heap = 0x00,
+        Native = 0x00,
         FrameRelative = 0x01,
-        FrameAbsolute = 0x02,
-        ConstHeap = 0x03,
-        InstructionRelative = 0x04,
-        InstructionAbsolute = 0x05,
+        ConstHeap = 0x02,
+        InstructionRelative = 0x03,
+        InstructionAbsolute = 0x04,
         Forbidden = 0xff,
     };
 
@@ -61,17 +64,6 @@ struct Address
         Address result;
         result.value = (uint64_t(tag) << kAddressTagShift) | payload;
         return result;
-    }
-
-    /// Encodes an absolute byte offset in the frame stack.
-    ///
-    /// For example, a local whose backing storage starts at stack byte 40 stores 40 below the
-    /// `FrameAbsolute` tag. Passing the resulting eight-byte value to another function preserves
-    /// which caller stack bytes it addresses.
-    static Address makeAbsoluteFrame(uint32_t byteOffset)
-    {
-        SLANG_ASSERT(byteOffset < kFramePayloadLimit);
-        return makeTagged(Tag::FrameAbsolute, byteOffset);
     }
 
     /// Encodes an absolute instruction-stack word address when it fits the staged 32-bit offset.
@@ -87,6 +79,8 @@ struct Address
     ///
     /// For example, a scalar slot at byte offset 24 stores 24 below the `FrameRelative` tag; a
     /// callee can use the same embedded value because resolution adds that callee's frame base.
+    /// Only staged operands use this form; a program value that names frame storage is the
+    /// `Native` address of the frame base plus the offset.
     static Address makeRelativeFrame(uint32_t byteOffset)
     {
         SLANG_ASSERT(byteOffset < kFramePayloadLimit);
@@ -104,24 +98,24 @@ struct Address
         return makeTagged(Tag::ConstHeap, byteOffset);
     }
 
-    /// Encodes one heap pointer after proving that its high byte is available for HGVM's tag.
+    /// Encodes one raw host address after proving that its high byte is available for the tag.
     ///
     /// The check is deliberately performed before masking. Architectures or allocator modes that
-    /// return tagged pointers must fail here instead of silently changing the native address.
-    static Address fromHeapPointer(void* pointer)
+    /// return tagged pointers must fail here instead of silently changing the host address.
+    static Address fromNativePointer(const void* pointer)
     {
         static_assert(sizeof(uintptr_t) <= sizeof(uint64_t));
         uint64_t rawPointer = uint64_t(reinterpret_cast<uintptr_t>(pointer));
         SLANG_RELEASE_ASSERT((rawPointer & ~kAddressPayloadMask) == 0);
-        return makeTagged(Tag::Heap, rawPointer);
+        return makeTagged(Tag::Native, rawPointer);
     }
 
-    static Address fromObject(HeapObject* object) { return fromHeapPointer(object); }
+    static Address fromObject(HeapObject* object) { return fromNativePointer(object); }
 
     /// Decodes the address-space tag without inspecting the addressed value.
     ///
-    /// For example, both frame tags select stack storage, while their distinct high-byte values
-    /// determine whether the current frame base must be added.
+    /// For example, a staged `FrameRelative` operand needs the current frame base added, while a
+    /// `Native` address already is the host pointer.
     SLANG_FORCE_INLINE AddressKind getKind() const
     {
         if (!value)
@@ -154,50 +148,66 @@ struct Address
         return int32_t(int64_t(payload));
     }
 
-    /// Returns the native heap pointer without changing its ownership.
-    void* getHeapPointer() const
+    /// Returns the raw host pointer without changing the ownership of what it names.
+    void* getNativePointer() const
     {
-        SLANG_ASSERT(getKind() == AddressKind::Heap);
+        SLANG_ASSERT(getKind() == AddressKind::Native);
         return reinterpret_cast<void*>(uintptr_t(getUnsignedPayload()));
     }
 
-    HeapObject* getObject() const { return static_cast<HeapObject*>(getHeapPointer()); }
+    HeapObject* getObject() const { return static_cast<HeapObject*>(getNativePointer()); }
 
     explicit operator bool() const { return value != 0; }
 
-    /// Adds a byte displacement without changing the address space or relative/absolute tag.
+    /// Adds a byte displacement without changing the address kind.
     ///
-    /// Consider an absolute-frame address for `value` and a staged field offset of eight bytes:
-    /// this returns the absolute-frame address for `value.field`. Class field access uses the same
-    /// operation on its heap payload. Instruction-stack addresses remain word-addressed, so their
-    /// byte displacements are passed separately to `resolveAddressAt`.
+    /// Consider a native address for `value` and a staged field offset of eight bytes: this
+    /// returns the native address for `value.field`, whether `value` lives in a frame, a class
+    /// object, or any other host storage. A staged frame-relative cleanup operand stays
+    /// frame-relative. Instruction-stack addresses remain word-addressed, so their byte
+    /// displacements are passed separately to `resolveAddressAt`.
     Address addByteOffset(uint32_t byteOffset) const
     {
         AddressKind kind = getKind();
-        if (kind == AddressKind::Heap)
+        if (kind == AddressKind::Native)
         {
-            uint8_t* pointer = static_cast<uint8_t*>(getHeapPointer());
-            return fromHeapPointer(pointer + byteOffset);
+            uint8_t* pointer = static_cast<uint8_t*>(getNativePointer());
+            return fromNativePointer(pointer + byteOffset);
         }
-        SLANG_ASSERT(kind == AddressKind::FrameRelative || kind == AddressKind::FrameAbsolute);
+        SLANG_ASSERT(kind == AddressKind::FrameRelative);
         uint64_t payload = getUnsignedPayload();
         SLANG_RELEASE_ASSERT(byteOffset <= kAddressPayloadMask - payload);
-        return makeTagged(
-            kind == AddressKind::FrameRelative ? Tag::FrameRelative : Tag::FrameAbsolute,
-            payload + byteOffset);
+        return makeTagged(Tag::FrameRelative, payload + byteOffset);
     }
 };
 
 static_assert(sizeof(Address) == sizeof(uint64_t));
-static_assert(uint8_t(AddressKind::Heap) == uint8_t(Address::Tag::Heap));
+static_assert(uint8_t(AddressKind::Native) == uint8_t(Address::Tag::Native));
 static_assert(uint8_t(AddressKind::FrameRelative) == uint8_t(Address::Tag::FrameRelative));
-static_assert(uint8_t(AddressKind::FrameAbsolute) == uint8_t(Address::Tag::FrameAbsolute));
 static_assert(uint8_t(AddressKind::ConstHeap) == uint8_t(Address::Tag::ConstHeap));
 static_assert(
     uint8_t(AddressKind::InstructionRelative) == uint8_t(Address::Tag::InstructionRelative));
 static_assert(
     uint8_t(AddressKind::InstructionAbsolute) == uint8_t(Address::Tag::InstructionAbsolute));
 static_assert(uint8_t(AddressKind::Forbidden) == uint8_t(Address::Tag::Forbidden));
+
+/// Stores the fixed-width interpreter representation of every source-language `String`.
+///
+/// Consider the literal `"hello"`: `literalBytes` is the native address of five NUL-terminated
+/// bytes in the program's literal segment, `byteCount` is five, and `owner` is null. The result
+/// of `format("{}", value)` instead leaves `literalBytes` invalid and owns a `StringObject`.
+/// Keeping both cases in the same trivial value lets calls, returns, aggregate construction,
+/// loads, and stores copy exactly 24 bytes.
+struct StringValue
+{
+    Address literalBytes;
+    uint32_t byteCount = 0;
+    Address owner;
+};
+
+static_assert(sizeof(StringValue) == 24);
+static_assert(offsetof(StringValue, owner) == 16);
+static_assert(std::is_trivially_copyable_v<StringValue>);
 
 /// Identifies the concrete interpreter object behind a heap `Address` without C++ RTTI.
 ///

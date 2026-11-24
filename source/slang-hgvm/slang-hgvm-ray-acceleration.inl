@@ -114,7 +114,7 @@ void DeviceState::buildRayAccelerationStructure(
         for (uint32_t i = 0; i < inputs->elementCount; ++i)
         {
             Address input =
-                Address::fromHeapPointer(inputs->payload + i * inputs->elementByteStride);
+                Address::fromNativePointer(inputs->payload + i * inputs->elementByteStride);
             if (!interpreter.readValueAt<Address>(input, record.fieldOffsets[0]))
                 fail(
                     "HGVM ray scene instances require a built bottom-level acceleration structure");
@@ -183,7 +183,7 @@ void DeviceState::buildRayAccelerationStructure(
         for (uint32_t i = 0; i < inputs->elementCount; ++i)
         {
             Address input =
-                Address::fromHeapPointer(inputs->payload + i * inputs->elementByteStride);
+                Address::fromNativePointer(inputs->payload + i * inputs->elementByteStride);
             if (record.inputKind == HGBCAccelerationStructureInputKind::AABBs)
             {
                 if (!interpreter.readValueAt<Address>(input, record.fieldOffsets[0]))

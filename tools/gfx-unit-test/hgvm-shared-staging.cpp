@@ -3,6 +3,8 @@
 #include "slang-hgvm/slang-hgvm-interpreter.h"
 #include "slang-hgvm/slang-hgvm-staged-records.h"
 
+#include <cstring>
+
 using namespace Slang;
 using namespace Slang::HGVM;
 
@@ -292,4 +294,77 @@ SLANG_UNIT_TEST(hgvmSharedStagingRejectsConflictingDefinition)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(scalar.getScalarData(ScalarType::Int32, &number, sizeof(number), error)));
     SLANG_CHECK(number == 42);
+}
+
+namespace
+{
+/// Returns the staged `StringValue` printed by the first `print` of a string in `programId`.
+const StringValue* findPrintedString(InterpreterCore& interpreter, uint64_t programId)
+{
+    for (const auto& function : interpreter.getDebugMap(programId)->getFunctions())
+    {
+        for (uint32_t pc = function.entry; pc < function.end;)
+        {
+            const auto* record = interpreter.getRecord({programId, pc});
+            if ((record->opcodeAndFlags & StagedRecord::kOpcodeMask) == uint32_t(HGBCOpcode::Print))
+            {
+                auto print = reinterpret_cast<const StagedRecord::Print*>(record);
+                if (print->kind == ValueKind::String)
+                {
+                    SLANG_CHECK_ABORT(
+                        print->valueAddress.getKind() == AddressKind::InstructionAbsolute);
+                    return reinterpret_cast<const StringValue*>(interpreter.getRecord(
+                        {programId, uint32_t(print->valueAddress.getUnsignedPayload())}));
+                }
+            }
+            pc += record->recordWordCount;
+        }
+    }
+    return nullptr;
+}
+} // namespace
+
+SLANG_UNIT_TEST(hgvmSharedStagingStableLiterals)
+{
+    // A string literal's bytes have a native address that survives staging another program, even
+    // though the instruction storage shared by both programs relocates while the second stages.
+    const char* literal = "stable literal";
+    auto first = compileHGVMTestProgram(
+        unitTestContext->slangGlobalSession,
+        R"([host] void main() { print("stable literal"); })",
+        SLANG_DEBUG_INFO_LEVEL_NONE,
+        "hgvm_stable_literal_first");
+    StringBuilder secondSource;
+    secondSource << "[host] void main()\n{\n";
+    for (int i = 0; i < 2000; ++i)
+        secondSource << "    print(\"filler literal number " << i
+                     << " that makes the shared instruction storage grow\");\n";
+    secondSource << "}\n";
+    auto second = compileHGVMTestProgram(
+        unitTestContext->slangGlobalSession,
+        secondSource.getBuffer(),
+        SLANG_DEBUG_INFO_LEVEL_NONE,
+        "hgvm_stable_literal_second");
+
+    InterpreterCore interpreter;
+    String error;
+    uint64_t firstId = 0, secondId = 0;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(interpreter.prepareProgram(first, firstId, error)));
+    const StringValue* before = findPrintedString(interpreter, firstId);
+    SLANG_CHECK_ABORT(before);
+    SLANG_CHECK_ABORT(before->literalBytes.getKind() == AddressKind::Native);
+    SLANG_CHECK_ABORT(before->byteCount == strlen(literal));
+    auto bytes = static_cast<const char*>(before->literalBytes.getNativePointer());
+    SLANG_CHECK(std::memcmp(bytes, literal, before->byteCount) == 0);
+    // Literal storage is NUL-terminated, so the bytes can be borrowed as a C string.
+    SLANG_CHECK(bytes[before->byteCount] == 0);
+    Address literalAddress = before->literalBytes;
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(interpreter.prepareProgram(second, secondId, error)));
+    const StringValue* after = findPrintedString(interpreter, firstId);
+    SLANG_CHECK_ABORT(after);
+    // The staged value moved with the instruction storage; the literal bytes did not.
+    SLANG_CHECK(after != before);
+    SLANG_CHECK(after->literalBytes.value == literalAddress.value);
+    SLANG_CHECK(std::memcmp(bytes, literal, strlen(literal) + 1) == 0);
 }
