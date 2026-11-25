@@ -35,7 +35,7 @@
 // XOPT-NOT: OpName
 
 // Without `-incomplete-library`, the unresolved extern is still an error.
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=NOLIB): -target spirv -entry mainLoop -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=NOLIB,exit-code=2): -target spirv -entry mainLoop -stage compute
 // NOLIB: error[E45001]: unresolved external symbol
 
 // CHECK: OpCapability Linkage
