@@ -426,56 +426,16 @@ IRInst* NativeCallMarshallingContext::marshalNativeCall(
         auto paramType = originalFuncType->getParamType(i);
         marshalManagedValueToNativeValue(builder, paramType, originalArgs[i], args);
     }
-    IRType* originalReturnType = originalFuncType->getResultType();
-
-    IRVar* resultVar = nullptr;
-    IRVar* errorVar = nullptr;
-    if (auto resultType = as<IRResultType>(originalReturnType))
-    {
-        // Declare a local variable to receive result.
-        resultVar = builder.emitVar(getNativeType(builder, resultType->getValueType()));
-        errorVar = builder.emitVar(getNativeType(builder, resultType->getErrorType()));
-        args.add(resultVar);
-        args.add(errorVar);
-    }
+    // `lowerErrorHandling` runs during lower-to-IR, so a `throws` function reaches this pass
+    // returning its lowered result struct rather than an `IRResultType`.
+    SLANG_ASSERT(!as<IRResultType>(originalFuncType->getResultType()));
 
     // Insert call.
     IRInst* call = builder.emitCallInst(nativeFuncType->getResultType(), nativeFunc, args);
 
     // TODO: marshal output/ref args back to original args.
 
-    IRInst* returnValue = call;
-
-    // Marshal result and out arguments back to managed values.
-    if (auto resultType = as<IRResultType>(originalReturnType))
-    {
-        auto val = builder.emitLoad(resultVar);
-        auto err = builder.emitLoad(errorVar);
-        auto tag = call;
-        val = marshalNativeValueToManagedValue(builder, val);
-        err = marshalNativeValueToManagedValue(builder, err);
-        auto intTag = tag;
-        if (tag->getDataType()->getOp() != kIROp_IntType)
-        {
-            intTag = builder.emitCast(builder.getIntType(), tag);
-        }
-        auto tagIsError = builder.emitLess(intTag, builder.getIntValue(builder.getIntType(), 0));
-        IRBlock *trueBlock, *falseBlock, *afterBlock;
-        builder.emitIfElseWithBlocks(tagIsError, trueBlock, falseBlock, afterBlock);
-        builder.setInsertInto(trueBlock);
-        returnValue = builder.emitMakeResultError(resultType, err);
-        builder.emitBranch(afterBlock, 1, &returnValue);
-        builder.setInsertInto(falseBlock);
-        returnValue = builder.emitMakeResultValue(resultType, val);
-        builder.emitBranch(afterBlock, 1, &returnValue);
-        builder.setInsertInto(afterBlock);
-        returnValue = builder.emitParam(resultType);
-    }
-    else
-    {
-        returnValue = marshalNativeValueToManagedValue(builder, call);
-    }
-    return returnValue;
+    return marshalNativeValueToManagedValue(builder, call);
 }
 
 } // namespace Slang

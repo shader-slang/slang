@@ -5505,17 +5505,10 @@ void CLikeSourceEmitter::ensureGlobalInst(
     {
         if (ctx->openInsts.contains(inst))
         {
-            // A self-referential type such as `struct Node { Node* next; }` can be reached
-            // through `Node*` first, for example from a function signature. Defining that pointer
-            // type requires `Node`, and `Node`'s field then reaches the still-open `Node*` again.
-            // Inside `Node`'s definition the pointer needs only the name `Node`, which the
-            // definition itself declares, so this is not a real cycle. (`ensureInstOperandsRec`
-            // handles the opposite order, where `Node` is opened before `Node*`.)
-            if (auto ptrType = as<IRPtrType>(inst);
-                ptrType && ctx->openInsts.contains(ptrType->getValueType()))
-            {
+            // An open pointer is reached again only from inside its pointee's definition, as in
+            // `struct Node { Node* next; }`, where `Node*` needs only the name `Node`.
+            if (as<IRPtrType>(inst))
                 return;
-            }
             SLANG_UNEXPECTED("circularity during codegen");
             return;
         }
