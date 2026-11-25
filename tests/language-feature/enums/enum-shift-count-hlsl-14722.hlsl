@@ -21,8 +21,8 @@ void computeMain()
 {
     outputBuffer[0] = Mask;
     outputBuffer[1] = 1024 >> Shift;
-    //HLSL: outputBuffer{{.*}} = 64;
-    //HLSL: outputBuffer{{.*}} = 16;
+    //HLSL: outputBuffer{{.*}} = 64L;
+    //HLSL: outputBuffer{{.*}} = 16L;
 }
 
 // CHECK: OpEntryPoint
