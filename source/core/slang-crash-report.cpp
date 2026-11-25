@@ -193,15 +193,37 @@ static void _appendReportHeading(CrashReportText& ioText)
                   "[report]\n");
 }
 
-/// Append the `slang`, `host`, `front-end` and `signature` lines that end every `[report]`
-/// part, then the `[stack]` part with one line for each frame of `stackTrace`.
+/// Append one `key: value` line of a breadcrumb, or `none` if the breadcrumb is not set.
+static void _appendBreadcrumb(
+    CrashReportText& ioText,
+    const char* paddedKey,
+    const CrashBreadcrumbText& text)
+{
+    ioText.append(paddedKey);
+    if (text.isSet() && text.length > 0)
+        ioText.appendSingleLine(text.chars, text.length < 128 ? text.length : 128);
+    else
+        ioText.append("none");
+    ioText.append("\n");
+}
+
+/// Append the breadcrumb lines and the `slang`, `host`, `front-end` and `signature` lines that
+/// end every `[report]` part, then the `[stack]` part with one line for each frame of
+/// `stackTrace`.
 static void _appendCommonFieldsAndStack(
+    const CrashBreadcrumbs* breadcrumbs,
     const char* slangVersion,
     const char* frontEnd,
     const char* signature,
     const StackTrace* stackTrace,
     CrashReportText& ioText)
 {
+    const CrashBreadcrumbs empty;
+    const CrashBreadcrumbs& crumbs = breadcrumbs ? *breadcrumbs : empty;
+    _appendBreadcrumb(ioText, "phase:       ", crumbs.phase);
+    _appendBreadcrumb(ioText, "pass:        ", crumbs.pass);
+    _appendBreadcrumb(ioText, "target:      ", crumbs.target);
+    _appendBreadcrumb(ioText, "stage:       ", crumbs.stage);
     _appendField(ioText, "slang:       ", slangVersion);
     _appendField(ioText, "host:        ", CrashReportUtil::getHostName());
     _appendField(ioText, "front-end:   ", frontEnd);
@@ -271,6 +293,7 @@ static void _appendDetailsAndHowToReport(
     _appendLocation(desc, ioText);
     ioText.append("\n");
     _appendCommonFieldsAndStack(
+        desc.breadcrumbs,
         desc.slangVersion,
         desc.frontEnd,
         signature.getBuffer(),
@@ -343,6 +366,7 @@ static bool _isSystemModule(const char* moduleName)
         ioText.append("\n");
     }
     _appendCommonFieldsAndStack(
+        desc.breadcrumbs,
         desc.slangVersion,
         desc.frontEnd,
         signature.getBuffer(),
@@ -373,6 +397,15 @@ static std::atomic<bool> g_areReportsEnabled{false};
 /* static */ bool CrashReportUtil::areReportsEnabled()
 {
     return g_areReportsEnabled.load();
+}
+
+// The function that reads the breadcrumbs of the crashing thread. Set at start-up, like the
+// other settings.
+static const CrashBreadcrumbs* (*g_breadcrumbSource)() = nullptr;
+
+/* static */ void CrashReportUtil::setBreadcrumbSource(const CrashBreadcrumbs* (*source)())
+{
+    g_breadcrumbSource = source;
 }
 
 // The directory that reports are saved in. Like the strings above, it is written at start-up,
@@ -483,6 +516,7 @@ static void _saveReportAndAppendPath(
         desc.sourceFile = record.file;
         desc.sourceLine = record.line;
         desc.stackTrace = record.stackTrace;
+        desc.breadcrumbs = record.breadcrumbs;
     }
 
     const int lengthBeforeReport = ioText.getLength();
@@ -518,6 +552,8 @@ static void _saveReportAndAppendPath(
     desc.slangVersion = g_slangVersion;
     desc.frontEnd = g_frontEnd;
     desc.stackTrace = &stackTrace;
+    desc.breadcrumbs =
+        g_breadcrumbSource ? g_breadcrumbSource() : &CrashBreadcrumbUtil::getCurrent();
 
     const int lengthBeforeReport = ioText.getLength();
     appendCrashReport(desc, ioText);

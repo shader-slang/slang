@@ -154,6 +154,7 @@ int MAIN(int argc, char** argv)
         // its settings live in that copy, apart from the library's.
         CrashHandler::install("slangc", spGetBuildTagString());
         CrashReportUtil::setReportDirectory(directory.getBuffer());
+        CrashReportUtil::setBreadcrumbSource(slang_getCrashBreadcrumbs);
     }
 
     auto stdWriters = StdWriters::initDefaultSingleton();

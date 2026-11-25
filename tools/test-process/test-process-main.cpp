@@ -1,5 +1,6 @@
 // test-process-main.cpp
 
+#include "core/slang-crash-breadcrumbs.h"
 #include "core/slang-crash-handler.h"
 #include "core/slang-crash-report.h"
 #include "core/slang-http.h"
@@ -95,6 +96,9 @@ static SLANG_TEST_PROCESS_NO_UBSAN SlangResult _crash(int argc, const char* cons
         return SLANG_E_NOT_AVAILABLE;
     if (argc > 3)
         CrashReportUtil::setReportDirectory(argv[3]);
+
+    // The report of a crash reads the breadcrumbs of the crashing thread from the handler.
+    CrashBreadcrumbScope phaseBreadcrumb(CrashBreadcrumbField::Phase, "test-crash");
 
     const UnownedStringSlice kind(argv[2]);
     if (kind == "segv")

@@ -423,6 +423,11 @@ SLANG_API void slang_setCrashReportDirectory(const char* directory)
     Slang::CrashReportUtil::setReportDirectory(directory);
 }
 
+SLANG_API const Slang::CrashBreadcrumbs* slang_getCrashBreadcrumbs()
+{
+    return &Slang::CrashBreadcrumbUtil::getCurrent();
+}
+
 SLANG_API void spDestroySession(SlangSession* inSession)
 {
     if (!inSession)

@@ -1,6 +1,7 @@
 #ifndef SLANG_INTERNAL_H_INCLUDED
 #define SLANG_INTERNAL_H_INCLUDED
 
+#include "core/slang-crash-breadcrumbs.h"
 #include "slang.h"
 
 namespace Slang
@@ -31,5 +32,10 @@ SLANG_API void slang_enableCrashReports(const char* frontEndName);
 /// `slang-report-<signature>.txt`, or pass null to save none. Nothing is saved by default.
 /// The path is UTF-8 and is copied.
 SLANG_API void slang_setCrashReportDirectory(const char* directory);
+
+/// Return the crash breadcrumbs of the calling thread, as the Slang library sets them: the
+/// phase, the IR pass, the target and the stage that the thread is working on. A crash handler
+/// in a program that links its own copy of `core` reads them through this function.
+SLANG_API const Slang::CrashBreadcrumbs* slang_getCrashBreadcrumbs();
 
 #endif

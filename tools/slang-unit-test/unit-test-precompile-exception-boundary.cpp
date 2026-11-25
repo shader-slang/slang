@@ -142,6 +142,10 @@ SLANG_UNIT_TEST(internalErrorEndsWithCrashReportWhenEnabled, NoRenderApi)
     SLANG_CHECK(report.indexOf(toSlice("\nsignal-type: unimplemented\n")) >= 0);
     SLANG_CHECK(report.indexOf(toSlice("\nlocation:    slang-")) >= 0);
     SLANG_CHECK(report.indexOf(toSlice("\nfront-end:   unit-test\n")) >= 0);
+
+    // The error was raised while the compiler generated code for SPIR-V, and the report says
+    // so, though the code that set the breadcrumb had already ended when the error was caught.
+    SLANG_CHECK(report.indexOf(toSlice("\ntarget:      spirv\n")) >= 0);
     SLANG_CHECK(report.indexOf(toSlice("\nsignature:   ice-")) >= 0);
 
     // The message can hold names from the user's code, so it appears in the `[details]` part.

@@ -1,5 +1,6 @@
 #include "slang-signal.h"
 
+#include "slang-crash-breadcrumbs.h"
 #include "slang-exception.h"
 #include "slang-stack-trace.h"
 #include "slang-test-tool-util.h"
@@ -28,6 +29,7 @@ struct LastSignal
     const char* file = nullptr;
     int line = 0;
     StackTrace stackTrace;
+    CrashBreadcrumbs breadcrumbs;
 };
 static thread_local LastSignal g_lastSignal;
 
@@ -173,6 +175,7 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
     g_lastSignal.file = file;
     g_lastSignal.line = line;
     StackTraceUtil::capture(1, g_lastSignal.stackTrace);
+    g_lastSignal.breadcrumbs = CrashBreadcrumbUtil::getCurrent();
     g_lastSignal.isValid = true;
 
     g_lastSignalMessage = _getMessage(type, message);
@@ -219,6 +222,7 @@ bool getLastSignalRecord(SignalRecord& outRecord)
     outRecord.file = g_lastSignal.file;
     outRecord.line = g_lastSignal.line;
     outRecord.stackTrace = &g_lastSignal.stackTrace;
+    outRecord.breadcrumbs = &g_lastSignal.breadcrumbs;
     return true;
 }
 

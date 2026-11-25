@@ -50,6 +50,7 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
 const char* getLastSignalMessage();
 
 struct StackTrace;
+struct CrashBreadcrumbs;
 
 /// What the calling thread's most recent internal error was raised with.
 struct SignalRecord
@@ -63,6 +64,11 @@ struct SignalRecord
     /// The call stack at the raise. It has no frames on a platform that cannot capture one.
     /// The trace belongs to the calling thread and stays valid until that thread raises again.
     const StackTrace* stackTrace;
+
+    /// The thread's crash breadcrumbs at the raise. The scopes that set them have ended by the
+    /// time a `catch` reads the record, so the record keeps a copy. Valid as long as
+    /// `stackTrace`.
+    const CrashBreadcrumbs* breadcrumbs;
 };
 
 /// Get the record of the calling thread's most recent internal error.

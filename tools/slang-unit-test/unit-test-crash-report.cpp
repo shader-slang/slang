@@ -127,6 +127,10 @@ SLANG_UNIT_TEST(crashReportInternalErrorFormat, NoRenderApi)
                 "kind:        internal-error\n"
                 "signal-type: unexpected\n"
                 "location:    slang-example.cpp:42\n"
+                "phase:       none\n"
+                "pass:        none\n"
+                "target:      none\n"
+                "stage:       none\n"
                 "slang:       2026.22.1\n"
                 "host:        "
              << CrashReportUtil::getHostName()
@@ -292,4 +296,37 @@ SLANG_UNIT_TEST(crashReportCrashFormat, NoRenderApi)
     CrashReportUtil::appendCrashSignature(abortDesc, abortSignature);
     SLANG_CHECK(strcmp(signature.getBuffer(), abortSignature.getBuffer()) != 0);
     SLANG_CHECK(strlen(signature.getBuffer()) == strlen("crash-") + 8);
+}
+
+SLANG_UNIT_TEST(crashReportBreadcrumbs, NoRenderApi)
+{
+    // Breadcrumbs print as names, and a breadcrumb whose text is a slice of a longer table
+    // entry prints only the slice.
+    static const char kTargets[] = "spirv,spirv-asm";
+    CrashBreadcrumbs breadcrumbs;
+    breadcrumbs.phase = {"emit", 4};
+    breadcrumbs.pass = {"legalizeVaryingParams", 21};
+    breadcrumbs.target = {kTargets, 5};
+
+    InternalErrorReportDesc desc;
+    desc.breadcrumbs = &breadcrumbs;
+    CrashReportText text;
+    CrashReportUtil::appendInternalErrorReport(desc, text);
+
+    const char* report = text.getBuffer();
+    SLANG_CHECK(
+        strstr(
+            report,
+            "\nphase:       emit\npass:        legalizeVaryingParams\ntarget:      spirv\n"
+            "stage:       none\n") != nullptr);
+
+    // Breadcrumbs are not part of the signature: the same bug, reached from another pass,
+    // is the same bug.
+    InternalErrorReportDesc withoutBreadcrumbs = desc;
+    withoutBreadcrumbs.breadcrumbs = nullptr;
+    CrashReportText signature;
+    CrashReportText signatureWithout;
+    CrashReportUtil::appendInternalErrorSignature(desc, signature);
+    CrashReportUtil::appendInternalErrorSignature(withoutBreadcrumbs, signatureWithout);
+    SLANG_CHECK(strcmp(signature.getBuffer(), signatureWithout.getBuffer()) == 0);
 }

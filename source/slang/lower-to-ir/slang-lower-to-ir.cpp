@@ -3,6 +3,7 @@
 
 #include "core/slang-char-encode.h"
 #include "core/slang-char-util.h"
+#include "core/slang-crash-breadcrumbs.h"
 #include "core/slang-hash.h"
 #include "core/slang-performance-profiler.h"
 #include "core/slang-random-generator.h"
@@ -15515,6 +15516,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 {
     SLANG_PROFILE;
     SLANG_AST_BUILDER_RAII(astBuilder);
+    CrashBreadcrumbScope phaseBreadcrumb(CrashBreadcrumbField::Phase, "lower");
 
     auto session = translationUnit->getSession();
     auto compileRequest = translationUnit->compileRequest;

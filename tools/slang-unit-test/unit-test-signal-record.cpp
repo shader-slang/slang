@@ -1,5 +1,6 @@
 // unit-test-signal-record.cpp
 
+#include "core/slang-crash-breadcrumbs.h"
 #include "core/slang-exception.h"
 #include "core/slang-signal.h"
 #include "core/slang-stack-trace.h"
@@ -121,6 +122,35 @@ SLANG_UNIT_TEST(signalRecordIsPerThread, NoRenderApi)
     SLANG_CHECK(!getLastSignalRecord(record));
 }
 
+SLANG_UNIT_TEST(signalRecordKeepsBreadcrumbs, NoRenderApi)
+{
+    // The scopes end while the exception unwinds, so the thread's breadcrumbs are empty again
+    // in the `catch`, but the record kept the ones that were set at the raise.
+    try
+    {
+        CrashBreadcrumbScope phase(CrashBreadcrumbField::Phase, "emit");
+        CrashBreadcrumbScope pass(CrashBreadcrumbField::Pass, "examplePass");
+        SLANG_UNEXPECTED("signal record test");
+    }
+    catch (const Exception&)
+    {
+    }
+
+    SLANG_CHECK(!CrashBreadcrumbUtil::getCurrent().phase.isSet());
+    SLANG_CHECK(!CrashBreadcrumbUtil::getCurrent().pass.isSet());
+
+    SignalRecord record;
+    SLANG_CHECK_ABORT(getLastSignalRecord(record));
+    SLANG_CHECK_ABORT(record.breadcrumbs != nullptr);
+    SLANG_CHECK(
+        UnownedStringSlice(record.breadcrumbs->phase.chars, record.breadcrumbs->phase.length) ==
+        "emit");
+    SLANG_CHECK(
+        UnownedStringSlice(record.breadcrumbs->pass.chars, record.breadcrumbs->pass.length) ==
+        "examplePass");
+    clearLastSignalRecord();
+}
+
 #endif // SLANG_HAS_EXCEPTIONS
 
 SLANG_UNIT_TEST(signalTypeNames, NoRenderApi)
@@ -132,4 +162,20 @@ SLANG_UNIT_TEST(signalTypeNames, NoRenderApi)
     SLANG_CHECK(strcmp(getSignalTypeName(SignalType::Unreachable), "unreachable") == 0);
     SLANG_CHECK(strcmp(getSignalTypeName(SignalType::InvalidOperation), "invalid-operation") == 0);
     SLANG_CHECK(strcmp(getSignalTypeName(SignalType::AbortCompilation), "abort-compilation") == 0);
+}
+
+SLANG_UNIT_TEST(crashBreadcrumbScopesNest, NoRenderApi)
+{
+    const CrashBreadcrumbs& current = CrashBreadcrumbUtil::getCurrent();
+    SLANG_CHECK(!current.pass.isSet());
+    {
+        CrashBreadcrumbScope outer(CrashBreadcrumbField::Pass, "outerPass");
+        {
+            CrashBreadcrumbScope inner(CrashBreadcrumbField::Pass, "innerPass");
+            SLANG_CHECK(UnownedStringSlice(current.pass.chars, current.pass.length) == "innerPass");
+        }
+        // The inner scope restored the value that the outer scope set.
+        SLANG_CHECK(UnownedStringSlice(current.pass.chars, current.pass.length) == "outerPass");
+    }
+    SLANG_CHECK(!current.pass.isSet());
 }

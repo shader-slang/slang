@@ -3,6 +3,7 @@
 #define SLANG_CORE_CRASH_REPORT_H
 
 #include "slang-common.h"
+#include "slang-crash-breadcrumbs.h"
 #include "slang-stack-trace.h"
 
 #include <stdint.h>
@@ -70,6 +71,9 @@ struct InternalErrorReportDesc
     /// The call stack at the point that raised the error, or null if none was captured.
     const StackTrace* stackTrace = nullptr;
 
+    /// Where in the compiler the error was raised, or null if that is not known.
+    const CrashBreadcrumbs* breadcrumbs = nullptr;
+
     /// The message of the error. It can contain names from the user's code, so the report
     /// prints it in the `[details]` part, which the user is told to read before sharing.
     const char* message = nullptr;
@@ -92,6 +96,9 @@ struct CrashReportDesc
 
     /// The call stack, starting at the instruction that faulted.
     const StackTrace* stackTrace = nullptr;
+
+    /// Where in the compiler the crashing thread was, or null if that is not known.
+    const CrashBreadcrumbs* breadcrumbs = nullptr;
 };
 
 struct CrashReportUtil
@@ -137,6 +144,14 @@ struct CrashReportUtil
     static void enableReports(const char* frontEnd, const char* slangVersion);
 
     static bool areReportsEnabled();
+
+    /// Set the function that a crash report calls to read the breadcrumbs of the crashing
+    /// thread, or pass null to read those of this copy of `core`.
+    ///
+    /// A program such as slangc links its own copy of `core`, and the Slang library has
+    /// another. The compiler sets the breadcrumbs in the library's copy, while the crash
+    /// handler lives in the program's, so the program passes a function of the library.
+    static void setBreadcrumbSource(const CrashBreadcrumbs* (*source)());
 
     /// Set the directory in which every report is also saved, or pass null to save none.
     ///

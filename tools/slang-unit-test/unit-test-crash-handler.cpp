@@ -93,6 +93,9 @@ static void _checkCrashReport(
     SLANG_CHECK(report.indexOf(signalLine.getUnownedSlice()) >= 0);
     SLANG_CHECK(report.indexOf(toSlice("\nslang:       test-version\n")) >= 0);
     SLANG_CHECK(report.indexOf(toSlice("\nfront-end:   test-process\n")) >= 0);
+
+    // The tool sets a breadcrumb before it crashes, and the handler reads it.
+    SLANG_CHECK(report.indexOf(toSlice("\nphase:       test-crash\n")) >= 0);
     SLANG_CHECK(report.indexOf(toSlice("\nsignature:   crash-")) >= 0);
 
     // The stack starts at the faulting code, not in the handler or in the system code that

@@ -1,6 +1,8 @@
 // slang-check.cpp
 #include "slang/semantic-checking/slang-check.h"
 
+#include "core/slang-crash-breadcrumbs.h"
+
 // This file provides general facilities related to semantic
 // checking that don't cleanly land in one of the more
 // specialized `slang-check-*` files.
@@ -183,6 +185,7 @@ void checkTranslationUnit(
     LoadedModuleDictionary& loadedModules)
 {
     SLANG_AST_BUILDER_RAII(translationUnit->compileRequest->getLinkage()->getASTBuilder());
+    CrashBreadcrumbScope phaseBreadcrumb(CrashBreadcrumbField::Phase, "check");
 
     SharedSemanticsContext sharedSemanticsContext(
         translationUnit->compileRequest->getLinkage(),
