@@ -3210,11 +3210,13 @@ for (auto op : intrinsicBinaryOps)
 
         if (op.flags & BOOL_RESULT) resultType = "bool";
 
-        // The shift amount of a SHIFT op is always `int`, independent of the
-        // LHS type, matching the semantics of shifts in C and HLSL. Concrete
-        // overloads with a fixed `int` shift amount also let an enum-typed
-        // operand coerce to `int` through the implicit enum-to-tag-type
-        // conversion during overload resolution.
+        // The shift amount of a SHIFT op is pinned to `int`, so it does not
+        // adopt the LHS type in any of the shapes below. Like C and HLSL the
+        // count's type is independent of the LHS, but unlike C — which
+        // promotes the count as an integer in its own right — we fix it to
+        // `int` so the generated overload set stays small. Pinning the count
+        // also lets an enum-typed operand coerce to `int` through the
+        // implicit enum-to-tag-type conversion during overload resolution.
         if (op.flags & SHIFT) rightType = "int";
 
         // scalar version
@@ -3285,7 +3287,6 @@ for (auto op : intrinsicBinaryOps)
         char const* resultType = leftType;
 
         if (op.flags & BOOL_RESULT) resultType = "bool";
-        // TODO: handle `SHIFT`
 
         // scalar version
         sb << "__generic<T : " << op.interface << ">\n";
@@ -3322,9 +3323,14 @@ for (auto op : intrinsicBinaryOps)
     }
 }
 
-// We will declare the shift operations entirely as generics
-// rather than try to handle all the pairings of left-hand
-// and right-hand side types.
+// Shift operations are declared in two parts. The `intrinsicBinaryOps` loop
+// above generates concrete per-type overloads with the shift amount pinned
+// to `int`, while this section generates fully generic overloads covering
+// the pairings of left- and right-hand side types, along with the compound
+// `<<=`/`>>=` operators. The generics remain the resolver for genuinely
+// mixed count types (e.g. `uint << uint64`), where an exact-match generic
+// beats a converted concrete candidate on conversion cost, so both parts
+// are load-bearing.
 //
 static const struct ShiftOpInfo
 {

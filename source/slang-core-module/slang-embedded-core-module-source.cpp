@@ -23,6 +23,10 @@ enum
     BOOL_RESULT = 1 << 2,
     BOOL_MASK = 1 << 3,
     UINT_MASK = 1 << 4,
+    // An operator-mode flag, like BOOL_RESULT, rather than a type-category
+    // mask: it never filters which types an op applies to; it forces the
+    // generated right-hand parameter type to `int` (see the intrinsicBinaryOps
+    // loop in core.meta.slang).
     SHIFT = 1 << 5,
 
     INT_MASK = SINT_MASK | UINT_MASK,
@@ -313,6 +317,9 @@ struct IntrinsicOpInfo
     {kIROp_BitAnd, "and", "&", "__BuiltinLogicalType", LOGICAL_MASK},
     {kIROp_BitOr, "or", "|", "__BuiltinLogicalType", LOGICAL_MASK},
     {kIROp_BitXor, "xor", "^", "__BuiltinLogicalType", LOGICAL_MASK},
+    // The shift ops deliberately carry a null interface: their generic
+    // overloads come from the `kShiftOps` section of core.meta.slang, so this
+    // table must not synthesize additional ranked generics for them.
     {kIROp_Lsh, "shl", "<<", nullptr, INT_MASK | SHIFT},
     {kIROp_Rsh, "shr", ">>", nullptr, INT_MASK | SHIFT},
     {kIROp_Eql, "eql", "==", "__BuiltinType", ANY_MASK | BOOL_RESULT},
