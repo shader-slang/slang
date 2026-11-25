@@ -84,6 +84,13 @@ static SLANG_TEST_PROCESS_NO_UBSAN SlangResult _crash(int argc, const char* cons
 {
     if (argc < 3)
         return SLANG_FAIL;
+#if defined(_MSC_VER)
+    // A debug build of the Microsoft C runtime shows a dialog box when `abort` is called and
+    // waits for someone to close it, which would hang the test that aborts on purpose. We turn
+    // the dialog off whatever `SLANG_IGNORE_ABORT_MSG` says, which is what
+    // `TestToolUtil::suppressDebugDialogs` keys on.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
     if (!CrashHandler::install("test-process", "test-version"))
         return SLANG_E_NOT_AVAILABLE;
     if (argc > 3)

@@ -69,6 +69,13 @@ static bool _unwindToCaller(CONTEXT& context)
         // return address is where the call put it: on top of the stack on x64, and in the
         // link register on ARM64.
 #if SLANG_PROCESSOR_X86_64
+        // After a crash the stack pointer can be anything, so we read through it only while
+        // it points into this thread's stack.
+        ULONG_PTR stackLow = 0;
+        ULONG_PTR stackHigh = 0;
+        ::GetCurrentThreadStackLimits(&stackLow, &stackHigh);
+        if (context.Rsp < stackLow || context.Rsp + sizeof(DWORD64) > stackHigh)
+            return false;
         context.Rip = *reinterpret_cast<const DWORD64*>(context.Rsp);
         context.Rsp += sizeof(DWORD64);
 #else
@@ -80,6 +87,47 @@ static bool _unwindToCaller(CONTEXT& context)
     if (callerProgramCounter == 0)
         return false;
     return callerProgramCounter != programCounter || _getStackPointer(context) != stackPointer;
+}
+
+/// Step `context` to the caller like `_unwindToCaller`, and return false instead of faulting if
+/// a damaged stack makes the step read memory that is not there.
+///
+/// The structured-exception guard needs the Microsoft compiler. Other compilers step without
+/// it, which is safe on the healthy stack of `capture` and is a risk only after a crash.
+static bool _tryUnwindToCaller(CONTEXT& context)
+{
+#if defined(_MSC_VER)
+    __try
+    {
+        return _unwindToCaller(context);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return false;
+    }
+#else
+    return _unwindToCaller(context);
+#endif
+}
+
+/// Walk from `context` to its callers and append the program counter after each step to
+/// `ioTrace`, leaving out the first `skipStepCount` of them.
+///
+/// The bound on the number of steps ends the walk even if a damaged stack sends the unwinder
+/// around a cycle.
+static void _appendCallers(CONTEXT& context, int skipStepCount, StackTrace& ioTrace)
+{
+    const int maxStepCount = StackTrace::kMaxFrameCount + skipStepCount;
+    for (int step = 0; step < maxStepCount && ioTrace.frameCount < StackTrace::kMaxFrameCount;
+         ++step)
+    {
+        if (!_tryUnwindToCaller(context))
+            break;
+        if (step < skipStepCount)
+            continue;
+        ioTrace.returnAddresses[ioTrace.frameCount++] =
+            reinterpret_cast<void*>(_getProgramCounter(context));
+    }
 }
 
 // We keep `capture` out of line so that it always owns exactly one stack frame: the first step
@@ -94,20 +142,24 @@ static bool _unwindToCaller(CONTEXT& context)
     CONTEXT context;
     ::RtlCaptureContext(&context);
 
-    // The bound on the number of steps ends the walk even if a damaged stack sends the
-    // unwinder around a cycle.
-    int frameCount = 0;
-    const int maxStepCount = StackTrace::kMaxFrameCount + skipFrameCount;
-    for (int step = 0; step < maxStepCount; ++step)
-    {
-        if (!_unwindToCaller(context))
-            break;
-        if (step < skipFrameCount)
-            continue;
-        outTrace.returnAddresses[frameCount++] =
-            reinterpret_cast<void*>(_getProgramCounter(context));
-    }
-    outTrace.frameCount = frameCount;
+    outTrace.frameCount = 0;
+    _appendCallers(context, skipFrameCount, outTrace);
+}
+
+/* static */ void StackTraceUtil::captureFromContext(
+    const void* platformContext,
+    StackTrace& outTrace)
+{
+    // We walk a copy, because the unwinder rewrites the context at every step, and the caller
+    // may still pass the original to the next exception filter.
+    CONTEXT context = *static_cast<const CONTEXT*>(platformContext);
+
+    // The first frame is the instruction that faulted. It is not a return address, so it comes
+    // from the context itself, and each step after it adds a caller.
+    outTrace.frameCount = 0;
+    outTrace.returnAddresses[outTrace.frameCount++] =
+        reinterpret_cast<void*>(_getProgramCounter(context));
+    _appendCallers(context, 0, outTrace);
 }
 
 #else
@@ -132,6 +184,16 @@ static bool _unwindToCaller(CONTEXT& context)
         ULONG(StackTrace::kMaxFrameCount),
         outTrace.returnAddresses,
         nullptr));
+}
+
+/* static */ void StackTraceUtil::captureFromContext(
+    const void* platformContext,
+    StackTrace& outTrace)
+{
+    // Without a table-based unwinder we can only report the faulting instruction.
+    outTrace.returnAddresses[0] =
+        reinterpret_cast<void*>(static_cast<const CONTEXT*>(platformContext)->Eip);
+    outTrace.frameCount = 1;
 }
 
 #endif

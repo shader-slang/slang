@@ -59,6 +59,17 @@ struct StackTraceUtil
     /// because an assert on this path would capture a stack trace again.
     static void capture(int skipFrameCount, StackTrace& outTrace);
 
+#if SLANG_WINDOWS_FAMILY
+    /// Capture the call stack that `platformContext`, a Windows `CONTEXT`, describes into
+    /// `outTrace`. The first frame is the instruction that the context points at, and the
+    /// frames after it are its callers.
+    ///
+    /// An exception filter passes the context of the exception, so the trace starts at the
+    /// faulting instruction and not inside the filter. The walk tolerates a damaged stack: it
+    /// stops where the stack can no longer be read.
+    static void captureFromContext(const void* platformContext, StackTrace& outTrace);
+#endif
+
     /// Find the module that contains `address` and the offset of `address` inside that module.
     ///
     /// Return false, and leave `outModule` unspecified, if no loaded module contains `address`.

@@ -13,8 +13,13 @@ using namespace Slang;
 // A crash ends the process, so each test runs the `test-process` tool, which installs the
 // handler as slangc does and then crashes on purpose. The tests read what the handler wrote to
 // stderr and to the report file, and how the process ended.
-//
-// The Windows handler is not written yet, so these tests run where the handler exists.
+
+// The name of the tool's own module in a stack frame.
+#if SLANG_WINDOWS_FAMILY
+static const char kToolModule[] = "test-process.exe+";
+#else
+static const char kToolModule[] = "test-process+";
+#endif
 
 /// What a crashed `test-process` left behind.
 struct CrashOutcome
@@ -23,6 +28,7 @@ struct CrashOutcome
     int terminationSignal = 0;
     String savedReport;
     String savedReportPath;
+    int32_t returnValue = 0;
 };
 
 /// Run `test-process crash <kind> <directory>` in a new, empty directory, wait for it to end,
@@ -50,6 +56,7 @@ static SlangResult _runCrash(UnitTestContext* context, const char* kind, CrashOu
     outOutcome.standardError = String(
         UnownedStringSlice((const char*)standardError.getBuffer(), standardError.getCount()));
     outOutcome.terminationSignal = process->getTerminationSignal();
+    outOutcome.returnValue = process->getReturnValue();
 
     // The report names the file that it saved, on its `Saved as:` line.
     static const char kSavedAs[] = "\nSaved as:    ";
@@ -94,15 +101,23 @@ static void _checkCrashReport(
     const Index detailsStart = report.indexOf(toSlice("\n[details]\n"));
     SLANG_CHECK_ABORT(stackStart >= 0 && detailsStart > stackStart);
     const UnownedStringSlice stack = report.subString(stackStart, detailsStart - stackStart);
+    StringBuilder firstFrame;
+    firstFrame << "\n[stack]\n#0  " << kToolModule;
+    StringBuilder anyFrame;
+    anyFrame << "  " << kToolModule;
     if (faultsInTool)
-        SLANG_CHECK(stack.startsWith(toSlice("\n[stack]\n#0  test-process+")));
-    SLANG_CHECK(stack.indexOf(toSlice("  test-process+")) >= 0);
+        SLANG_CHECK(stack.startsWith(firstFrame.getUnownedSlice()));
+    SLANG_CHECK(stack.indexOf(anyFrame.getUnownedSlice()) >= 0);
 
     // The report was saved, under its signature, and the file holds the same report.
     SLANG_CHECK(outcome.savedReportPath.indexOf(toSlice("slang-report-crash-")) >= 0);
     SLANG_CHECK(outcome.savedReport.getLength() > 0);
     SLANG_CHECK(report.startsWith(outcome.savedReport.getUnownedSlice()));
 }
+
+// After the report, the crash goes on as it would have without the handler, so the process
+// ends the same way. On POSIX it ends by the signal. On Windows an unhandled exception ends it
+// with the exception code as its exit code, and an abort with exit code 3.
 
 SLANG_UNIT_TEST(crashHandlerReportsSegmentationFault, NoRenderApi)
 {
@@ -113,14 +128,16 @@ SLANG_UNIT_TEST(crashHandlerReportsSegmentationFault, NoRenderApi)
 
     CrashOutcome outcome;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runCrash(unitTestContext, "segv", outcome)));
+#if SLANG_WINDOWS_FAMILY
+    _checkCrashReport(outcome, "EXCEPTION_ACCESS_VIOLATION", true);
+    SLANG_CHECK(outcome.returnValue == int32_t(0xC0000005u));
+#else
     _checkCrashReport(outcome, "SIGSEGV", true);
+    SLANG_CHECK(outcome.terminationSignal == SIGSEGV);
+#endif
 
     // A write through a null pointer faults at address 0.
     SLANG_CHECK(outcome.standardError.indexOf(toSlice("\nfault-address: 0x0\n")) >= 0);
-
-    // After the report, the action that was there before runs, so the process ends the way
-    // it would have without the handler.
-    SLANG_CHECK(outcome.terminationSignal == SIGSEGV);
 }
 
 SLANG_UNIT_TEST(crashHandlerReportsAbort, NoRenderApi)
@@ -133,7 +150,11 @@ SLANG_UNIT_TEST(crashHandlerReportsAbort, NoRenderApi)
     CrashOutcome outcome;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runCrash(unitTestContext, "abort", outcome)));
     _checkCrashReport(outcome, "SIGABRT", false);
+#if SLANG_WINDOWS_FAMILY
+    SLANG_CHECK(outcome.returnValue == 3);
+#else
     SLANG_CHECK(outcome.terminationSignal == SIGABRT);
+#endif
 }
 
 SLANG_UNIT_TEST(crashHandlerReportsStackOverflow, NoRenderApi)
@@ -143,10 +164,16 @@ SLANG_UNIT_TEST(crashHandlerReportsStackOverflow, NoRenderApi)
         SLANG_IGNORE_TEST;
     }
 
-    // A stack overflow leaves no stack for the handler. The handler runs on the alternate
-    // stack that `install` gave the main thread.
+    // A stack overflow leaves no stack for the handler. It runs on the alternate stack that
+    // `install` gave the main thread on POSIX, and on the stack that the guarantee keeps back
+    // on Windows.
     CrashOutcome outcome;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runCrash(unitTestContext, "stack-overflow", outcome)));
+#if SLANG_WINDOWS_FAMILY
+    _checkCrashReport(outcome, "EXCEPTION_STACK_OVERFLOW", true);
+    SLANG_CHECK(outcome.returnValue == int32_t(0xC00000FDu));
+#else
     _checkCrashReport(outcome, "SIGSEGV", true);
     SLANG_CHECK(outcome.terminationSignal == SIGSEGV);
+#endif
 }
