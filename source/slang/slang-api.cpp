@@ -418,6 +418,11 @@ SLANG_API void slang_enableCrashReports(const char* frontEndName)
     Slang::CrashReportUtil::enableReports(frontEndName, Slang::getBuildTagString());
 }
 
+SLANG_API void slang_setCrashReportDirectory(const char* directory)
+{
+    Slang::CrashReportUtil::setReportDirectory(directory);
+}
+
 SLANG_API void spDestroySession(SlangSession* inSession)
 {
     if (!inSession)

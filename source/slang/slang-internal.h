@@ -27,4 +27,9 @@ SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 /// host application that loads Slang sees no change unless it calls this.
 SLANG_API void slang_enableCrashReports(const char* frontEndName);
 
+/// Set the directory in which every crash report is also saved, as
+/// `slang-report-<signature>.txt`, or pass null to save none. Nothing is saved by default.
+/// The path is UTF-8 and is copied.
+SLANG_API void slang_setCrashReportDirectory(const char* directory);
+
 #endif
