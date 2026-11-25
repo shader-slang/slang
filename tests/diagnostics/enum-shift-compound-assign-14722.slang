@@ -10,6 +10,9 @@
 // through the concrete overloads, so the compiler can offer the
 // `x = x << y` rewrite — which is also why this diagnostic is pinned here:
 // the note only exists when the binary form applies.
+// The compound gap itself is tracked as shader-slang/slang#14727; once that
+// is fixed this test is expected to succeed, and the pins below should be
+// replaced by coverage of the then-working compound form.
 
 enum Options { Shift = 6 };
 
