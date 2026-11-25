@@ -1,5 +1,7 @@
 // main.cpp
 
+#include "core/slang-crash-handler.h"
+#include "core/slang-crash-report.h"
 #include "core/slang-io.h"
 #include "core/slang-platform.h"
 #include "core/slang-test-tool-util.h"
@@ -146,6 +148,12 @@ int MAIN(int argc, char** argv)
             directory << ".";
         }
         slang_setCrashReportDirectory(directory.getBuffer());
+
+        // A crash is a failure that the compiler does not detect, so the operating system
+        // reports it to the handler. slangc links its own copy of `core`, so the handler and
+        // its settings live in that copy, apart from the library's.
+        CrashHandler::install("slangc", spGetBuildTagString());
+        CrashReportUtil::setReportDirectory(directory.getBuffer());
     }
 
     auto stdWriters = StdWriters::initDefaultSingleton();

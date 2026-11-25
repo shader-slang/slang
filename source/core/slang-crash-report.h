@@ -75,6 +75,25 @@ struct InternalErrorReportDesc
     const char* message = nullptr;
 };
 
+/// The facts that the report of a crash states: a fatal signal or exception that the
+/// operating system raised, such as a segmentation fault.
+struct CrashReportDesc
+{
+    /// The name of the signal, such as `SIGSEGV`, or of the Windows exception, such as
+    /// `EXCEPTION_ACCESS_VIOLATION`.
+    const char* signalName = nullptr;
+
+    /// The address that the faulting instruction accessed, for a memory fault.
+    bool hasFaultAddress = false;
+    uintptr_t faultAddress = 0;
+
+    const char* slangVersion = nullptr;
+    const char* frontEnd = nullptr;
+
+    /// The call stack, starting at the instruction that faulted.
+    const StackTrace* stackTrace = nullptr;
+};
+
 struct CrashReportUtil
 {
     /// Return the platform that this binary was built for, named like our release packages:
@@ -98,6 +117,15 @@ struct CrashReportUtil
     static void appendInternalErrorReport(
         const InternalErrorReportDesc& desc,
         CrashReportText& ioText);
+
+    /// Append the signature of the crash that `desc` describes, such as `crash-7c41d9e2`. It
+    /// hashes the signal and the faulting frame as `module+offset`, so it identifies one bug in
+    /// one build.
+    static void appendCrashSignature(const CrashReportDesc& desc, CrashReportText& ioText);
+
+    /// Append the complete report of the crash that `desc` describes. It has the same parts as
+    /// the report of an internal error, with `kind: crash` and a `signal` line.
+    static void appendCrashReport(const CrashReportDesc& desc, CrashReportText& ioText);
 
     /// Turn crash reports on for this process, or off again with a null `frontEnd`.
     ///
@@ -135,6 +163,18 @@ struct CrashReportUtil
     ///
     /// Return false, and append nothing, if crash reports are off.
     static bool appendReportOfLastInternalError(const char* message, CrashReportText& ioText);
+
+    /// Append the report of a crash of this process, and save it like the report of an
+    /// internal error. The crash handler calls this from the handler of a fatal signal, so it
+    /// uses fixed storage only. `stackTrace` starts at the instruction that faulted.
+    ///
+    /// Return false, and append nothing, if crash reports are off.
+    static bool appendCrashReportOfThisProcess(
+        const char* signalName,
+        bool hasFaultAddress,
+        uintptr_t faultAddress,
+        const StackTrace& stackTrace,
+        CrashReportText& ioText);
 };
 
 } // namespace Slang

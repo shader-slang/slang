@@ -151,6 +151,16 @@ static void _appendLocation(const InternalErrorReportDesc& desc, CrashReportText
     ioText.appendDecimal(desc.sourceLine > 0 ? uint64_t(desc.sourceLine) : 0);
 }
 
+/// Append a signature: `prefix` followed by the eight hexadecimal digits of the hash of
+/// `identity`. The digits include leading zeros, so every signature has the same length.
+static void _appendSignature(const char* prefix, const char* identity, CrashReportText& ioText)
+{
+    const uint32_t hash = _hashText(2166136261u, identity);
+    ioText.append(prefix);
+    for (int shift = 28; shift >= 0; shift -= 4)
+        ioText.appendHex((hash >> shift) & 0xf);
+}
+
 /* static */ void CrashReportUtil::appendInternalErrorSignature(
     const InternalErrorReportDesc& desc,
     CrashReportText& ioText)
@@ -162,13 +172,7 @@ static void _appendLocation(const InternalErrorReportDesc& desc, CrashReportText
     identity.append("@");
     _appendLocation(desc, identity);
 
-    const uint32_t hash = _hashText(2166136261u, identity.getBuffer());
-
-    // The signature always has eight digits, so we print the leading zeros that `appendHex`
-    // leaves out.
-    ioText.append("ice-");
-    for (int shift = 28; shift >= 0; shift -= 4)
-        ioText.appendHex((hash >> shift) & 0xf);
+    _appendSignature("ice-", identity.getBuffer(), ioText);
 }
 
 /// Append one `key: value` line of the `[report]` part. A null `value` is printed as `unknown`.
@@ -179,69 +183,172 @@ static void _appendField(CrashReportText& ioText, const char* paddedKey, const c
     ioText.append("\n");
 }
 
-/* static */ void CrashReportUtil::appendInternalErrorReport(
-    const InternalErrorReportDesc& desc,
-    CrashReportText& ioText)
+/// Append the opening lines of a report and the heading of its `[report]` part.
+static void _appendReportHeading(CrashReportText& ioText)
 {
     ioText.append("==== Slang crash report (format 1) ====\n"
                   "Slang stopped because of a bug in Slang, not in your code.\n"
                   "This report is plain text. Slang wrote it on this machine and sent it nowhere.\n"
                   "\n"
-                  "[report]\n"
-                  "kind:        internal-error\n");
-    _appendField(ioText, "signal-type: ", desc.signalTypeName);
-    ioText.append("location:    ");
-    _appendLocation(desc, ioText);
-    ioText.append("\n");
-    _appendField(ioText, "slang:       ", desc.slangVersion);
-    _appendField(ioText, "host:        ", getHostName());
-    _appendField(ioText, "front-end:   ", desc.frontEnd);
-    ioText.append("signature:   ");
-    appendInternalErrorSignature(desc, ioText);
-    ioText.append("\n");
+                  "[report]\n");
+}
+
+/// Append the `slang`, `host`, `front-end` and `signature` lines that end every `[report]`
+/// part, then the `[stack]` part with one line for each frame of `stackTrace`.
+static void _appendCommonFieldsAndStack(
+    const char* slangVersion,
+    const char* frontEnd,
+    const char* signature,
+    const StackTrace* stackTrace,
+    CrashReportText& ioText)
+{
+    _appendField(ioText, "slang:       ", slangVersion);
+    _appendField(ioText, "host:        ", CrashReportUtil::getHostName());
+    _appendField(ioText, "front-end:   ", frontEnd);
+    _appendField(ioText, "signature:   ", signature);
 
     ioText.append("\n[stack]\n");
-    if (!desc.stackTrace || desc.stackTrace->frameCount == 0)
+    if (!stackTrace || stackTrace->frameCount == 0)
     {
         ioText.append("(not available)\n");
+        return;
     }
-    else
+    for (int i = 0; i < stackTrace->frameCount; ++i)
     {
-        for (int i = 0; i < desc.stackTrace->frameCount; ++i)
+        ioText.append("#");
+        ioText.appendDecimal(uint64_t(i));
+        ioText.append("  ");
+
+        // An address outside every loaded module cannot be resolved later, so we print a
+        // placeholder for it and keep the frame numbers contiguous.
+        StackFrameModule module;
+        if (StackTraceUtil::findModule(stackTrace->returnAddresses[i], module))
         {
-            ioText.append("#");
-            ioText.appendDecimal(uint64_t(i));
-            ioText.append("  ");
-
-            // An address outside every loaded module cannot be resolved later, so we print a
-            // placeholder for it and keep the frame numbers contiguous.
-            StackFrameModule module;
-            if (StackTraceUtil::findModule(desc.stackTrace->returnAddresses[i], module))
-            {
-                ioText.append(module.moduleName[0] ? module.moduleName : "?");
-                ioText.append("+0x");
-                ioText.appendHex(uint64_t(module.offset));
-            }
-            else
-            {
-                ioText.append("?");
-            }
-            ioText.append("\n");
+            ioText.append(module.moduleName[0] ? module.moduleName : "?");
+            ioText.append("+0x");
+            ioText.appendHex(uint64_t(module.offset));
         }
+        else
+        {
+            ioText.append("?");
+        }
+        ioText.append("\n");
     }
+}
 
+/// Append the `[details]` part with `message`, and the `[how to report]` part with a search
+/// for `signature`.
+static void _appendDetailsAndHowToReport(
+    const char* message,
+    const char* signature,
+    CrashReportText& ioText)
+{
     ioText.append("\n[details]\n"
                   "This part can hold names from your code. Read it before you share the report.\n"
                   "message:     ");
-    ioText.appendSingleLine(desc.message ? desc.message : "(none)", 2048);
+    ioText.appendSingleLine(message ? message : "(none)", 2048);
     ioText.append("\n");
 
     ioText.append("\n[how to report]\n"
                   "Known bug?   https://github.com/shader-slang/slang/issues?q=%22");
-    appendInternalErrorSignature(desc, ioText);
+    ioText.append(signature);
     ioText.append("%22\n"
                   "Report it:   https://github.com/shader-slang/slang/issues/new"
                   "?template=crash-report.yml\n");
+}
+
+/* static */ void CrashReportUtil::appendInternalErrorReport(
+    const InternalErrorReportDesc& desc,
+    CrashReportText& ioText)
+{
+    CrashReportText signature;
+    appendInternalErrorSignature(desc, signature);
+
+    _appendReportHeading(ioText);
+    ioText.append("kind:        internal-error\n");
+    _appendField(ioText, "signal-type: ", desc.signalTypeName);
+    ioText.append("location:    ");
+    _appendLocation(desc, ioText);
+    ioText.append("\n");
+    _appendCommonFieldsAndStack(
+        desc.slangVersion,
+        desc.frontEnd,
+        signature.getBuffer(),
+        desc.stackTrace,
+        ioText);
+    _appendDetailsAndHowToReport(desc.message, signature.getBuffer(), ioText);
+}
+
+/// Return true if `moduleName` is a library of the operating system or of the C and C++
+/// runtimes, which a crash passes through but is not the cause of.
+static bool _isSystemModule(const char* moduleName)
+{
+    static const char* const kPrefixes[] = {
+        "libc.",      "libc-",      "libm.",     "libpthread", "ld-linux",  "libgcc",   "libstdc++",
+        "libc++",     "libsystem_", "libdyld",   "dyld",       "ntdll",     "kernel32", "KERNEL32",
+        "KERNELBASE", "ucrtbase",   "vcruntime", "msvcp",      "libunwind",
+    };
+    for (const char* prefix : kPrefixes)
+    {
+        if (strncmp(moduleName, prefix, strlen(prefix)) == 0)
+            return true;
+    }
+    return false;
+}
+
+/* static */ void CrashReportUtil::appendCrashSignature(
+    const CrashReportDesc& desc,
+    CrashReportText& ioText)
+{
+    // A crash has no location in Slang's source, so its identity is the signal and the first
+    // frame that is not in a system library, as `module+offset`. An abort faults inside the C
+    // library, so without that rule every abort on a platform would share one signature. The
+    // offset belongs to one build, so the same bug in another release or on another platform
+    // has another signature, and the triage side merges those after it has resolved the frames
+    // to names.
+    CrashReportText identity;
+    identity.append(desc.signalName ? desc.signalName : "unknown");
+    identity.append("@");
+    const int frameCount = desc.stackTrace ? desc.stackTrace->frameCount : 0;
+    for (int i = 0; i < frameCount; ++i)
+    {
+        StackFrameModule module;
+        if (!StackTraceUtil::findModule(desc.stackTrace->returnAddresses[i], module) ||
+            _isSystemModule(module.moduleName))
+        {
+            continue;
+        }
+        identity.append(module.moduleName);
+        identity.append("+");
+        identity.appendHex(uint64_t(module.offset));
+        break;
+    }
+    _appendSignature("crash-", identity.getBuffer(), ioText);
+}
+
+/* static */ void CrashReportUtil::appendCrashReport(
+    const CrashReportDesc& desc,
+    CrashReportText& ioText)
+{
+    CrashReportText signature;
+    appendCrashSignature(desc, signature);
+
+    _appendReportHeading(ioText);
+    ioText.append("kind:        crash\n");
+    _appendField(ioText, "signal:      ", desc.signalName);
+    if (desc.hasFaultAddress)
+    {
+        ioText.append("fault-address: 0x");
+        ioText.appendHex(uint64_t(desc.faultAddress));
+        ioText.append("\n");
+    }
+    _appendCommonFieldsAndStack(
+        desc.slangVersion,
+        desc.frontEnd,
+        signature.getBuffer(),
+        desc.stackTrace,
+        ioText);
+    _appendDetailsAndHowToReport(nullptr, signature.getBuffer(), ioText);
 }
 
 // The process-wide settings of crash reports. The strings are written once at start-up, before
@@ -325,20 +432,17 @@ static bool _saveReportIn(
            CrashReportFileResult::Failed;
 }
 
-/// Save the report of the internal error `desc`, which is the last `reportLength` characters
-/// of `ioText`, and append the line that tells the user where it is.
+/// Save the report whose signature is `signature`, which is the last `reportLength`
+/// characters of `ioText`, and append the line that tells the user where it is.
 static void _saveReportAndAppendPath(
-    const InternalErrorReportDesc& desc,
+    const char* signature,
     size_t reportLength,
     CrashReportText& ioText)
 {
-    CrashReportText signature;
-    CrashReportUtil::appendInternalErrorSignature(desc, signature);
     const char* report = ioText.getBuffer() + ioText.getLength() - reportLength;
 
     char path[kMaxReportPathLength + 1];
-    bool isSaved =
-        _saveReportIn(g_reportDirectory, signature.getBuffer(), report, reportLength, path);
+    bool isSaved = _saveReportIn(g_reportDirectory, signature, report, reportLength, path);
     if (!isSaved)
     {
         // The directory can be read-only, as a source tree on a build machine often is. The
@@ -346,12 +450,7 @@ static void _saveReportAndAppendPath(
         char temporaryDirectory[CrashReportUtil::kMaxReportDirectoryLength + 1];
         if (CrashReportFile::getTemporaryDirectory(temporaryDirectory, sizeof(temporaryDirectory)))
         {
-            isSaved = _saveReportIn(
-                temporaryDirectory,
-                signature.getBuffer(),
-                report,
-                reportLength,
-                path);
+            isSaved = _saveReportIn(temporaryDirectory, signature, report, reportLength, path);
         }
     }
 
@@ -391,7 +490,47 @@ static void _saveReportAndAppendPath(
     clearLastSignalRecord();
 
     if (g_hasReportDirectory.load())
-        _saveReportAndAppendPath(desc, size_t(ioText.getLength() - lengthBeforeReport), ioText);
+    {
+        CrashReportText signature;
+        appendInternalErrorSignature(desc, signature);
+        _saveReportAndAppendPath(
+            signature.getBuffer(),
+            size_t(ioText.getLength() - lengthBeforeReport),
+            ioText);
+    }
+    return true;
+}
+
+/* static */ bool CrashReportUtil::appendCrashReportOfThisProcess(
+    const char* signalName,
+    bool hasFaultAddress,
+    uintptr_t faultAddress,
+    const StackTrace& stackTrace,
+    CrashReportText& ioText)
+{
+    if (!areReportsEnabled())
+        return false;
+
+    CrashReportDesc desc;
+    desc.signalName = signalName;
+    desc.hasFaultAddress = hasFaultAddress;
+    desc.faultAddress = faultAddress;
+    desc.slangVersion = g_slangVersion;
+    desc.frontEnd = g_frontEnd;
+    desc.stackTrace = &stackTrace;
+
+    const int lengthBeforeReport = ioText.getLength();
+    appendCrashReport(desc, ioText);
+
+    if (g_hasReportDirectory.load())
+    {
+        CrashReportText signature;
+        appendCrashSignature(desc, signature);
+        _saveReportAndAppendPath(
+            signature.getBuffer(),
+            size_t(ioText.getLength() - lengthBeforeReport),
+            ioText);
+    }
     return true;
 }
 

@@ -252,3 +252,44 @@ SLANG_UNIT_TEST(crashReportTemporaryDirectory, NoRenderApi)
     char tooSmall[2];
     SLANG_CHECK(!CrashReportFile::getTemporaryDirectory(tooSmall, sizeof(tooSmall)));
 }
+
+SLANG_UNIT_TEST(crashReportCrashFormat, NoRenderApi)
+{
+    CrashReportDesc desc;
+    desc.signalName = "SIGSEGV";
+    desc.hasFaultAddress = true;
+    desc.faultAddress = 0x18;
+    desc.slangVersion = "2026.22.1";
+    desc.frontEnd = "slangc";
+
+    CrashReportText text;
+    CrashReportUtil::appendCrashReport(desc, text);
+    const char* report = text.getBuffer();
+
+    // A crash report has the parts of an internal-error report, with the signal in place of
+    // the kind of error and its location.
+    SLANG_CHECK(
+        strstr(report, "\n[report]\nkind:        crash\nsignal:      SIGSEGV\n") != nullptr);
+    SLANG_CHECK(strstr(report, "\nfault-address: 0x18\n") != nullptr);
+    SLANG_CHECK(strstr(report, "\nfront-end:   slangc\n") != nullptr);
+    SLANG_CHECK(strstr(report, "\nsignature:   crash-") != nullptr);
+    SLANG_CHECK(strstr(report, "\n[stack]\n(not available)\n") != nullptr);
+    SLANG_CHECK(strstr(report, "\n[details]\n") != nullptr);
+    SLANG_CHECK(strstr(report, "\n[how to report]\n") != nullptr);
+
+    // Without a memory fault there is no fault address.
+    CrashReportDesc abortDesc = desc;
+    abortDesc.signalName = "SIGABRT";
+    abortDesc.hasFaultAddress = false;
+    CrashReportText abortText;
+    CrashReportUtil::appendCrashReport(abortDesc, abortText);
+    SLANG_CHECK(strstr(abortText.getBuffer(), "fault-address") == nullptr);
+
+    // The signal is part of the signature.
+    CrashReportText signature;
+    CrashReportText abortSignature;
+    CrashReportUtil::appendCrashSignature(desc, signature);
+    CrashReportUtil::appendCrashSignature(abortDesc, abortSignature);
+    SLANG_CHECK(strcmp(signature.getBuffer(), abortSignature.getBuffer()) != 0);
+    SLANG_CHECK(strlen(signature.getBuffer()) == strlen("crash-") + 8);
+}
