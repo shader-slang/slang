@@ -856,6 +856,7 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             sink.diagnose(Diagnostics::CompilationAbortedDueToException{
                 .exceptionType = typeid(e).name(),
                 .exceptionMessage = e.Message});
+            diagnoseCrashReportOfLastInternalError(sink, e.Message.getBuffer());
             sink.getBlobIfNeeded(outDiagnostics);
         }
         return nullptr;

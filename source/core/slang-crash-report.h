@@ -98,6 +98,27 @@ struct CrashReportUtil
     static void appendInternalErrorReport(
         const InternalErrorReportDesc& desc,
         CrashReportText& ioText);
+
+    /// Turn crash reports on for this process, or off again with a null `frontEnd`.
+    ///
+    /// Reports are off until a program asks for them: `slangc` turns them on at start-up, and a
+    /// library that is loaded into a host application stays silent unless the host opts in.
+    /// `frontEnd` names the program in every report, for example `slangc`, and `slangVersion`
+    /// is the version that reports state. Both strings must stay valid while reports are on.
+    /// A program calls this once at start-up, before it compiles on any thread.
+    static void enableReports(const char* frontEnd, const char* slangVersion);
+
+    static bool areReportsEnabled();
+
+    /// Append the report of the internal error that the calling thread just caught.
+    ///
+    /// The report describes the thread's signal record, so the caller is the `catch` that
+    /// handles the error, on the thread that raised it. `message` is the message of the caught
+    /// error and can be null. The call uses the record up: a later error that was not raised
+    /// through `handleSignal` then reports an unknown location instead of this one.
+    ///
+    /// Return false, and append nothing, if crash reports are off.
+    static bool appendReportOfLastInternalError(const char* message, CrashReportText& ioText);
 };
 
 } // namespace Slang

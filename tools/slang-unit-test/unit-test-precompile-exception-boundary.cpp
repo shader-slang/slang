@@ -3,6 +3,7 @@
 #include "core/slang-memory-file-system.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
+#include "slang/slang-internal.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <string.h>
@@ -23,7 +24,9 @@ using namespace Slang;
 // Gated on `SLANG_HAS_EXCEPTIONS`: with exceptions disabled `SLANG_UNIMPLEMENTED_X` panics and
 // exits the process instead of throwing, so there is no exception for the boundary to contain.
 #if SLANG_HAS_EXCEPTIONS
-SLANG_UNIT_TEST(precompileForTargetContainsEmissionException, NoRenderApi)
+/// Precompile the module described above for SPIR-V, which raises `InternalError` during
+/// emission. Return the result of `precompileForTarget` and its diagnostics.
+static SlangResult _precompileModuleThatRaisesInternalError(ComPtr<slang::IBlob>& outDiagnostics)
 {
     const char* moduleSource = R"SLANG(
         module nested;
@@ -66,9 +69,14 @@ SLANG_UNIT_TEST(precompileForTargetContainsEmissionException, NoRenderApi)
             (void**)precompileService.writeRef()) == SLANG_OK);
     SLANG_CHECK_ABORT(precompileService != nullptr);
 
-    diagnostics.setNull();
-    const SlangResult result =
-        precompileService->precompileForTarget(SLANG_SPIRV, diagnostics.writeRef());
+    outDiagnostics.setNull();
+    return precompileService->precompileForTarget(SLANG_SPIRV, outDiagnostics.writeRef());
+}
+
+SLANG_UNIT_TEST(precompileForTargetContainsEmissionException, NoRenderApi)
+{
+    ComPtr<slang::IBlob> diagnostics;
+    const SlangResult result = _precompileModuleThatRaisesInternalError(diagnostics);
 
     // Reaching this line at all proves the `SLANG_NO_THROW` boundary contained the exception rather
     // than letting it terminate the process.
@@ -77,5 +85,71 @@ SLANG_UNIT_TEST(precompileForTargetContainsEmissionException, NoRenderApi)
     // The caller must also learn why, rather than getting a bare failure with the message lost.
     SLANG_CHECK(diagnostics != nullptr);
     SLANG_CHECK(diagnostics->getBufferSize() != 0);
+}
+
+/// Return the text of `diagnostics`, or an empty string if there is none.
+static String _getText(slang::IBlob* diagnostics)
+{
+    if (!diagnostics)
+        return String();
+    return String(UnownedStringSlice(
+        static_cast<const char*>(diagnostics->getBufferPointer()),
+        diagnostics->getBufferSize()));
+}
+
+// A host application that loads Slang gets no crash report unless it asks for one, so the
+// diagnostics of a failed call are what they were before crash reports existed.
+SLANG_UNIT_TEST(internalErrorHasNoCrashReportByDefault, NoRenderApi)
+{
+    ComPtr<slang::IBlob> diagnostics;
+    SLANG_CHECK(SLANG_FAILED(_precompileModuleThatRaisesInternalError(diagnostics)));
+    SLANG_CHECK(_getText(diagnostics).indexOf(toSlice("Slang crash report")) < 0);
+}
+
+/// Crash reports are on for the lifetime of this object. Reports are a setting of the whole
+/// process, so a test that aborts must not leave them on for the tests that run after it.
+struct ScopedCrashReports
+{
+    ScopedCrashReports(const char* frontEndName) { slang_enableCrashReports(frontEndName); }
+    ~ScopedCrashReports() { slang_enableCrashReports(nullptr); }
+};
+
+// Once a program turns crash reports on, the diagnostics of a call that fails on an internal
+// error end with the report, and the report says what was raised and where.
+SLANG_UNIT_TEST(internalErrorEndsWithCrashReportWhenEnabled, NoRenderApi)
+{
+    ComPtr<slang::IBlob> diagnostics;
+    SlangResult result = SLANG_OK;
+    {
+        ScopedCrashReports crashReports("unit-test");
+        result = _precompileModuleThatRaisesInternalError(diagnostics);
+    }
+
+    SLANG_CHECK(SLANG_FAILED(result));
+    const String text = _getText(diagnostics);
+
+    const Index reportStart = text.indexOf(toSlice("==== Slang crash report (format 1) ===="));
+    SLANG_CHECK_ABORT(reportStart >= 0);
+
+    // The message that the call reported before is still there, ahead of the report.
+    SLANG_CHECK(reportStart > 0);
+
+    // `SLANG_UNIMPLEMENTED_X` raised the error from a Slang source file, and the program that
+    // asked for reports is named.
+    const UnownedStringSlice report = text.getUnownedSlice().tail(reportStart);
+    SLANG_CHECK(report.indexOf(toSlice("\nkind:        internal-error\n")) >= 0);
+    SLANG_CHECK(report.indexOf(toSlice("\nsignal-type: unimplemented\n")) >= 0);
+    SLANG_CHECK(report.indexOf(toSlice("\nlocation:    slang-")) >= 0);
+    SLANG_CHECK(report.indexOf(toSlice("\nfront-end:   unit-test\n")) >= 0);
+    SLANG_CHECK(report.indexOf(toSlice("\nsignature:   ice-")) >= 0);
+
+    // The message can hold names from the user's code, so it appears in the `[details]` part.
+    const Index detailsStart = report.indexOf(toSlice("\n[details]\n"));
+    SLANG_CHECK_ABORT(detailsStart >= 0);
+    SLANG_CHECK(report.tail(detailsStart).indexOf(toSlice("\nmessage:     unimplemented")) >= 0);
+
+    // Turning reports off again restores the default.
+    SLANG_CHECK(SLANG_FAILED(_precompileModuleThatRaisesInternalError(diagnostics)));
+    SLANG_CHECK(_getText(diagnostics).indexOf(toSlice("Slang crash report")) < 0);
 }
 #endif // SLANG_HAS_EXCEPTIONS
