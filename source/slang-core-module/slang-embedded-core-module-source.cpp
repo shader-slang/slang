@@ -23,6 +23,7 @@ enum
     BOOL_RESULT = 1 << 2,
     BOOL_MASK = 1 << 3,
     UINT_MASK = 1 << 4,
+    SHIFT = 1 << 5,
 
     INT_MASK = SINT_MASK | UINT_MASK,
     ARITHMETIC_MASK = INT_MASK | FLOAT_MASK,
@@ -312,6 +313,8 @@ struct IntrinsicOpInfo
     {kIROp_BitAnd, "and", "&", "__BuiltinLogicalType", LOGICAL_MASK},
     {kIROp_BitOr, "or", "|", "__BuiltinLogicalType", LOGICAL_MASK},
     {kIROp_BitXor, "xor", "^", "__BuiltinLogicalType", LOGICAL_MASK},
+    {kIROp_Lsh, "shl", "<<", nullptr, INT_MASK | SHIFT},
+    {kIROp_Rsh, "shr", ">>", nullptr, INT_MASK | SHIFT},
     {kIROp_Eql, "eql", "==", "__BuiltinType", ANY_MASK | BOOL_RESULT},
     {kIROp_Neq, "neq", "!=", "__BuiltinType", ANY_MASK | BOOL_RESULT},
     {kIROp_Greater, "greater", ">", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},

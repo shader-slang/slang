@@ -3210,15 +3210,12 @@ for (auto op : intrinsicBinaryOps)
 
         if (op.flags & BOOL_RESULT) resultType = "bool";
 
-        // TODO: We should handle a `SHIFT` flag on the op
-        // by changing `rightType` to `int` in order to
-        // account for the fact that the shift amount should
-        // always have a fixed type independent of the LHS.
-        //
-        // (It is unclear why this change hadn't been made
-        // already, so it is possible that such a change
-        // breaks overload resolution or other parts of
-        // the compiler)
+        // The shift amount of a SHIFT op is always `int`, independent of the
+        // LHS type, matching the semantics of shifts in C and HLSL. Concrete
+        // overloads with a fixed `int` shift amount also let an enum-typed
+        // operand coerce to `int` through the implicit enum-to-tag-type
+        // conversion during overload resolution.
+        if (op.flags & SHIFT) rightType = "int";
 
         // scalar version
         sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftType << " left, " << rightType << " right);\n";
