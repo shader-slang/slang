@@ -1,6 +1,7 @@
 // main.cpp
 
 #include "core/slang-io.h"
+#include "core/slang-platform.h"
 #include "core/slang-test-tool-util.h"
 #include "slang.h"
 #include "slang/slang-internal.h"
@@ -113,8 +114,24 @@ SLANG_TEST_TOOL_API SlangResult innerMain(
     return res;
 }
 
+/// Return true unless the user turned crash reports off with `SLANG_CRASH_REPORT=0`.
+static bool _areCrashReportsWanted()
+{
+    StringBuilder value;
+    if (SLANG_FAILED(
+            PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_CRASH_REPORT"), value)))
+        return true;
+    return value.getUnownedSlice().trim() != UnownedStringSlice("0");
+}
+
 int MAIN(int argc, char** argv)
 {
+    // slangc is Slang's own program, so a failure of the compiler here is ours to report. When
+    // a compile stops on an internal error, the diagnostics on stderr end with a crash report
+    // that the user can file as an issue.
+    if (_areCrashReportsWanted())
+        slang_enableCrashReports("slangc");
+
     auto stdWriters = StdWriters::initDefaultSingleton();
     SlangResult res = innerMain(stdWriters, nullptr, argc, argv);
     slang::shutdown();

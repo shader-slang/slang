@@ -3,6 +3,7 @@
 
 #include "compiler-core/slang-rich-diagnostics-render.h"
 #include "core/slang-char-util.h"
+#include "core/slang-crash-report.h"
 #include "core/slang-dictionary.h"
 #include "core/slang-memory-arena.h"
 #include "core/slang-string-util.h"
@@ -959,11 +960,33 @@ void outputExceptionDiagnostic(
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
+/// Write `report` to `sink` on lines of its own. A raw diagnostic carries no line break, so the
+/// report supplies the one that separates it from the message before it.
+static void _diagnoseCrashReport(DiagnosticSink& sink, const CrashReportText& report)
+{
+    sink.diagnoseRaw(Severity::Note, "\n");
+    sink.diagnoseRaw(Severity::Note, report.getBuffer());
+}
+
+void diagnoseCrashReportOfLastInternalError(DiagnosticSink& sink, const char* message)
+{
+    CrashReportText report;
+    if (CrashReportUtil::appendReportOfLastInternalError(message, report))
+        _diagnoseCrashReport(sink, report);
+}
+
 void outputExceptionDiagnostic(
     const Exception& exception,
     DiagnosticSink& sink,
     slang::IBlob** outDiagnostics)
 {
+    // We build the report before we diagnose the message. A diagnostic of `Internal` severity
+    // aborts compilation, and that abort is itself a signal, which would replace the record of
+    // the error that we are reporting.
+    CrashReportText report;
+    const bool hasReport =
+        CrashReportUtil::appendReportOfLastInternalError(exception.Message.getBuffer(), report);
+
     SLANG_EXCEPTION_TRY
     {
         sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
@@ -975,6 +998,12 @@ void outputExceptionDiagnostic(
         // for Internal severity to prevent exception leak from loadModule
     }
 #endif
+    // The abort above left a signal record that describes this function, not an error. We
+    // forget it, so that no later report can take it for one.
+    clearLastSignalRecord();
+
+    if (hasReport)
+        _diagnoseCrashReport(sink, report);
     sink.getBlobIfNeeded(outDiagnostics);
 }
 

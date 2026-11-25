@@ -1,6 +1,10 @@
 // slang-crash-report.cpp
 #include "slang-crash-report.h"
 
+#include "slang-signal.h"
+
+#include <atomic>
+
 // This file uses only C library calls and fixed storage. Slang's own containers allocate and
 // assert, and both are off limits on the paths that produce a crash report.
 
@@ -236,6 +240,58 @@ static void _appendField(CrashReportText& ioText, const char* paddedKey, const c
     ioText.append("%22\n"
                   "Report it:   https://github.com/shader-slang/slang/issues/new"
                   "?template=crash-report.yml\n");
+}
+
+// The process-wide settings of crash reports. The strings are written once at start-up, before
+// the flag that publishes them, and the flag is atomic, so a thread that sees reports enabled
+// also sees both strings.
+static const char* g_frontEnd = nullptr;
+static const char* g_slangVersion = nullptr;
+static std::atomic<bool> g_areReportsEnabled{false};
+
+/* static */ void CrashReportUtil::enableReports(const char* frontEnd, const char* slangVersion)
+{
+    if (!frontEnd)
+    {
+        g_areReportsEnabled.store(false);
+        return;
+    }
+    g_frontEnd = frontEnd;
+    g_slangVersion = slangVersion;
+    g_areReportsEnabled.store(true);
+}
+
+/* static */ bool CrashReportUtil::areReportsEnabled()
+{
+    return g_areReportsEnabled.load();
+}
+
+/* static */ bool CrashReportUtil::appendReportOfLastInternalError(
+    const char* message,
+    CrashReportText& ioText)
+{
+    if (!areReportsEnabled())
+        return false;
+
+    InternalErrorReportDesc desc;
+    desc.slangVersion = g_slangVersion;
+    desc.frontEnd = g_frontEnd;
+    desc.message = message;
+
+    // An error that did not pass through `handleSignal`, such as an exception from the C++
+    // library, leaves no record. Its report still states the version and the host.
+    SignalRecord record;
+    if (getLastSignalRecord(record))
+    {
+        desc.signalTypeName = getSignalTypeName(record.type);
+        desc.sourceFile = record.file;
+        desc.sourceLine = record.line;
+        desc.stackTrace = record.stackTrace;
+    }
+
+    appendInternalErrorReport(desc, ioText);
+    clearLastSignalRecord();
+    return true;
 }
 
 } // namespace Slang
