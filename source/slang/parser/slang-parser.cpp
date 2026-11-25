@@ -9207,12 +9207,11 @@ static BaseType _determineIntegerLiteralType(
     // Slang type rather than rejecting code that used to compile.
     // `parseIntegerLiteralExpr` narrows the stored value to the chosen
     // type, which turns the bit pattern into that negative value.
-    if (sourceLanguage == SourceLanguage::GLSL &&
-            widthSuffix == IntegerLiteralWidthSuffix::None &&
-            unsignedSuffix == IntegerLiteralUnsignedSuffix::None && (rawValue <= UINT32_MAX))
-        {
-            return BaseType::Int;
-        }
+    if (sourceLanguage == SourceLanguage::GLSL && widthSuffix == IntegerLiteralWidthSuffix::None &&
+        unsignedSuffix == IntegerLiteralUnsignedSuffix::None && (rawValue <= UINT32_MAX))
+    {
+        return BaseType::Int;
+    }
 
     if (isDecimalBase)
     {
