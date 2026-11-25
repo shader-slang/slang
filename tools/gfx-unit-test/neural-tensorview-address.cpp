@@ -227,7 +227,7 @@ void neuralTensorViewAddressTestImpl(IDevice* device, UnitTestContext* context)
     }
 }
 
-SLANG_UNIT_TEST(neuralTensorViewAddressCUDA)
+SLANG_UNIT_TEST(neuralTensorViewAddressCUDA, CUDA)
 {
     if (!(unitTestContext->enabledApis & Slang::RenderApiFlag::CUDA))
     {

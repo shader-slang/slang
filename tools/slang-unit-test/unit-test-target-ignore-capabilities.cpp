@@ -79,7 +79,7 @@ String loadDiagnostics(
 // IgnoreCapabilities set in a TargetDesc's compilerOptionEntries must silence the capability
 // errors reported for that target, as the same option does when set for the whole session, and
 // must not silence them for the session's other targets.
-SLANG_UNIT_TEST(targetIgnoreCapabilities)
+SLANG_UNIT_TEST(targetIgnoreCapabilities, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(

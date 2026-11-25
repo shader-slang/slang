@@ -29,7 +29,7 @@ static bool _checkDecode(const UnownedStringSlice& encoded, const UnownedStringS
     const auto encoded = toSlice(#x); \
     const auto decoded = toSlice(x);
 
-SLANG_UNIT_TEST(StringEscape)
+SLANG_UNIT_TEST(StringEscape, NoRenderApi)
 {
     // Check greedy hex digits
     {

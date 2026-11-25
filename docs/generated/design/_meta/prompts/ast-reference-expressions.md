@@ -7,7 +7,7 @@ reference family contract**.
 
 Produce `docs/generated/design/ast-reference/expressions.md` — the
 per-node reference for the `Expr` family declared in
-[slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h).
+[slang-ast-expr.h](../../../../source/slang/ast/slang-ast-expr.h).
 
 ## Family-specific guidance
 

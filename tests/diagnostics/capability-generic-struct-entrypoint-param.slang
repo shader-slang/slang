@@ -55,13 +55,13 @@
 // code must compile. We assert no E36107 *and* that compilation reaches code
 // emission (the entry-point rename warning E40100 only fires on success), so the
 // case cannot pass by failing for some unrelated reason.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CPP): -target cpp -entry main -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=CPP,exit-code=0): -target cpp -entry main -stage vertex
 //CPP-NOT: E36107
 //CPP: E40100
 // Profile-implicit-upgrade path: a generic struct requiring a higher shader model
 // than the requested profile contributes to the "implicitly upgraded" warning
 // (this path uses the augmented capability set, not the bare entry-point set).
-//DIAGNOSTIC_TEST:SIMPLE(diag=UPGRADE,non-exhaustive): -target hlsl -profile sm_5_0 -capability hlsl -entry mainUpgrade -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=UPGRADE,exit-code=0,non-exhaustive): -target hlsl -profile sm_5_0 -capability hlsl -entry mainUpgrade -stage compute
 //UPGRADE: E41012
 //UPGRADE: sm_6_5
 

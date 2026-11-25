@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/01-lex-preprocess.md#what-the-lexer-does-not-do
-//META: doc_section_digest=effeedc2dec5b1cd62b793dca8f844925076b3dea4a96212a0cd91d16b3e59d4
+//META: doc_section_digest=a66927ad7c772505d1caa17edb5bc9ef28e60e4d0e9391050ed0bf07ef5e2a17
 //META: purpose=The lexer emits whitespace and comments as their own token types but the preprocessor's token collection filters them, so the parser never sees a comment embedded mid-expression.
 //META: intent=functional
 //META: pipeline_stage=lex

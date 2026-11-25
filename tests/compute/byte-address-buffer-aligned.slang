@@ -1,7 +1,6 @@
 // byte-address-buffer-aligned.slang
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -d3d12 -profile cs_6_0 -shaderobj -output-using-type
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -cuda -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=CHECK):-profile cs_6_0 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type
 
 //TEST:SIMPLE(filecheck=CHECK1):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK2):-target hlsl -entry computeMain -stage compute
@@ -41,9 +40,9 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // CHECK2: buffer0_0.Store(32U,float4((buffer0_0).Load<float >(8U), (buffer0_0).Load<float >(12U), (buffer0_0).Load<float >(16U), (buffer0_0).Load<float >(20U)));
     // CHECK2: float4 [[WIDE:[A-Za-z0-9_]+]] = (buffer0_0).Load<float4 >(32U);
     // CHECK2: buffer0_0.Store(8U,[[WIDE]][int(0)]);
-    // CHECK2: buffer0_0.Store(12U,[[WIDE]][int(1)]);
-    // CHECK2: buffer0_0.Store(16U,[[WIDE]][int(2)]);
-    // CHECK2: buffer0_0.Store(20U,[[WIDE]][int(3)]);
+    // CHECK2: buffer0_0.Store(12U,[[WIDE]][1L]);
+    // CHECK2: buffer0_0.Store(16U,[[WIDE]][2L]);
+    // CHECK2: buffer0_0.Store(20U,[[WIDE]][3L]);
     // CHECK2: float [[W12:[A-Za-z0-9_]+]] = (buffer0_0).Load<float >(12U);
     // CHECK2: float [[W16:[A-Za-z0-9_]+]] = (buffer0_0).Load<float >(16U);
     // CHECK2: float [[W20:[A-Za-z0-9_]+]] = (buffer0_0).Load<float >(20U);

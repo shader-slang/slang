@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all-vk-glsl-wgpu-llvm):
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
 
 //CHECK-DAG: txq.width.b32 %0, [%1];
@@ -33,7 +33,7 @@ RWStructuredBuffer<uint> cudaOutputBuffer;
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
-    
+
     uint width = 0;
     uint height = 0;
     uint depth = 0;

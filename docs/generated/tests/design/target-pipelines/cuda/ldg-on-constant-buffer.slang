@@ -3,7 +3,7 @@
 //META: generated_at=2026-09-16T08:36:25Z
 //META: source_commit=d3b56927b854c14fa1ac169b72da6e080ea80833
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#lowerimmutablebufferloadforcuda
-//META: doc_section_digest=031d306ccbb9670357e2a8af6d7e786afcb208ea0c4a357ccf9a309fc8034205
+//META: doc_section_digest=176050d5aa6473a960364c4e8306dcb0207b369af4a0a0c828054dd949a1f62f
 //META: purpose=The backing pointer for a top-level ConstantBuffer<T> is loaded from SLANG_globalParams, after which reading its contents is eligible for __ldg global-memory lowering.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

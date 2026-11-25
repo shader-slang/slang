@@ -1,8 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -dx12 -profile cs_6_0 -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=BUF):-profile cs_6_0 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+metal+cuda, filecheck-buffer=BUF):-output-using-type
 //TEST:SIMPLE(filecheck=LIB):-target metallib -entry computeMain -stage compute -DMETAL
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0]):name=uintBuffer
 RWByteAddressBuffer uintBuffer;

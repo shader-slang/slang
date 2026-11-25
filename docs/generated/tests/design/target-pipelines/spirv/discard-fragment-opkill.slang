@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#spir-v-specific-runtime-predicates
-//META: doc_section_digest=be20aea74fa93375641ba6be403852dd450904a22e0ef9e13e36b0b0c43712d3
+//META: doc_section_digest=de7fb1b469f279ad72ab2adf5d4d8d12e6f5f3d071cfbb3e0bca532a60e980c9
 //META: purpose=Under SPIR-V 1.5 (the Slang default) discard lowers to OpKill — the documented "shouldEmitDiscardAsDemote returns false" branch where removeUnreachableCodeAfterDiscardForOpKill is active.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

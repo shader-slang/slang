@@ -16,7 +16,7 @@ using namespace Slang;
 // - the standalone reflected type layout for `Params<1,2,3>`
 // - the cumulative offsets seen through the linked program's global `gParams`
 //   parameter layout, walking the `next.next` path
-SLANG_UNIT_TEST(packBranchTypeLayoutReflection)
+SLANG_UNIT_TEST(packBranchTypeLayoutReflection, NoRenderApi)
 {
     const char* source = R"(
         struct EmptyNode

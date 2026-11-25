@@ -5,16 +5,16 @@
 #include "compiler-core/slang-artifact-util.h"
 #include "core/slang-performance-profiler.h"
 #include "core/slang-type-text-util.h"
-#include "slang-ast-dump.h"
-#include "slang-check-impl.h"
 #include "slang-compiler.h"
-#include "slang-emit-source-writer.h"
-#include "slang-lower-to-ir.h"
 #include "slang-markdown.h"
 #include "slang-options.h"
-#include "slang-parser.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-serialize-container.h"
+#include "slang/ast/slang-ast-dump.h"
+#include "slang/emission/slang-emit-source-writer.h"
+#include "slang/lower-to-ir/slang-lower-to-ir.h"
+#include "slang/parser/slang-parser.h"
+#include "slang/semantic-checking/slang-check-impl.h"
+#include "slang/serialization/slang-serialize-container.h"
 
 namespace Slang
 {
@@ -824,14 +824,17 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         parseTranslationUnit(translationUnit);
     }
 
+    // We check for errors before the preprocessor-only (`-E`) return so that `-E` fails like any
+    // other request with errors. Under `-E`, `parseTranslationUnit` has already written the
+    // preprocessed text, so failing here keeps that text.
+    if (getSink()->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
     {
         // If doing pre-processor output, then we are done
         return SLANG_OK;
     }
-
-    if (getSink()->getErrorCount() != 0)
-        return SLANG_FAIL;
 
     // Perform semantic checking on the whole collection
     {

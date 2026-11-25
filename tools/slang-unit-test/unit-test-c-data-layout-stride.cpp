@@ -217,12 +217,12 @@ static void _testCDataLayoutReflectionStride(UnitTestContext* context, bool forc
     SLANG_CHECK(hasStatsAt32);
 }
 
-SLANG_UNIT_TEST(CDataLayoutReflectionStride)
+SLANG_UNIT_TEST(CDataLayoutReflectionStride, NoRenderApi)
 {
     _testCDataLayoutReflectionStride(unitTestContext, false);
 }
 
-SLANG_UNIT_TEST(CDataLayoutReflectionStrideWithScalarLayout)
+SLANG_UNIT_TEST(CDataLayoutReflectionStrideWithScalarLayout, NoRenderApi)
 {
     _testCDataLayoutReflectionStride(unitTestContext, true);
 }

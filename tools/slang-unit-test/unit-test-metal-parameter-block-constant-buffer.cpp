@@ -8,7 +8,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(metalConstantBufferInParameterBlockLayout)
+SLANG_UNIT_TEST(metalConstantBufferInParameterBlockLayout, NoRenderApi)
 {
     const char* testSource = R"(
         struct T 
@@ -70,7 +70,7 @@ SLANG_UNIT_TEST(metalConstantBufferInParameterBlockLayout)
     testBody();
 }
 
-SLANG_UNIT_TEST(metalArgumentBufferLayout)
+SLANG_UNIT_TEST(metalArgumentBufferLayout, NoRenderApi)
 {
     const char* testSource = R"(
         struct T 

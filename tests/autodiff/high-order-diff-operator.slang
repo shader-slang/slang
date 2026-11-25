@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -32,5 +30,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Expect sin''(Pi/2) = -1.
     outputBuffer[1] = __fwd_diff(__fwd_diff(sin))(
                           DifferentialPair<DifferentialPair<float>>(
-                              DifferentialPair<float>(float.getPi()/2, 1.0), DifferentialPair<float>(1.0, 0.0))).d.d; 
+                              DifferentialPair<float>(float.getPi()/2, 1.0), DifferentialPair<float>(1.0, 0.0))).d.d;
 }

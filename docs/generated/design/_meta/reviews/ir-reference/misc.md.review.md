@@ -1,51 +1,51 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:12:06+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T08:07:11Z
 target_doc: ir-reference/misc.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: 1155790e3696c9cddf4f2405223ad2c7acc6846e935a3f2e3b8e67beb91416f3
+source_commit: 8341c7e537a3f5cb3a60cd062066ffd630da40d8
 checklist:
-  factual_accuracy: fail
+  factual_accuracy: partial
   cross_references: pass
-  completeness: fail
-  style_consistency: pass
-  source_alignment: fail
-  front_matter_validity: partial
+  completeness: partial
+  style_consistency: partial
+  source_alignment: partial
+  front_matter_validity: pass
 finding_count: 7
 severity_breakdown:
   critical: 2
-  major: 2
-  minor: 3
-  nit: 0
+  major: 3
+  minor: 1
+  nit: 1
 ---
 
 # Review report for ir-reference/misc.md
 
 ## Summary
-The page has strong coverage and every numeric citation resolves to the stated source location, but two behavioral explanations contradict the recorded source. Most importantly, the type-predicate table misstates the implemented vector behavior, while the barrier callout incorrectly says the IR preserves symbolic flags and that cross-language numeric drift is caught at compile time. The tables also retain the explicitly retired `(synthesized)` producer label in 16 rows and do not mark their 12 hand-written wrappers.
+
+The document needs corrections before acceptance. Most checked encodings and citations match the source, but the `GetArrayLength` entry incorrectly denies an intrinsic lowering producer, and the expansion callout attributes specialization behavior to the wrong pass. Coverage and several mandatory table conventions also need correction.
 
 ## Items checked
-- Reviewed the target, `_common.md`, the per-document prompt, both dependency documents, and all 13 files resolved by `regenerate.py show` at source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
-- Verified every line-number citation in the body against that source snapshot, including lowering, builder, pass, emitter, core-module, type-system, and work-graph citations.
-- Spot-checked more than 10 behavioral claims, including pack lowering, type predicates, storage/logical casts, annotations, liveness, string hashing, CUDA launch, barrier emission, untyped handles, and compiler dictionaries.
-- Checked all 65 opcode rows for the required column shape, exact-producer terminology, wrapper naming, hand-written-wrapper marking, and duplicate ownership.
-- Resolved all relative links with `regenerate.py lint ir-reference/misc.md` and checked generated peer pages against the manifest.
-- Recomputed the digest for the currently resolved watched set; it is `68307fb210079951c7475f2a90085649cb5551132e6648106e00c80d147882d8`, not the digest recorded in the target front matter.
+
+- Read `_review.md`, `_common.md`, the document-specific prompt, and `regenerate.py show ir-reference/misc.md`.
+- Verified against the current working tree, which the supplied review context identifies as matching the document’s source commit throughout `source/`.
+- Checked all located line-number citations, covering 135 distinct source locations or ranges, including repeated citations and implicit file references.
+- Spot-checked more than 20 behavioral claims, including capability construction, pack branching, witness packs, type predicates, size/count queries, opaque-handle lowering, storage casts, annotation caching, dictionary keys, string-hash validation, CUDA launch encoding, and barrier emission.
+- Resolved all 108 Markdown links across 50 distinct destinations; checked generated-page manifest membership and the `values.md#conversions` anchor.
+- Compared the 66 opcode rows with sibling tables and Lua declarations. Found no duplicate ownership; checked the stated count of 12 handwritten wrappers.
+- Checked required sections, table columns, front-matter keys and formats, Mermaid syntax, and Liquid safety. Dependency pages were consulted only for cross-reference checks.
+- Performed read-only inspection; no files were written.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | `### Type queries and predicates`, rows `IsInt` through `IsVector` (lines 217-224) | The summaries do not describe the implemented predicate behavior. Before evaluating `IsInt`, `IsFloat`, `IsHalf`, signedness, `IsBool`, or `IsVector`, peephole unwraps a vector or matrix to its element type. Consequently the scalar predicates can return true for vector/matrix operands, while `IsVector` returns false for a concrete vector because the value tested by `as<IRVectorType>` has already been replaced with its element type. The row's claim that `IsVector` is “True for a vector” is directly contradicted by the source. | `source/slang/slang-ir-peephole.cpp:1878-1912` unwraps vector/matrix types at lines 1879-1882 and only then evaluates `IsVector` at lines 1910-1912. | Rewrite these summaries to state the actual element-type folding behavior at this commit, explicitly noting the implemented `IsVector` result rather than documenting the apparent intended semantics. |
-| F-002 | critical | `### getEnumBarrierMemoryTypeFlags and getEnumBarrierSemanticFlags`, lines 564-600 | The callout says the IR carries a “symbolic flag value” and that divergence between the C++ and Slang numeric definitions is a compile error. In fact, HLSL emission requires the operand to be an `IRIntLit`, converts it to `uint32_t`, and reconstructs names from numeric bits. The `static_assert`s compare C++ enum members with literals in the same C++ header; they do not reference `workgraph.slang`, so changing only the Slang values does not trigger those assertions. | `source/slang/slang-emit-hlsl.cpp:1177-1193` consumes `IRIntLit`; `source/slang/slang-emit-hlsl-prelude.cpp:553-616` maps numeric bits to names; `source/slang/slang-type-system-shared.h:12-63` contains only same-file literal assertions; `source/standard-modules/experimental/workgraph.slang:274-307` separately hard-codes the Slang values. | State that the IR carries a folded numeric bitmask and the emitter maps known bit values back to HLSL names. Replace the compile-error claim with the actual manual synchronization requirement, and clarify that the C++ assertions pin only the C++ side. |
-| F-003 | major | `AST origin` cells at lines 134, 150-151, 167, 169, 200, 264-266, 315-316, 330, and 364-367 | Sixteen rows still use the retired catch-all `(synthesized)`, despite both the source prose and the prompt saying every row must name the actual producer or say **no producer at HEAD**. These rows hide materially different origins: `getCapabilityValue`, the PyTorch binding pass, lowering visitors, buffer-element legalization, liveness/phi passes, dispatch lowering, and `initializeTranslationDictionary`; `nop` appears to have no instruction producer. | Producer-column contract at `docs/generated/design/_meta/prompts/_common.md:240` and `docs/generated/design/_meta/prompts/ir-reference-misc.md:25-34`; representative producers at `source/slang/slang-ir.cpp:2669-2707`, `source/slang/slang-ir-pytorch-cpp-binding.cpp:460-472`, `source/slang/slang-lower-to-ir.cpp:2056-2069`, `source/slang/slang-ir-lower-buffer-element-type.cpp:1174-1180`, and `source/slang/slang-ir-translate.cpp:16-27`. | Trace and replace all 16 `(synthesized)` cells with the specific producing function/pass. Mark `nop` **no producer at HEAD** if a complete source sweep confirms it is only used as an opcode sentinel, and mention no-producer status in its Summary cell as required. |
-| F-004 | major | All `C++ wrapper` cells; hand-written-wrapper prose at lines 63-77 | The page correctly states that 12 wrappers are hand-written, but none of those rows is marked in the C++ wrapper column. The family contract explicitly requires each hand-written wrapper to be marked, not merely listed in separate prose. | `docs/generated/design/_meta/prompts/_common.md:237`; representative hand-written definitions include `IRAnnotation` and `IRDispatchKernel` at `source/slang/slang-ir-insts.h:740-758`, `IRExpand`/`IREach` at `source/slang/slang-ir-insts.h:2378-2393`, and the compiler-dictionary wrappers at `source/slang/slang-ir-insts.h:3084-3109`. | Add a consistent marker such as `‡` to all 12 applicable wrapper cells and define it immediately below the tables or in the existing wrapper explanation. |
-| F-005 | minor | Operand cells for `makeTensorView` (line 167), `liveRangeStart` (line 315), and `DispatchKernel` (line 330) | These cells mix builder-produced operands into a column whose contract is the Lua schema. `makeTensorView` has no named Lua operands, `liveRangeStart` declares only `min_operands = 2`, and `DispatchKernel` names exactly three Lua operands without `args...`. The builder discrepancies are useful, but belong in summaries/callouts rather than changing the schema column. | Column contract at `docs/generated/design/_meta/prompts/_common.md:238`; Lua entries at `source/slang/slang-ir-insts.lua:1687`, `2961`, and `2856`; actual builder shapes at `source/slang/slang-ir.cpp:3682-3690`, `3758-3775`, and `4961-4964`. | Make the three operand cells report only the Lua-declared schema, and retain the actual one-operand/trailing-argument discrepancies in the nearby prose. |
-| F-006 | minor | `### Coverage gaps against sibling pages`, lines 370-382 | The first “gap” is stale: the paragraph says sibling pages do not yet list the named work-graph/handle types, `imageGatherOffset`, work-graph decorations, or `TypeAlignment`, but those opcodes are now present in the sibling tables. | Examples are present at `docs/generated/design/ir-reference/types.md:283-292,370,376-377`, `docs/generated/design/ir-reference/resources-and-atomics.md:169`, `docs/generated/design/ir-reference/decorations.md:129,169,254-258`, and `docs/generated/design/ir-reference/metadata.md:167`. | Delete the obsolete first-gap paragraph or replace it with a current ownership statement that does not claim those sibling rows are missing. |
-| F-007 | minor | Front matter, line 6 | The recorded `watched_paths_digest` no longer matches the watched set resolved by the required `regenerate.py show` invocation. With the 13 paths currently declared in the manifest, `regenerate.py digest ir-reference/misc.md` returns `68307fb210079951c7475f2a90085649cb5551132e6648106e00c80d147882d8`, not `64be22...d1bc`. | Current watched paths are declared at `docs/generated/design/_meta/manifest.yaml:739-752`; target front matter records the old digest at `docs/generated/design/ir-reference/misc.md:6`. | Regenerate the page metadata against the current resolved watched set so the front-matter digest equals the driver output; do not merely hand-edit the hash without rerunning the generation workflow. |
-
-## No-issues notes
-- All required front-matter keys are present and syntactically well formed.
-- The required notable callouts for `Each`, `PackBranch`, `MakeWitnessPack`, `getStringHash`, and `CudaKernelLaunch` are present.
-- All relative links resolve, and every numeric source citation is at the claimed symbol or range.
+| F-001 | critical | `## Opcodes`, line 306 | `GetArrayLength` is labeled `no lowering producer`, and the summary claims `Array<T>::getCount` follows `visitGetArrayLengthExpr`. These are different paths: the intrinsic declaration produces the opcode through ordinary intrinsic call lowering. A later fold does not establish absence of a producer. | `source/slang/core.meta.slang:2330` declares `getCount()` with `kIROp_GetArrayLength`; `source/slang/slang-lower-to-ir.cpp:991–1019` emits intrinsic opcodes through `emitCallToDeclRef`. `source/slang/slang-ir-peephole.cpp:411–416` subsequently replaces `GetArrayLength` with the array extent. | Name `Array<T,N>::getCount` via `emitCallToDeclRef` as the producer. Distinguish this from the synthesized `GetArrayLengthExpr` visitor, which directly returns the extent. Remove the claim that absence from a dump proves no instruction was constructed. |
+| F-002 | critical | `### Expand and Each`, lines 489–491; opcode row 221 | The callout says `slang-ir-lower-expand-type.cpp` “re-emits the pattern once per slot once the pack length is known.” That pass constructs an indexed `IRExpand` region and rewrites `Each` accesses; specialization performs the per-element expansion. The row also omits this intermediate producer for `ExpandType` and `ExpandIntValPack`. | `source/slang/slang-ir-lower-expand-type.cpp:86–108` constructs `IRExpand`; lines 24–32 convert `Each` to tuple access. `source/slang/slang-ir-specialize.cpp:3317–3408` determines cardinality and clones the body per element. `source/slang/slang-lower-to-ir.cpp:2221,2255` initially builds `ExpandTypeOrVal`. | Attribute region construction and `Each` rewriting to `lowerExpandTypeImpl`/`clonePatternValImpl`; attribute per-slot expansion to `maybeSpecializeExpand`. Clarify the direct `ExpandExpr` producer versus the `ExpandTypeOrVal` conversion path. |
+| F-003 | major | `### Coverage gaps against sibling pages`, lines 463–473 | `Every concrete Lua entry no other ir-reference/ page claims is listed above` is false: `reportOptiXIntersection` is absent from every family opcode table. | `source/slang/slang-ir-insts.lua:1670` declares the concrete opcode; `source/slang/hlsl.meta.slang:21379–21381` declares its intrinsic producer. The sibling table census contains no corresponding row. | Assign this opcode to the ray-tracing section of `resources-and-atomics.md`, update the relevant prompts as required by the family-specific routing rule, and cross-link that ownership here. Correct the exhaustive-coverage claim until ownership is complete. |
+| F-004 | major | Operand cells, lines 330–331, 338, 388–389, 406–407 | Six rows use the explicitly forbidden `(variadic, min=N)` notation for unnamed minimum operands. `liveRangeEnd` instead supplies an accessor-derived name without the required `†` explanation. | `source/slang/slang-ir-insts.lua:1672,2802–2803,2998,3004–3005` supplies minimum counts or an empty entry, not those variadic declarations. `source/slang/slang-ir-insts.h:2651` supplies `getReferenced()`. `_common.md`, IR-reference operand-column contract, requires `(N unnamed)` or explained accessor-derived names. | Use `(2 unnamed)` for the two storage casts, `Annotation`, `WitnessTableAnnotation`, and `liveRangeStart`; use `(1 unnamed)` for `GetLegalizedSPIRVGlobalParamAddr`. Mark `referenced` as accessor-derived with `†` and add a legend. Preserve builder discrepancies in the explanatory prose. |
+| F-005 | major | AST-origin cells, lines 221–232, 258, 303–305, 459 | Numerous AST-produced rows name only AST classes or line numbers, omitting the actual `visit*` producer required by the column contract. | `_common.md`, IR-reference AST-origin contract, requires the AST class plus visitor. Examples exist at `source/slang/slang-lower-to-ir.cpp:2304` (`visitTypePackSubtypeWitness`), 5448 (`visitSizeOfLikeExpr`), 5509 (`visitPackQueryExpr`), 5531 (`visitShapePackTransformExpr`), and 6991 (`visitIsTypeExpr`). | Add the relevant visitor names to each affected AST-origin cell, including the shared pack-query, shape-transform, and size-query visitors. For indirect production, identify the intermediate pass as described in F-002. |
+| F-006 | minor | `## Source`, lines 95–102 | The blanket statement that cited `slang-ir-*.cpp` passes “are not watched” is stale. Several cited producer passes are explicitly watched. | `docs/generated/design/_meta/manifest.yaml:1013–1018` lists peephole, PyTorch binding, buffer-element lowering, liveness, phi elimination, and translation sources. | State that the entire glob is excluded but a selected subset is watched. Limit the freshness caveat to producers outside that subset. |
+| F-007 | nit | Introduction, lines 12–27; opcode summary line 458 | The intended reader appears in a separate second paragraph, although the universal contract requires it in the first. The dictionary-value summary also uses `*weakly*`, contrary to the summary-column restriction to inline-code markup only. | `docs/generated/design/_meta/prompts/_common.md`, universal content rules and IR-reference Summary-column contract. | Merge the intended-reader sentence into the opening paragraph and remove emphasis markup around “weakly.” |

@@ -67,7 +67,7 @@ static bool _hasOneSourceMap(ISlangMutableFileSystem* fileSystem)
     return fileCount > 0 && sourceMapCount == 1;
 }
 
-SLANG_UNIT_TEST(getResultAsFileSystemSharedArtifact)
+SLANG_UNIT_TEST(getResultAsFileSystemSharedArtifact, NoRenderApi)
 {
     const char* userSourceBody = R"(
         [shader("compute")]

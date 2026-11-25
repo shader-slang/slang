@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu -output-using-type
-//TEST(compute):COMPARE_COMPUTE:-cuda -output-using-type
-//TEST(compute):COMPARE_COMPUTE:-llvm -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-metal-wgpu):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

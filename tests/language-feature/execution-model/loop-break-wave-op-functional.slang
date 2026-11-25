@@ -7,8 +7,7 @@
 // Iteration 2: 2 active, thread 2 breaks → count=2 for thread 2
 // Iteration 3: 1 active, thread 3 breaks → count=1 for thread 3
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 
 RWStructuredBuffer<int> outputBuffer;

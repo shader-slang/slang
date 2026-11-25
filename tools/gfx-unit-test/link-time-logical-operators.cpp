@@ -135,12 +135,12 @@ void linkTimeLogicalOperatorsTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, outputBuffer, std::array{30.0f});
 }
 
-SLANG_UNIT_TEST(linkTimeLogicalOperatorsD3D12)
+SLANG_UNIT_TEST(linkTimeLogicalOperatorsD3D12, D3D12)
 {
     runTestImpl(linkTimeLogicalOperatorsTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(linkTimeLogicalOperatorsVulkan)
+SLANG_UNIT_TEST(linkTimeLogicalOperatorsVulkan, Vulkan)
 {
     runTestImpl(linkTimeLogicalOperatorsTestImpl, unitTestContext, DeviceType::Vulkan);
 }

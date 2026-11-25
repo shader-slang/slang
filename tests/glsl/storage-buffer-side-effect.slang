@@ -1,4 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 #version 430
 precision highp float;
 precision highp int;

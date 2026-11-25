@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -output-using-type -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=BUF): -output-using-type
 //TEST_INPUT:ubuffer(data=[7 7 7 7 7 7 7 7], stride=1, count=8):out,name=outputBuffer
 RWStructuredBuffer<uint8_t> outputBuffer;
 

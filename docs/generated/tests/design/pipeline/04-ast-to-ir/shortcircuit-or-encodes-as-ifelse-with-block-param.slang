@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#builtin-operators-bypass-call-lowering
-//META: doc_section_digest=687130475ff4ddc8d392b53fafb20c7efbd82d162c595dcf4113ef5f326b0274
+//META: doc_section_digest=406739b370a5ef05319669d01da3461b7d7e09195ac8ecfdfe64017fe9eca325
 //META: purpose=A short-circuit logical-OR of `(a > b)` and `(c < d)` is excluded from the builtin fast path and lowers through its dedicated control-flow path — an `ifElse(...)` whose join block receives the Bool via a block-parameter branch argument, with the RHS evaluated only on the false edge.
 //META: intent=boundary
 //META: pipeline_stage=lower

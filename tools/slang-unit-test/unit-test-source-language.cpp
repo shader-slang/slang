@@ -10,7 +10,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(sourceLanguageRejectsConflictingPrimaryFileExtensions)
+SLANG_UNIT_TEST(sourceLanguageRejectsConflictingPrimaryFileExtensions, NoRenderApi)
 {
     ComPtr<slang::ICompileRequest> request;
     SLANG_ALLOW_DEPRECATED_BEGIN
@@ -46,7 +46,7 @@ SLANG_UNIT_TEST(sourceLanguageRejectsConflictingPrimaryFileExtensions)
     SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("warning[E00120]")) < 0);
 }
 
-SLANG_UNIT_TEST(sourceLanguageAllowGLSLNormalizesThroughDeprecatedAPI)
+SLANG_UNIT_TEST(sourceLanguageAllowGLSLNormalizesThroughDeprecatedAPI, NoRenderApi)
 {
     slang::CompilerOptionEntry allowGLSLInputOption = {};
     allowGLSLInputOption.name = slang::CompilerOptionName::AllowGLSL;
@@ -103,7 +103,7 @@ SLANG_UNIT_TEST(sourceLanguageAllowGLSLNormalizesThroughDeprecatedAPI)
     SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("warning[E00129]")) >= 0);
 }
 
-SLANG_UNIT_TEST(sourceLanguageAllowGLSLDoesNotApplyToImportedModules)
+SLANG_UNIT_TEST(sourceLanguageAllowGLSLDoesNotApplyToImportedModules, NoRenderApi)
 {
     const char* importedSource = R"(
         #language slang 2026
@@ -147,7 +147,7 @@ SLANG_UNIT_TEST(sourceLanguageAllowGLSLDoesNotApplyToImportedModules)
     SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("E00120")) < 0);
 }
 
-SLANG_UNIT_TEST(sourceLanguageReproPreservesRequestAllowGLSLBeforeCompile)
+SLANG_UNIT_TEST(sourceLanguageReproPreservesRequestAllowGLSLBeforeCompile, NoRenderApi)
 {
     ComPtr<slang::ICompileRequest> request;
     SLANG_ALLOW_DEPRECATED_BEGIN
@@ -183,7 +183,7 @@ SLANG_UNIT_TEST(sourceLanguageReproPreservesRequestAllowGLSLBeforeCompile)
     SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("warning[E00117]")) >= 0);
 }
 
-SLANG_UNIT_TEST(sourceLanguageVersionAppliesToEveryPrimaryFile)
+SLANG_UNIT_TEST(sourceLanguageVersionAppliesToEveryPrimaryFile, NoRenderApi)
 {
     ComPtr<slang::ICompileRequest> request;
     SLANG_ALLOW_DEPRECATED_BEGIN
@@ -213,7 +213,7 @@ SLANG_UNIT_TEST(sourceLanguageVersionAppliesToEveryPrimaryFile)
     SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("error[E00124]")) >= 0);
 }
 
-SLANG_UNIT_TEST(sourceLanguageRejectsConflictingPrimaryFileVersions)
+SLANG_UNIT_TEST(sourceLanguageRejectsConflictingPrimaryFileVersions, NoRenderApi)
 {
     ComPtr<slang::ICompileRequest> request;
     SLANG_ALLOW_DEPRECATED_BEGIN
@@ -243,7 +243,7 @@ SLANG_UNIT_TEST(sourceLanguageRejectsConflictingPrimaryFileVersions)
     SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("error[E00126]")) >= 0);
 }
 
-SLANG_UNIT_TEST(sourceLanguageSessionAllowGLSLAppliesWithoutMutation)
+SLANG_UNIT_TEST(sourceLanguageSessionAllowGLSLAppliesWithoutMutation, NoRenderApi)
 {
     slang::CompilerOptionEntry allowGLSLInputOption = {};
     allowGLSLInputOption.name = slang::CompilerOptionName::AllowGLSL;
@@ -283,7 +283,7 @@ SLANG_UNIT_TEST(sourceLanguageSessionAllowGLSLAppliesWithoutMutation)
     }
 }
 
-SLANG_UNIT_TEST(sourceLanguageCommandLineAllowGLSLCanConfigureSession)
+SLANG_UNIT_TEST(sourceLanguageCommandLineAllowGLSLCanConfigureSession, NoRenderApi)
 {
     const char* args[] = {"-allow-glsl"};
     slang::SessionDesc sessionDesc = {};
@@ -310,7 +310,7 @@ SLANG_UNIT_TEST(sourceLanguageCommandLineAllowGLSLCanConfigureSession)
     SLANG_CHECK(foundAllowGLSL);
 }
 
-SLANG_UNIT_TEST(sourceLanguageSessionOptionAppliesToModuleSourceString)
+SLANG_UNIT_TEST(sourceLanguageSessionOptionAppliesToModuleSourceString, NoRenderApi)
 {
     // `loadModuleFromSourceString()` does not take a language parameter. A client such as
     // render-test therefore selects GLSL on the session and may still give its in-memory source a
@@ -347,7 +347,7 @@ SLANG_UNIT_TEST(sourceLanguageSessionOptionAppliesToModuleSourceString)
     SLANG_CHECK(module != nullptr);
 }
 
-SLANG_UNIT_TEST(sourceLanguageModuleSourceStringUsesFileExtension)
+SLANG_UNIT_TEST(sourceLanguageModuleSourceStringUsesFileExtension, NoRenderApi)
 {
     slang::SessionDesc sessionDesc = {};
     ComPtr<slang::ISession> session;
@@ -369,7 +369,7 @@ SLANG_UNIT_TEST(sourceLanguageModuleSourceStringUsesFileExtension)
     SLANG_CHECK(module != nullptr);
 }
 
-SLANG_UNIT_TEST(sourceLanguageCommandLineAcceptsBareMarkdownPath)
+SLANG_UNIT_TEST(sourceLanguageCommandLineAcceptsBareMarkdownPath, NoRenderApi)
 {
     const char* source = "# Literate Slang\n\n```slang\nvoid main() {}\n```\n";
     ComPtr<ISlangFileSystemExt> fileSystem = ComPtr<ISlangFileSystemExt>(new MemoryFileSystem());

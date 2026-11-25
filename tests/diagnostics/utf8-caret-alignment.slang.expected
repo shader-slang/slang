@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 error[E30015]: undefined identifier
   --> tests/diagnostics/utf8-caret-alignment.slang:13:15

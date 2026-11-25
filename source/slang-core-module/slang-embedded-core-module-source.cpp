@@ -1,7 +1,7 @@
 #include "slang-compiler.h"
 #include "slang-core-module-textures.h"
-#include "slang-ir-util.h"
-#include "slang-ir.h"
+#include "slang/ir/slang-ir-util.h"
+#include "slang/ir/slang-ir.h"
 
 #define STRINGIZE(x) STRINGIZE2(x)
 #define STRINGIZE2(x) #x

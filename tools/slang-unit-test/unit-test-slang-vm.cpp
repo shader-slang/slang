@@ -413,7 +413,7 @@ static void expectVMExecuteFails(slang::IBlob* blob)
     SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
 
-SLANG_UNIT_TEST(slangVM)
+SLANG_UNIT_TEST(slangVM, NoRenderApi)
 {
     const char* testSource = R"(
         int one() { return 1; }
@@ -504,7 +504,7 @@ SLANG_UNIT_TEST(slangVM)
     SLANG_CHECK(*returnVal == 100);
 }
 
-SLANG_UNIT_TEST(slangVMRejectMalformedByteCodeOffsets)
+SLANG_UNIT_TEST(slangVMRejectMalformedByteCodeOffsets, NoRenderApi)
 {
     auto validByteCode = makeMinimalVMByteCode();
     SLANG_CHECK(validateVMModuleForTest(validByteCode.data) == SLANG_OK);
@@ -633,7 +633,7 @@ SLANG_UNIT_TEST(slangVMRejectMalformedByteCodeOffsets)
 }
 
 #if SLANG_ENABLE_VALIDATION_VM_BYTECODE
-SLANG_UNIT_TEST(slangVMRejectsOutOfBoundsOperand)
+SLANG_UNIT_TEST(slangVMRejectsOutOfBoundsOperand, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -654,7 +654,7 @@ SLANG_UNIT_TEST(slangVMRejectsOutOfBoundsOperand)
     SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
 
-SLANG_UNIT_TEST(slangVMRejectsOversizedCopy)
+SLANG_UNIT_TEST(slangVMRejectsOversizedCopy, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -678,7 +678,7 @@ SLANG_UNIT_TEST(slangVMRejectsOversizedCopy)
     SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
 
-SLANG_UNIT_TEST(slangVMRejectsRawCopiedPointerStore)
+SLANG_UNIT_TEST(slangVMRejectsRawCopiedPointerStore, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -711,7 +711,7 @@ SLANG_UNIT_TEST(slangVMRejectsRawCopiedPointerStore)
     SLANG_CHECK(externalValue == 0x12345678);
 }
 
-SLANG_UNIT_TEST(slangVMRejectsJumpTargetMidInstruction)
+SLANG_UNIT_TEST(slangVMRejectsJumpTargetMidInstruction, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -726,7 +726,7 @@ SLANG_UNIT_TEST(slangVMRejectsJumpTargetMidInstruction)
     expectVMLoadFails(blob);
 }
 
-SLANG_UNIT_TEST(slangVMRejectsCallToInvalidFunction)
+SLANG_UNIT_TEST(slangVMRejectsCallToInvalidFunction, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -742,7 +742,7 @@ SLANG_UNIT_TEST(slangVMRejectsCallToInvalidFunction)
     expectVMLoadFails(blob);
 }
 
-SLANG_UNIT_TEST(slangVMRejectsCallArgumentCountMismatch)
+SLANG_UNIT_TEST(slangVMRejectsCallArgumentCountMismatch, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -776,7 +776,7 @@ SLANG_UNIT_TEST(slangVMRejectsCallArgumentCountMismatch)
     expectVMExecuteFails(blob);
 }
 
-SLANG_UNIT_TEST(slangVMRejectsArithmeticOperandCountMismatch)
+SLANG_UNIT_TEST(slangVMRejectsArithmeticOperandCountMismatch, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -808,7 +808,7 @@ SLANG_UNIT_TEST(slangVMRejectsArithmeticOperandCountMismatch)
     expectVMExecuteFails(unaryBlob);
 }
 
-SLANG_UNIT_TEST(slangVMRejectsCastWithOversizedOperandSize)
+SLANG_UNIT_TEST(slangVMRejectsCastWithOversizedOperandSize, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -830,7 +830,7 @@ SLANG_UNIT_TEST(slangVMRejectsCastWithOversizedOperandSize)
     expectVMExecuteFails(blob);
 }
 
-SLANG_UNIT_TEST(slangVMRejectsPrintNonStringOperand)
+SLANG_UNIT_TEST(slangVMRejectsPrintNonStringOperand, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -847,7 +847,7 @@ SLANG_UNIT_TEST(slangVMRejectsPrintNonStringOperand)
     expectVMExecuteFails(blob);
 }
 
-SLANG_UNIT_TEST(slangVMRejectsCallReturnLargerThanCaller)
+SLANG_UNIT_TEST(slangVMRejectsCallReturnLargerThanCaller, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -883,7 +883,7 @@ SLANG_UNIT_TEST(slangVMRejectsCallReturnLargerThanCaller)
     expectVMExecuteFails(blob);
 }
 
-SLANG_UNIT_TEST(slangVMRejectsImmediateOperandAsMemory)
+SLANG_UNIT_TEST(slangVMRejectsImmediateOperandAsMemory, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -900,7 +900,7 @@ SLANG_UNIT_TEST(slangVMRejectsImmediateOperandAsMemory)
 }
 #endif
 
-SLANG_UNIT_TEST(slangVMAllowsUnalignedWorkingSetSize)
+SLANG_UNIT_TEST(slangVMAllowsUnalignedWorkingSetSize, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -935,7 +935,7 @@ SLANG_UNIT_TEST(slangVMAllowsUnalignedWorkingSetSize)
 }
 
 #if SLANG_ENABLE_VALIDATION_VM_BYTECODE
-SLANG_UNIT_TEST(slangVMRejectsNonZeroFirstParameterOffset)
+SLANG_UNIT_TEST(slangVMRejectsNonZeroFirstParameterOffset, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -960,7 +960,7 @@ SLANG_UNIT_TEST(slangVMRejectsNonZeroFirstParameterOffset)
     SLANG_CHECK(SLANG_FAILED(runner->loadModule(blob)));
 }
 
-SLANG_UNIT_TEST(slangVMRejectsWorkingSetPointerEscape)
+SLANG_UNIT_TEST(slangVMRejectsWorkingSetPointerEscape, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -998,7 +998,7 @@ SLANG_UNIT_TEST(slangVMRejectsWorkingSetPointerEscape)
 }
 #endif
 
-SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerWithoutDereference)
+SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerWithoutDereference, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -1022,7 +1022,7 @@ SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerWithoutDereference)
     SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
 
-SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerDereference)
+SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerDereference, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -1048,7 +1048,7 @@ SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerDereference)
     SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
 
-SLANG_UNIT_TEST(slangVMAllowsInteriorWorkingSetPointerOffsetBack)
+SLANG_UNIT_TEST(slangVMAllowsInteriorWorkingSetPointerOffsetBack, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -1094,7 +1094,7 @@ SLANG_UNIT_TEST(slangVMAllowsInteriorWorkingSetPointerOffsetBack)
 }
 
 #if SLANG_ENABLE_VALIDATION_VM_BYTECODE
-SLANG_UNIT_TEST(slangVMAllowsParameterPointerOffsetIntoCallerWorkingSet)
+SLANG_UNIT_TEST(slangVMAllowsParameterPointerOffsetIntoCallerWorkingSet, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -1175,7 +1175,7 @@ SLANG_UNIT_TEST(slangVMAllowsParameterPointerOffsetIntoCallerWorkingSet)
     SLANG_CHECK(*returnVal == value);
 }
 
-SLANG_UNIT_TEST(slangVMRejectsParameterPointerAccessOutsideCallerWorkingSet)
+SLANG_UNIT_TEST(slangVMRejectsParameterPointerAccessOutsideCallerWorkingSet, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -1244,7 +1244,7 @@ SLANG_UNIT_TEST(slangVMRejectsParameterPointerAccessOutsideCallerWorkingSet)
     expectVMExecuteFails(blob);
 }
 
-SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerOffsetForward)
+SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerOffsetForward, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -1278,7 +1278,7 @@ SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerOffsetForward)
 }
 #endif
 
-SLANG_UNIT_TEST(slangVMClearsStackWhenSelectingFunction)
+SLANG_UNIT_TEST(slangVMClearsStackWhenSelectingFunction, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -1323,7 +1323,7 @@ SLANG_UNIT_TEST(slangVMClearsStackWhenSelectingFunction)
 }
 
 #if SLANG_ENABLE_VALIDATION_VM_BYTECODE
-SLANG_UNIT_TEST(slangVMRejectsUndersizedCallExt)
+SLANG_UNIT_TEST(slangVMRejectsUndersizedCallExt, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -1341,7 +1341,7 @@ SLANG_UNIT_TEST(slangVMRejectsUndersizedCallExt)
     SLANG_CHECK(SLANG_FAILED(runner->loadModule(blob)));
 }
 
-SLANG_UNIT_TEST(slangVMRejectsUndersizedStringOperand)
+SLANG_UNIT_TEST(slangVMRejectsUndersizedStringOperand, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -1360,7 +1360,7 @@ SLANG_UNIT_TEST(slangVMRejectsUndersizedStringOperand)
 }
 #endif
 
-SLANG_UNIT_TEST(slangVMAllowsNopWithUnusedOperand)
+SLANG_UNIT_TEST(slangVMAllowsNopWithUnusedOperand, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -1383,7 +1383,7 @@ SLANG_UNIT_TEST(slangVMAllowsNopWithUnusedOperand)
     SLANG_CHECK(runner->execute(nullptr, 0) == SLANG_OK);
 }
 
-SLANG_UNIT_TEST(slangVMAllowsVoidRetWithUnusedOperand)
+SLANG_UNIT_TEST(slangVMAllowsVoidRetWithUnusedOperand, NoRenderApi)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -1403,7 +1403,7 @@ SLANG_UNIT_TEST(slangVMAllowsVoidRetWithUnusedOperand)
     SLANG_CHECK(runner->execute(nullptr, 0) == SLANG_OK);
 }
 
-SLANG_UNIT_TEST(slangVMRejectsArgumentsOutsideParameterArea)
+SLANG_UNIT_TEST(slangVMRejectsArgumentsOutsideParameterArea, NoRenderApi)
 {
     // Argument-size rejection is intentionally active even when bytecode validation is disabled.
     List<uint8_t> constants;
@@ -1444,7 +1444,7 @@ static void vmExtPingHandler(slang::IByteCodeRunner*, slang::VMExecInstHeader* i
     memcpy(inst->getOperand(0).getPtr(), &result, sizeof(result));
 }
 
-SLANG_UNIT_TEST(slangVMRegisterExtCall)
+SLANG_UNIT_TEST(slangVMRegisterExtCall, NoRenderApi)
 {
     const char* testSource = R"(
         __target_intrinsic(dispatch, "vmExtPing")

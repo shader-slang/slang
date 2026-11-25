@@ -15,7 +15,7 @@ static SHA1::Digest _computeDigest(const String& content)
 // SourceFile caches the digest and the line break offsets of its content. Both must be derived
 // from the contents that were set last, including when they were queried before any contents
 // were set (a SourceFile can be created with only a size and receive its contents later).
-SLANG_UNIT_TEST(sourceFileSetContentsResetsCaches)
+SLANG_UNIT_TEST(sourceFileSetContentsResetsCaches, NoRenderApi)
 {
     SLANG_UNUSED(unitTestContext);
 

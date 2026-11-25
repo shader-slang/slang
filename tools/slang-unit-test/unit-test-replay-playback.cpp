@@ -138,7 +138,7 @@ private:
 
 // Test the REPLAY_REGISTER infrastructure by using the replayHandler template directly
 // with a known signature
-SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
+SLANG_UNIT_TEST(replayContextReplayRegisterMacro, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -221,7 +221,7 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
 }
 
 // Test the MemberFunctionTraits template
-SLANG_UNIT_TEST(replayContextMemberFunctionTraits)
+SLANG_UNIT_TEST(replayContextMemberFunctionTraits, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -252,7 +252,7 @@ SLANG_UNIT_TEST(replayContextMemberFunctionTraits)
 
 // Test that recording via RECORD_CALL and playback via REPLAY_REGISTER work together
 // This validates that parseSignature produces matching signatures in both directions
-SLANG_UNIT_TEST(replayContextFullRoundTrip)
+SLANG_UNIT_TEST(replayContextFullRoundTrip, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -361,7 +361,7 @@ SLANG_UNIT_TEST(replayContextFullRoundTrip)
 }
 
 // Test parseSignature with various signature formats
-SLANG_UNIT_TEST(replayContextParseSignature)
+SLANG_UNIT_TEST(replayContextParseSignature, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -412,7 +412,7 @@ SLANG_UNIT_TEST(replayContextParseSignature)
 // Stage 2: With recording enabled, create same objects and verify proxy wrapping
 // Stage 3: Playback the recording and verify objects are recreated correctly
 
-SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
+SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -581,7 +581,7 @@ static uint32_t playbackProxyRefCount(ISlangUnknown* proxy)
 // component's m_returnedEntryPoints, so a sweep that released the (already given up) creation
 // reference would drop the proxy to zero while that list still points at it, and the list's
 // release would then touch freed memory (use-after-free under ASAN at teardown).
-SLANG_UNIT_TEST(replayContextOrphanNoteCancelledByReplayedRelease)
+SLANG_UNIT_TEST(replayContextOrphanNoteCancelledByReplayedRelease, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -608,7 +608,7 @@ SLANG_UNIT_TEST(replayContextOrphanNoteCancelledByReplayedRelease)
 // A user addRef() followed by release() leaves the user's original reference in place, so the
 // creation reference is still outstanding at the end of the replay and the sweep has to release
 // it: cancelling the note for the release alone would leak the proxy.
-SLANG_UNIT_TEST(replayContextOrphanNoteKeptForBalancedAddRefRelease)
+SLANG_UNIT_TEST(replayContextOrphanNoteKeptForBalancedAddRefRelease, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -697,7 +697,7 @@ int TestOwningProxy::s_owningProxyDestroyed = 0;
 // The orphan bookkeeping added for #11936 keeps the replay path from leaking a
 // proxy the dispatcher created. The production noter is the replay dispatcher,
 // which no unit test can drive, so the accounting is pinned directly here.
-SLANG_UNIT_TEST(replayContextOrphanedProxyAccounting)
+SLANG_UNIT_TEST(replayContextOrphanedProxyAccounting, NoRenderApi)
 {
     // REPLAY_TEST declares the fixture that resets the context; this test drives
     // the context through ctx() and never needs unitTestContext itself.
@@ -745,7 +745,7 @@ SLANG_UNIT_TEST(replayContextOrphanedProxyAccounting)
 // A proxy that the replayed release stream drives to refcount 0 destroys itself
 // through ~ProxyBase -> unregisterProxy. That has to scrub the orphan note too,
 // or the teardown sweep would release an object that is already freed.
-SLANG_UNIT_TEST(replayContextUnregisterScrubsOrphanNote)
+SLANG_UNIT_TEST(replayContextUnregisterScrubsOrphanNote, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -778,7 +778,7 @@ SLANG_UNIT_TEST(replayContextUnregisterScrubsOrphanNote)
 // the noted references are dropped while still live. It also has to keep the
 // context reachable while draining, since the proxy destructors it runs
 // unregister through it -- which is what s_contextDraining is for.
-SLANG_UNIT_TEST(replayContextDestroySingletonDrainsWithoutResurrecting)
+SLANG_UNIT_TEST(replayContextDestroySingletonDrainsWithoutResurrecting, NoRenderApi)
 {
     SLANG_UNUSED(unitTestContext);
 
@@ -826,7 +826,7 @@ SLANG_UNIT_TEST(replayContextDestroySingletonDrainsWithoutResurrecting)
 // Session that a GlobalSessionProxy holds. So the owner has to be released
 // first, which is what the descending-handle order in the sweep guarantees;
 // registering `owned` before `owner` gives the owner the higher handle.
-SLANG_UNIT_TEST(replayContextOrphanSweepStopsAtCascadeDestroy)
+SLANG_UNIT_TEST(replayContextOrphanSweepStopsAtCascadeDestroy, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -866,7 +866,7 @@ SLANG_UNIT_TEST(replayContextOrphanSweepStopsAtCascadeDestroy)
 // sweep and is destroyed only when its owning component proxy is torn down. The
 // retention does not balance the creation reference, so the sweep has to take
 // the proxy 2 -> 1 and leave the retained reference holding the last one.
-SLANG_UNIT_TEST(replayContextOrphanSweepKeepsEntryPointRetention)
+SLANG_UNIT_TEST(replayContextOrphanSweepKeepsEntryPointRetention, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -1000,7 +1000,7 @@ std::atomic<int> TestFileSystem::s_liveCount{0};
 //
 // replayContextCustomFileSystemRegisteredSessionPlayback below is the dedicated
 // regression check for the registered-reuse leak (#12470).
-SLANG_UNIT_TEST(replayContextCustomFileSystemSessionPlayback)
+SLANG_UNIT_TEST(replayContextCustomFileSystemSessionPlayback, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -1088,7 +1088,7 @@ SLANG_UNIT_TEST(replayContextCustomFileSystemSessionPlayback)
 // suppression net structurally cannot catch, so covering it needs a test that
 // executes it. The s_liveCount check additionally catches a residual reference on
 // the registered-file-system write arm.
-SLANG_UNIT_TEST(replayContextCustomFileSystemRegisteredSessionPlayback)
+SLANG_UNIT_TEST(replayContextCustomFileSystemRegisteredSessionPlayback, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -1163,7 +1163,7 @@ SLANG_UNIT_TEST(replayContextCustomFileSystemRegisteredSessionPlayback)
 // recording and the later session's recorded handle no longer resolves. This pins that the
 // stand-in on that arm keeps per-call identity (a shared, deduplicated instance would make
 // the second occurrence reuse the first proxy and desync the handles).
-SLANG_UNIT_TEST(replayContextTwoDistinctCustomFileSystemsPlayback)
+SLANG_UNIT_TEST(replayContextTwoDistinctCustomFileSystemsPlayback, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);

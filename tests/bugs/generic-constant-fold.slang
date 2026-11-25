@@ -1,7 +1,6 @@
 // constant-fold.slang
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all-cpu):
 
 struct AnotherStruct<let SomeValue : int>
 {
@@ -31,15 +30,15 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     SomeStruct<false> b;
     SomeStruct<bool(1)> c;
     SomeStruct<bool(0)> d;
-    
+
     AnotherStruct<true> e;
     AnotherStruct<false> f;
     AnotherStruct<2> g;
     AnotherStruct<-2> h;
-    
-    
+
+
     uint tid = dispatchThreadID.x;
-    
+
     int outVal;
     switch (tid)
     {
@@ -53,6 +52,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         case 6: outVal = g.value; break;
         case 7: outVal = h.value; break;
     }
-    
+
     outputBuffer[tid] = outVal;
 }

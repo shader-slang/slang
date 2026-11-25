@@ -306,10 +306,8 @@ SlangResult TestServer::init(int argc, const char* const* argv)
     _startParentMonitorFromArgs(argc, argv);
 #endif
 
-#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
-    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
-    _set_abort_behavior(0, _WRITE_ABORT_MSG);
-#endif
+    // Suppress modal dialogs in unattended/LLM-driven builds.
+    Slang::TestToolUtil::suppressDebugDialogs();
 
     String canonicalPath;
     if (SLANG_SUCCEEDED(Path::getCanonical(m_exePath, canonicalPath)))

@@ -6,9 +6,7 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cpu -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -wgpu -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11, filecheck-buffer=BUF): -output-using-type
 
 struct S
 {
@@ -68,4 +66,4 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // HLSL: outputBuffer_0[int(0)] = [[V]].y;
 // HLSL: uint [[C:[A-Za-z0-9_]+]] = rw_0.Load(base_0 + 16U + 12U);
 // HLSL: rw_0.Store({{.*}}, 200U);
-// HLSL: outputBuffer_0[int(2)] = [[C]];
+// HLSL: outputBuffer_0[2L] = [[C]];

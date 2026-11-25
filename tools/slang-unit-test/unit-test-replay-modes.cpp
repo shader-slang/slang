@@ -13,7 +13,7 @@
 // Stream State
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextStreamState)
+SLANG_UNIT_TEST(replayContextStreamState, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -36,7 +36,7 @@ SLANG_UNIT_TEST(replayContextStreamState)
 // Proxy Wrapping Tests
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextSessionWrappedWhenActive)
+SLANG_UNIT_TEST(replayContextSessionWrappedWhenActive, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -65,7 +65,7 @@ SLANG_UNIT_TEST(replayContextSessionWrappedWhenActive)
     slang_enableRecordLayer(wasActive);
 }
 
-SLANG_UNIT_TEST(replayContextSessionNotWrappedWhenInactive)
+SLANG_UNIT_TEST(replayContextSessionNotWrappedWhenInactive, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -95,7 +95,7 @@ SLANG_UNIT_TEST(replayContextSessionNotWrappedWhenInactive)
 // Mode Tests
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextIdleMode)
+SLANG_UNIT_TEST(replayContextIdleMode, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -119,7 +119,7 @@ SLANG_UNIT_TEST(replayContextIdleMode)
     SLANG_CHECK(ctx().getStream().getSize() == 0);
 }
 
-SLANG_UNIT_TEST(replayContextRecordMode)
+SLANG_UNIT_TEST(replayContextRecordMode, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -143,7 +143,7 @@ SLANG_UNIT_TEST(replayContextRecordMode)
     SLANG_CHECK(readValue == 42);
 }
 
-SLANG_UNIT_TEST(replayContextPlaybackMode)
+SLANG_UNIT_TEST(replayContextPlaybackMode, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -180,7 +180,7 @@ SLANG_UNIT_TEST(replayContextPlaybackMode)
     SLANG_CHECK(strcmp(readStr, "test") == 0);
 }
 
-SLANG_UNIT_TEST(replayContextSyncModeMatching)
+SLANG_UNIT_TEST(replayContextSyncModeMatching, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -217,7 +217,7 @@ SLANG_UNIT_TEST(replayContextSyncModeMatching)
     SLANG_CHECK(noException);
 }
 
-SLANG_UNIT_TEST(replayContextSyncModeMismatch)
+SLANG_UNIT_TEST(replayContextSyncModeMismatch, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -247,7 +247,7 @@ SLANG_UNIT_TEST(replayContextSyncModeMismatch)
     SLANG_CHECK(caughtException);
 }
 
-SLANG_UNIT_TEST(replayContextPlaybackOutputVerification)
+SLANG_UNIT_TEST(replayContextPlaybackOutputVerification, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -285,7 +285,7 @@ SLANG_UNIT_TEST(replayContextPlaybackOutputVerification)
     SLANG_CHECK(expectedOutput == 100); // Value unchanged since it matched
 }
 
-SLANG_UNIT_TEST(replayContextPlaybackOutputMismatch)
+SLANG_UNIT_TEST(replayContextPlaybackOutputMismatch, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -315,7 +315,7 @@ SLANG_UNIT_TEST(replayContextPlaybackOutputMismatch)
     SLANG_CHECK(caughtException);
 }
 
-SLANG_UNIT_TEST(replayContextModeTransitions)
+SLANG_UNIT_TEST(replayContextModeTransitions, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -346,7 +346,7 @@ SLANG_UNIT_TEST(replayContextModeTransitions)
     SLANG_CHECK(ctx().getMode() == Mode::Playback);
 }
 
-SLANG_UNIT_TEST(replayContextReset)
+SLANG_UNIT_TEST(replayContextReset, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -364,7 +364,7 @@ SLANG_UNIT_TEST(replayContextReset)
     SLANG_CHECK(ctx().getStream().getSize() == 0);
 }
 
-SLANG_UNIT_TEST(replayContextSyncModeWritesToStream)
+SLANG_UNIT_TEST(replayContextSyncModeWritesToStream, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -452,7 +452,7 @@ static Slang::ComPtr<MutableFileSystemProxy> dirtyReplayContext(int32_t value)
     return fsProxy;
 }
 
-SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
+SLANG_UNIT_TEST(replayContextRecoversFromDirtyState, NoRenderApi)
 {
     // Force a known-clean entry state. This test runs amid other replay tests
     // in the same process, and any prior test that left the stream in reading
@@ -486,7 +486,7 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
 // aborted mid-read leaves the stream in reading mode at a non-zero position,
 // and a subsequent test that calls setMode(Record) + record() before
 // REPLAY_TEST throws on the still-reading stream.
-SLANG_UNIT_TEST(replayContextRecoversFromDirtyPlaybackState)
+SLANG_UNIT_TEST(replayContextRecoversFromDirtyPlaybackState, NoRenderApi)
 {
     ctx().reset();
 
@@ -517,7 +517,7 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyPlaybackState)
     checkReplayContextIsPristine();
 }
 
-SLANG_UNIT_TEST(replayContextSwitchToSyncClearsReplayArenaAllocation)
+SLANG_UNIT_TEST(replayContextSwitchToSyncClearsReplayArenaAllocation, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -529,7 +529,7 @@ SLANG_UNIT_TEST(replayContextSwitchToSyncClearsReplayArenaAllocation)
     SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() == 0);
 }
 
-SLANG_UNIT_TEST(replayContextLoadReplayClearsReplayArenaAllocation)
+SLANG_UNIT_TEST(replayContextLoadReplayClearsReplayArenaAllocation, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -559,7 +559,7 @@ SLANG_UNIT_TEST(replayContextLoadReplayClearsReplayArenaAllocation)
 // but pinning it down explicitly so a regression in
 // ScopedReplayContext::~ScopedReplayContext fails here directly instead of as
 // a downstream cascade.
-SLANG_UNIT_TEST(replayContextDtorLeavesSingletonClean)
+SLANG_UNIT_TEST(replayContextDtorLeavesSingletonClean, NoRenderApi)
 {
     ctx().reset();
 
@@ -590,7 +590,7 @@ bool recordStaticCallLocksMutex()
 }
 } // namespace
 
-SLANG_UNIT_TEST(replayContextRecordStaticCallSkipsLockWhenIdle)
+SLANG_UNIT_TEST(replayContextRecordStaticCallSkipsLockWhenIdle, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -604,7 +604,7 @@ SLANG_UNIT_TEST(replayContextRecordStaticCallSkipsLockWhenIdle)
     SLANG_CHECK(recordStaticCallLocksMutex());
 }
 
-SLANG_UNIT_TEST(replayContextLockIfActiveOwnership)
+SLANG_UNIT_TEST(replayContextLockIfActiveOwnership, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -634,7 +634,7 @@ static const char* kResolvesEnvChildEnvVar = "SLANG_REPLAY_RESOLVES_ENV_CHILD";
 // CRT Objects Across DLL Boundaries":
 // https://learn.microsoft.com/cpp/c-runtime-library/potential-errors-passing-crt-objects-across-dll-boundaries
 // A child launched with the variable set is also the scenario the product supports.
-SLANG_UNIT_TEST(replayContextLockIfActiveResolvesEnvOnFirstCall)
+SLANG_UNIT_TEST(replayContextLockIfActiveResolvesEnvOnFirstCall, NoRenderApi)
 {
     StringBuilder childMarker;
     if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
@@ -706,7 +706,7 @@ SLANG_UNIT_TEST(replayContextLockIfActiveResolvesEnvOnFirstCall)
     SLANG_CHECK(output.indexOf(passedLine.getUnownedSlice()) >= 0);
 }
 
-SLANG_UNIT_TEST(replayContextCreateGlobalSessionIdleLeavesContextPristine)
+SLANG_UNIT_TEST(replayContextCreateGlobalSessionIdleLeavesContextPristine, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);

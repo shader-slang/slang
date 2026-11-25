@@ -7,12 +7,8 @@
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SPV):  -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly
 //TEST:SIMPLE(filecheck=IR):   -target spirv-asm -entry computeMain -stage compute -dump-ir-after eliminateMultiLevelBreak
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -compute -entry computeMain -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-mtl -compute -entry computeMain -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -compute -entry computeMain -output-using-type -profile cs_6_0
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+metal+cuda+cpu+wgpu, filecheck-buffer=BUF):-entry computeMain -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=BUF):-entry computeMain -output-using-type -profile cs_6_0
 
 static const int N = 8;
 

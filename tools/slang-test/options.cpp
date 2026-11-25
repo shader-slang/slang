@@ -73,7 +73,7 @@ static bool _isSubCommand(const char* arg)
         "  -v [level]                     Set verbosity level (verbose, info, failure)\n"
         "                                 Default: verbose when -v used, info otherwise\n"
         "  -hide-ignored                  Hide results from ignored tests\n"
-        "  -api-only                      Only run tests that use specified APIs\n"
+        "  -compile-test [true|false]     Run the tests that use no render API (default: true)\n"
         "  -verbose-paths                 Use verbose paths in output\n"
         "  -category <name>               Only run tests in specified category\n"
         "  -exclude <name>                Exclude tests in specified category\n"
@@ -94,7 +94,9 @@ static bool _isSubCommand(const char* arg)
         "  -skip-reference-image-generation Skip generating reference images for render tests\n"
         "  -emit-spirv-via-glsl           Emit SPIR-V through GLSL instead of directly\n"
         "  -expected-failure-list <file>  Specify file containing expected failures\n"
-        "  -skip-list <file>              Specify file containing tests to skip (path prefixes)\n"
+        "  -include-list <file>           Specify file containing tests to run (path prefixes)\n"
+        "  -exclude-list <file>           Specify file with tests to exclude (path prefixes)\n"
+        "  -skip-list <file>              Same as -exclude-list\n"
         "  -use-shared-library            Run tests in-process using shared library\n"
         "  -use-test-server               Run tests using test server\n"
         "  -use-fully-isolated-test-server  Run each test in isolated server\n"
@@ -128,6 +130,56 @@ static bool _isSubCommand(const char* arg)
         "\n"
         "Test prefixes are used to filter which tests to run. If no prefix is specified,\n"
         "all tests will be run.\n");
+}
+
+// Reads a test list file, such as the file of `-exclude-list`, and adds its entries to `entries`.
+//
+// Each line is a path prefix or the name of a subtest. Everything after a '#' is a comment, and
+// empty lines are ignored. Returns the number of entries that the file has, or a negative number if
+// the file cannot be read.
+static int _readTestListFile(const char* fileName, Slang::List<Slang::String>& entries)
+{
+    using namespace Slang;
+    String text;
+    if (SLANG_FAILED(File::readAllText(fileName, text)))
+    {
+        return -1;
+    }
+    List<UnownedStringSlice> lines;
+    StringUtil::split(text.getUnownedSlice(), '\n', lines);
+    int entryCount = 0;
+    for (auto line : lines)
+    {
+        // Remove comments (everything after '#' character)
+        auto trimmedLine = line;
+        auto commentIndex = line.indexOf('#');
+        if (commentIndex != -1)
+        {
+            trimmedLine = line.head(commentIndex);
+        }
+
+        // Trim whitespace and skip empty lines
+        trimmedLine = trimmedLine.trim();
+        if (trimmedLine.getLength() > 0)
+        {
+            StringBuilder sb;
+            Path::simplify(trimmedLine, Path::SimplifyStyle::NoRoot, sb);
+            entries.add(sb);
+            entryCount++;
+        }
+    }
+    return entryCount;
+}
+
+// Returns false if the operand of a boolean option, such as `-compile-test false`, reads as false
+// ("false", "no", "0" or "off"), and true otherwise.
+static bool _parseBoolOperand(const char* value)
+{
+    const bool isFalse =
+        value[0] == 'f' || value[0] == 'F' || value[0] == 'n' || value[0] == 'N' ||
+        value[0] == '0' ||
+        ((value[0] == 'o' || value[0] == 'O') && (value[1] == 'f' || value[1] == 'F'));
+    return !isFalse;
 }
 
 /* static */ Result Options::parse(
@@ -280,10 +332,6 @@ static bool _isSubCommand(const char* arg)
         else if (strcmp(arg, "-hide-ignored") == 0)
         {
             optionsOut->hideIgnored = true;
-        }
-        else if (strcmp(arg, "-api-only") == 0)
-        {
-            optionsOut->apiOnly = true;
         }
         else if (strcmp(arg, "-verbose-paths") == 0)
         {
@@ -587,7 +635,7 @@ static bool _isSubCommand(const char* arg)
             fileInfo.count = fileEntryCount;
             optionsOut->expectedFailureFiles.add(fileInfo);
         }
-        else if (strcmp(arg, "-skip-list") == 0)
+        else if (strcmp(arg, "-skip-list") == 0 || strcmp(arg, "-exclude-list") == 0)
         {
             if (argCursor == argEnd)
             {
@@ -596,35 +644,34 @@ static bool _isSubCommand(const char* arg)
                 return SLANG_FAIL;
             }
             auto fileName = *argCursor++;
-            String text;
-            File::readAllText(fileName, text);
-            List<UnownedStringSlice> lines;
-            StringUtil::split(text.getUnownedSlice(), '\n', lines);
-            int fileEntryCount = 0;
-            for (auto line : lines)
-            {
-                // Remove comments (everything after '#' character)
-                auto trimmedLine = line;
-                auto commentIndex = line.indexOf('#');
-                if (commentIndex != -1)
-                {
-                    trimmedLine = line.head(commentIndex);
-                }
-
-                // Trim whitespace and skip empty lines
-                trimmedLine = trimmedLine.trim();
-                if (trimmedLine.getLength() > 0)
-                {
-                    Slang::StringBuilder sb;
-                    Slang::Path::simplify(trimmedLine, Slang::Path::SimplifyStyle::NoRoot, sb);
-                    optionsOut->skipList.add(sb);
-                    fileEntryCount++;
-                }
-            }
             Options::TestListFileInfo fileInfo;
             fileInfo.fileName = fileName;
-            fileInfo.count = fileEntryCount;
+            // A list that cannot be read has no entries, as before.
+            fileInfo.count = Math::Max(0, _readTestListFile(fileName, optionsOut->skipList));
             optionsOut->skipListFiles.add(fileInfo);
+        }
+        else if (strcmp(arg, "-include-list") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+            auto fileName = *argCursor++;
+            Options::TestListFileInfo fileInfo;
+            fileInfo.fileName = fileName;
+            fileInfo.count = _readTestListFile(fileName, optionsOut->includeList);
+            // An include list that has no entries would select every test, which is the opposite
+            // of what the list is for, so a list that is missing or empty is an error.
+            if (fileInfo.count <= 0)
+            {
+                stdError.print(
+                    "error: the include list '%s' is missing, or it has no entries\n",
+                    fileName);
+                return SLANG_FAIL;
+            }
+            optionsOut->includeListFiles.add(fileInfo);
         }
         else if (strcmp(arg, "-test-dir") == 0)
         {
@@ -646,8 +693,6 @@ static bool _isSubCommand(const char* arg)
         }
         else if (strcmp(arg, "-enable-debug-layers") == 0)
         {
-            optionsOut->enableDebugLayers = true;
-
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
@@ -655,19 +700,21 @@ static bool _isSubCommand(const char* arg)
                 return SLANG_FAIL;
             }
 
-            // Check for false variants
-            const char* value = *argCursor++;
-            if (value[0] == 'f' || value[0] == 'F' || value[0] == 'n' || value[0] == 'N' ||
-                value[0] == '0' ||
-                ((value[0] == 'o' || value[0] == 'O') && (value[1] == 'f' || value[1] == 'F')))
+            optionsOut->enableDebugLayers = _parseBoolOperand(*argCursor++);
+        }
+        else if (strcmp(arg, "-compile-test") == 0)
+        {
+            if (argCursor == argEnd)
             {
-                optionsOut->enableDebugLayers = false;
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
             }
+
+            optionsOut->compileTest = _parseBoolOperand(*argCursor++);
         }
         else if (strcmp(arg, "-cache-rhi-device") == 0)
         {
-            optionsOut->cacheRhiDevice = true;
-
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
@@ -675,14 +722,7 @@ static bool _isSubCommand(const char* arg)
                 return SLANG_FAIL;
             }
 
-            // Check for false variants
-            const char* value = *argCursor++;
-            if (value[0] == 'f' || value[0] == 'F' || value[0] == 'n' || value[0] == 'N' ||
-                value[0] == '0' ||
-                ((value[0] == 'o' || value[0] == 'O') && (value[1] == 'f' || value[1] == 'F')))
-            {
-                optionsOut->cacheRhiDevice = false;
-            }
+            optionsOut->cacheRhiDevice = _parseBoolOperand(*argCursor++);
         }
 #if _DEBUG
         else if (strcmp(arg, "-disable-debug-layers") == 0)
@@ -727,6 +767,9 @@ static bool _isSubCommand(const char* arg)
         optionsOut->testPrefixes.add(sb);
     }
 
+    // The entries of the include lists select tests in the same way as the test prefixes do.
+    optionsOut->testPrefixes.addRange(optionsOut->includeList);
+
     if (optionsOut->binDir.getLength() == 0)
     {
         // If the binDir isn't set try using the path to the executable
@@ -757,6 +800,16 @@ static bool _isSubCommand(const char* arg)
     {
         stdOut.print("Skip lists:\n");
         for (const auto& fileInfo : optionsOut->skipListFiles)
+        {
+            stdOut.print(" - %s : %d entries\n", fileInfo.fileName.getBuffer(), fileInfo.count);
+        }
+    }
+
+    if (optionsOut->verbosity >= VerbosityLevel::Info &&
+        optionsOut->includeListFiles.getCount() > 0)
+    {
+        stdOut.print("Include lists:\n");
+        for (const auto& fileInfo : optionsOut->includeListFiles)
         {
             stdOut.print(" - %s : %d entries\n", fileInfo.fileName.getBuffer(), fileInfo.count);
         }

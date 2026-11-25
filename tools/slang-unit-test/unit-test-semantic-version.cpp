@@ -51,7 +51,7 @@ SemanticVersion parseOrFail(const char* text)
 
 } // namespace
 
-SLANG_UNIT_TEST(semanticVersionParse)
+SLANG_UNIT_TEST(semanticVersionParse, NoRenderApi)
 {
     SemanticVersion v;
 
@@ -72,7 +72,7 @@ SLANG_UNIT_TEST(semanticVersionParse)
     SLANG_CHECK(v.m_major == 0 && v.m_minor == 0 && v.m_patch == 123456789u);
 }
 
-SLANG_UNIT_TEST(semanticVersionParseSeparator)
+SLANG_UNIT_TEST(semanticVersionParseSeparator, NoRenderApi)
 {
     SemanticVersion v;
     // Custom separator (used for some downstream-compiler version strings).
@@ -83,7 +83,7 @@ SLANG_UNIT_TEST(semanticVersionParseSeparator)
     SLANG_CHECK(SLANG_FAILED(SemanticVersion::parse(UnownedStringSlice("1-2-3"), v)));
 }
 
-SLANG_UNIT_TEST(semanticVersionParseInvalid)
+SLANG_UNIT_TEST(semanticVersionParseInvalid, NoRenderApi)
 {
     SemanticVersion v;
     // Empty.
@@ -96,7 +96,7 @@ SLANG_UNIT_TEST(semanticVersionParseInvalid)
     SLANG_CHECK(SLANG_FAILED(SemanticVersion::parse(UnownedStringSlice("1.2.3.4"), v)));
 }
 
-SLANG_UNIT_TEST(semanticVersionRoundTrip)
+SLANG_UNIT_TEST(semanticVersionRoundTrip, NoRenderApi)
 {
     // SemanticVersion::append elides ".0" patch, so "1.2.0" → "1.2".
     // Verify both directions match the documented format.
@@ -121,7 +121,7 @@ SLANG_UNIT_TEST(semanticVersionRoundTrip)
     }
 }
 
-SLANG_UNIT_TEST(semanticVersionOrdering)
+SLANG_UNIT_TEST(semanticVersionOrdering, NoRenderApi)
 {
     SemanticVersion v1_0_0(1, 0, 0);
     SemanticVersion v1_0_1(1, 0, 1);
@@ -138,7 +138,7 @@ SLANG_UNIT_TEST(semanticVersionOrdering)
     SLANG_CHECK(v1_0_0 >= v1_0_0);
 }
 
-SLANG_UNIT_TEST(semanticVersionRawValueRoundTrip)
+SLANG_UNIT_TEST(semanticVersionRawValueRoundTrip, NoRenderApi)
 {
     SemanticVersion samples[] = {
         SemanticVersion(0, 0, 0),
@@ -155,7 +155,7 @@ SLANG_UNIT_TEST(semanticVersionRawValueRoundTrip)
     }
 }
 
-SLANG_UNIT_TEST(semanticVersionIsSet)
+SLANG_UNIT_TEST(semanticVersionIsSet, NoRenderApi)
 {
     SLANG_CHECK(!SemanticVersion().isSet());
     SLANG_CHECK(SemanticVersion(1, 0, 0).isSet());
@@ -167,7 +167,7 @@ SLANG_UNIT_TEST(semanticVersionIsSet)
     SLANG_CHECK(!v.isSet());
 }
 
-SLANG_UNIT_TEST(semanticVersionBackwardsCompat)
+SLANG_UNIT_TEST(semanticVersionBackwardsCompat, NoRenderApi)
 {
     // Implementation: same major required; this.minor must be >= other.minor;
     // patch is intentionally ignored.
@@ -182,7 +182,7 @@ SLANG_UNIT_TEST(semanticVersionBackwardsCompat)
     SLANG_CHECK(!v1_2_5.isBackwardsCompatibleWith(SemanticVersion(0, 9, 9))); // older major
 }
 
-SLANG_UNIT_TEST(semanticVersionEarliestLatest)
+SLANG_UNIT_TEST(semanticVersionEarliestLatest, NoRenderApi)
 {
     SemanticVersion versions[] = {
         SemanticVersion(2, 0, 0),
@@ -201,7 +201,7 @@ SLANG_UNIT_TEST(semanticVersionEarliestLatest)
     SLANG_CHECK(SemanticVersion::getLatest(versions, 0) == SemanticVersion());
 }
 
-SLANG_UNIT_TEST(semanticVersionHashCode)
+SLANG_UNIT_TEST(semanticVersionHashCode, NoRenderApi)
 {
     // The contract is one-directional: equal versions must hash the
     // same. Different versions producing different hashes is

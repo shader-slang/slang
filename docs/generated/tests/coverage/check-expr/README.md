@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4-8[1m]
-generated_at: 2026-06-11T13:22:38+00:00
-source_commit: ef1068b5485e09b3a7afadba2e25f9541e29af42
-watched_paths_digest: 50f3927d8d5182d8b0ea76a1385cd5f0b05daac09fba7d68297998ea30f2809b
+model: claude-sonnet-5-5
+generated_at: 2026-11-08T21:31:43+00:00
+source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
+watched_paths_digest: c3ca27ae4c08b3c5eae97bb67701e28823330b3e066ea4f523e5b1d0000c2c7b
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -11,7 +11,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 
 ## Intent
 
-White-box characterization tests for `source/slang/slang-check-expr.cpp`
+White-box characterization tests for `source/slang/semantic-checking/slang-check-expr.cpp`
 (expression checking; ~56% covered). These pin the **current observed
 behaviour** of CLI-reachable expression-checking branches, not a spec.
 Strategy: focus on the under-tested swizzle-checking paths
@@ -50,28 +50,28 @@ profile. Prefer that two-step check over trusting the profile alone.
 
 | Test                                                                                             | What it pins (current behaviour)                                                                                                       | covers=                           |
 | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| [`ambiguous-call-diag.slang`](ambiguous-call-diag.slang)                                         | Two overloads that each win on one argument but not the other give an ambiguous-call error (E39999) plus per-candidate notes (E40011). | source/slang/slang-check-expr.cpp |
-| [`call-operator-not-found-diag.slang`](call-operator-not-found-diag.slang)                       | Invoking a struct value with no call operator (`s(3)`) reports "no call operation found for type 'S'" (E30016).                        | source/slang/slang-check-expr.cpp |
-| [`comma-operator-warning-diag.slang`](comma-operator-warning-diag.slang)                         | A comma sequence inside an expression emits the may-be-unintended warning (E41024) and still compiles.                                 | source/slang/slang-check-expr.cpp |
-| [`const-type-modifier-diag.slang`](const-type-modifier-diag.slang)                               | `typedef const int` reports E20018 and the modifier is dropped, so the alias still checks as plain `int` with no follow-on error.      | source/slang/slang-check-expr.cpp |
-| [`dispatch-kernel-size-type-mismatch-diag.slang`](dispatch-kernel-size-type-mismatch-diag.slang) | `__dispatch_kernel` checks both size arguments independently and reports each against `vector<uint,3>` (E30019).                       | source/slang/slang-check-expr.cpp |
-| [`matrix-layout-modifier-on-scalar-diag.slang`](matrix-layout-modifier-on-scalar-diag.slang)     | `typedef row_major int` reports E39026 and drops the layout modifier, leaving the alias usable as `int`.                               | source/slang/slang-check-expr.cpp |
-| [`matrix-swizzle-vector-result.slang`](matrix-swizzle-vector-result.slang)                       | A multi-component matrix swizzle `m._m00_m11` lowers (HLSL) to a `float2(...)` built from per-element `[row][col]` matrix subscripts.  | source/slang/slang-check-expr.cpp |
-| [`return-val-not-available-diag.slang`](return-val-not-available-diag.slang)                     | `__return_val` in a function returning a copyable type reports E38104; only error-typed and non-copyable returns define it.            | source/slang/slang-check-expr.cpp |
-| [`spirv-asm-id-redefinition-diag.slang`](spirv-asm-id-redefinition-diag.slang)                   | Defining the same `spirv_asm` result id twice reports E29113 on the second definition, not the first.                                  | source/slang/slang-check-expr.cpp |
-| [`spirv-asm-not-enough-operands-diag.slang`](spirv-asm-not-enough-operands-diag.slang)           | A `spirv_asm` instruction with fewer operands than its result-id index needs reports E29112.                                           | source/slang/slang-check-expr.cpp |
-| [`spirv-asm-unknown-builtin-name-diag.slang`](spirv-asm-unknown-builtin-name-diag.slang)         | An unknown name in a `spirv_asm` `builtin(...)` operand reports E29107 from the dedicated `BuiltIn` lookup.                            | source/slang/slang-check-expr.cpp |
-| [`spirv-asm-unknown-enum-name-diag.slang`](spirv-asm-unknown-enum-name-diag.slang)               | A `spirv_asm` named-value operand that matches no enumerator, type-prefixed enumerator or opcode reports E29107.                       | source/slang/slang-check-expr.cpp |
-| [`subscript-non-array-diag.slang`](subscript-non-array-diag.slang)                               | Subscripting a scalar (`x[0]` where x is float) reports "no subscript declarations found for type 'float'" (E30013).                   | source/slang/slang-check-expr.cpp |
-| [`subscript-too-many-indices-diag.slang`](subscript-too-many-indices-diag.slang)                 | `a[1, 2]` is rejected by the subscript arity guard before overload resolution, as "too many arguments to call (got 2, expected 1)".    | source/slang/slang-check-expr.cpp |
-| [`swizzle-duplicate-not-lvalue-diag.slang`](swizzle-duplicate-not-lvalue-diag.slang)             | A swizzle with a repeated component (`v.xx`) is not an l-value, so assigning to it is rejected with E30011.                            | source/slang/slang-check-expr.cpp |
-| [`swizzle-out-of-range-diag.slang`](swizzle-out-of-range-diag.slang)                             | A component beyond the vector width (`v.z` on float2) is rejected as a missing member (E30027), not a swizzle-specific error.          | source/slang/slang-check-expr.cpp |
-| [`swizzle-reorder-and-dup-rvalue.slang`](swizzle-reorder-and-dup-rvalue.slang)                   | `v.wzyx` reverses the components and `v.xxy` duplicates the first component when used as an r-value.                                   | source/slang/slang-check-expr.cpp |
-| [`swizzle-rgba-alias.slang`](swizzle-rgba-alias.slang)                                           | The r/g/b/a swizzle letters select the same elements as x/y/z/w.                                                                       | source/slang/slang-check-expr.cpp |
-| [`swizzle-too-long-diag.slang`](swizzle-too-long-diag.slang)                                     | A swizzle longer than four valid components (`v.xxxxx`) is rejected as a missing member (E30027).                                      | source/slang/slang-check-expr.cpp |
-| [`try-clause-shape-diag.slang`](try-clause-shape-diag.slang)                                     | The three `try` shape rules get distinct diagnostics: non-call operand (E30090), non-throwing callee (E30091), missing `try` (E30094). | source/slang/slang-check-expr.cpp |
-| [`try-error-type-mismatch-diag.slang`](try-error-type-mismatch-diag.slang)                       | A `try` call whose callee and caller declare different error types reports E30095, distinct from the uncaught-`try` error.             | source/slang/slang-check-expr.cpp |
-| [`tuple-swizzle-out-of-range-diag.slang`](tuple-swizzle-out-of-range-diag.slang)                 | `t._5` on a two-element tuple is an invalid swizzle (E30052) rather than a missing member.                                             | source/slang/slang-check-expr.cpp |
+| [`ambiguous-call-diag.slang`](ambiguous-call-diag.slang)                                         | Two overloads that each win on one argument but not the other give an ambiguous-call error (E39999) plus per-candidate notes (E40011). | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`call-operator-not-found-diag.slang`](call-operator-not-found-diag.slang)                       | Invoking a struct value with no call operator (`s(3)`) reports "no call operation found for type 'S'" (E30016).                        | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`comma-operator-warning-diag.slang`](comma-operator-warning-diag.slang)                         | A comma sequence inside an expression emits the may-be-unintended warning (E41024) and still compiles.                                 | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`const-type-modifier-diag.slang`](const-type-modifier-diag.slang)                               | `typedef const int` reports E20018 and the modifier is dropped, so the alias still checks as plain `int` with no follow-on error.      | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`dispatch-kernel-size-type-mismatch-diag.slang`](dispatch-kernel-size-type-mismatch-diag.slang) | `__dispatch_kernel` checks both size arguments independently and reports each against `vector<uint,3>` (E30019).                       | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`matrix-layout-modifier-on-scalar-diag.slang`](matrix-layout-modifier-on-scalar-diag.slang)     | `typedef row_major int` reports E39026 and drops the layout modifier, leaving the alias usable as `int`.                               | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`matrix-swizzle-vector-result.slang`](matrix-swizzle-vector-result.slang)                       | A multi-component matrix swizzle `m._m00_m11` lowers (HLSL) to a `float2(...)` built from per-element `[row][col]` matrix subscripts.  | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`return-val-not-available-diag.slang`](return-val-not-available-diag.slang)                     | `__return_val` in a function returning a copyable type reports E38104; only error-typed and non-copyable returns define it.            | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`spirv-asm-id-redefinition-diag.slang`](spirv-asm-id-redefinition-diag.slang)                   | Defining the same `spirv_asm` result id twice reports E29113 on the second definition, not the first.                                  | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`spirv-asm-not-enough-operands-diag.slang`](spirv-asm-not-enough-operands-diag.slang)           | A `spirv_asm` instruction with fewer operands than its result-id index needs reports E29112.                                           | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`spirv-asm-unknown-builtin-name-diag.slang`](spirv-asm-unknown-builtin-name-diag.slang)         | An unknown name in a `spirv_asm` `builtin(...)` operand reports E29107 from the dedicated `BuiltIn` lookup.                            | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`spirv-asm-unknown-enum-name-diag.slang`](spirv-asm-unknown-enum-name-diag.slang)               | A `spirv_asm` named-value operand that matches no enumerator, type-prefixed enumerator or opcode reports E29107.                       | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`subscript-non-array-diag.slang`](subscript-non-array-diag.slang)                               | Subscripting a scalar (`x[0]` where x is float) reports "no subscript declarations found for type 'float'" (E30013).                   | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`subscript-too-many-indices-diag.slang`](subscript-too-many-indices-diag.slang)                 | `a[1, 2]` is rejected by the subscript arity guard before overload resolution, as "too many arguments to call (got 2, expected 1)".    | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`swizzle-duplicate-not-lvalue-diag.slang`](swizzle-duplicate-not-lvalue-diag.slang)             | A swizzle with a repeated component (`v.xx`) is not an l-value, so assigning to it is rejected with E30011.                            | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`swizzle-out-of-range-diag.slang`](swizzle-out-of-range-diag.slang)                             | A component beyond the vector width (`v.z` on float2) is rejected as a missing member (E30027), not a swizzle-specific error.          | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`swizzle-reorder-and-dup-rvalue.slang`](swizzle-reorder-and-dup-rvalue.slang)                   | `v.wzyx` reverses the components and `v.xxy` duplicates the first component when used as an r-value.                                   | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`swizzle-rgba-alias.slang`](swizzle-rgba-alias.slang)                                           | The r/g/b/a swizzle letters select the same elements as x/y/z/w.                                                                       | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`swizzle-too-long-diag.slang`](swizzle-too-long-diag.slang)                                     | A swizzle longer than four valid components (`v.xxxxx`) is rejected as a missing member (E30027).                                      | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`try-clause-shape-diag.slang`](try-clause-shape-diag.slang)                                     | The three `try` shape rules get distinct diagnostics: non-call operand (E30090), non-throwing callee (E30091), missing `try` (E30094). | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`try-error-type-mismatch-diag.slang`](try-error-type-mismatch-diag.slang)                       | A `try` call whose callee and caller declare different error types reports E30095, distinct from the uncaught-`try` error.             | source/slang/semantic-checking/slang-check-expr.cpp |
+| [`tuple-swizzle-out-of-range-diag.slang`](tuple-swizzle-out-of-range-diag.slang)                 | `t._5` on a two-element tuple is an invalid swizzle (E30052) rather than a missing member.                                             | source/slang/semantic-checking/slang-check-expr.cpp |
 
 ## Unreachable gaps
 

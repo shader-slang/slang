@@ -30,7 +30,7 @@ static Index countDownstreamArgsEntries(const slang::CompilerOptionEntry* entrie
 // A `-X` argument given on the command line belongs to the session, so the parsed description
 // lists it once, in the session entries, and not again in the target entries; passing both to
 // `createSession` therefore gives the tool the argument once.
-SLANG_UNIT_TEST(parseCommandLineArgumentsKeepsDownstreamArgsInSession)
+SLANG_UNIT_TEST(parseCommandLineArgumentsKeepsDownstreamArgsInSession, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -85,7 +85,7 @@ static SlangResult createSessionWithDownstreamArg(
 // A module's own option set does not hold the session's `DownstreamArgs`, but its digest still
 // covers them, matching the session-side freshness check: a precompiled module embeds downstream
 // output, so a serialized module is up to date only for the same session `DownstreamArgs`.
-SLANG_UNIT_TEST(serializedModuleFreshnessCoversSessionDownstreamArgs)
+SLANG_UNIT_TEST(serializedModuleFreshnessCoversSessionDownstreamArgs, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -126,7 +126,7 @@ SLANG_UNIT_TEST(serializedModuleFreshnessCoversSessionDownstreamArgs)
 
 // SPIR-V debug info records the command line a target program passes to downstream tools, so we
 // can check the forwarded order of session, target and link arguments without running NVRTC.
-SLANG_UNIT_TEST(downstreamArgsComposeSessionTargetLinkInOrder)
+SLANG_UNIT_TEST(downstreamArgsComposeSessionTargetLinkInOrder, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -239,7 +239,7 @@ static bool sameDigest(ISlangBlob* a, ISlangBlob* b)
 // change with the `DownstreamArgs` of either level and tell the two levels apart. A target's
 // options no longer hold a copy of the session's, so each level reaches the digest only through its
 // own set.
-SLANG_UNIT_TEST(sessionDescDigestCoversDownstreamArgsAtEachLevel)
+SLANG_UNIT_TEST(sessionDescDigestCoversDownstreamArgsAtEachLevel, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 

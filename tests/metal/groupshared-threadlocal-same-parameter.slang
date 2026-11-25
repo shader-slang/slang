@@ -1,8 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -emit-spirv-directly -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -mtl
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -llvm
+//TEST(compute):COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=BUF): -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUF):
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

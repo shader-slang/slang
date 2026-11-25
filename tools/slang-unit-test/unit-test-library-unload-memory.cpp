@@ -351,7 +351,7 @@ static void checkUnloadReleasesMemory(
 
 #endif
 
-SLANG_UNIT_TEST(libraryUnloadReleasesMemory)
+SLANG_UNIT_TEST(libraryUnloadReleasesMemory, NoRenderApi)
 {
 #if SLANG_UNLOAD_TEST_ENABLED
     // Without an embedded core module every cycle would compile the core module from source.

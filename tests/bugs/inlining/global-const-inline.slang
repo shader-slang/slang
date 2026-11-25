@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute,vulkan):COMPARE_COMPUTE_EX:-vk -slang -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 static const float3 CONSTANT = float3(16);
 

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang glsl tests/diagnostics/redeclaration-glsl-interface-block-member.slang -target spirv -stage vertex -entry main
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK,exit-code=0): -lang glsl tests/diagnostics/redeclaration-glsl-interface-block-member.slang -target spirv -stage vertex -entry main
 
 // The members of a GLSL interface block without an instance name are visible in the
 // enclosing scope, so they conflict with other declarations of the same name

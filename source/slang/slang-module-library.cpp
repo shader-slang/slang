@@ -7,8 +7,8 @@
 
 
 // Serialization
-#include "slang-serialize-container.h"
-#include "slang-serialize-ir.h"
+#include "slang/serialization/slang-serialize-container.h"
+#include "slang/serialization/slang-serialize-ir.h"
 
 namespace Slang
 {

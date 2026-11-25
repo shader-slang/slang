@@ -8,7 +8,7 @@ See [_common.md](_common.md) for the universal rules and the
 Produce `docs/generated/design/pipeline/04b-pre-link-passes.md` —
 the ordered, control-flow-aware reference for the IR pass
 sequence that runs inside `generateIRForTranslationUnit`
-([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+([slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
 line ~14386) **before** the per-module IR is cached on the
 `Module` and pulled into `linkAndOptimizeIR` by `linkIR`.
 

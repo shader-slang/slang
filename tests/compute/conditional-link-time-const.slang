@@ -3,9 +3,7 @@
 // in Conditional<> type parameters using extern const with default values.
 // This is similar to the unit test but without linking an override module.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK):
 
 // Expected output with default values (HAS_FEATURE=false, ENABLE_EXTRA=false):
 // - notValue: !false = true, has value 5.0

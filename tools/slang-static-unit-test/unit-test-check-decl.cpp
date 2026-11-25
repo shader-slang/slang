@@ -12,11 +12,11 @@
 // (no target code generation) and then walk the resulting `ModuleDecl`
 // directly.
 
-#include "slang/slang-ast-builder.h"
-#include "slang/slang-check-impl.h"
+#include "slang/ast/slang-ast-builder.h"
+#include "slang/ast/slang-syntax.h"
+#include "slang/semantic-checking/slang-check-impl.h"
 #include "slang/slang-mangle.h"
 #include "slang/slang-module.h"
-#include "slang/slang-syntax.h"
 #include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -66,7 +66,7 @@ bool isDirectMember(ContainerDecl* containerDecl, Decl* candidate)
 
 // The checker produces a `ModuleDecl` whose direct members are the declarations
 // written in the source.
-SLANG_UNIT_TEST(checkedModuleExposesTopLevelDeclarations)
+SLANG_UNIT_TEST(checkedModuleExposesTopLevelDeclarations, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
 
@@ -88,7 +88,7 @@ SLANG_UNIT_TEST(checkedModuleExposesTopLevelDeclarations)
 // Struct fields keep their source order and each is resolved to a type. Field
 // order is observable in memory layout, so a checker that reordered members
 // would corrupt any buffer written by a host application.
-SLANG_UNIT_TEST(checkedStructPreservesFieldOrderAndTypes)
+SLANG_UNIT_TEST(checkedStructPreservesFieldOrderAndTypes, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
 
@@ -134,7 +134,7 @@ SLANG_UNIT_TEST(checkedStructPreservesFieldOrderAndTypes)
 // parameter types receive different mangled names. Mangling is what keeps
 // overloads distinct across separately-compiled modules, so a collision here
 // would let one overload satisfy a reference to the other.
-SLANG_UNIT_TEST(checkedOverloadsMangleDistinctly)
+SLANG_UNIT_TEST(checkedOverloadsMangleDistinctly, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
 
@@ -165,7 +165,7 @@ SLANG_UNIT_TEST(checkedOverloadsMangleDistinctly)
 // lookup cannot expose it. The synthesized-declaration registry is the only whole-module path that
 // advances both its outer generic signature and inner function through the normal semantic phases
 // to `CapabilityChecked`.
-SLANG_UNIT_TEST(detachedGenericWitnessReachesFinalCheckState)
+SLANG_UNIT_TEST(detachedGenericWitnessReachesFinalCheckState, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
 
@@ -215,7 +215,7 @@ SLANG_UNIT_TEST(detachedGenericWitnessReachesFinalCheckState)
 // Registration is idempotent and persistent across phase drains. A root published after an early
 // drain must catch up in the next drain, while a speculative candidate that is never published
 // must remain untouched.
-SLANG_UNIT_TEST(synthesizedDeclarationRegistryPersistsAcrossPhases)
+SLANG_UNIT_TEST(synthesizedDeclarationRegistryPersistsAcrossPhases, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
 
@@ -265,7 +265,7 @@ SLANG_UNIT_TEST(synthesizedDeclarationRegistryPersistsAcrossPhases)
 // A registry drain must keep consuming roots appended by declarations it checks. This fixture
 // registers a detached struct whose property conformance resolves storage through a transparent
 // member and synthesizes another detached declaration. One drain must complete both roots.
-SLANG_UNIT_TEST(synthesizedDeclarationRegistryDrainsNewRoots)
+SLANG_UNIT_TEST(synthesizedDeclarationRegistryDrainsNewRoots, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
 
@@ -323,7 +323,7 @@ SLANG_UNIT_TEST(synthesizedDeclarationRegistryDrainsNewRoots)
 // established names. In particular, only explicitly `[mutating]` and `[__ref]` ordinary methods
 // had mode suffixes; a borrowed method, a setter's writable default, and a direct function-type
 // declaration did not.
-SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes)
+SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
 
@@ -409,7 +409,7 @@ SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes)
 // Synthesized witness wrappers use the checked effective `this` parameter mode as part of their
 // internal symbol identity. This keeps wrappers with different calling conventions distinct when
 // linking coalesces declarations with the same mangled name.
-SLANG_UNIT_TEST(synthesizedEffectiveThisManglingEncodesMode)
+SLANG_UNIT_TEST(synthesizedEffectiveThisManglingEncodesMode, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
 
@@ -462,7 +462,7 @@ SLANG_UNIT_TEST(synthesizedEffectiveThisManglingEncodesMode)
 // `ParamInfo` and a type carrying a parameter-passing-mode wrapper are two encodings of the same
 // information. The wrapper represents only the mode; semantic modifiers such as `no_diff` remain
 // part of the value type in both directions.
-SLANG_UNIT_TEST(paramInfoWrappedTypeRoundTrips)
+SLANG_UNIT_TEST(paramInfoWrappedTypeRoundTrips, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     auto astBuilder = env.getASTBuilder();
@@ -496,7 +496,7 @@ SLANG_UNIT_TEST(paramInfoWrappedTypeRoundTrips)
 // Source that fails to check reports a diagnostic rather than returning a
 // module. This pins the contract the other tests here depend on: a non-null
 // module means checking actually succeeded.
-SLANG_UNIT_TEST(checkedModuleReportsDiagnosticOnInvalidSource)
+SLANG_UNIT_TEST(checkedModuleReportsDiagnosticOnInvalidSource, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
 

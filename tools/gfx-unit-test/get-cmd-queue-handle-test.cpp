@@ -79,12 +79,12 @@ void getQueueHandleTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum 
     getQueueHandleTestImpl(device, context);
 }
 
-SLANG_UNIT_TEST(getCmdQueueHandleD3D12)
+SLANG_UNIT_TEST(getCmdQueueHandleD3D12, D3D12)
 {
     return getQueueHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(getCmdQueueHandleVulkan)
+SLANG_UNIT_TEST(getCmdQueueHandleVulkan, Vulkan)
 {
     return getQueueHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
 }

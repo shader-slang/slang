@@ -91,7 +91,7 @@ String getFormatDiagnostics(
 }
 } // namespace
 
-SLANG_UNIT_TEST(diagnosticFormatFrontEnd)
+SLANG_UNIT_TEST(diagnosticFormatFrontEnd, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -120,7 +120,7 @@ SLANG_UNIT_TEST(diagnosticFormatFrontEnd)
     SLANG_CHECK(machineReadable.indexOf(toSlice("\x1B[")) == -1);
 }
 
-SLANG_UNIT_TEST(diagnosticFormatTargetStage)
+SLANG_UNIT_TEST(diagnosticFormatTargetStage, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -141,7 +141,7 @@ SLANG_UNIT_TEST(diagnosticFormatTargetStage)
     SLANG_CHECK(defaultFormat.indexOf(toSlice("warning[E39019]:")) != -1);
 }
 
-SLANG_UNIT_TEST(diagnosticFormatLegacySink)
+SLANG_UNIT_TEST(diagnosticFormatLegacySink, NoRenderApi)
 {
     DiagnosticSink parent(nullptr, nullptr);
     parent.setDiagnosticFormat(SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO);
@@ -157,7 +157,7 @@ SLANG_UNIT_TEST(diagnosticFormatLegacySink)
 }
 
 
-SLANG_UNIT_TEST(diagnosticFormatStructuredSpans)
+SLANG_UNIT_TEST(diagnosticFormatStructuredSpans, NoRenderApi)
 {
     SourceManager sourceManager;
     sourceManager.initialize(nullptr, nullptr);
@@ -224,7 +224,7 @@ SLANG_UNIT_TEST(diagnosticFormatStructuredSpans)
     SLANG_CHECK(headerCount == 2);
 }
 
-SLANG_UNIT_TEST(diagnosticFormatWithoutSource)
+SLANG_UNIT_TEST(diagnosticFormatWithoutSource, NoRenderApi)
 {
     GenericDiagnostic diagnostic = {};
     diagnostic.code = -1;
@@ -239,7 +239,7 @@ SLANG_UNIT_TEST(diagnosticFormatWithoutSource)
     SLANG_CHECK(text == "note: unlocated note\n    label without source\n");
 }
 
-SLANG_UNIT_TEST(diagnosticFormatEmptyMessages)
+SLANG_UNIT_TEST(diagnosticFormatEmptyMessages, NoRenderApi)
 {
     GenericDiagnostic diagnostic = {};
     diagnostic.code = 42;

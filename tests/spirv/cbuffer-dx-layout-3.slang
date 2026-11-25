@@ -1,4 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -xslang -fvk-use-dx-layout -emit-spirv-directly -xslang -matrix-layout-column-major
+//TEST:COMPARE_COMPUTE(targets=vk+dx11+dx12, filecheck-buffer=CHECK):-xslang -fvk-use-dx-layout -xslang -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry computeMain -stage compute -fvk-use-dx-layout -matrix-layout-column-major
 //TEST_INPUT:cbuffer(data=[1 0 0 0   2.0 3.0 4.0 0   5.0 6.0 7.0 0   8.0 9.0 10.0 11]):name=Test
 

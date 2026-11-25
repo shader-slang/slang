@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -g0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -g0
+//TEST:COMPARE_COMPUTE(targets=all):-g0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

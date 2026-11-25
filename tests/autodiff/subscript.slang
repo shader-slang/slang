@@ -1,6 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHK): -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHK): -output-using-type -vk
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHK): -output-using-type -cuda
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK): -output-using-type
 
 interface ITest
 {

@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute,vulkan):COMPARE_COMPUTE_EX:-vk -slang -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 struct Thing
 {
@@ -15,7 +14,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     Thing thing = {};
     int index = int(dispatchThreadID.x);
-    
+
     if (index % 3 != 0)
     {
         thing.a = (index & 1) != 0;
@@ -24,7 +23,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         thing.b = (index & 2) != 0;
     }
- 
+
     int v = (thing.a ? 2 : 0) + (thing.b ? 1: 0);
 
     outputBuffer[index] = v;

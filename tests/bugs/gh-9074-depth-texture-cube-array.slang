@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -profile glsl_460 -target glsl -capability GL_EXT_texture_shadow_lod
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -vk -emit-spirv-via-glsl
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=POSITIVE_RESULT):
 
 // This is a minimal repro for issue 8802
 
@@ -19,7 +19,6 @@ SamplerCubeArrayShadow sampler;
 void fragMain()
 {
 // POSITIVE-NOT: {{(error|warning).*}}:
-// POSITIVE: result code = 0
 // POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: main
 // POSITIVE-NOT: {{(error|warning).*}}:

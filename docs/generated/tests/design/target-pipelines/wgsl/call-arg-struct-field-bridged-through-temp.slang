@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#legalizecall-and-the-ptrfunction-t-address-space-rule
-//META: doc_section_digest=be15d3c3215e5a9573f5410bea3b67209427e8137b1e2cb1df5c104f9a77fe1a
+//META: doc_section_digest=f4a3bc5ddc3d834e82f3fe4a075113dd6ae2927e73c74b3c13753d0cffdda364
 //META: purpose=A pointer to a struct field passed to an out parameter is bridged unconditionally through a function-space temporary
 //META: intent=functional
 //META: pipeline_stage=ir-pass

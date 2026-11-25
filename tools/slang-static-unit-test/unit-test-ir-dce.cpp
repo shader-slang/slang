@@ -11,7 +11,7 @@
 // Building the module by hand removes the scaffolding: place exactly two
 // functions, decorate one, run the pass, and assert which one survived.
 
-#include "slang/slang-ir-dce.h"
+#include "slang/ir-passes/slang-ir-dce.h"
 #include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -19,7 +19,7 @@ using namespace Slang;
 
 // An unreferenced function without `[KeepAlive]` is removed, while an
 // unreferenced function with it is retained.
-SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedFunction)
+SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedFunction, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -41,7 +41,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedFunction)
 // Running the pass on a module that has nothing to remove reports that it made
 // no change. Passes report `changed` so a fixpoint loop can terminate, so a
 // pass that always claims to have changed something is a real defect.
-SLANG_UNIT_TEST(irDeadCodeEliminationReportsNoChangeWhenNothingIsDead)
+SLANG_UNIT_TEST(irDeadCodeEliminationReportsNoChangeWhenNothingIsDead, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -58,7 +58,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationReportsNoChangeWhenNothingIsDead)
 // encountered. A pass that stops after its first removal, or that invalidates
 // its own iteration when it edits the instruction list, would pass a
 // single-function test and fail this one.
-SLANG_UNIT_TEST(irDeadCodeEliminationRemovesAllDeadFunctions)
+SLANG_UNIT_TEST(irDeadCodeEliminationRemovesAllDeadFunctions, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -78,7 +78,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationRemovesAllDeadFunctions)
 
 // The pass is idempotent: running it a second time on its own output finds
 // nothing further to remove.
-SLANG_UNIT_TEST(irDeadCodeEliminationIsIdempotent)
+SLANG_UNIT_TEST(irDeadCodeEliminationIsIdempotent, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -108,7 +108,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationIsIdempotent)
 // gets removed, while this covers what reachability keeps alive. A regression
 // that stopped following call operands when marking live instructions would
 // leave every test above green and fail only this one.
-SLANG_UNIT_TEST(irDeadCodeEliminationKeepsFunctionReachableFromLiveRoot)
+SLANG_UNIT_TEST(irDeadCodeEliminationKeepsFunctionReachableFromLiveRoot, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -132,7 +132,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationKeepsFunctionReachableFromLiveRoot)
 // Reachability is transitive: a function reached only through an intermediate
 // callee is still kept. A pass that marked only the direct operands of a live
 // root would keep the intermediate but drop the function beyond it.
-SLANG_UNIT_TEST(irDeadCodeEliminationKeepsTransitivelyReachableFunction)
+SLANG_UNIT_TEST(irDeadCodeEliminationKeepsTransitivelyReachableFunction, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -158,7 +158,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationKeepsTransitivelyReachableFunction)
 // survives an ordinary run. Shader parameters rely on that to reach reflection even
 // when no code reads them, and nothing else here would notice if the default were
 // flipped.
-SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedGlobalParamByDefault)
+SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedGlobalParamByDefault, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -177,7 +177,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedGlobalParamByDefault)
 // ...and with the flag off the same parameter is removed. Paired with the test above,
 // this pins the flag itself rather than only the value it happens to default to: a
 // change that ignored the option would fail exactly one of the two.
-SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedGlobalParamWhenNotKeptAlive)
+SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedGlobalParamWhenNotKeptAlive, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -196,7 +196,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedGlobalParamWhenNotKeptAl
 // removed on an ordinary run and kept when the flag is set. Linkage decorations are
 // what a separately-compiled module needs to survive, so the two settings answer
 // genuinely different questions and neither is universally right.
-SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedExportByDefault)
+SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedExportByDefault, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -208,7 +208,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedExportByDefault)
     SLANG_CHECK(builder.countGlobalInsts(kIROp_Func) == 0);
 }
 
-SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedExportWhenAsked)
+SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedExportWhenAsked, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -226,7 +226,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedExportWhenAsked)
 
 // The same pairing for `keepLayoutsAlive`. Layout decorations are what reflection
 // reads, so a pass run with the flag set must not drop the instructions carrying them.
-SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedLayoutByDefault)
+SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedLayoutByDefault, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -238,7 +238,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedLayoutByDefault)
     SLANG_CHECK(builder.countGlobalInsts(kIROp_Func) == 0);
 }
 
-SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedLayoutWhenAsked)
+SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedLayoutWhenAsked, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -259,7 +259,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedLayoutWhenAsked)
 // above: an ordinary call operand keeps a callee, a `WeakUse` operand must not.
 // Without a test, a change that stopped consulting `isWeakReferenceOperand` would
 // look like "DCE got more conservative" rather than a defect.
-SLANG_UNIT_TEST(irDeadCodeEliminationDoesNotKeepAWeaklyReferencedFunction)
+SLANG_UNIT_TEST(irDeadCodeEliminationDoesNotKeepAWeaklyReferencedFunction, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -286,7 +286,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationDoesNotKeepAWeaklyReferencedFunction)
 // work list more than once (`phiRemoved` in slang-ir-dce.cpp): the parameter goes, and
 // the branch argument feeding it has to go with it. A regression in that rerun loop --
 // or in its termination -- would leave every other test in this file green.
-SLANG_UNIT_TEST(irDeadCodeEliminationRemovesAnUnusedBlockParameter)
+SLANG_UNIT_TEST(irDeadCodeEliminationRemovesAnUnusedBlockParameter, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -321,7 +321,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationRemovesAnUnusedBlockParameter)
 // The `IRInst*` overload runs the pass rooted at one instruction rather than the whole
 // module. Nothing else here covers it, so a change that broke rooted runs -- or that
 // let one escape its root and edit the rest of the module -- would go unnoticed.
-SLANG_UNIT_TEST(irDeadCodeEliminationOnASingleRootLeavesTheRestOfTheModuleAlone)
+SLANG_UNIT_TEST(irDeadCodeEliminationOnASingleRootLeavesTheRestOfTheModuleAlone, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -340,7 +340,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationOnASingleRootLeavesTheRestOfTheModuleAlone)
 
 // `trimOptimizableTypes` is a separate entry point from `eliminateDeadCode`, and drops
 // unreferenced fields from a struct marked `[OptimizableType]`.
-SLANG_UNIT_TEST(irTrimOptimizableTypesRemovesAnUnusedField)
+SLANG_UNIT_TEST(irTrimOptimizableTypesRemovesAnUnusedField, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());
@@ -378,7 +378,7 @@ SLANG_UNIT_TEST(irTrimOptimizableTypesRemovesAnUnusedField)
 // builds today. This test is the honest half: it catches a fast path that starts
 // disagreeing on the simple shapes, and says nothing about the shapes where disagreement
 // is the whole point.
-SLANG_UNIT_TEST(irDeadCodeEliminationFastAnalysisAgreesOnSideEffectFreeFunctions)
+SLANG_UNIT_TEST(irDeadCodeEliminationFastAnalysisAgreesOnSideEffectFreeFunctions, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());

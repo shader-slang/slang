@@ -10,7 +10,7 @@
 // CHECK-DAG: OpBitcast %float
 // CHECK-DAG: OpCompositeExtract
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=OUT):-vk -compute -emit-spirv-directly -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=OUT):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[1065353216 1073741824 1077936128 1082130432 1084227584 1086324736 1088421888 1090519040 1091567616 1092616192 1093664768 1094713344 1095761920 1096810496 1097859072 1098907648], stride=4):name=inputBuffer
 RWStructuredBuffer<uint> inputBuffer;

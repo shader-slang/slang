@@ -180,6 +180,29 @@ Build with the following command:
 $ cmake --build --preset release
 ```
 
+#### Installing Metal Developer Tools (Optional)
+
+Slang can generate Metal Shading Language (MSL) code on any platform. To compile the generated MSL, for example to check it with the Apple Metal compiler, install the Metal Developer Tools. This step is not required to build Slang. Apple does not provide these tools for Linux.
+
+Open [https://developer.apple.com/metal/tools/](https://developer.apple.com/metal/tools/) and go to the "Get started" section. Then follow the instructions for your platform.
+
+**Windows**
+
+1. In the "Metal Developer Tools for Windows" entry, click the "Download now" link. This opens the Apple Downloads page with a search for "metal developer tools for windows".
+2. Download the "Metal Developer Tools for Windows" package. Apple may ask you to sign in with an Apple ID.
+3. Run the downloaded installer, and follow its instructions.
+
+> Note: The package contains the Windows-hosted tools, headers, and libraries that build Metal shader programs for iOS, macOS, and tvOS.
+
+**MacOS**
+
+1. In the "Metal Developer Tools for macOS" entry, follow the link to download Xcode. If you already installed Xcode as described in the [MacOS build instructions](#macos), you can skip this step.
+2. Make sure the Metal Toolchain is installed, either using Xcode Components settings, or from the command line:
+
+   ```
+   $ xcodebuild -downloadComponent MetalToolchain
+   ```
+
 #### Building with a Local Build of slang-llvm
 
 `slang-llvm` is required to run `slang-test` properly.

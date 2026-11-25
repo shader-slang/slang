@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -17,7 +16,7 @@ interface ISub
 interface IAddAndSub
 {
     float addf(float u, float v);
-    float subf(float u, float v);    
+    float subf(float u, float v);
 }
 
 struct Simple : IAdd

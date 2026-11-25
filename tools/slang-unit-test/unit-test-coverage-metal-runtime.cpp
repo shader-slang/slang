@@ -115,7 +115,7 @@ static void diagnoseIfNeeded(slang::IBlob* diagnostics, const char* label)
 
 } // anonymous namespace
 
-SLANG_UNIT_TEST(coverageMetalRuntimeDispatch)
+SLANG_UNIT_TEST(coverageMetalRuntimeDispatch, Metal)
 {
 #if SLANG_APPLE_FAMILY
     // Skip when the machine has no Metal device (e.g. GPU-less CI hosts).

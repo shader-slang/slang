@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -output-using-type -shaderobj
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type
 
 // Test that __getStructuredBufferPtr and __getByteAddressBufferPtr work on CUDA.
 // Ptr<T[]> emits as T** on CUDA, and the buffer's .data pointer is used.

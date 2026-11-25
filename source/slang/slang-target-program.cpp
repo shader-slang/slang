@@ -3,7 +3,7 @@
 
 #include "slang-compiler.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-type-layout.h"
+#include "slang/layout-and-binding/slang-type-layout.h"
 
 namespace Slang
 {

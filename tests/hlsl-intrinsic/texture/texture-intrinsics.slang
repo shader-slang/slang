@@ -1,9 +1,7 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX11):-slang -compute -dx11 -shaderobj -output-using-type -render-feature hardware-device
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12):-slang -compute -dx12 -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12CS6):-slang -compute -dx12 -profile cs_6_0 -shaderobj -output-using-type -xslang -DCS60
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx11, filecheck-buffer=DX11):-output-using-type -render-feature hardware-device
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=DX12):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=DX12CS6):-profile cs_6_0 -output-using-type -xslang -DCS60
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=VK):-output-using-type -render-feature hardware-device -xslang -DVK
 
 //TEST_INPUT: Texture1D(size=4, format=D32Float, content = one):name t1D
 Texture1D<float> t1D;

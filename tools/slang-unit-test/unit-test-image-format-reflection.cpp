@@ -13,7 +13,7 @@ using namespace Slang;
 
 // Test that the getBindingRangeImageFormat API works.
 
-SLANG_UNIT_TEST(imageFormatReflection)
+SLANG_UNIT_TEST(imageFormatReflection, NoRenderApi)
 {
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(

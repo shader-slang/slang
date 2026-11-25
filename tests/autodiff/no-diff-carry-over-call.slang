@@ -16,10 +16,9 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
 
-// Compile must succeed (result code = 0) with no `derivative is lost`
+// Compile must succeed (slang-test expects exit code 0) with no `derivative is lost`
 // diagnostic and no E41031 error. A trailing positive check for `void main(`
 // in the emitted HLSL confirms code generation completed.
-// CHECK: result code = 0
 // CHECK-NOT: error[E41031]
 // CHECK-NOT: derivative is lost
 // CHECK: void main(

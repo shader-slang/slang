@@ -4,7 +4,6 @@
 #include "compiler-core/slang-pretty-writer.h"
 #include "core/slang-memory-file-system.h"
 #include "core/slang-performance-profiler.h"
-#include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-emit-dependency-file.h"
 #include "slang-module-library.h"
@@ -12,7 +11,8 @@
 #include "slang-reflection-json.h"
 #include "slang-repro.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-serialize-container.h"
+#include "slang/semantic-checking/slang-check-impl.h"
+#include "slang/serialization/slang-serialize-container.h"
 
 // TODO: The "artifact" system is a scourge.
 #include "compiler-core/slang-artifact-associated-impl.h"
@@ -228,6 +228,13 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // pass runs later during code generation.
     if (m_passThrough == PassThroughMode::None)
     {
+        // Checking the specialization arguments runs semantic analysis, which allocates
+        // nodes through the thread-local "current" AST builder. The front-end's own
+        // `SLANG_AST_BUILDER_RAII` scope has already popped by this point, so without
+        // this scope a builder left behind by an earlier compilation on the same
+        // thread would silently become current.
+        SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
+
         m_specializedGlobalComponentType = createSpecializedGlobalComponentType(this);
         if (getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
@@ -1969,9 +1976,16 @@ SlangResult EndToEndCompileRequest::compile()
         {
             // If for some reason we didn't output any diagnostic, something is
             // going wrong, but we want to make sure we at least output something.
+            // Aborting without any prior diagnostic means the compiler gave up on
+            // its own (for example `SLANG_ABORT_COMPILATION("unsupported stage.")`
+            // in an emitter) rather than because of a problem in the user's code,
+            // so we report it as an internal compiler error. An abort that follows
+            // a diagnostic (such as a fatal "cyclic reference" error) is an
+            // ordinary compilation failure and keeps the `SLANG_FAIL` result.
             getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
                 .exceptionType = typeid(e).name(),
                 .exceptionMessage = e.Message});
+            res = SLANG_E_ABORT;
         }
     }
     catch (const Exception& e)
@@ -1983,6 +1997,7 @@ SlangResult EndToEndCompileRequest::compile()
         getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
             .exceptionType = typeid(e).name(),
             .exceptionMessage = e.Message});
+        res = SLANG_E_ABORT;
     }
     catch (...)
     {
@@ -1991,6 +2006,7 @@ SlangResult EndToEndCompileRequest::compile()
         // let the user know that we messed up, so they know to blame Slang
         // and not some other component in their system.
         getSink()->diagnose(Diagnostics::CompilationAborted{});
+        res = SLANG_E_ABORT;
     }
 #endif
     m_diagnosticOutput = getSink()->outputBuffer.produceString();
@@ -2390,7 +2406,17 @@ SlangResult EndToEndCompileRequest::processCommandLineArguments(
     char const* const* args,
     int argCount)
 {
-    return parseOptions(this, argCount, args);
+    // We treat a request in command-line compiler mode as a complete slangc command line, to
+    // which nothing adds targets after the parse. slangc, and slang-test's slangc tool and test
+    // server, set the mode before this call and add no targets afterwards. An API caller that sets
+    // the mode and then adds targets still gets the slangc diagnostics, such as E00044 for a
+    // floating-point mode given with no `-target`.
+    return parseOptions(
+        this,
+        argCount,
+        args,
+        m_isCommandLineCompile ? CommandLineParsePurpose::CompleteCommandLine
+                               : CommandLineParsePurpose::CompileRequest);
 }
 
 SlangReflection* EndToEndCompileRequest::getReflection()

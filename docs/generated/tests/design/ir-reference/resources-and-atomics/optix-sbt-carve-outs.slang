@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#raytracing-payload
-//META: doc_section_digest=62e382bfde21cbd8b5988a74ec48d0f0a4a6bb7aa79436a40a159583650f8b33
+//META: doc_section_digest=9082ae54ded6cb49d7f3a159b2f8dd6bcb051518267d30ba67d1ca1dc471a6f4
 //META: purpose=Two shapes near the SBT worked example do not produce `getOptiXSbtDataPointer`: a module-scope `uniform` global becomes an ordinary `global_param` read out of the CUDA global parameter block, and a `compute` entry point is skipped by the pass so its `uniform` parameter becomes a kernel launch argument.
 //META: intent=boundary
 //META: pipeline_stage=emit

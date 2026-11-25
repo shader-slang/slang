@@ -5,8 +5,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=INIT): -target spirv -entry computeMain -stage compute -DINITIALIZED
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -shaderobj -output-using-type -Xslang -DINITIALIZED
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type -Xslang -DINITIALIZED
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-output-using-type -Xslang -DINITIALIZED
 
 // CHECK: OpEntryPoint
 

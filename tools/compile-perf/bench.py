@@ -687,11 +687,13 @@ def real_error(text, benign=_BENIGN):
     return None
 
 
-# The platform's two representations of slangc's intentional exit(-1)
-# compile-error exit (see classify_sample's docstring for why exactly these
-# two, and only these two). Module-level so both the classifier and its
-# self-check reference the same value rather than restating it.
-_EXIT_NEGATIVE_ONE = (255, 0xFFFFFFFF)
+# slangc's exit code for an intentional compile-error exit
+# (ToolReturnCode::CompilationFailed, 2 since #14573). It is the only exit code
+# that excuses a workload that is SUPPOSED to fail the compile. Every other
+# code above 1 or below 0 is a crash, including 3 (internal compiler error)
+# and the old exit(-1) values 255 and 0xFFFFFFFF. Module-level so both the
+# classifier and its self-check use the same value.
+_EXIT_COMPILATION_FAILED = 2
 
 
 def classify_sample(rc, text, expected_diags, benign):
@@ -705,12 +707,12 @@ def classify_sample(rc, text, expected_diags, benign):
                    (see WorkloadRun.add_sample for the platform-specific values),
                    EXCEPT when every expected diagnostic is present, no
                    unexpected error was seen, AND rc is one of
-                   _EXIT_NEGATIVE_ONE -- slangc's intentional, non-portable
-                   exit(-1) for a workload that is SUPPOSED to fail the
-                   compile, not a crash. A crash occurring after slangc had
+                   _EXIT_COMPILATION_FAILED -- slangc's intentional
+                   compile-error exit (2) for a workload that is
+                   SUPPOSED to fail the compile, not a crash. A crash occurring after slangc had
                    already printed every expected diagnostic still counts as
                    a crash: is_crash checks `rc` first and only consults the
-                   expected-failure override for the two exact values it
+                   expected-failure override for the exact value it
                    covers, so an unrelated crash code cannot be excused by
                    incidentally-complete diagnostic text.
       ok        -- False if is_crash. Otherwise: for a workload with no
@@ -724,7 +726,7 @@ def classify_sample(rc, text, expected_diags, benign):
     missing = [c for c in expected_diags if c not in text]
     expected_failure = (bool(expected_diags) and not missing
                          and real_error(text, benign) is None
-                         and rc in _EXIT_NEGATIVE_ONE)
+                         and rc == _EXIT_COMPILATION_FAILED)
     is_crash = (rc > 1 or rc < 0) and not expected_failure
     if is_crash:
         return False, missing, True
@@ -741,19 +743,27 @@ assert classify_sample(0, "no diagnostics here", [], ()) == (True, [], False), \
     "classify_sample: an ordinary clean compile with no expected diagnostics is ok"
 assert classify_sample(0, "no diagnostics here", ["E30019"], ()) == (False, ["E30019"], False), \
     "classify_sample: a clean compile IS the failure mode for a workload with expected_diags"
-assert classify_sample(255, "error[E30019]: type mismatch in expression", ["E30019"],
+assert classify_sample(2, "error[E30019]: type mismatch in expression", ["E30019"],
                         ("E30019",)) == (True, [], False), \
-    "classify_sample: rc==255 with every expected diagnostic present is the intended " \
-    "exit(-1), not a crash"
+    "classify_sample: rc==2 (current slangc CompilationFailed) with every expected " \
+    "diagnostic present is the intended compile-error exit, not a crash"
+assert classify_sample(3, "error[E30019]: type mismatch in expression", ["E30019"],
+                        ("E30019",)) == (False, [], True), \
+    "classify_sample: rc==3 (slangc InternalCompilerError) must count as a crash even " \
+    "when the expected diagnostic text is fully present"
+assert classify_sample(255, "error[E30019]: type mismatch in expression", ["E30019"],
+                        ("E30019",)) == (False, [], True), \
+    "classify_sample: rc==255 (the old exit(-1) on POSIX) is a crash, not the intended " \
+    "compile-error exit"
 assert classify_sample(0xFFFFFFFF, "error[E30019]: type mismatch in expression",
-                        ["E30019"], ("E30019",)) == (True, [], False), \
-    "classify_sample: rc==0xFFFFFFFF (Windows) with every expected diagnostic present " \
-    "is the intended exit(-1), not a crash"
+                        ["E30019"], ("E30019",)) == (False, [], True), \
+    "classify_sample: rc==0xFFFFFFFF (the old exit(-1) on Windows) is a crash, not the " \
+    "intended compile-error exit"
 assert classify_sample(-11, "error[E30019]: type mismatch in expression", ["E30019"],
                         ("E30019",)) == (False, [], True), \
     "classify_sample: a genuine crash code (POSIX SIGSEGV) must count as a crash even " \
     "when the expected diagnostic text is fully present -- the override is scoped to " \
-    "_EXIT_NEGATIVE_ONE, not to 'diagnostics look complete'"
+    "_EXIT_COMPILATION_FAILED, not to 'diagnostics look complete'"
 assert classify_sample(0xC0000005, "error[E30019]: type mismatch in expression",
                         ["E30019"], ("E30019",)) == (False, [], True), \
     "classify_sample: a genuine Windows crash code (STATUS_ACCESS_VIOLATION) must " \

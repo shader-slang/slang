@@ -13,9 +13,7 @@
 // 2. Dispatch through a properly-formatted uniform IFoo* works (runtime check)
 
 // Runtime tests: dispatch through uniform IFoo*.
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck-buffer=CHECK): -output-using-type
 
 interface IFoo
 {

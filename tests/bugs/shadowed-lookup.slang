@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE_EX: -slang -compute
+//TEST:COMPARE_COMPUTE(targets=all):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -19,6 +19,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     float2 v = float2(inVal, inVal + 2);
     SomeType t = { inVal + 1, 0, 1, 0 };
-    
+
     outputBuffer[tid] = mul(t, v).x;
-} 
+}

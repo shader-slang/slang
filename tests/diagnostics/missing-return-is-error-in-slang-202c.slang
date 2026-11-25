@@ -1,9 +1,9 @@
 // Missing a return is accepted with a warning in Slang 2026 and previous versions
 //
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SUPP): -std legacy
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SUPP): -std 2018
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SUPP): -std 2025
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SUPP): -std 2026
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SUPP,exit-code=0): -std legacy
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SUPP,exit-code=0): -std 2018
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SUPP,exit-code=0): -std 2025
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SUPP,exit-code=0): -std 2026
 
 // Starting from Slang 202c, a non-void function missing a return is
 // always an error, even if non-essential validation is disabled.

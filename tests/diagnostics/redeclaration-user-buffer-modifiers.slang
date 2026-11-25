@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 // User code can make a variable transparent through `syntax`. Lookup then finds the members of
 // the variable's type, so they conflict with later declarations of the same name, as the

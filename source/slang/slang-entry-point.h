@@ -205,6 +205,13 @@ public:
     /// Get the name of the entry point
     Name* getName() { return m_name; }
 
+    /// Set the source-level name exposed for an entry point whose implementation uses another
+    /// declaration (for example, a structural ray-tracing stage implemented by `invoke`).
+    void setNameOverride(Name* name) { m_name = name; }
+
+    /// Set the default physical name independently of the source-level lookup name.
+    void setEntryPointNameOverride(String name) { m_entryPointNameOverride = _Move(name); }
+
     /// Get the profile associated with the entry point
     ///
     /// Note: only the stage part of the profile is expected
@@ -230,6 +237,16 @@ public:
     {
         m_inferredCapabilityRequirements = caps;
     }
+
+    /// Marks an entry selected through a checked structural ray-tracing conformance.
+    void markAsStructuralRayTracingEntryPoint()
+    {
+        m_isStructuralRayTracingEntryPoint = true;
+        // Defer native parameter layout for the logical input until an adapter is generated.
+        m_shaderParams.clear();
+    }
+
+    bool isStructuralRayTracingEntryPoint() const { return m_isStructuralRayTracingEntryPoint; }
 
     /// Get the module that contains the entry point.
     Module* getModule();
@@ -329,10 +346,15 @@ private:
     // The name of the entry point function (e.g., `main`)
     //
     Name* m_name = nullptr;
+    String m_entryPointNameOverride;
 
     // The declaration of the entry-point function itself.
     //
     DeclRef<FuncDecl> m_funcDeclRef;
+
+    // Source validation distinguishes structural selection from a native function that happens
+    // to take an RT input. The checked function signature carries all structural type information.
+    bool m_isStructuralRayTracingEntryPoint = false;
 
     /// The mangled name of the entry point function
     String m_mangledName;

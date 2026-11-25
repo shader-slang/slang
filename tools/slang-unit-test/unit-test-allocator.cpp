@@ -7,7 +7,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(defaultAllocator)
+SLANG_UNIT_TEST(defaultAllocator, NoRenderApi)
 {
     void* allocation = StandardAllocator::allocate(32);
     SLANG_CHECK(allocation != nullptr);
@@ -42,7 +42,7 @@ SLANG_UNIT_TEST(defaultAllocator)
     AlignedAllocator<64>::deallocate(aligned);
 }
 
-SLANG_UNIT_TEST(scopedAllocationOwnsAttachedStandardAllocation)
+SLANG_UNIT_TEST(scopedAllocationOwnsAttachedStandardAllocation, NoRenderApi)
 {
     void* standardAllocation = StandardAllocator::allocate(32);
     SLANG_CHECK(standardAllocation != nullptr);
@@ -70,7 +70,7 @@ SLANG_UNIT_TEST(scopedAllocationOwnsAttachedStandardAllocation)
     SLANG_CHECK(blob->getBufferSize() == 64);
 }
 
-SLANG_UNIT_TEST(memoryArenaOwnsExternalStandardAllocation)
+SLANG_UNIT_TEST(memoryArenaOwnsExternalStandardAllocation, NoRenderApi)
 {
     {
         MemoryArena arena(256);

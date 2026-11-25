@@ -1,13 +1,11 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -compute -output-using-type -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj
-//TEST(compute):SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -compute -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -output-using-type -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all-metal-wgpu, filecheck-buffer=CHECK): -output-using-type
+//TEST(compute):SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute
 
 //TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 //SPIRV-NOT: Validation of generated SPIR-V failed
+//SPIRV: OpEntryPoint GLCompute
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

@@ -1,8 +1,6 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-dx12 -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx11+dx12, filecheck-buffer=CHK):-output-using-type
 
 // Vulkan/GLSL doesn't support 1-dimensional matrix.
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -output-using-type -emit-spirv-via-glsl
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -output-using-type -emit-spirv-directly
 
 //TEST_INPUT: ubuffer(data=[0.0 1.0 2.0 3.0], stride=4):name=inputBuffer
 RWStructuredBuffer<float> inputBuffer;

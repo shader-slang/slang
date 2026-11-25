@@ -9,8 +9,8 @@
 #   - neural-module-discovery-diagnose.slang (module discovery diagnostics)
 
 # TODO: Those test expose the issue that our compiler is very slow in debug mode
-        when specializing complicated generics. We might need to optimize this
-        in the future. File an issue to track the this #9755.
+#       when specializing complicated generics. We might need to optimize this
+#       in the future. File an issue to track the this #9755.
 
 tests/bugs/neural-autodiff-constexpr-crash.slang
 tests/bugs/neural-autodiff-constexpr-crash-full.slang
@@ -19,12 +19,10 @@ tests/neural/common.slang
 tests/neural/mma-helper-test-multi-warps-arbitrary-size.slang
 tests/neural/mma-helper-test-multi-warps.slang
 tests/neural/mma-helper-test-single-warp-arbitrary-size.slang
-tests/neural/mma-helper-test-single-warp.slang
 tests/neural/mma-helper-test-transpose-multi-warps-arbitrary-size.slang
 tests/neural/mma-helper-test-transpose-multi-warps.slang
 tests/neural/mma-helper-test-transpose-single-warp-arbitrary-size.slang
 tests/neural/mma-helper-test-transpose-single-warp.slang
-tests/neural/neural-module-discovery-diagnose.slang
 tests/neural/outerproduct-accumulate-test-arbitrary-size.slang
 tests/neural/outerproduct-accumulate-test.slang
 tests/neural/shared-memory-size.slang
