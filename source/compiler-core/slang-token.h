@@ -352,6 +352,15 @@ public:
         TokenFlags flags = 0,
         Name* name = nullptr);
 
+    /// Creates a lexeme with its tag's canonical unspliced spelling and no name.
+    ///
+    /// Requires a concrete tag with a fixed spelling in the lexeme definitions.
+    /// Both spellings use that spelling; location and flags belong to the returned value.
+    Lexeme createFixedSpellingLexeme(
+        LexemeTypeTag kind,
+        SourceLoc loc = SourceLoc(),
+        TokenFlags flags = 0);
+
     /// Forms a physical cluster whose trivia and raw token occupy adjacent source bytes.
     ///
     /// Requires a non-empty raw token and concrete trivia objects in both arrays.

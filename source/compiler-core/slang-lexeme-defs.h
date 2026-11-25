@@ -82,10 +82,32 @@ inline constexpr LexemeType kConcreteLexemeTypes[] = {
 % end
 };
 
+/// Canonical unspliced spelling for each concrete tag, or null for variable spellings.
+///
+/// An empty string describes a zero-width token; it differs from a null entry.
+inline constexpr const char* kFixedLexemeSpellings[] = {
+% for _, class in ipairs(lexeme_defs.concreteClasses) do
+%     if class.fixedSpelling ~= nil then
+    $(string.format("%q", class.fixedSpelling)),
+%     else
+    nullptr,
+%     end
+% end
+};
+
 /// Whether `tag` identifies a concrete lexeme type.
 constexpr bool isValidLexemeTypeTag(LexemeTypeTag tag)
 {
     return uint8_t(tag) < uint8_t(LexemeTypeTag::Count);
+}
+
+/// Returns a tag's canonical unspliced spelling, or null if its spelling varies.
+///
+/// Requires a concrete tag. A non-null empty string denotes fixed empty spelling.
+inline const char* getFixedLexemeSpelling(LexemeTypeTag tag)
+{
+    SLANG_RELEASE_ASSERT(isValidLexemeTypeTag(tag));
+    return kFixedLexemeSpellings[uint8_t(tag)];
 }
 
 /// Returns the descriptor for a concrete tag.

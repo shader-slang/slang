@@ -6,6 +6,7 @@
 //
 
 #include "core/slang-char-encode.h"
+#include "core/slang-char-util.h"
 #include "core/slang-string-escape-util.h"
 #include "core/slang-string-util.h"
 #include "fast_float/fast_float.h"
@@ -405,18 +406,49 @@ static bool isNonAsciiCodePoint(unsigned int codePoint)
     return codePoint != 0xFFFFFFFF && codePoint >= 0x80;
 }
 
+/// Returns whether a code point is an ASCII letter, digit, or underscore.
+static SLANG_FORCE_INLINE bool _isAsciiIdentifierContinuation(unsigned int codePoint)
+{
+    // Non-ASCII code points and the unsigned form of `kEOF` are outside ASCII.
+    // We reject them before using the shared byte classifier.
+    if (codePoint >= 0x80)
+        return false;
+    if (codePoint == '_')
+        return true;
+    return CharUtil::isAlphaOrDigit(char(codePoint));
+}
+
+// We read identifier continuations and leave the next non-identifier code point
+// unconsumed. We scan each ordinary ASCII prefix with a local cursor, then publish
+// its end before using the logical reader. If the next logical code point continues
+// the identifier, we consume it and resume ASCII scanning.
 static void _lexIdentifier(Lexer* lexer)
 {
     for (;;)
     {
-        int c = _peek(lexer);
-        if (('a' <= c) && (c <= 'z') || ('A' <= c) && (c <= 'Z') || ('0' <= c) && (c <= '9') ||
-            (c == '_') || isNonAsciiCodePoint((unsigned int)c))
+        // ASCII identifier bytes change no state except the cursor: they require
+        // neither decoding nor splice tracking, and cannot produce diagnostics.
+        auto cursor = lexer->m_cursor;
+        const auto end = lexer->m_end;
+        while (cursor < end)
         {
-            _advance(lexer);
-            continue;
+            const auto byte = static_cast<unsigned char>(*cursor);
+            if (!_isAsciiIdentifierContinuation(byte))
+                break;
+            ++cursor;
         }
-        return;
+        lexer->m_cursor = cursor;
+
+        // Lookahead may cross a splice without committing it. We consume only a
+        // continuation, leaving punctuation and any preceding splice for later
+        // lexemes.
+        const int codePoint = _peek(lexer);
+        if (!_isAsciiIdentifierContinuation(static_cast<unsigned int>(codePoint)))
+        {
+            if (!isNonAsciiCodePoint(static_cast<unsigned int>(codePoint)))
+                return;
+        }
+        _advance(lexer);
     }
 }
 
@@ -2621,11 +2653,27 @@ Lexeme Lexer::readLexeme()
         if (kind == TokenType::Identifier || kind == TokenType::CompletionRequest)
             name = m_namePool->getName(logicalSpelling);
     }
+    // Recognition determines a fixed token's spelling when no internal splice
+    // occurred. Unnamed occurrences can then reuse the tag's canonical object;
+    // named completion requests and physically spliced forms use the full key.
+    if (!m_hasLineSpliceInCurrentLexeme)
+    {
+        if (!name)
+        {
+            if (getFixedLexemeSpelling(kind))
+                return m_tokenPool->createFixedSpellingLexeme(kind, loc, flags);
+        }
+    }
     return m_tokenPool->createLexeme(kind, physicalSpelling, logicalSpelling, loc, flags, name);
 }
 
-Token Lexer::readToken()
+Token Lexer::readToken(NewLineTrivia* outTrailingNewLine)
 {
+    // The preprocessor needs the line delimiter as well as the complete cluster.
+    // We report the newline during recognition so it need not walk the trivia again.
+    if (outTrailingNewLine)
+        *outTrailingNewLine = NewLineTrivia();
+
     // Each trivia item belongs to one cluster. Leading trivia includes blank
     // lines left after the preceding token's first trailing newline; EOF is a
     // normal zero-width token that can own that remaining trivia.
@@ -2650,7 +2698,19 @@ Token Lexer::readToken()
             auto trivia = readLexeme();
             trailing.add(trivia.getObject());
             if (trivia.getTypeTag() == TokenType::NewLine)
+            {
+                // We match attached trivia: its flags are zero, and its location
+                // is unknown whenever the raw token's location is unknown.
+                if (outTrailingNewLine)
+                {
+                    auto newLineLoc = trivia.getLoc();
+                    if (!rawToken.getLoc().isValid())
+                        newLineLoc = SourceLoc();
+                    *outTrailingNewLine =
+                        Lexeme(trivia.getObject(), newLineLoc).as<NewLineTrivia>();
+                }
                 break;
+            }
         }
     }
     return m_tokenPool->createToken(rawToken, leading.getArrayView(), trailing.getArrayView());

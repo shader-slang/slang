@@ -12,7 +12,7 @@ local function defineLexemeClasses(_ENV)
     NumericLiteral = LexemeClass{Literal, "numeric literal", abstract = true}
     Punctuation = LexemeClass{Token, "punctuation", abstract = true}
 
-    EndOfFile = LexemeClass{Token, "end of file"}
+    EndOfFile = LexemeClass{Token, "end of file", fixedSpelling = ""}
     Invalid = LexemeClass{Token, "invalid character"}
     Identifier = LexemeClass{Token, "identifier"}
     IntegerLiteral = LexemeClass{NumericLiteral, "integer literal"}
@@ -25,65 +25,65 @@ local function defineLexemeClasses(_ENV)
     LineComment = LexemeClass{Comment, "line comment"}
     BlockComment = LexemeClass{Comment, "block comment"}
 
-    Semicolon = LexemeClass{Punctuation, "';'"}
-    Comma = LexemeClass{Punctuation, "','"}
-    Dot = LexemeClass{Punctuation, "'.'"}
-    DotDot = LexemeClass{Punctuation, "'..'"}
-    Ellipsis = LexemeClass{Punctuation, "'...'"}
-    LBrace = LexemeClass{Punctuation, "'{'"}
-    RBrace = LexemeClass{Punctuation, "'}'"}
-    LBracket = LexemeClass{Punctuation, "'['"}
-    RBracket = LexemeClass{Punctuation, "']'"}
-    LParent = LexemeClass{Punctuation, "'('"}
-    RParent = LexemeClass{Punctuation, "')'"}
-    OpAssign = LexemeClass{Punctuation, "'='"}
-    OpAdd = LexemeClass{Punctuation, "'+'"}
-    OpSub = LexemeClass{Punctuation, "'-'"}
-    OpMul = LexemeClass{Punctuation, "'*'"}
-    OpDiv = LexemeClass{Punctuation, "'/'"}
-    OpMod = LexemeClass{Punctuation, "'%'"}
-    OpNot = LexemeClass{Punctuation, "'!'"}
-    OpBitNot = LexemeClass{Punctuation, "'~'"}
-    OpLsh = LexemeClass{Punctuation, "'<<'"}
-    OpRsh = LexemeClass{Punctuation, "'>>'"}
-    OpEql = LexemeClass{Punctuation, "'=='"}
-    OpNeq = LexemeClass{Punctuation, "'!='"}
-    OpGreater = LexemeClass{Punctuation, "'>'"}
-    OpLess = LexemeClass{Punctuation, "'<'"}
-    OpGeq = LexemeClass{Punctuation, "'>='"}
-    OpLeq = LexemeClass{Punctuation, "'<='"}
-    OpAnd = LexemeClass{Punctuation, "'&&'"}
-    OpOr = LexemeClass{Punctuation, "'||'"}
-    OpBitAnd = LexemeClass{Punctuation, "'&'"}
-    OpBitOr = LexemeClass{Punctuation, "'|'"}
-    OpBitXor = LexemeClass{Punctuation, "'^'"}
-    OpInc = LexemeClass{Punctuation, "'++'"}
-    OpDec = LexemeClass{Punctuation, "'--'"}
-    OpAddAssign = LexemeClass{Punctuation, "'+='"}
-    OpSubAssign = LexemeClass{Punctuation, "'-='"}
-    OpMulAssign = LexemeClass{Punctuation, "'*='"}
-    OpDivAssign = LexemeClass{Punctuation, "'/='"}
-    OpModAssign = LexemeClass{Punctuation, "'%='"}
-    OpShlAssign = LexemeClass{Punctuation, "'<<='"}
-    OpShrAssign = LexemeClass{Punctuation, "'>>='"}
-    OpAndAssign = LexemeClass{Punctuation, "'&='"}
-    OpOrAssign = LexemeClass{Punctuation, "'|='"}
-    OpXorAssign = LexemeClass{Punctuation, "'^='"}
-    QuestionMark = LexemeClass{Punctuation, "'?'"}
-    Colon = LexemeClass{Punctuation, "':'"}
-    RightArrow = LexemeClass{Punctuation, "'->'"}
-    DoubleRightArrow = LexemeClass{Punctuation, "'=>'"}
-    At = LexemeClass{Punctuation, "'@'"}
-    Dollar = LexemeClass{Punctuation, "'$'"}
-    DollarDollar = LexemeClass{Punctuation, "'$$'"}
-    Pound = LexemeClass{Punctuation, "'#'"}
-    PoundPound = LexemeClass{Punctuation, "'##'"}
-    Scope = LexemeClass{Punctuation, "'::'"}
-    CompletionRequest = LexemeClass{Punctuation, "'#?'"}
+    Semicolon = LexemeClass{Punctuation, fixedSpelling = ";"}
+    Comma = LexemeClass{Punctuation, fixedSpelling = ","}
+    Dot = LexemeClass{Punctuation, fixedSpelling = "."}
+    DotDot = LexemeClass{Punctuation, fixedSpelling = ".."}
+    Ellipsis = LexemeClass{Punctuation, fixedSpelling = "..."}
+    LBrace = LexemeClass{Punctuation, fixedSpelling = "{"}
+    RBrace = LexemeClass{Punctuation, fixedSpelling = "}"}
+    LBracket = LexemeClass{Punctuation, fixedSpelling = "["}
+    RBracket = LexemeClass{Punctuation, fixedSpelling = "]"}
+    LParent = LexemeClass{Punctuation, fixedSpelling = "("}
+    RParent = LexemeClass{Punctuation, fixedSpelling = ")"}
+    OpAssign = LexemeClass{Punctuation, fixedSpelling = "="}
+    OpAdd = LexemeClass{Punctuation, fixedSpelling = "+"}
+    OpSub = LexemeClass{Punctuation, fixedSpelling = "-"}
+    OpMul = LexemeClass{Punctuation, fixedSpelling = "*"}
+    OpDiv = LexemeClass{Punctuation, fixedSpelling = "/"}
+    OpMod = LexemeClass{Punctuation, fixedSpelling = "%"}
+    OpNot = LexemeClass{Punctuation, fixedSpelling = "!"}
+    OpBitNot = LexemeClass{Punctuation, fixedSpelling = "~"}
+    OpLsh = LexemeClass{Punctuation, fixedSpelling = "<<"}
+    OpRsh = LexemeClass{Punctuation, fixedSpelling = ">>"}
+    OpEql = LexemeClass{Punctuation, fixedSpelling = "=="}
+    OpNeq = LexemeClass{Punctuation, fixedSpelling = "!="}
+    OpGreater = LexemeClass{Punctuation, fixedSpelling = ">"}
+    OpLess = LexemeClass{Punctuation, fixedSpelling = "<"}
+    OpGeq = LexemeClass{Punctuation, fixedSpelling = ">="}
+    OpLeq = LexemeClass{Punctuation, fixedSpelling = "<="}
+    OpAnd = LexemeClass{Punctuation, fixedSpelling = "&&"}
+    OpOr = LexemeClass{Punctuation, fixedSpelling = "||"}
+    OpBitAnd = LexemeClass{Punctuation, fixedSpelling = "&"}
+    OpBitOr = LexemeClass{Punctuation, fixedSpelling = "|"}
+    OpBitXor = LexemeClass{Punctuation, fixedSpelling = "^"}
+    OpInc = LexemeClass{Punctuation, fixedSpelling = "++"}
+    OpDec = LexemeClass{Punctuation, fixedSpelling = "--"}
+    OpAddAssign = LexemeClass{Punctuation, fixedSpelling = "+="}
+    OpSubAssign = LexemeClass{Punctuation, fixedSpelling = "-="}
+    OpMulAssign = LexemeClass{Punctuation, fixedSpelling = "*="}
+    OpDivAssign = LexemeClass{Punctuation, fixedSpelling = "/="}
+    OpModAssign = LexemeClass{Punctuation, fixedSpelling = "%="}
+    OpShlAssign = LexemeClass{Punctuation, fixedSpelling = "<<="}
+    OpShrAssign = LexemeClass{Punctuation, fixedSpelling = ">>="}
+    OpAndAssign = LexemeClass{Punctuation, fixedSpelling = "&="}
+    OpOrAssign = LexemeClass{Punctuation, fixedSpelling = "|="}
+    OpXorAssign = LexemeClass{Punctuation, fixedSpelling = "^="}
+    QuestionMark = LexemeClass{Punctuation, fixedSpelling = "?"}
+    Colon = LexemeClass{Punctuation, fixedSpelling = ":"}
+    RightArrow = LexemeClass{Punctuation, fixedSpelling = "->"}
+    DoubleRightArrow = LexemeClass{Punctuation, fixedSpelling = "=>"}
+    At = LexemeClass{Punctuation, fixedSpelling = "@"}
+    Dollar = LexemeClass{Punctuation, fixedSpelling = "$"}
+    DollarDollar = LexemeClass{Punctuation, fixedSpelling = "$$"}
+    Pound = LexemeClass{Punctuation, fixedSpelling = "#"}
+    PoundPound = LexemeClass{Punctuation, fixedSpelling = "##"}
+    Scope = LexemeClass{Punctuation, fixedSpelling = "::"}
+    CompletionRequest = LexemeClass{Punctuation, fixedSpelling = "#?"}
 
     EscapedNewLine = LexemeClass{Trivia, "escaped end of line"}
     AngleBracketHeaderName = LexemeClass{Token, "angle-bracket-enclosed header name"}
-    EndOfDirective = LexemeClass{Token, "end of preprocessor directive"}
+    EndOfDirective = LexemeClass{Token, "end of preprocessor directive", fixedSpelling = ""}
 end
 
 
@@ -92,7 +92,7 @@ end
 local LexemeClass = {}
 LexemeClass.__index = LexemeClass
 local classesByName = {}
-local specificationKeys = {[1] = true, [2] = true, abstract = true}
+local specificationKeys = {[1] = true, [2] = true, abstract = true, fixedSpelling = true}
 
 -- Returns whether this class is `base` or derives from it.
 function LexemeClass:isSubclassOf(base)
@@ -104,7 +104,7 @@ function LexemeClass:isSubclassOf(base)
     return false
 end
 
--- Creates an unnamed class from a description, optional parent, and abstract flag.
+-- Creates an unnamed lexeme class from its schema specification.
 --
 -- The schema environment supplies the name when it registers the definition.
 local function createLexemeClass(specification)
@@ -120,14 +120,25 @@ local function createLexemeClass(specification)
     for key in pairs(specification) do
         assert(specificationKeys[key], "unknown lexeme class option: " .. tostring(key))
     end
+    -- A fixed spelling can supply the punctuation's diagnostic description as well.
+    -- An explicit empty spelling describes a zero-width token; nil means variable spelling.
+    local fixedSpelling = specification.fixedSpelling
+    if fixedSpelling ~= nil then
+        assert(type(fixedSpelling) == "string", "fixedSpelling must be a string")
+        if description == nil then description = "'" .. fixedSpelling .. "'" end
+    end
     assert(type(description) == "string", "a lexeme class needs a diagnostic description")
     local isAbstract = specification.abstract
     if isAbstract == nil then isAbstract = false end
     assert(type(isAbstract) == "boolean", "abstract must be a boolean")
+    if fixedSpelling ~= nil then
+        assert(not isAbstract, "an abstract class cannot have a fixed spelling")
+    end
     return setmetatable({
         base = base,
         description = description,
         isAbstract = isAbstract,
+        fixedSpelling = fixedSpelling,
     }, LexemeClass)
 end
 
@@ -157,6 +168,7 @@ local function registerLexemeClass(_, name, definition)
     class.base = definition.base
     class.description = definition.description
     class.isAbstract = definition.isAbstract
+    class.fixedSpelling = definition.fixedSpelling
     class.isDefined = true
 end
 

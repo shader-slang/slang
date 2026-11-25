@@ -605,18 +605,15 @@ private:
         // The lexer groups trailing trivia through the first explicit newline.
         // We preserve the physical cluster and remember only that line delimiter
         // for the preprocessor's next read.
-        Token token = m_lexer.readToken();
-        for (auto trivia : token.getTrailingTrivia())
+        NewLineTrivia trailingNewLine;
+        Token token = m_lexer.readToken(&trailingNewLine);
+        if (trailingNewLine)
         {
-            if (trivia.getTypeTag() == TokenType::NewLine)
-            {
-                m_pendingEndOfDirective = getTokenPool()->createToken(
-                    TokenType::EndOfDirective,
-                    UnownedStringSlice(),
-                    trivia.getLoc(),
-                    trivia.getFlags());
-                break;
-            }
+            m_pendingEndOfDirective = getTokenPool()->createToken(
+                TokenType::EndOfDirective,
+                UnownedStringSlice(),
+                trailingNewLine.getLoc(),
+                trailingNewLine.getFlags());
         }
         return token;
     }

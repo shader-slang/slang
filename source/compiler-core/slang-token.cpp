@@ -76,6 +76,15 @@ struct TokenPool::Impl
     Dictionary<LexemeKey, const LexemeObj*> lexemes;
     Dictionary<TokenKey, const TokenObj*> tokens;
     List<RefPtr<Name>> names;
+
+    // Each slot remembers a pool-owned object of its indexed kind. The dictionary
+    // remains authoritative when a request differs from that object in either
+    // spelling or in its optional name.
+    const LexemeObj* recentLexemes[uint8_t(LexemeTypeTag::Count)] = {};
+
+    // Fixed-spelling requests select one complete, unnamed lexical state by tag.
+    // Every populated slot points to the canonical object in `lexemes`.
+    const LexemeObj* fixedLexemes[uint8_t(LexemeTypeTag::Count)] = {};
 };
 
 TokenPool::TokenPool()
@@ -123,8 +132,26 @@ Lexeme TokenPool::createLexeme(
     if (name)
         SLANG_RELEASE_ASSERT(name->text.getUnownedSlice() == logicalSpelling);
     Impl::LexemeKey key{kind, physicalSpelling, logicalSpelling, name};
+
+    // Repeated spellings of one kind can reuse the preceding object without
+    // hashing their bytes. We use the interner's complete equality test so names
+    // and physical spelling remain significant even when logical spelling agrees.
+    auto& recentObject = m_impl->recentLexemes[uint8_t(kind)];
+    if (recentObject)
+    {
+        const Impl::LexemeKey recentKey{
+            recentObject->getTypeTag(),
+            recentObject->getPhysicalSpelling(),
+            recentObject->getLogicalSpelling(),
+            recentObject->getName()};
+        if (key == recentKey)
+            return Lexeme(recentObject, loc, flags);
+    }
     if (auto found = m_impl->lexemes.tryGetValue(key))
+    {
+        recentObject = *found;
         return Lexeme(*found, loc, flags);
+    }
 
     // We share the two text views when no lexical scrubbing was necessary.
     // This avoids two copies for the common case without borrowing input storage.
@@ -147,6 +174,24 @@ Lexeme TokenPool::createLexeme(
         object);
     if (name)
         m_impl->names.add(name);
+    recentObject = object;
+    return Lexeme(object, loc, flags);
+}
+
+Lexeme TokenPool::createFixedSpellingLexeme(LexemeTypeTag kind, SourceLoc loc, TokenFlags flags)
+{
+    // The schema determines both unspliced spellings; this factory requests no
+    // name. Those choices identify one object without comparing input bytes.
+    const auto spellingText = getFixedLexemeSpelling(kind);
+    SLANG_RELEASE_ASSERT(spellingText);
+    auto& object = m_impl->fixedLexemes[uint8_t(kind)];
+    if (!object)
+    {
+        // The normal interner supplies the initial object so a generic request
+        // for the same complete state shares identity in either creation order.
+        const UnownedStringSlice spelling(spellingText);
+        object = createLexeme(kind, spelling, spelling).getObject();
+    }
     return Lexeme(object, loc, flags);
 }
 
@@ -215,7 +260,8 @@ Token TokenPool::createToken(TokenType kind, Name* name, SourceLoc loc, TokenFla
 
 EndOfFileToken TokenPool::createEndOfFile(SourceLoc loc, TokenFlags flags)
 {
-    return createToken(TokenType::EndOfFile, UnownedStringSlice(), loc, flags).as<EndOfFileToken>();
+    return createToken(createFixedSpellingLexeme(TokenType::EndOfFile, loc, flags).as<RawToken>())
+        .as<EndOfFileToken>();
 }
 
 RawOpGreater TokenPool::createSecondGreaterToken(RawOpRsh rightShift)

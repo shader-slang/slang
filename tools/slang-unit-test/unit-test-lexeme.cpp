@@ -666,6 +666,55 @@ SLANG_UNIT_TEST(lexerRetainsPhysicalAndLogicalSpellings)
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
 
+/// Checks that the reported delimiter matches attached trivia and is cleared by every read.
+SLANG_UNIT_TEST(lexerReportsItsTrailingNewLine)
+{
+    // We compare the recognition result with the existing located-trivia API.
+    // Comments and splices can contain physical newlines without ending a directive;
+    // blank lines after the first delimiter instead lead the next token or EOF.
+    const char* inputs[] = {
+        "a /*embedded\nline*/ \\\r\n \r\n\n b c",
+        "a\r\nb\n\rc\rd\n",
+        "a\\\nb",
+        "a \\\nb",
+        "/*only\ntrivia*/\n",
+        "a\n",
+        "",
+    };
+    const bool baseLocationCases[] = {true, false};
+    for (bool hasKnownBaseLocation : baseLocationCases)
+    {
+        for (const auto text : inputs)
+        {
+            LexemeTestInput input(text);
+            // An unknown raw-token location also makes its attached trivia unlocated.
+            // Clearing the base exercises that case when the raw token begins at byte zero.
+            if (!hasKnownBaseLocation)
+                input.lexer.m_startLoc = SourceLoc();
+
+            // A nonempty initial value detects stale results even for an empty input.
+            auto reported =
+                input.tokenPool->createLexeme(LexemeTypeTag::NewLine, toSlice("\n"), toSlice("\n"))
+                    .as<NewLineTrivia>();
+            for (;;)
+            {
+                const auto token = input.lexer.readToken(&reported);
+                NewLineTrivia attached;
+                for (auto trivia : token.getTrailingTrivia())
+                {
+                    if (auto newLine = trivia.as<NewLineTrivia>())
+                        attached = newLine;
+                }
+                SLANG_CHECK(reported.getObject() == attached.getObject());
+                SLANG_CHECK(reported.getLoc() == attached.getLoc());
+                SLANG_CHECK(reported.getFlags() == 0);
+                if (token.is<EndOfFileToken>())
+                    break;
+            }
+        }
+    }
+}
+
 /// Checks that attached trivia partitions the input and preserves block comments across newlines.
 SLANG_UNIT_TEST(lexerTokenTriviaPartitionsPhysicalInput)
 {
@@ -984,4 +1033,381 @@ SLANG_UNIT_TEST(lexemeTypeRangesClassifyConcreteTags)
     SLANG_CHECK(!RawPunctuation::type.contains(RawIdentifier::tag));
     SLANG_CHECK(RawLiteral::type.contains(RawStringLiteral::tag));
     SLANG_CHECK(!RawLiteral::type.contains(RawIdentifier::tag));
+}
+
+/// Checks that names and both spellings remain part of identity across repeated requests.
+SLANG_UNIT_TEST(lexemePoolDistinguishesNamesAndSpellings)
+{
+    // Equal text from separate name pools still gives distinct names. Alternating
+    // those names and spellings must not replace the object for an earlier request.
+    RefPtr<TokenPool> pool = new TokenPool();
+    NamePool firstNames;
+    NamePool secondNames;
+    const auto firstName = firstNames.getName(toSlice("same"));
+    const auto secondName = secondNames.getName(toSlice("same"));
+    SLANG_CHECK(firstName != secondName);
+
+    const auto initial = pool->createLexeme(
+        LexemeTypeTag::Identifier,
+        toSlice("same"),
+        toSlice("same"),
+        SourceLoc::fromRaw(100),
+        TokenFlag::AtStartOfLine,
+        firstName);
+    const auto otherName = pool->createLexeme(
+        LexemeTypeTag::Identifier,
+        toSlice("same"),
+        toSlice("same"),
+        {},
+        0,
+        secondName);
+    const auto noName =
+        pool->createLexeme(LexemeTypeTag::Identifier, toSlice("same"), toSlice("same"));
+    const auto spliced = pool->createLexeme(
+        LexemeTypeTag::Identifier,
+        toSlice("sa\\\nme"),
+        toSlice("same"),
+        {},
+        0,
+        firstName);
+
+    // The factory also accepts explicitly supplied logical spellings for synthetic
+    // lexemes. Their identity cannot be inferred from the physical spelling alone.
+    const auto otherLogical =
+        pool->createLexeme(LexemeTypeTag::Identifier, toSlice("same"), toSlice("different"));
+    SLANG_CHECK(initial.getObject() != otherName.getObject());
+    SLANG_CHECK(initial.getObject() != noName.getObject());
+    SLANG_CHECK(initial.getObject() != spliced.getObject());
+    SLANG_CHECK(noName.getObject() != otherLogical.getObject());
+
+    // A later request must recover its original object after those intervening
+    // states, while the returned occurrence keeps its new location and flags.
+    const auto repeated = pool->createLexeme(
+        LexemeTypeTag::Identifier,
+        toSlice("same"),
+        toSlice("same"),
+        SourceLoc::fromRaw(200),
+        TokenFlag::AfterWhitespace,
+        firstName);
+    SLANG_CHECK(repeated.getObject() == initial.getObject());
+    SLANG_CHECK(repeated.getLoc() == SourceLoc::fromRaw(200));
+    SLANG_CHECK(repeated.getFlags() == TokenFlag::AfterWhitespace);
+    const auto adjacentRepeat = pool->createLexeme(
+        LexemeTypeTag::Identifier,
+        toSlice("same"),
+        toSlice("same"),
+        {},
+        0,
+        firstName);
+    SLANG_CHECK(adjacentRepeat.getObject() == initial.getObject());
+    SLANG_CHECK(adjacentRepeat.getLoc() == SourceLoc());
+    SLANG_CHECK(adjacentRepeat.getFlags() == 0);
+}
+
+/// Checks that each newline spelling keeps its own canonical object across alternating requests.
+SLANG_UNIT_TEST(lexemePoolDistinguishesNewLineSpellings)
+{
+    // A file may mix line endings. Sharing one lexeme type does not make these
+    // byte sequences interchangeable when reconstructing the physical input.
+    RefPtr<TokenPool> pool = new TokenPool();
+    const char* spellings[] = {"\n", "\r", "\r\n", "\n\r"};
+    const LexemeObj* objects[SLANG_COUNT_OF(spellings)] = {};
+    for (Index i = 0; i < SLANG_COUNT_OF(spellings); ++i)
+    {
+        const auto spelling = UnownedStringSlice(spellings[i]);
+        objects[i] = pool->createLexeme(LexemeTypeTag::NewLine, spelling, spelling).getObject();
+        for (Index earlier = 0; earlier < i; ++earlier)
+            SLANG_CHECK(objects[i] != objects[earlier]);
+    }
+    for (Index i = 0; i < SLANG_COUNT_OF(spellings); ++i)
+    {
+        const auto spelling = UnownedStringSlice(spellings[i]);
+        const auto repeated = pool->createLexeme(LexemeTypeTag::NewLine, spelling, spelling);
+        SLANG_CHECK(repeated.getObject() == objects[i]);
+        SLANG_CHECK(repeated.getPhysicalSpelling() == spelling);
+        SLANG_CHECK(repeated.getLogicalSpelling() == spelling);
+    }
+}
+
+/// Checks that lexing and generic creation share fixed spellings in either creation order.
+SLANG_UNIT_TEST(lexerFixedSpellingsShareGenericLexemeObjects)
+{
+    // Generic creation can supply a name or a synthetic spelling even for a
+    // punctuation tag. Lexing `++` must select the canonical unnamed `++` state,
+    // while `+` followed by a splice and another `+` keeps a distinct physical spelling.
+    LexemeTestInput input("++ +\\\n+ ... .. <<=");
+    const auto namedSpelling = input.namePool.getName(toSlice("++"));
+    const auto named = input.tokenPool->createLexeme(
+        LexemeTypeTag::OpInc,
+        toSlice("++"),
+        toSlice("++"),
+        {},
+        0,
+        namedSpelling);
+    const auto synthetic = input.tokenPool->createLexeme(
+        LexemeTypeTag::OpInc,
+        toSlice("synthetic"),
+        toSlice("synthetic"));
+    const auto generic =
+        input.tokenPool->createLexeme(LexemeTypeTag::OpInc, toSlice("++"), toSlice("++"));
+    const auto ordinary = input.lexer.readToken();
+    const auto spliced = input.lexer.readToken();
+    SLANG_CHECK(ordinary.is<OpIncToken>());
+    SLANG_CHECK(spliced.is<OpIncToken>());
+    SLANG_CHECK(ordinary.getRawToken().getObject() == generic.getObject());
+    SLANG_CHECK(ordinary.getRawToken().getObject() != named.getObject());
+    SLANG_CHECK(ordinary.getRawToken().getObject() != synthetic.getObject());
+    SLANG_CHECK(spliced.getRawToken().getObject() != generic.getObject());
+    SLANG_CHECK(spliced.getPhysicalSpelling() == toSlice("+\\\n+"));
+    SLANG_CHECK(spliced.getLogicalSpelling() == toSlice("++"));
+
+    // These other multi-byte spellings are lexed before any generic request.
+    // Generic creation must find those same objects rather than create a second identity.
+    const auto ellipsis = input.lexer.readToken();
+    const auto dotDot = input.lexer.readToken();
+    const auto shiftAssign = input.lexer.readToken();
+    SLANG_CHECK(ellipsis.is<EllipsisToken>());
+    SLANG_CHECK(dotDot.is<DotDotToken>());
+    SLANG_CHECK(shiftAssign.is<OpShlAssignToken>());
+    SLANG_CHECK(
+        input.tokenPool->createLexeme(LexemeTypeTag::Ellipsis, toSlice("..."), toSlice("..."))
+            .getObject() == ellipsis.getRawToken().getObject());
+    SLANG_CHECK(
+        input.tokenPool->createLexeme(LexemeTypeTag::DotDot, toSlice(".."), toSlice(".."))
+            .getObject() == dotDot.getRawToken().getObject());
+    SLANG_CHECK(
+        input.tokenPool->createLexeme(LexemeTypeTag::OpShlAssign, toSlice("<<="), toSlice("<<="))
+            .getObject() == shiftAssign.getRawToken().getObject());
+}
+
+/// Checks that completion requests retain their names despite having a fixed spelling.
+SLANG_UNIT_TEST(lexerCompletionRequestsPreserveNames)
+{
+    // The lexer gives `#?` a name. An unnamed request with the same tag and bytes
+    // must remain a separate state, even when it was the most recently created one.
+    LexemeTestInput input("#? #?");
+    const auto name = input.namePool.getName(toSlice("#?"));
+    const auto named = input.tokenPool->createLexeme(
+        LexemeTypeTag::CompletionRequest,
+        toSlice("#?"),
+        toSlice("#?"),
+        {},
+        0,
+        name);
+    const auto unnamed = input.tokenPool->createLexeme(
+        LexemeTypeTag::CompletionRequest,
+        toSlice("#?"),
+        toSlice("#?"));
+    const auto first = input.lexer.readToken();
+    const auto second = input.lexer.readToken();
+    SLANG_CHECK(first.is<CompletionRequestToken>());
+    SLANG_CHECK(first.getRawToken().getObject() == named.getObject());
+    SLANG_CHECK(second.getRawToken().getObject() == named.getObject());
+    SLANG_CHECK(first.getRawToken().getObject() != unnamed.getObject());
+    SLANG_CHECK(first.getName() == name);
+}
+
+/// Checks that interning preserves raw-token and ordered-trivia identity after other requests.
+SLANG_UNIT_TEST(tokenPoolReusePreservesRawTokenAndTriviaIdentity)
+{
+    // The same trivia objects can form different clusters by changing their order
+    // or their attachment to the raw token. A different raw spelling also changes
+    // cluster identity, even when its tag and the attached trivia remain the same.
+    RefPtr<TokenPool> pool = new TokenPool();
+    const auto raw =
+        pool->createLexeme(LexemeTypeTag::OpAdd, toSlice("+"), toSlice("+")).as<RawToken>();
+    const auto otherRaw =
+        pool->createLexeme(LexemeTypeTag::OpAdd, toSlice("other"), toSlice("other")).as<RawToken>();
+    const auto space = pool->createLexeme(LexemeTypeTag::WhiteSpace, toSlice(" "), toSlice(" "));
+    const auto comment =
+        pool->createLexeme(LexemeTypeTag::BlockComment, toSlice("/**/"), toSlice("/**/"));
+    const auto newline = pool->createLexeme(LexemeTypeTag::NewLine, toSlice("\n"), toSlice("\n"));
+    const LexemeObj* leading[] = {space.getObject(), comment.getObject()};
+    const LexemeObj* reversed[] = {comment.getObject(), space.getObject()};
+    const LexemeObj* trailing[] = {newline.getObject()};
+    const LexemeObj* shiftedTrailing[] = {comment.getObject(), newline.getObject()};
+    const auto initial =
+        pool->createToken(raw, makeConstArrayView(leading), makeConstArrayView(trailing));
+    const auto changedOrder =
+        pool->createToken(raw, makeConstArrayView(reversed), makeConstArrayView(trailing));
+    const auto changedDivision =
+        pool->createToken(raw, makeConstArrayView(leading, 1), makeConstArrayView(shiftedTrailing));
+    const auto changedRaw =
+        pool->createToken(otherRaw, makeConstArrayView(leading), makeConstArrayView(trailing));
+    SLANG_CHECK(initial.getObject() != changedOrder.getObject());
+    SLANG_CHECK(initial.getObject() != changedDivision.getObject());
+    SLANG_CHECK(initial.getObject() != changedRaw.getObject());
+
+    // Recovering the original cluster must use the new occurrence's location and
+    // flags. A following request with default values must receive those defaults.
+    const auto relocatedLexeme = pool->createLexeme(
+        LexemeTypeTag::OpAdd,
+        toSlice("+"),
+        toSlice("+"),
+        SourceLoc::fromRaw(100),
+        TokenFlag::AfterWhitespace);
+    const auto repeated = pool->createToken(
+        relocatedLexeme.as<RawToken>(),
+        makeConstArrayView(leading),
+        makeConstArrayView(trailing));
+    SLANG_CHECK(repeated.getObject() == initial.getObject());
+    SLANG_CHECK(repeated.getLoc() == SourceLoc::fromRaw(100));
+    SLANG_CHECK(repeated.getFlags() == TokenFlag::AfterWhitespace);
+    const auto adjacentRepeat =
+        pool->createToken(raw, makeConstArrayView(leading), makeConstArrayView(trailing));
+    SLANG_CHECK(adjacentRepeat.getObject() == initial.getObject());
+    SLANG_CHECK(adjacentRepeat.getLoc() == SourceLoc());
+    SLANG_CHECK(adjacentRepeat.getFlags() == 0);
+}
+
+/// Checks that each token pool maintains independent lexeme and token identities.
+SLANG_UNIT_TEST(tokenPoolsKeepCanonicalObjectsSeparate)
+{
+    // Equal requests in two live pools must produce different objects. Repeating
+    // each request must still recover the object owned by its selected pool.
+    RefPtr<TokenPool> first = new TokenPool();
+    RefPtr<TokenPool> second = new TokenPool();
+    const auto firstToken = first->createToken(TokenType::OpInc, toSlice("++"));
+    const auto secondToken = second->createToken(TokenType::OpInc, toSlice("++"));
+    SLANG_CHECK(firstToken.getObject() != secondToken.getObject());
+    SLANG_CHECK(firstToken.getRawToken().getObject() != secondToken.getRawToken().getObject());
+    SLANG_CHECK(firstToken.getPool() == first.get());
+    SLANG_CHECK(secondToken.getPool() == second.get());
+    const auto repeatedFirstToken = first->createToken(TokenType::OpInc, toSlice("++"));
+    const auto repeatedSecondToken = second->createToken(TokenType::OpInc, toSlice("++"));
+    SLANG_CHECK(repeatedFirstToken.getObject() == firstToken.getObject());
+    SLANG_CHECK(repeatedSecondToken.getObject() == secondToken.getObject());
+}
+
+/// Checks identifier spelling and context across ASCII, Unicode, and internal splice transitions.
+SLANG_UNIT_TEST(lexerIdentifierContinuesAfterUnicodeAndSplices)
+{
+    /// A physical identifier spelling and its expected logical spelling.
+    struct IdentifierSpellingCase
+    {
+        const char* physicalSpelling;
+        const char* logicalSpelling;
+    };
+    const IdentifierSpellingCase cases[] = {
+        {"plain_012AZ", "plain_012AZ"},
+        {"R", "R"},
+        {"Rprefix_09", "Rprefix_09"},
+        {"R\\\nname_9", "Rname_9"},
+        {"ab\xC3\xA9"
+         "CD_9",
+         "ab\xC3\xA9"
+         "CD_9"},
+        {"\xCE\xB1"
+         "ab_09",
+         "\xCE\xB1"
+         "ab_09"},
+        {"\xF0\x9F\x98\x80"
+         "ab_2",
+         "\xF0\x9F\x98\x80"
+         "ab_2"},
+        {"ab\\\nCD\\\r\nEF", "abCDEF"},
+        {"ab\\\n"
+         "\xCE\xB1"
+         "CD_9",
+         "ab\xCE\xB1"
+         "CD_9"},
+        {"ab\xCE\xB1"
+         "\\\r\nCD_9",
+         "ab\xCE\xB1"
+         "CD_9"},
+    };
+
+    // Each input is one complete identifier. The Unicode and splice cases must
+    // resume consuming ASCII suffixes rather than returning an early token.
+    for (const auto& testCase : cases)
+    {
+        const auto physical = UnownedStringSlice(testCase.physicalSpelling);
+        const auto logical = UnownedStringSlice(testCase.logicalSpelling);
+        LexemeTestInput input(physical);
+        const auto identifier = input.lexer.readLexeme();
+        SLANG_CHECK(identifier.is<RawIdentifier>());
+        SLANG_CHECK(identifier.getPhysicalSpelling() == physical);
+        SLANG_CHECK(identifier.getLogicalSpelling() == logical);
+        SLANG_CHECK(identifier.getName() == input.namePool.getName(logical));
+        SLANG_CHECK(identifier.getLoc() == input.beginLoc);
+        SLANG_CHECK(
+            identifier.getFlags() == (TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace));
+        const auto eof = input.lexer.readLexeme();
+        SLANG_CHECK(eof.is<RawEndOfFile>());
+        SLANG_CHECK(eof.getLoc() == input.beginLoc + physical.getLength());
+        SLANG_CHECK(input.sink.getErrorCount() == 0);
+    }
+}
+
+/// Checks that a splice before punctuation or EOF remains its own atomic lexeme.
+SLANG_UNIT_TEST(lexerIdentifierLeavesBoundarySpliceSeparate)
+{
+    /// An identifier followed by a separate splice and another atomic lexeme.
+    struct IdentifierBoundaryCase
+    {
+        const char* text;
+        const char* identifierSpelling;
+        const char* spliceSpelling;
+        LexemeTypeTag followingKind;
+    };
+    const IdentifierBoundaryCase cases[] = {
+        {"alpha\\\n+", "alpha", "\\\n", LexemeTypeTag::OpAdd},
+        {"alpha\\\r\n+", "alpha", "\\\r\n", LexemeTypeTag::OpAdd},
+        {"alpha\\\n", "alpha", "\\\n", LexemeTypeTag::EndOfFile},
+        {"ab\xC3\xA9"
+         "\\\n+",
+         "ab\xC3\xA9",
+         "\\\n",
+         LexemeTypeTag::OpAdd},
+    };
+
+    // Peeking through a splice may find punctuation rather than another identifier
+    // continuation. Neither the splice nor that punctuation belongs to the identifier.
+    for (const auto& testCase : cases)
+    {
+        LexemeTestInput input(UnownedStringSlice(testCase.text));
+        const auto identifierSpelling = UnownedStringSlice(testCase.identifierSpelling);
+        const auto spliceSpelling = UnownedStringSlice(testCase.spliceSpelling);
+        const auto identifier = input.lexer.readLexeme();
+        SLANG_CHECK(identifier.is<RawIdentifier>());
+        SLANG_CHECK(identifier.getPhysicalSpelling() == identifierSpelling);
+        SLANG_CHECK(identifier.getLogicalSpelling() == identifierSpelling);
+        const auto splice = input.lexer.readLexeme();
+        SLANG_CHECK(splice.is<EscapedNewLineTrivia>());
+        SLANG_CHECK(splice.getPhysicalSpelling() == spliceSpelling);
+        SLANG_CHECK(splice.getLogicalSpelling().getLength() == 0);
+        SLANG_CHECK(splice.getLoc() == input.beginLoc + identifierSpelling.getLength());
+        const auto following = input.lexer.readLexeme();
+        SLANG_CHECK(following.getTypeTag() == testCase.followingKind);
+        SLANG_CHECK(following.getFlags() == 0);
+        SLANG_CHECK(
+            following.getLoc() ==
+            input.beginLoc + identifierSpelling.getLength() + spliceSpelling.getLength());
+        SLANG_CHECK(input.sink.getErrorCount() == 0);
+    }
+}
+
+/// Checks that identifiers exclude an adjacent identifier byte outside the supplied view.
+SLANG_UNIT_TEST(lexerIdentifierRespectsBoundedEnd)
+{
+    // The final `z` is outside each view. Consuming it would extend the identifier
+    // beyond that range, including after the Unicode-to-ASCII transition.
+    const char ascii[] = {'a', 'b', '_', '9', 'z'};
+    const char unicode[] = {'a', char(0xC3), char(0xA9), 'b', 'z'};
+    const UnownedStringSlice inputs[] = {
+        UnownedStringSlice(ascii, size_t(4)),
+        UnownedStringSlice(unicode, size_t(4)),
+    };
+    for (auto text : inputs)
+    {
+        LexemeTestInput input(text);
+        const auto identifier = input.lexer.readLexeme();
+        SLANG_CHECK(identifier.is<RawIdentifier>());
+        SLANG_CHECK(identifier.getPhysicalSpelling() == text);
+        SLANG_CHECK(identifier.getLogicalSpelling() == text);
+        const auto eof = input.lexer.readLexeme();
+        SLANG_CHECK(eof.is<RawEndOfFile>());
+        SLANG_CHECK(eof.getLoc() == input.beginLoc + 4);
+        SLANG_CHECK(input.sink.getErrorCount() == 0);
+    }
 }

@@ -281,7 +281,9 @@ struct Lexer
     /// Trailing trivia ends after the first `NewLine` lexeme. The lexer classifies
     /// trivia from characters without lexing the following raw token, so callers
     /// may change header-name mode or diagnostic suppression before that token.
-    Token readToken();
+    /// When supplied, `outTrailingNewLine` receives that newline with zero occurrence
+    /// flags, matching the attached trivia, or an empty value if no trailing newline exists.
+    Token readToken(NewLineTrivia* outTrailingNewLine = nullptr);
 
     /// Selects recognition rules before the next raw token is read.
     ///
