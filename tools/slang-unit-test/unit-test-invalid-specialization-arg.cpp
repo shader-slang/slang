@@ -14,7 +14,7 @@ using namespace Slang;
 // Test that we can report proper error when passing an invalid specialization arg to
 // `IComponentType::specialize`.
 
-SLANG_UNIT_TEST(invalidSpecializationArg)
+SLANG_UNIT_TEST(invalidSpecializationArg, NoRenderApi)
 {
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(

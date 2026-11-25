@@ -1,5 +1,4 @@
-//TEST(smoke,compute):COMPARE_COMPUTE: -shaderobj
-//TEST(smoke,compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // This is a basic test for Slang compute shader.
 
@@ -19,7 +18,7 @@ interface IEmptyS
 };
 struct EmptyS : IEmptyS
 {
-    float emptyFunc() {return 0.0;}    
+    float emptyFunc() {return 0.0;}
 };
 
 struct Empty<TT : IEmptyS> : IInterface

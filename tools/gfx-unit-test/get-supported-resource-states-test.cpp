@@ -133,7 +133,7 @@ void getSupportedResourceStatesTestImpl(IDevice* device, UnitTestContext* contex
 
 namespace gfx_test
 {
-SLANG_UNIT_TEST(getSupportedResourceStatesD3D12)
+SLANG_UNIT_TEST(getSupportedResourceStatesD3D12, D3D12)
 {
     runTestImpl(
         getSupportedResourceStatesTestImpl<GetSupportedResourceStatesBase>,
@@ -141,7 +141,7 @@ SLANG_UNIT_TEST(getSupportedResourceStatesD3D12)
         DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(getSupportedResourceStatesVulkan)
+SLANG_UNIT_TEST(getSupportedResourceStatesVulkan, Vulkan)
 {
     runTestImpl(
         getSupportedResourceStatesTestImpl<GetSupportedResourceStatesBase>,

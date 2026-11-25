@@ -1,4 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE:-shaderobj
+// TODO: Remove `glsl` from the targets when https://github.com/shader-slang/slang/issues/14590 is fixed. glslang rejects a shift of an
+// int by an int vector.
+//TEST:COMPARE_COMPUTE(targets=all-glsl):
 
 //TEST_INPUT:ubuffer(data=[3 7 8 10], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;

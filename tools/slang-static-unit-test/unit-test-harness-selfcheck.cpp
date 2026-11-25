@@ -43,7 +43,7 @@ bool selfCheckArmed()
 } // namespace
 
 // A failed `SLANG_CHECK` must be reported as a failure and make the run exit non-zero.
-SLANG_UNIT_TEST(harnessSelfCheckReportsAFailingCheck)
+SLANG_UNIT_TEST(harnessSelfCheckReportsAFailingCheck, NoRenderApi)
 {
     if (!selfCheckArmed())
     {
@@ -58,7 +58,7 @@ SLANG_UNIT_TEST(harnessSelfCheckReportsAFailingCheck)
 // terminating the process. `SLANG_UNIT_TEST` catches only `AbortTestException`, so a
 // `SLANG_ASSERT` firing inside a compiler entry point arrives here as an ordinary
 // exception, which is the case the driver's `catch` exists for.
-SLANG_UNIT_TEST(harnessSelfCheckSurvivesAThrowingTest)
+SLANG_UNIT_TEST(harnessSelfCheckSurvivesAThrowingTest, NoRenderApi)
 {
     if (!selfCheckArmed())
     {
@@ -79,7 +79,7 @@ SLANG_UNIT_TEST(harnessSelfCheckSurvivesAThrowingTest)
 // Thrown directly rather than by firing an assert, because what `SLANG_ASSERT` does
 // depends on the `SLANG_ASSERT` environment variable (see the table in CLAUDE.md) and
 // a self-check should not vary with it. The type thrown is the type an assert throws.
-SLANG_UNIT_TEST(harnessSelfCheckReportsASlangExceptionMessage)
+SLANG_UNIT_TEST(harnessSelfCheckReportsASlangExceptionMessage, NoRenderApi)
 {
     if (!selfCheckArmed())
     {
@@ -92,7 +92,7 @@ SLANG_UNIT_TEST(harnessSelfCheckReportsASlangExceptionMessage)
 // A failure reported through `message()` rather than `addResult` must still fail the
 // test. The driver classifies `RunError` and `TestFailure` as failures, which is a
 // deliberate choice nothing else in the suite drives.
-SLANG_UNIT_TEST(harnessSelfCheckFailsOnAReportedRunError)
+SLANG_UNIT_TEST(harnessSelfCheckFailsOnAReportedRunError, NoRenderApi)
 {
     if (!selfCheckArmed())
     {
@@ -106,7 +106,7 @@ SLANG_UNIT_TEST(harnessSelfCheckFailsOnAReportedRunError)
 // classifies both as failures -- the enum defines `TestFailure` as describing how a
 // failure took place -- and that choice deserves a driver of its own rather than being
 // covered by inspection.
-SLANG_UNIT_TEST(harnessSelfCheckFailsOnAReportedTestFailure)
+SLANG_UNIT_TEST(harnessSelfCheckFailsOnAReportedTestFailure, NoRenderApi)
 {
     if (!selfCheckArmed())
     {
@@ -121,7 +121,7 @@ SLANG_UNIT_TEST(harnessSelfCheckFailsOnAReportedTestFailure)
 // the per-test handler, this line would never be reached and CI would not see its `ok`.
 // That carry-on property is the half of the handler's contract that the non-zero exit
 // alone does not pin.
-SLANG_UNIT_TEST(harnessSelfCheckContinuesAfterAThrow)
+SLANG_UNIT_TEST(harnessSelfCheckContinuesAfterAThrow, NoRenderApi)
 {
     if (!selfCheckArmed())
     {

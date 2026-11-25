@@ -38,7 +38,7 @@ static void _checkSourceFileBom(
     SLANG_CHECK(col >= 0);
 }
 
-SLANG_UNIT_TEST(sourceFileBomContentSize)
+SLANG_UNIT_TEST(sourceFileBomContentSize, NoRenderApi)
 {
     SLANG_UNUSED(unitTestContext);
 

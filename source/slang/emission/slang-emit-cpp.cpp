@@ -212,6 +212,14 @@ static UnownedStringSlice _getResourceTypePrefix(IROp op)
         return UnownedStringSlice::fromLiteral("RWByteAddressBuffer");
     case kIROp_HLSLByteAddressBufferType:
         return UnownedStringSlice::fromLiteral("ByteAddressBuffer");
+    case kIROp_HLSLUnsizedStructuredBufferType:
+        return UnownedStringSlice::fromLiteral("UnsizedStructuredBuffer");
+    case kIROp_HLSLUnsizedRWStructuredBufferType:
+        return UnownedStringSlice::fromLiteral("UnsizedRWStructuredBuffer");
+    case kIROp_HLSLUnsizedByteAddressBufferType:
+        return UnownedStringSlice::fromLiteral("UnsizedByteAddressBuffer");
+    case kIROp_HLSLUnsizedRWByteAddressBufferType:
+        return UnownedStringSlice::fromLiteral("UnsizedRWByteAddressBuffer");
     case kIROp_SamplerStateType:
         return UnownedStringSlice::fromLiteral("SamplerState");
     case kIROp_SamplerComparisonStateType:
@@ -321,6 +329,8 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << "*";
             return SLANG_OK;
         }
+    case kIROp_ByValueBorrowInParamType:
+        return calcTypeName(static_cast<IRPtrTypeBase*>(type)->getValueType(), target, out);
     case kIROp_RTTIType:
         {
             out << "TypeInfo";
@@ -491,6 +501,7 @@ void CPPSourceEmitter::useType(IRType* type)
         }
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
         {
             type = static_cast<IRPtrTypeBase*>(type)->getValueType();
             break;
@@ -1180,6 +1191,9 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             _emitType(ptrType->getValueType(), &refDeclarator);
         }
         break;
+    case kIROp_ByValueBorrowInParamType:
+        _emitType(cast<IRPtrTypeBase>(type)->getValueType(), declarator);
+        break;
     case kIROp_ArrayType:
         {
             auto arrayType = static_cast<IRArrayType*>(type);
@@ -1432,6 +1446,17 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 {
     switch (inst->getOp())
     {
+    case kIROp_SizedBufferToUnsizedBuffer:
+        {
+            // Both forms are prelude aggregates. The unsized value retains only
+            // the data field, whose physical element type was legalized together
+            // with the sized source before emission.
+            emitType(inst->getDataType());
+            m_writer->emit("{(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(").data}");
+            return true;
+        }
     default:
         {
             return false;
@@ -2097,6 +2122,14 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec
     if (shouldFoldInstIntoUseSites(inst))
     {
         emitInstExpr(inst, outerPrec);
+        return;
+    }
+
+    // A by-value borrow is declared as the value `p`, so, as for a local `Var`, the pointer it
+    // stands for in the IR is `&p`.
+    if (inst->getOp() == kIROp_Param && as<IRByValueBorrowInParamType>(inst->getDataType()))
+    {
+        emitVarExpr(inst, outerPrec);
         return;
     }
 

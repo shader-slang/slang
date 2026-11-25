@@ -7,7 +7,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -mtl -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=metal+cuda+cpu, filecheck-buffer=BUFFER):-output-using-type
 
 // METALLIB: @computeMain
 

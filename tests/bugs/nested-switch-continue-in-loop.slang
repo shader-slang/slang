@@ -1,14 +1,10 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -output-using-type -Xslang -DWHILE_LOOP
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -Xslang -DWHILE_LOOP
+//TEST:COMPARE_COMPUTE(targets=all-dx11, filecheck-buffer=CHECK):-output-using-type -Xslang -DWHILE_LOOP
 
 // Disable dx11/FXC: "error X3708: 'continue' cannot be used in a switch"
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-dx11 -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-dx11 -output-using-type -Xslang -DWHILE_LOOP
 
 // Test `continue` statement inside of switch inside of a loop.
 

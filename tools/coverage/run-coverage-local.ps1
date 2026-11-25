@@ -69,7 +69,7 @@ if (-not $SkipTest) {
 
     $testArgs = @(
         '-expected-failure-list', 'tests/expected-failure-github.txt'
-        '-expected-failure-list', 'tests/expected-failure-no-gpu.txt'
+        '-expected-failure-list', 'tests/expected-failure-nogpu.txt'
         '-skip-reference-image-generation'
         '-show-adapter-info'
         '-enable-debug-layers', 'true'

@@ -2573,7 +2573,11 @@ IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue inValue)
     switch (type->getOp())
     {
     case kIROp_FloatType:
-        keyInst.value.floatVal = static_cast<float>(inValue);
+        // A `float` literal holds the double that `FloatBitsToDouble` gives for its bits, so
+        // a signaling NaN keeps its bits. Read it back with `DoubleToFloatBits`, not `(float)`,
+        // which would quiet it. A value conversion that should quiet a NaN, as one at run time
+        // does, quiets the value before calling this (see `SCCPContext::evalCast`).
+        keyInst.value.floatVal = FloatBitsToDouble(DoubleToFloatBits(inValue));
         break;
     case kIROp_HalfType:
         keyInst.value.floatVal = HalfToFloat(FloatToHalf((float)inValue));
@@ -3035,6 +3039,18 @@ IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressS
 {
     return (IRBorrowInParamType*)getPtrType(
         kIROp_BorrowInParamType,
+        valueType,
+        AccessQualifier::Read,
+        addrSpace,
+        getDefaultBufferLayoutType());
+}
+
+IRByValueBorrowInParamType* IRBuilder::getByValueBorrowInParamType(
+    IRType* valueType,
+    AddressSpace addrSpace)
+{
+    return (IRByValueBorrowInParamType*)getPtrType(
+        kIROp_ByValueBorrowInParamType,
         valueType,
         AccessQualifier::Read,
         addrSpace,
@@ -4235,6 +4251,7 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
     case kIROp_RawPointerType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
     case kIROp_ComPtrType:
     case kIROp_NativePtrType:
     case kIROp_NativeStringType:
@@ -4399,6 +4416,7 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     case kIROp_RawPointerType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
         return TypeCastStyle::Ptr;
     case kIROp_EnumType:
         return TypeCastStyle::Enum;
@@ -9594,6 +9612,7 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_LookupWitnessMethod:
     case kIROp_GetSequentialID:
     case kIROp_GetAddress:
+    case kIROp_SizedBufferToUnsizedBuffer:
     case kIROp_GetValueFromBoundInterface:
     case kIROp_MakeUInt64:
     case kIROp_MakeCoopVector:

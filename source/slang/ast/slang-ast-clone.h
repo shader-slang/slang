@@ -134,6 +134,10 @@ public:
         {
             dst = as<T>(cloneStmt(src));
         }
+        else if constexpr (std::is_base_of_v<ConditionClause, T>)
+        {
+            dst = as<T>(cloneSyntaxNode(src));
+        }
         else if constexpr (std::is_base_of_v<Modifier, T>)
         {
             dst = as<T>(cloneModifier(src));

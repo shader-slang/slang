@@ -304,6 +304,15 @@ class ContainerDecl : public Decl
         Index index,
         VarDecl* backingVarDecl);
 
+    /// Insert the constraints split off `original` (`T : A & B` -> `T : A`, `T : B`) right
+    /// after it. Appending is not enough: constraints are lowered in member order, and a later
+    /// `U : IFoo<T>` needs the witnesses of all of them. The parser cannot do the split, since
+    /// the conjunction may be hidden behind a typealias.
+    ///
+    void _insertFlattenedConstraintDeclsAfter(
+        GenericTypeConstraintDecl* original,
+        List<GenericTypeConstraintDecl*> const& splitConstraints);
+
     // TODO: The following should be a private member, but currently
     // we have auto-generated code for things like dumping and serialization
     // that expect to have access to it.

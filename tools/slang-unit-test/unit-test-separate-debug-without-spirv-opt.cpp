@@ -433,7 +433,7 @@ void checkSplitModules(const CompileOutcome& outcome)
 // A required load reports E00100, so its absence shows that the optimizer was not required. The
 // library is still requested by the build-identifier hash, which reads the downstream version
 // on a best-effort basis that cannot fail the compile.
-SLANG_UNIT_TEST(separateDebugAtO0SucceedsWithoutSpirvOpt)
+SLANG_UNIT_TEST(separateDebugAtO0SucceedsWithoutSpirvOpt, NoRenderApi)
 {
     const CompileOutcome outcome = compileToSpirv({.library = GlslangLibrary::Missing});
 
@@ -444,7 +444,7 @@ SLANG_UNIT_TEST(separateDebugAtO0SucceedsWithoutSpirvOpt)
 
 // Validation loads `slang-glslang`, but at `-O0` the optimizer has nothing to do, so a split
 // compile must validate, must not call the optimizer, and must still produce both modules.
-SLANG_UNIT_TEST(separateDebugAtO0WithValidationDoesNotCallOptimizer)
+SLANG_UNIT_TEST(separateDebugAtO0WithValidationDoesNotCallOptimizer, NoRenderApi)
 {
     ScopedEnvVar validateSpirv("SLANG_RUN_SPIRV_VALIDATION", "1");
     const CompileOutcome outcome =
@@ -459,7 +459,7 @@ SLANG_UNIT_TEST(separateDebugAtO0WithValidationDoesNotCallOptimizer)
 // Linking a precompiled module loads `slang-glslang`, but at `-O0` the optimizer has nothing to
 // do, so a split compile must split the linked module without calling the optimizer. The fake
 // link result carries a debug-only marker, which must end up in the debug module only.
-SLANG_UNIT_TEST(separateDebugAtO0SplitsLinkedModule)
+SLANG_UNIT_TEST(separateDebugAtO0SplitsLinkedModule, NoRenderApi)
 {
     const CompileOutcome outcome =
         compileToSpirv({.library = GlslangLibrary::Faked, .linkPrecompiledLibrary = true});
@@ -475,7 +475,7 @@ SLANG_UNIT_TEST(separateDebugAtO0SplitsLinkedModule)
 // At `-O1` the optimizer is required. With `slang-glslang` missing, the API compile reports E00100
 // and still returns the natively emitted module, as it does without separate debug info; with
 // separate debug info it returns both modules instead of crashing on a missing debug module.
-SLANG_UNIT_TEST(separateDebugWithMissingSpirvOptMatchesNonSplitCompile)
+SLANG_UNIT_TEST(separateDebugWithMissingSpirvOptMatchesNonSplitCompile, NoRenderApi)
 {
     const CompileOutcome plain = compileToSpirv(
         {.library = GlslangLibrary::Missing,

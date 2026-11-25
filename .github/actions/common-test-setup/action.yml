@@ -18,10 +18,10 @@ inputs:
     required: false
     description: "Optional suffix for artifact name (e.g., '-cuda')"
     default: ""
-  cpu-only:
+  gpu-tier:
     required: false
-    description: "Whether this job is restricted to CPU/LLVM backends (no GPU APIs to check)"
-    default: "false"
+    description: "GPU tier of the runner: 't4', 'sm80plus', 'metal' (macOS), or 'nogpu' (no GPU)"
+    default: ""
 
 runs:
   using: "composite"
@@ -80,10 +80,17 @@ runs:
       shell: bash
       run: |
         echo "Checking supported backends"
+        # The smoke test runs on every API that starts. A job without a GPU
+        # needs only cpu and llvm, and a software device, such as WARP on
+        # windows-2022, can start and then fail to run the compute test.
+        smoke_args=()
+        if [[ "${{ inputs.gpu-tier }}" == "nogpu" ]]; then
+          smoke_args+=("-api" "cpu+llvm")
+        fi
         # Capture the output of slang-test while also displaying it
         # Add retry logic for intermittent failures
         for attempt in 1 2 3; do
-          if smokeResult=$("$bin_dir/slang-test" "tests/render/check-backend-support-on-ci.slang" 2>&1); then
+          if smokeResult=$("$bin_dir/slang-test" "${smoke_args[@]}" "tests/render/check-backend-support-on-ci.slang" 2>&1); then
             break
           else
             echo "⚠️  Attempt $attempt failed, retrying..."
@@ -137,8 +144,13 @@ runs:
           echo "runner_name=${RUNNER_NAME:-unknown}"
           echo "os=macos"
           echo "ENV_INFO_END"
-        elif [[ "${{ inputs.os }}" == "windows" && "${{ inputs.cpu-only }}" != "true" ]]; then
-          check_api_support "vk,vulkan" "dx12,d3d12" "dx11,d3d11" "cuda"
+        elif [[ "${{ inputs.gpu-tier }}" == "nogpu" ]]; then
+          # A job without a GPU runs the (cpu) and (llvm) tests, so it needs
+          # both. The GPU APIs are not checked, because the runner can have a
+          # software device, such as WARP on Windows.
+          check_api_support "cpu" "llvm"
+        elif [[ "${{ inputs.os }}" == "windows" ]]; then
+          check_api_support "vk,vulkan" "dx12,d3d12" "dx11,d3d11" "cuda" "wgpu,webgpu"
 
           echo "Printing CUDA compiler version: ..."
           nvcc --version || (echo "ERROR: CUDA compiler (nvcc) not available on Windows" && exit 1)

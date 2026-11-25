@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+wgpu, filecheck-buffer=BUF):-output-using-type
 
 // Only integer scalar initializers built from builtin operators constant-fold, so a float
 // scalar or a vector `static const` global that names a specialization constant reaches

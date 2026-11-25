@@ -1,10 +1,7 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl -output-using-type
+//TEST(compute):COMPARE_COMPUTE(targets=all-cuda-cpu-wgpu-llvm):-shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+metal): -output-using-type
 // Not supported in WGSL: read-write storage texture with "rg16f" format
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 // Disabled due to missing texture support in LLVM target.
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-llvm
 
 //TEST_INPUT: RWTexture2D(format=RG16Float, size=4, content = one, mipMaps = 1):name g_test
 [format("rg16f")]

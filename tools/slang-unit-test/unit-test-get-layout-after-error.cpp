@@ -15,7 +15,7 @@ static bool blobHasText(slang::IBlob* blob)
     return blob && blob->getBufferSize() != 0;
 }
 
-SLANG_UNIT_TEST(getLayoutAfterError)
+SLANG_UNIT_TEST(getLayoutAfterError, NoRenderApi)
 {
     // Both parameters land on Vulkan binding 0 of space 0 once `-fvk-t-shift 0 all` is applied,
     // which is a layout-time error.

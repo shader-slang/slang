@@ -94,6 +94,10 @@ set_target_properties(
 )
 
 add_executable(shader-coverage-backends ${_sources})
+# This executable is created with a raw add_executable rather than
+# slang_add_target, so it opts into the shared longPathAware application
+# manifest explicitly (see slang_add_windows_manifest).
+slang_add_windows_manifest(shader-coverage-backends)
 # Apply the project-default compile/link options, as the sibling coverage
 # demos do. In particular this adds the SLANG_ENABLE_ASAN sanitizer flags
 # to the link line; without them the executable fails to link against the

@@ -1607,6 +1607,25 @@ struct IRPtrTypeBase : IRType
     IRType* getDataLayout() { return getOperandCount() > 3 ? (IRType*)getOperand(3) : nullptr; }
 };
 
+/// A read-only `borrow in` parameter, passed by address.
+FIDDLE()
+struct IRBorrowInParamType : IRPtrTypeBase
+{
+    FIDDLE(baseInst())
+};
+
+/// A `borrow in` parameter that the C-like emitters declare as a by-value parameter.
+///
+/// The IR treats the parameter as a pointer to its value, so a callee that takes a `borrow in` can
+/// receive its address, while the emitted declaration keeps the by-value signature `T p` and
+/// references to the parameter are emitted as `&p`. An entry point uses this for a uniform
+/// aggregate parameter, whose by-value declaration is fixed by the host's launch interface.
+FIDDLE()
+struct IRByValueBorrowInParamType : IRBorrowInParamType
+{
+    FIDDLE(leafInst())
+};
+
 
 /// The base class of RawPointerType and RTTIPointerType.
 FIDDLE()
@@ -2249,8 +2268,8 @@ public:
     // Adding or removing AST classes changes the sequential `ASTNodeType` values. We raise the
     // minimum supported version when those values change so older modules are rejected before
     // their node IDs can be decoded as different AST classes.
-    const static UInt k_minSupportedModuleVersion = 42;
-    const static UInt k_maxSupportedModuleVersion = 42;
+    const static UInt k_minSupportedModuleVersion = 45;
+    const static UInt k_maxSupportedModuleVersion = 45;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

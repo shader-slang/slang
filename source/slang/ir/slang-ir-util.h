@@ -286,6 +286,10 @@ bool hasGenericAssemblyImplementation(IRFunc* func);
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
 
+/// Returns whether the buffer type omits length metadata on pointer-based targets.
+/// Native resource targets erase this distinction during unsized-buffer lowering.
+bool isUnsizedBufferType(IRType* type);
+
 /// Return whether `type` is itself a texture or storage image, a sampler, a combined
 /// texture-sampler, a subpass input (including a GLSL input attachment), or an acceleration
 /// structure. Unlike a buffer, which a target can represent as a pointer to memory, a value of one

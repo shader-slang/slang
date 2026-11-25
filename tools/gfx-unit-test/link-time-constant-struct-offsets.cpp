@@ -220,12 +220,12 @@ void linkTimeConstantStructOffsetsTestImpl(IDevice* device, UnitTestContext* con
         "after linking");
 }
 
-SLANG_UNIT_TEST(linkTimeConstantStructOffsetsD3D12)
+SLANG_UNIT_TEST(linkTimeConstantStructOffsetsD3D12, D3D12)
 {
     runTestImpl(linkTimeConstantStructOffsetsTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(linkTimeConstantStructOffsetsVulkan)
+SLANG_UNIT_TEST(linkTimeConstantStructOffsetsVulkan, Vulkan)
 {
     runTestImpl(linkTimeConstantStructOffsetsTestImpl, unitTestContext, DeviceType::Vulkan);
 }

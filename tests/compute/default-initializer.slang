@@ -3,8 +3,7 @@
 // Confirm that a type with a default initializer gets
 // default-initialized where appropriate.
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 struct Stuff
 {

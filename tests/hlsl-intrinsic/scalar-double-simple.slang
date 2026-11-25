@@ -1,16 +1,11 @@
-// Here we are going to do a very simple calculation with double. 
+// Here we are going to do a very simple calculation with double.
 // For simplicity we are not going to use any intrinsics, and not use any resources that use double
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -render-feature double
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -render-feature double
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda+cpu+llvm):
+//TEST:COMPARE_COMPUTE(targets=all-metal-wgpu):-render-feature double
+//TEST:COMPARE_COMPUTE(targets=dx12):-profile sm_6_0
+//TEST:COMPARE_COMPUTE(targets=vk):-render-feature double
 // Not supported in WGSL: Double and other unsupported scalar types
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
-//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -19,7 +14,7 @@ RWStructuredBuffer<uint> outputBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
-    
+
     double f = idx * (1.0l / (4.0l));
 
     f = 1.0l / f;

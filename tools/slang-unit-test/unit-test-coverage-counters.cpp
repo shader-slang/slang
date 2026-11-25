@@ -3,7 +3,7 @@
 
 using coverageDemo::decodeCoverageCounters;
 
-SLANG_UNIT_TEST(coverageCountersDecode32)
+SLANG_UNIT_TEST(coverageCountersDecode32, NoRenderApi)
 {
     const uint8_t bytes[][4] = {
         {0, 0, 0, 0},             // Zero hits.
@@ -16,7 +16,7 @@ SLANG_UNIT_TEST(coverageCountersDecode32)
     SLANG_CHECK(hits == expected);
 }
 
-SLANG_UNIT_TEST(coverageCountersDecode64)
+SLANG_UNIT_TEST(coverageCountersDecode64, NoRenderApi)
 {
     const uint8_t bytes[][8] = {
         {0, 0, 0, 0, 0, 0, 0, 0},                         // Zero hits.
@@ -31,13 +31,13 @@ SLANG_UNIT_TEST(coverageCountersDecode64)
     SLANG_CHECK(hits == expected);
 }
 
-SLANG_UNIT_TEST(coverageCountersDecodeEmpty)
+SLANG_UNIT_TEST(coverageCountersDecodeEmpty, NoRenderApi)
 {
     SLANG_CHECK(decodeCoverageCounters(nullptr, 0, 4).empty());
     SLANG_CHECK(decodeCoverageCounters(nullptr, 0, 8).empty());
 }
 
-SLANG_UNIT_TEST(coverageCountersDecodeUnaligned)
+SLANG_UNIT_TEST(coverageCountersDecodeUnaligned, NoRenderApi)
 {
     // The sentinel leaves the counter at an unaligned address. Decoding must not
     // alter the raw snapshot that the examples later write to counters.bin.

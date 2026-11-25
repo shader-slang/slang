@@ -405,6 +405,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_BorrowInOutParamType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
     case kIROp_RawPointerType:
     case kIROp_PtrType:
     case kIROp_NativePtrType:
@@ -527,6 +528,16 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         break;
     default:
         break;
+    }
+
+    // Unsized CPU/CUDA prelude buffers contain only their data pointer.
+    if (isUnsizedBufferType(type))
+    {
+        auto size = targetReq && (isCPUTarget(targetReq) || isCUDATarget(targetReq))
+                        ? builtinTypeInfo.genericPointerSize
+                        : 8;
+        *outSizeAndAlignment = IRSizeAndAlignment(size, size);
+        return SLANG_OK;
     }
 
     // Handle StructuredBuffer types

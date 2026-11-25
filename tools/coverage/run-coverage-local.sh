@@ -120,7 +120,7 @@ if [[ "$SKIP_TEST" == "false" ]]; then
   # Build test arguments
   test_args=(
     "-expected-failure-list" "tests/expected-failure-github.txt"
-    "-expected-failure-list" "tests/expected-failure-no-gpu.txt"
+    "-expected-failure-list" "tests/expected-failure-nogpu.txt"
     "-skip-reference-image-generation"
     "-show-adapter-info"
     "-enable-debug-layers" "true"

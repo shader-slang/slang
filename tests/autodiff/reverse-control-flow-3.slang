@@ -1,5 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -g0
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type -g0
+//TEST:COMPARE_COMPUTE(targets=all-metal):-output-using-type -g0
 //DISABLE_TEST:SIMPLE(filecheck=CHK):-target hlsl -stage compute -entry computeMain -report-checkpoint-intermediates
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
@@ -147,7 +146,7 @@ void handleHit(inout PathState path, inout PathResult rs, inout VisibilityQuery 
         path.terminated = true;
         return;
     }
-     
+
     generateScatterRay(param, path, rs);
 
     rs.L = rs.thp * lightEval(path.depth);
@@ -203,7 +202,7 @@ bool tracePath(uint pathID, out PathState path, inout PathResult pathRes)
             handleMiss(path, pathRes);
         }
     }
-    
+
     return true;
 }
 

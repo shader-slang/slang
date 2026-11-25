@@ -63,17 +63,17 @@ void computeTrivialTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, numbersBuffer, std::array{1.0f, 2.0f, 3.0f, 4.0f});
 }
 
-SLANG_UNIT_TEST(computeTrivialD3D12)
+SLANG_UNIT_TEST(computeTrivialD3D12, D3D12)
 {
     runTestImpl(computeTrivialTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(computeTrivialD3D11)
+SLANG_UNIT_TEST(computeTrivialD3D11, D3D11)
 {
     runTestImpl(computeTrivialTestImpl, unitTestContext, DeviceType::D3D11);
 }
 
-SLANG_UNIT_TEST(computeTrivialVulkan)
+SLANG_UNIT_TEST(computeTrivialVulkan, Vulkan)
 {
     runTestImpl(computeTrivialTestImpl, unitTestContext, DeviceType::Vulkan);
 }

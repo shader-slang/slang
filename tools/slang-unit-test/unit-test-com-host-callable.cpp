@@ -346,7 +346,7 @@ SlangResult ComTestContext::_runTest()
 
 } // namespace
 
-SLANG_UNIT_TEST(comHostCallable)
+SLANG_UNIT_TEST(comHostCallable, NoRenderApi)
 {
 #if SLANG_PTR_IS_32 && !SLANG_MICROSOFT_FAMILY
     // TODO(JS):

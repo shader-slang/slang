@@ -10,13 +10,11 @@
 
 // Capability shaderDenormPreserveFloat32 is VK_FALSE on the Vulkan device used for CI testing, resulting in
 // runtime error VUID-RuntimeSpirv-shaderDenormPreserveFloat32-06297 during CI testing
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-vk -compute -Xslang -denorm-mode-fp32 -Xslang preserve
 // Capability shaderDenormFlushToZeroFloat32 is VK_FALSE on the Vulkan device used for CI testing, resulting in
 // runtime error VUID-RuntimeSpirv-shaderDenormFlushToZeroFloat32-06300 during CI testing
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=FTZ):-vk -compute -Xslang -denorm-mode-fp32 -Xslang ftz
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-slang -compute -dx12 -profile cs_6_2 -shaderobj -Xslang -denorm-mode-fp32 -Xslang preserve
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=FTZ):-slang -compute -dx12 -profile cs_6_2 -Xslang -denorm-mode-fp32 -Xslang ftz
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda+cpu+llvm, filecheck-buffer=PRESERVE):-profile cs_6_2 -Xslang -denorm-mode-fp32 -Xslang preserve
+//TEST:COMPARE_COMPUTE(targets=glsl+dx12+wgpu, filecheck-buffer=FTZ):-profile cs_6_2 -Xslang -denorm-mode-fp32 -Xslang ftz
 
 // CHECK_ANY-NOT: DenormPreserve
 // CHECK_ANY-NOT: DenormFlushToZero
@@ -59,6 +57,6 @@ void computeMain()
 {
     float smallestNormal = inputBuffer[0];
     float denormal = smallestNormal / 10;
-    
+
     outputBuffer[0] = denormal;
 }

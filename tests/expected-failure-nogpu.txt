@@ -8,6 +8,3 @@ slang-unit-test-tool/replayRecord_gpu_printing.internal
 # CUDA tests require a GPU
 slang-unit-test-tool/cudaCodeGenBug.internal
 gfx-unit-test-tool/neuralSlangNetworkConverterCUDA.internal
-
-# CPU gfx smoke imports the gfx module, which is not available on no-GPU hosted runners
-tests/cpu-program/gfx-smoke.slang (cpu)

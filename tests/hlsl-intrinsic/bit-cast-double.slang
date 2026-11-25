@@ -1,10 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-slang -compute -dx11 -shaderobj -render-feature double
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -shaderobj -render-feature double
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-slang -shaderobj -mtl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -llvm -shaderobj
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda+cpu+llvm, filecheck-buffer=CHK):
+//TEST:COMPARE_COMPUTE(targets=vk+dx11, filecheck-buffer=CHK): -render-feature double
 
 //CHK: 1
 
@@ -38,6 +33,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // status
     outputBuffer[0] = (int(r) == 0)
-        && (int(s.x) == 1) 
+        && (int(s.x) == 1)
         && (int(s.y) == 2);
 }

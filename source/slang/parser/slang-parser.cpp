@@ -135,6 +135,7 @@ public:
     ModuleDecl* currentModule = nullptr;
 
     bool hasSeenCompletionToken = false;
+    bool shouldDeferLambdaBodies = false;
 
     TokenReader tokenReader;
     DiagnosticSink* sink;
@@ -265,6 +266,20 @@ public:
     ForStmt* ParseForStatement();
     WhileStmt* ParseWhileStatement();
     DoWhileStmt* ParseDoWhileStatement(Stmt* body);
+    /// Parse a condition clause.
+    ConditionClause* parseConditionClause();
+    /// Parse an expression condition, diagnosing a declaration identified by lookahead.
+    ExprConditionClause* parseExprConditionClause(bool startsWithDeclaration);
+    /// Parse a condition that declares a variable.
+    DeclConditionClause* parseDeclConditionClause();
+    /// Determine whether the condition begins with a variable declaration.
+    bool doesConditionStartWithDeclaration();
+    /// Create a parser for lookahead within the given token span.
+    Parser makeConditionLookaheadParser(TokenSpan const& tokens, DiagnosticSink* probeSink);
+    /// Enter the statement's condition scope when the dialect allows declarations there.
+    void maybePushConditionScope(ScopeStmt* stmt);
+    /// Leave the scope entered by `maybePushConditionScope`, if any.
+    void popConditionScope(ScopeStmt* stmt);
     CatchStmt* ParseDoCatchStatement(Stmt* body);
     Stmt* ParseDoStatement();
     BreakStmt* ParseBreakStatement();
@@ -321,6 +336,21 @@ public:
             lastErrorLoc = loc;
         }
     }
+};
+
+/// Set a parser's pending modifiers and restore the previous list when leaving the scope.
+struct ScopedPendingModifiers
+{
+    ScopedPendingModifiers(Parser* parser, Modifiers& modifiers)
+        : parser(parser), previousModifiers(parser->pendingModifiers)
+    {
+        parser->pendingModifiers = &modifiers;
+    }
+
+    ~ScopedPendingModifiers() { parser->pendingModifiers = previousModifiers; }
+
+    Parser* parser;
+    Modifiers* previousModifiers;
 };
 
 // Forward Declarations
@@ -3113,7 +3143,11 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
         // If we have access to a semantic visitor, we can check the base
         // and see if it refers to a generic.
         auto checkedBase = parser->semanticsVisitor->CheckTerm(base);
-        if (auto declRefExpr = as<DeclRefExpr>(checkedBase))
+        // Calling a member on an interface value first opens the value into a temporary, so the
+        // checked base comes back wrapped in `LetExpr` nodes that bind those temporaries. We
+        // look through them to decide whether the member itself is generic.
+        Expr* checkedInner = SemanticsContext::ExprLocalScope::skipBindings(checkedBase);
+        if (auto declRefExpr = as<DeclRefExpr>(checkedInner))
         {
             if (declRefExpr->declRef.is<GenericDecl>())
             {
@@ -3136,7 +3170,7 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
                 baseKind = BaseGenericKind::NonGeneric;
             }
         }
-        else if (auto overloadedExpr = as<OverloadedExpr>(checkedBase))
+        else if (auto overloadedExpr = as<OverloadedExpr>(checkedInner))
         {
             baseKind = BaseGenericKind::NonGeneric;
             for (auto candidate : overloadedExpr->lookupResult2)
@@ -3160,12 +3194,11 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
             baseKind = BaseGenericKind::NonGeneric;
         }
 
-        // Checking a `MemberExpr` stores its dereferenced or opened base back into the node,
-        // so checking the unchecked node again can apply `->` to a non-pointer (`p->y` with
-        // `float2* p` would report that `vector<float,2>` cannot be dereferenced). We reuse the
-        // checked node once the kind is decided: `Generic` is only set for a `DeclRefExpr` or
-        // `OverloadedExpr`, which `AddGenericOverloadCandidates` accepts, while an `Unknown`
-        // node may be a `LetExpr` that it rejects, as in `h.o.get<4>()` with an interface `o`.
+        // Once the kind is decided, we reuse the checked expression instead of checking the base
+        // again. Checking a `MemberExpr` updates the node in place (its base is dereferenced or
+        // opened), so a second check could apply `->` to a non-pointer. The `LetExpr` bindings
+        // are kept as well: without them an opened base refers to a temporary that no longer
+        // aliases the original value, and writes through it are lost.
         if (as<MemberExpr>(base) && baseKind != BaseGenericKind::Unknown)
         {
             base = checkedBase;
@@ -6235,14 +6268,7 @@ static DeclBase* ParseDeclWithModifiers(
 {
     DeclBase* decl = nullptr;
 
-    struct RestorePendingModifiersRAII
-    {
-        Modifiers* oldValue;
-        Parser* parser;
-        ~RestorePendingModifiersRAII() { parser->pendingModifiers = oldValue; }
-    };
-    RestorePendingModifiersRAII restorePendingModifiersRAII{parser->pendingModifiers, parser};
-    parser->pendingModifiers = &modifiers;
+    ScopedPendingModifiers modifierContext(parser, modifiers);
 
     auto loc = parser->tokenReader.peekLoc();
     switch (peekTokenType(parser))
@@ -7741,6 +7767,10 @@ Stmt* Parser::parseIfLetStatement()
     ReadToken("if");
     ReadToken(TokenType::LParent);
 
+    auto condition = astBuilder->create<ExprConditionClause>();
+    FillPosition(condition);
+    ifStatement->condition = condition;
+
     // parse 'let var = X as Y'
     ReadToken("let");
     auto identifierToken = ReadToken(TokenType::Identifier);
@@ -7764,7 +7794,7 @@ Stmt* Parser::parseIfLetStatement()
     tempVarExpr->scope = currentScope;
     FillPosition(tempVarExpr);
     tempVarExpr->name = tempVarDecl->getName();
-    ifStatement->predicate = constructIfLetPredicate(this, tempVarExpr);
+    condition->expr = constructIfLetPredicate(this, tempVarExpr);
 
     ReadToken(TokenType::RParent);
 
@@ -7848,13 +7878,219 @@ Stmt* Parser::parseControlFlowBody(Stmt* parentStmt)
     return blockStmt;
 }
 
+ConditionClause* Parser::parseConditionClause()
+{
+    bool startsWithDeclaration = doesConditionStartWithDeclaration();
+    if (startsWithDeclaration && getSourceLanguage() == SourceLanguage::HLSL)
+        return parseDeclConditionClause();
+    return parseExprConditionClause(startsWithDeclaration);
+}
+
+ExprConditionClause* Parser::parseExprConditionClause(bool startsWithDeclaration)
+{
+    auto condition = astBuilder->create<ExprConditionClause>();
+    FillPosition(condition);
+    if (startsWithDeclaration)
+    {
+        // The enclosing statement still needs its closing parenthesis and body.
+        // We recover with an incomplete expression and skip the declaration as a unit.
+        sink->diagnose(
+            Diagnostics::VariableDeclarationNotAllowedAsCondition{.location = condition->loc});
+        isRecovering = true;
+        TryRecoverBefore(this, TokenType::RParent);
+        condition->expr = astBuilder->create<IncompleteExpr>();
+        condition->expr->loc = condition->loc;
+    }
+    else
+    {
+        condition->expr = ParseExpression();
+    }
+    return condition;
+}
+
+// Parse the type prefix shared by declaration conditions and their lookahead.
+static TypeSpec parseConditionTypeSpec(Parser* parser, Modifiers& modifiers)
+{
+    auto typeSpec = _parseTypeSpec(parser, modifiers);
+    if (!typeSpec.decl)
+        typeSpec.expr = parseBracketTypeSuffix(parser, typeSpec.expr);
+    return typeSpec;
+}
+
+DeclConditionClause* Parser::parseDeclConditionClause()
+{
+    auto condition = astBuilder->create<DeclConditionClause>();
+    FillPosition(condition);
+
+    // A declaration condition declares one variable. We parse its type and declarator as
+    // for a local declaration, including the distinction between type and declaration modifiers.
+    Modifiers modifiers;
+    ScopedPendingModifiers modifierContext(this, modifiers);
+    modifiers = ParseModifiers(this);
+    auto typeSpec = parseConditionTypeSpec(this, modifiers);
+    if (typeSpec.decl)
+    {
+        // A type definition introduces another declaration in addition to the variable.
+        StringBuilder declType;
+        printDiagnosticArg(declType, typeSpec.decl->astNodeType);
+        sink->diagnose(Diagnostics::DeclNotAllowed{
+            .declType = declType.produceString(),
+            .location = typeSpec.decl->loc});
+
+        // The rejected definition never enters the scope. We keep the variable's
+        // declarator for recovery and give it an incomplete type expression.
+        typeSpec.expr = astBuilder->create<IncompleteExpr>();
+        typeSpec.expr->loc = typeSpec.decl->loc;
+    }
+    auto initDeclarator = parseInitDeclarator(this, kDeclaratorParseOptions_None);
+    if (!initDeclarator.initializer)
+        ReadToken(TokenType::OpAssign);
+
+    if (LookAheadToken(TokenType::Comma))
+    {
+        // A comma may begin another declarator, which the condition grammar has no slot for.
+        // The statement parser still consumes the closing parenthesis after recovery.
+        Unexpected(this, TokenType::RParent);
+        TryRecoverBefore(this, TokenType::RParent);
+    }
+
+    // Completing the declaration makes the name available when the statement parser reads its
+    // body. The initializer was parsed before that name entered the scope.
+    DeclaratorInfo declaratorInfo;
+    declaratorInfo.typeSpec = typeSpec.expr;
+    UnwrapDeclarator(this, initDeclarator, &declaratorInfo);
+    auto containerDecl = currentScope->containerDecl;
+    auto decl = CreateVarDeclForContext(astBuilder, containerDecl);
+    CompleteVarDecl(this, decl, declaratorInfo);
+    CompleteDecl(this, decl, containerDecl, modifiers, nullptr);
+    condition->decl = decl;
+    return condition;
+}
+
+bool Parser::doesConditionStartWithDeclaration()
+{
+    // We first look for tokens that can separate a declaration from an expression.
+    switch (tokenReader.peekTokenType())
+    {
+    case TokenType::Identifier:
+    case TokenType::Scope:
+    case TokenType::LBracket:
+        break;
+    default:
+        return false;
+    }
+
+    // An initialized declarator needs an `=` outside any brackets or parentheses.
+    // Adjacent names also warrant a probe, so we can diagnose a missing initializer in
+    // `if (int count)`. The final parenthesis bounds both probes on malformed input.
+    bool hasDeclarationTokens = false;
+    TokenReader conditionEnd = tokenReader;
+    while (!IsClosingToken(conditionEnd.peekTokenType()))
+    {
+        if (conditionEnd.peekTokenType() == TokenType::OpAssign)
+            hasDeclarationTokens = true;
+        if (SkipBalancedToken(&conditionEnd) == TokenType::Identifier)
+        {
+            if (conditionEnd.peekTokenType() == TokenType::Identifier)
+                hasDeclarationTokens = true;
+        }
+    }
+    if (!hasDeclarationTokens || conditionEnd.peekTokenType() != TokenType::RParent)
+        return false;
+
+    TokenSpan tokens;
+    tokens.m_begin = tokenReader.m_cursor;
+    tokens.m_end = conditionEnd.m_cursor + 1;
+
+    // We try the type and declarator without parsing the initializer. If either
+    // prefix is missing, the real parser starts over with the expression grammar.
+    DiagnosticSink declSink(sink->getSourceManager(), nullptr);
+    auto declProbe = makeConditionLookaheadParser(tokens, &declSink);
+    Modifiers modifiers;
+    ScopedPendingModifiers declModifierContext(&declProbe, modifiers);
+    modifiers = ParseModifiers(&declProbe);
+    parseConditionTypeSpec(&declProbe, modifiers);
+    if (declSink.getErrorCount() != 0)
+        return false;
+
+    auto declarator = parseSemanticDeclarator(&declProbe, kDeclaratorParseOptions_None);
+    if (!declarator.declarator || declSink.getErrorCount() != 0)
+        return false;
+    auto afterDeclarator = declProbe.tokenReader.peekTokenType();
+    if (afterDeclarator != TokenType::OpAssign && afterDeclarator != TokenType::RParent)
+        return false;
+
+    // A declarator can overlap with expression syntax. In
+    // `if (getBuffer(i)[0] = 1, i > 0)`, for example, the apparent type is a
+    // function name and the apparent declarator looks like `(i)[0]`. We prefer a
+    // complete expression parse if it can serve as a predicate. A bare assignment
+    // fails that rule, but an assignment within a comma expression does not.
+    DiagnosticSink exprSink(sink->getSourceManager(), nullptr);
+    auto exprProbe = makeConditionLookaheadParser(tokens, &exprSink);
+    // `parseOptionalInheritanceClause` can run for inline types in expressions.
+    // The expression probe has no declaration modifiers to pass to it.
+    Modifiers emptyModifiers;
+    ScopedPendingModifiers exprModifierContext(&exprProbe, emptyModifiers);
+    auto expr = exprProbe.ParseExpression();
+    if (exprSink.getErrorCount() != 0)
+        return true;
+    if (!exprProbe.LookAheadToken(TokenType::RParent))
+        return true;
+    return as<AssignExpr>(expr) != nullptr;
+}
+
+Parser Parser::makeConditionLookaheadParser(TokenSpan const& tokens, DiagnosticSink* probeSink)
+{
+    // Parsing can introduce declarations or change the module's language version.
+    // The probe can look up names through the live lexical scope, but its declaration
+    // containers belong to a private module. It has no semantic visitor.
+    Parser probe(astBuilder, tokens, probeSink, outerScope, options);
+    probe.namePool = namePool;
+    probe.shouldDeferLambdaBodies = true;
+    probe.currentModule = astBuilder->create<ModuleDecl>();
+    if (currentModule)
+    {
+        probe.currentModule->languageVersion = currentModule->languageVersion;
+        probe.currentModule->ownedScope = currentModule->ownedScope;
+    }
+    else
+    {
+        probe.currentModule->ownedScope = outerScope;
+    }
+
+    auto scopeDecl = astBuilder->create<ScopeDecl>();
+    scopeDecl->parentDecl = probe.currentModule;
+    probe.PushScope(currentScope);
+    probe.PushScope(scopeDecl);
+    return probe;
+}
+
+void Parser::maybePushConditionScope(ScopeStmt* stmt)
+{
+    if (getSourceLanguage() == SourceLanguage::HLSL)
+    {
+        stmt->scopeDecl = astBuilder->create<ScopeDecl>();
+        pushScopeAndSetParent(stmt->scopeDecl);
+    }
+}
+
+void Parser::popConditionScope(ScopeStmt* stmt)
+{
+    if (stmt->scopeDecl)
+    {
+        SLANG_ASSERT(currentScope == stmt->scopeDecl->ownedScope);
+        PopScope();
+    }
+}
+
 IfStmt* Parser::parseIfStatement()
 {
     IfStmt* ifStatement = astBuilder->create<IfStmt>();
     FillPosition(ifStatement);
     ReadToken("if");
     ReadToken(TokenType::LParent);
-    ifStatement->predicate = ParseExpression();
+    maybePushConditionScope(ifStatement);
+    ifStatement->condition = parseConditionClause();
     ReadToken(TokenType::RParent);
     ifStatement->positiveStatement = parseControlFlowBody(ifStatement);
     if (LookAheadToken("else"))
@@ -7862,6 +8098,7 @@ IfStmt* Parser::parseIfStatement()
         ReadToken("else");
         ifStatement->negativeStatement = parseControlFlowBody(ifStatement);
     }
+    popConditionScope(ifStatement);
     ifStatement->afterLoc = tokenReader.peekLoc();
 
     return ifStatement;
@@ -7943,9 +8180,11 @@ WhileStmt* Parser::ParseWhileStatement()
     FillPosition(whileStatement);
     ReadToken("while");
     ReadToken(TokenType::LParent);
-    whileStatement->predicate = ParseExpression();
+    maybePushConditionScope(whileStatement);
+    whileStatement->condition = parseConditionClause();
     ReadToken(TokenType::RParent);
     whileStatement->statement = parseControlFlowBody();
+    popConditionScope(whileStatement);
     return whileStatement;
 }
 
@@ -7956,7 +8195,7 @@ DoWhileStmt* Parser::ParseDoWhileStatement(Stmt* body)
     doWhileStatement->statement = body;
     ReadToken("while");
     ReadToken(TokenType::LParent);
-    doWhileStatement->predicate = ParseExpression();
+    doWhileStatement->condition = parseExprConditionClause(doesConditionStartWithDeclaration());
     ReadToken(TokenType::RParent);
     ReadToken(TokenType::Semicolon);
     return doWhileStatement;
@@ -8921,7 +9160,11 @@ static Expr* parseLambdaExpr(Parser* parser)
     parser->ReadToken(TokenType::DoubleRightArrow);
     if (parser->LookAheadToken(TokenType::LBrace))
     {
-        lambdaExpr->bodyStmt = parser->parseBlockStatement();
+        // The semantic checker visits the parsed body to infer the return type and
+        // discover captures. The condition probes inspect the syntax around the
+        // lambda and discard their ASTs, so they can skip over its statements.
+        lambdaExpr->bodyStmt =
+            parser->shouldDeferLambdaBodies ? parseOptBody(parser) : parser->parseBlockStatement();
     }
     else
     {
@@ -10351,17 +10594,11 @@ static Expr* parsePrefixExpr(Parser* parser)
 
                     newLiteral->signedMinimumIntException = false;
 
-                    // Need to get the basic type, so we can fit to underlying type
-                    if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))
-                    {
-                        value = _fixIntegerLiteral(
-                            basicExprType->getBaseType(),
-                            value,
-                            nullptr,
-                            nullptr);
-                    }
-
-                    newLiteral->value = value;
+                    // Fit the folded value to the literal's type, which the suffix determines.
+                    // The parser does not assign `type` to a literal, so the suffix is the only
+                    // source of the type here. For example, `~0xffffffffu` folds to 0 in `uint`.
+                    newLiteral->value =
+                        _fixIntegerLiteral(newLiteral->suffixType, value, nullptr, nullptr);
                 }
 
                 return newLiteral;

@@ -44,7 +44,7 @@ static IRCall* findFirstDirectCall(IRFunc* caller, IRFunc* callee)
 // These operations all return values that depend on resource contents.
 // `doesOpReadResourceContents` keeps that classification independent of each operation's default
 // side-effect classification.
-SLANG_UNIT_TEST(resourceContentReadClassificationIncludesDedicatedOperations)
+SLANG_UNIT_TEST(resourceContentReadClassificationIncludesDedicatedOperations, NoRenderApi)
 {
     SLANG_CHECK(doesOpReadResourceContents(kIROp_ImageGatherOffset));
     SLANG_CHECK(doesOpReadResourceContents(kIROp_ImageLoad));
@@ -66,7 +66,7 @@ SLANG_UNIT_TEST(resourceContentReadClassificationIncludesDedicatedOperations)
 // instructions prevent both decorations because dead-code elimination has no separate rule that
 // preserves the debug records belonging to a removed call. Including `DebugNoScope` covers the
 // instruction that terminates a lexical debug scope without starting another one.
-SLANG_UNIT_TEST(funcPropertyPropagationRejectsResourceReadsAndDebugInstructions)
+SLANG_UNIT_TEST(funcPropertyPropagationRejectsResourceReadsAndDebugInstructions, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -134,7 +134,7 @@ SLANG_UNIT_TEST(funcPropertyPropagationRejectsResourceReadsAndDebugInstructions)
 // safety analysis uses `doesOpProduceResourceContentAddress` to recognize those roots instead of
 // following operand zero as it does for `GetElementPtr` and pointer-cast results. Loading through
 // such a result reads resource contents even when the resource is read-only.
-SLANG_UNIT_TEST(resourceContentAddressClassificationIncludesDedicatedRoots)
+SLANG_UNIT_TEST(resourceContentAddressClassificationIncludesDedicatedRoots, NoRenderApi)
 {
     SLANG_CHECK(doesOpProduceResourceContentAddress(kIROp_GetStructuredBufferPtr));
     SLANG_CHECK(doesOpProduceResourceContentAddress(kIROp_GetUntypedBufferPtr));
@@ -152,7 +152,7 @@ SLANG_UNIT_TEST(resourceContentAddressClassificationIncludesDedicatedRoots)
 // replace it. We build that module directly because source expressions that inspect only a value's
 // type are folded before this pass and therefore cannot preserve the module-scope reference we need
 // to test. We reject the decoration instead of silently deleting metadata owned by another object.
-SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsReferenceOutsideFunctionBody)
+SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsReferenceOutsideFunctionBody, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -187,7 +187,7 @@ SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsReferenceOutsideFunctionBody)
 // list is insufficient. We attach one decoration to the selected global and make metadata on a
 // different object refer to that decoration. The pass must reject the external reference before
 // removing either the global or its decoration.
-SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsExternalUseOfAttachedMetadata)
+SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsExternalUseOfAttachedMetadata, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -221,7 +221,7 @@ SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsExternalUseOfAttachedMetadata)
 // metadata instruction that supplies the user's operand. We attach the external reference to a
 // return instruction to verify that the diagnostic describes metadata ownership instead of
 // incorrectly claiming that every external user is outside a function body.
-SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsBodyUseOfAttachedMetadata)
+SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsBodyUseOfAttachedMetadata, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -257,7 +257,7 @@ SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsBodyUseOfAttachedMetadata)
 // A function-level decoration is not part of the function body, so it cannot reference a local
 // declared in the entry block. A function declaration has no block in which the pass could create
 // a local. We diagnose both references before rewriting either function.
-SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsFunctionLevelReference)
+SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsFunctionLevelReference, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -311,7 +311,7 @@ SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsFunctionLevelReference)
 // shape with a CUDA kernel that accesses a selected resource global. The call-site pass must leave
 // the argument use unchanged. Resource-global legalization must then diagnose that function-value
 // use because it could lead to an indirect invocation that the pass cannot find or rewrite.
-SLANG_UNIT_TEST(entryPointCallsiteFixDoesNotRewriteCallArguments)
+SLANG_UNIT_TEST(entryPointCallsiteFixDoesNotRewriteCallArguments, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -376,7 +376,7 @@ SLANG_UNIT_TEST(entryPointCallsiteFixDoesNotRewriteCallArguments)
 // `tests/bugs/13074/13074-static-resource-constref-write.slang` covers that producer path. We build
 // the same IR shape directly to check the pass's interprocedural effect classification: the caller
 // needs an `inout` parameter so the write returns to its caller.
-SLANG_UNIT_TEST(resourceGlobalLegalizationAccountsForWritesThroughBorrowInParameters)
+SLANG_UNIT_TEST(resourceGlobalLegalizationAccountsForWritesThroughBorrowInParameters, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -450,7 +450,7 @@ SLANG_UNIT_TEST(resourceGlobalLegalizationAccountsForWritesThroughBorrowInParame
 // from proving that the address remains local to the call. We build a helper whose generic-assembly
 // body receives the global through an `inout` parameter. The pass must reject the call before it
 // replaces the module-scope address with an entry-point local.
-SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsAddressPassedToGenericAssembly)
+SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsAddressPassedToGenericAssembly, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -508,7 +508,7 @@ SLANG_UNIT_TEST(resourceGlobalLegalizationRejectsAddressPassedToGenericAssembly)
 // unwrap that representation. We give an initialized global an attributed pointer type and pass
 // its address through a pointer cast, so the test exercises the shared representation contract
 // from initializer extraction through resource-global replacement.
-SLANG_UNIT_TEST(resourceGlobalLegalizationAcceptsAttributedPointerStorageTransfer)
+SLANG_UNIT_TEST(resourceGlobalLegalizationAcceptsAttributedPointerStorageTransfer, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -573,7 +573,7 @@ SLANG_UNIT_TEST(resourceGlobalLegalizationAcceptsAttributedPointerStorageTransfe
 // it has no source syntax at this stage of the pipeline. Legalization must preserve the launch and
 // replace the kernel's use of the global without adding a parameter to the kernel or its host
 // function.
-SLANG_UNIT_TEST(resourceGlobalLegalizationAcceptsLoweredCudaKernelLaunch)
+SLANG_UNIT_TEST(resourceGlobalLegalizationAcceptsLoweredCudaKernelLaunch, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -638,7 +638,7 @@ SLANG_UNIT_TEST(resourceGlobalLegalizationAcceptsLoweredCudaKernelLaunch)
 // fixed point. We construct two mutually recursive helpers, give only the first helper a direct
 // read of the selected global, and call only the second helper from the entry point. Legalization
 // must add a read-only resource parameter to both helpers and rewrite all three calls.
-SLANG_UNIT_TEST(resourceGlobalLegalizationPropagatesReadsThroughRecursiveCallCycle)
+SLANG_UNIT_TEST(resourceGlobalLegalizationPropagatesReadsThroughRecursiveCallCycle, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());

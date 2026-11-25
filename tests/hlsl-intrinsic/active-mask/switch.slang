@@ -2,12 +2,8 @@
 
 // Test active mask synthesis for a trivial `switch` statement
 
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -xslang -DHACK -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -DHACK -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute
+//TEST:COMPARE_COMPUTE(targets=vk):-xslang -DHACK
+//TEST:COMPARE_COMPUTE(targets=cuda):-capability cuda_sm_7_0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name buffer
 RWStructuredBuffer<int> buffer;

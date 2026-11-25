@@ -15,10 +15,7 @@
 //
 // anyValueSize is intentionally omitted to test the auto-computation path.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type -cpu
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-llvm -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-glsl-dx11-dx12-wgpu, filecheck-buffer=CHECK):-output-using-type
 
 // Verify dynamic dispatch is actually generated (not optimized away)
 //TEST:SIMPLE(filecheck=DISPATCH):-target spirv -stage compute -entry computeMain -report-dynamic-dispatch-sites

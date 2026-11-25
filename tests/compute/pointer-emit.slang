@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all-dx11):
 // Test emitting logic of pointer types.
 
 
@@ -23,7 +23,7 @@ ArrayType getArray()
 	return rs;
 }
 
-int inoutFunc(in out int param, 
+int inoutFunc(in out int param,
 			  int[2] arrayParam,
 			  out int[2] arrayOut,
 			  Something s0,

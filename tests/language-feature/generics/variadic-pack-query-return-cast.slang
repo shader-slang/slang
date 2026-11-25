@@ -2,7 +2,7 @@
 // The compute run disables warning 30816 (inheritance-unstable, emitted by the `struct Derived : Base`
 // declarations below); slangi does not accept that flag and does not surface the warning on its
 // checked stream, so INTERPRET intentionally omits it.
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cpu -shaderobj -output-using-type -xslang -warnings-disable -xslang 30816
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF): -output-using-type -xslang -warnings-disable -xslang 30816
 
 // Returning the result of `__first`/`__last` on a value pack through a `where`-clause witness must
 // lower correctly for every witness shape the cast can take:

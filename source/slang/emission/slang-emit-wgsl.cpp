@@ -526,6 +526,8 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
     case kIROp_HLSLRWStructuredBufferType:
     case kIROp_HLSLStructuredBufferType:
+    case kIROp_HLSLUnsizedStructuredBufferType:
+    case kIROp_HLSLUnsizedRWStructuredBufferType:
     case kIROp_HLSLRasterizerOrderedStructuredBufferType:
         {
             auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
@@ -538,6 +540,8 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
     case kIROp_HLSLByteAddressBufferType:
     case kIROp_HLSLRWByteAddressBufferType:
+    case kIROp_HLSLUnsizedByteAddressBufferType:
+    case kIROp_HLSLUnsizedRWByteAddressBufferType:
         {
             m_writer->emit("array<u32>");
         }
@@ -922,8 +926,10 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
     }
     else if (
         type->getOp() == kIROp_HLSLRWStructuredBufferType ||
+        type->getOp() == kIROp_HLSLUnsizedRWStructuredBufferType ||
         type->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
-        type->getOp() == kIROp_HLSLRWByteAddressBufferType)
+        type->getOp() == kIROp_HLSLRWByteAddressBufferType ||
+        type->getOp() == kIROp_HLSLUnsizedRWByteAddressBufferType)
     {
         // A GLSL `readonly buffer` reaches here as an RWStructuredBuffer (the SSBO lowering keeps
         // the binding a UAV for the other targets); WGSL forbids read_write storage in vertex
@@ -941,7 +947,9 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
     }
     else if (
         type->getOp() == kIROp_HLSLStructuredBufferType ||
-        type->getOp() == kIROp_HLSLByteAddressBufferType)
+        type->getOp() == kIROp_HLSLUnsizedStructuredBufferType ||
+        type->getOp() == kIROp_HLSLByteAddressBufferType ||
+        type->getOp() == kIROp_HLSLUnsizedByteAddressBufferType)
     {
         m_writer->emit("<");
         m_writer->emit("storage, read");

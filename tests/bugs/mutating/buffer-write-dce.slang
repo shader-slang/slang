@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Confirm that calling a mutating method to write to a buffer location doesn't
 // get DCE'd.

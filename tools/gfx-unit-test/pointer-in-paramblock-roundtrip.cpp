@@ -120,12 +120,12 @@ void pointerInParamBlockRoundtripTestImpl(IDevice* device, UnitTestContext* cont
     compareComputeResult(device, outputBuffer, std::array{38});
 }
 
-SLANG_UNIT_TEST(pointerInParamBlockRoundtripVulkan)
+SLANG_UNIT_TEST(pointerInParamBlockRoundtripVulkan, Vulkan)
 {
     runTestImpl(pointerInParamBlockRoundtripTestImpl, unitTestContext, DeviceType::Vulkan);
 }
 
-SLANG_UNIT_TEST(pointerInParamBlockRoundtripMetal)
+SLANG_UNIT_TEST(pointerInParamBlockRoundtripMetal, Metal)
 {
     runTestImpl(pointerInParamBlockRoundtripTestImpl, unitTestContext, DeviceType::Metal);
 }

@@ -2170,6 +2170,11 @@ SLANG_TEST_TOOL_API SlangResult innerMain(
 {
     using namespace Slang;
 
+    // render-test-tool is a shared library with its own copy of the static CRT, so the CRT report
+    // mode that test-server sets does not reach this module. Both `main` and test-server enter
+    // here.
+    TestToolUtil::suppressDebugDialogs();
+
     // Assume we will used the shared session
     ComPtr<slang::IGlobalSession> session(sharedSession);
 
@@ -2205,11 +2210,6 @@ SLANG_TEST_TOOL_API SlangResult innerMain(
 int main(int argc, char** argv)
 {
     using namespace Slang;
-
-#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
-    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
-    _set_abort_behavior(0, _WRITE_ABORT_MSG);
-#endif
 
     SlangSession* session = spCreateSession(nullptr);
 

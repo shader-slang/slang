@@ -222,12 +222,12 @@ void precompiledTargetModule2ExternalLinkTestImpl(IDevice* device, UnitTestConte
     precompiledModule2TestImplCommon(device, context, PrecompilationMode::ExternalLink);
 }
 
-SLANG_UNIT_TEST(precompiledModule2D3D12)
+SLANG_UNIT_TEST(precompiledModule2D3D12, D3D12)
 {
     runTestImpl(precompiledModule2TestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(precompiledTargetModuleInternalLink2D3D12)
+SLANG_UNIT_TEST(precompiledTargetModuleInternalLink2D3D12, D3D12)
 {
     runTestImpl(
         precompiledTargetModule2InternalLinkTestImpl,
@@ -237,19 +237,19 @@ SLANG_UNIT_TEST(precompiledTargetModuleInternalLink2D3D12)
 
 /*
 // Unavailable on D3D12/DXIL currently
-SLANG_UNIT_TEST(precompiledTargetModuleExternalLink2D3D12)
+SLANG_UNIT_TEST(precompiledTargetModuleExternalLink2D3D12, D3D12)
 {
     runTestImpl(precompiledTargetModule2ExternalLinkTestImpl, unitTestContext,
 DeviceType::D3D12);
 }
 */
 
-SLANG_UNIT_TEST(precompiledModule2Vulkan)
+SLANG_UNIT_TEST(precompiledModule2Vulkan, Vulkan)
 {
     runTestImpl(precompiledModule2TestImpl, unitTestContext, DeviceType::Vulkan);
 }
 
-SLANG_UNIT_TEST(precompiledTargetModule2InternalLinkVulkan)
+SLANG_UNIT_TEST(precompiledTargetModule2InternalLinkVulkan, Vulkan)
 {
     runTestImpl(
         precompiledTargetModule2InternalLinkTestImpl,
@@ -257,7 +257,7 @@ SLANG_UNIT_TEST(precompiledTargetModule2InternalLinkVulkan)
         DeviceType::Vulkan);
 }
 
-SLANG_UNIT_TEST(precompiledTargetModule2ExternalLinkVulkan)
+SLANG_UNIT_TEST(precompiledTargetModule2ExternalLinkVulkan, Vulkan)
 {
     runTestImpl(
         precompiledTargetModule2ExternalLinkTestImpl,

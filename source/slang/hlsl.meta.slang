@@ -157,11 +157,25 @@ This type is supported natively when targeting HLSL.
 For all other targets, this type maps to a buffer of 32bit unsigned integers.
  @category buffer_types
 */
-__magic_type(HLSLByteAddressBufferType)
-__intrinsic_type($(kIROp_HLSLByteAddressBufferType))
+${
+for (bool unsized : { false, true }) {
+$}
+__magic_type(HLSL$(unsized ? "UnsizedByteAddressBuffer" : "SizedByteAddressBuffer")Type)
+__intrinsic_type($(unsized ? kIROp_HLSLUnsizedByteAddressBufferType : kIROp_HLSLByteAddressBufferType))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
-struct ByteAddressBuffer
+struct $(unsized ? "__UnsizedByteAddressBuffer" : "ByteAddressBuffer")
 {
+${
+    if (unsized) {
+$}
+    /// Discard the buffer length while preserving access to the same storage.
+    [__readNone]
+    __intrinsic_op($(kIROp_SizedBufferToUnsizedBuffer))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(ByteAddressBuffer buffer);
+${
+    } else {
+$}
     /// Get the number of bytes in the buffer.
     ///@param[out] dim The number of bytes in the buffer.
     [__readNone]
@@ -179,6 +193,9 @@ struct ByteAddressBuffer
         }
     }
 
+${
+    }
+$}
     /// Load a 32-bit unsigned integer from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return The 32-bit unsigned integer loaded from the buffer.
@@ -510,6 +527,11 @@ struct ByteAddressBuffer
         return __byteAddressBufferLoad<T>(this, location, __naturalAlignmentOf<T>());
     }
 };
+${
+}
+$}
+
+typealias __SizedByteAddressBuffer = ByteAddressBuffer;
 
 // Texture
 
@@ -6622,6 +6644,18 @@ __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
 [require(spirv, structuredbuffer)]
 LayoutPtr<T, L> __getStructuredBufferElementPtr<T, L:IBufferDataLayout>(RWStructuredBuffer<T, L> buffer, uint element);
 
+__intrinsic_op($(kIROp_ByteAddressBufferLoad))
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
+T __byteAddressBufferLoad<T>(__UnsizedByteAddressBuffer buffer, uint offset, constexpr uint alignment);
+
+__intrinsic_op($(kIROp_ByteAddressBufferLoad))
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
+T __byteAddressBufferLoad<T>(__UnsizedRWByteAddressBuffer buffer, uint offset, constexpr uint alignment);
+
+__intrinsic_op($(kIROp_ByteAddressBufferStore))
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
+void __byteAddressBufferStore<T>(__UnsizedRWByteAddressBuffer buffer, uint offset, constexpr uint alignment, T value);
+
 /**
 Represents an opaque handle to a read-only structured buffer allocated in global memory.
 A structured buffer can be viewed as an array of the specified element type.
@@ -6636,12 +6670,26 @@ When generating code for other targets, this parameter is ignored and has no eff
 @see `RWStructuredBuffer`, `AppendStructuredBuffer`, `ConsumeStructuredBuffer`, `RasterizerOrderedStructuredBuffer`.
 @category buffer_types Buffer types
 **/
+${
+for (bool unsized : { false, true }) {
+$}
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
-__magic_type(HLSLStructuredBufferType)
-__intrinsic_type($(kIROp_HLSLStructuredBufferType))
-struct StructuredBuffer : IArray<T>
+__magic_type(HLSL$(unsized ? "UnsizedStructuredBuffer" : "SizedStructuredBuffer")Type)
+__intrinsic_type($(unsized ? kIROp_HLSLUnsizedStructuredBufferType : kIROp_HLSLStructuredBufferType))
+struct $(unsized ? "__UnsizedStructuredBuffer" : "StructuredBuffer")$(unsized ? "" : " : IArray<T>")
 {
 
+${
+    if (unsized) {
+$}
+    /// Discard the buffer length while preserving access to the same storage.
+    [__readNone]
+    __intrinsic_op($(kIROp_SizedBufferToUnsizedBuffer))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(StructuredBuffer<T, L> buffer);
+${
+    } else {
+$}
     /// Get the dimensions of the buffer.
     /// @param numStructs The number of structures in the buffer.
     /// @param stride The stride, in bytes, of each structure element.
@@ -6657,6 +6705,9 @@ struct StructuredBuffer : IArray<T>
         stride = rs.y;
     }
 
+${
+    }
+$}
     /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param location The index of buffer.
@@ -6696,6 +6747,11 @@ struct StructuredBuffer : IArray<T>
         get;
     };
 };
+${
+}
+$}
+
+typealias __SizedStructuredBuffer<T, L : IBufferDataLayout = DefaultDataLayout> = StructuredBuffer<T, L>;
 
 /**
 Represents an opaque handle to a consume structured buffer allocated in global memory.
@@ -6799,10 +6855,13 @@ ${
 static const struct {
     IROp op;
     char const* name;
+    char const* typeName;
+    bool unsized;
 } kMutableByteAddressBufferCases[] =
 {
-    { kIROp_HLSLRWByteAddressBufferType,                "RWByteAddressBuffer" },
-    { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer" },
+    { kIROp_HLSLRWByteAddressBufferType, "SizedRWByteAddressBuffer", "RWByteAddressBuffer", false },
+    { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer", "RasterizerOrderedByteAddressBuffer", false },
+    { kIROp_HLSLUnsizedRWByteAddressBufferType, "UnsizedRWByteAddressBuffer", "__UnsizedRWByteAddressBuffer", true },
 };
 for(auto item : kMutableByteAddressBufferCases) {
 $}
@@ -6820,11 +6879,22 @@ This type is supported natively when targeting HLSL.
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
 [require(byteaddressbuffer_rw)]
-struct $(item.name)
+struct $(item.typeName)
 {
     // Note(tfoley): supports all operations from `ByteAddressBuffer`
     // TODO(tfoley): can this be made a sub-type?
 
+${
+    if (item.unsized) {
+$}
+    /// Discard the buffer length while preserving access to the same storage.
+    [__readNone]
+    __intrinsic_op($(kIROp_SizedBufferToUnsizedBuffer))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(RWByteAddressBuffer buffer);
+${
+    } else {
+$}
     /// Get the number of bytes in the buffer.
     ///@param[out] dim The number of bytes in the buffer.
     [ForceInline]
@@ -6841,6 +6911,9 @@ struct $(item.name)
         }
     }
 
+${
+    }
+$}
     /// Load a 32-bit unsigned integer from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return The 32-bit unsigned integer loaded from the buffer.
@@ -7187,7 +7260,7 @@ ${
         {"Xor", "xor"},
         {"Exchange", "exchange"}
     };
-    if (item.op == kIROp_HLSLRWByteAddressBufferType)
+    if (item.op == kIROp_HLSLRWByteAddressBufferType || item.unsized)
     {
 $}
 
@@ -7880,14 +7953,19 @@ ${
 }
 $}
 
+typealias __SizedRWByteAddressBuffer = RWByteAddressBuffer;
+
 ${
 static const struct {
     IROp op;
     char const* name;
+    char const* typeName;
+    bool unsized;
 } kMutableStructuredBufferCases[] =
 {
-    { kIROp_HLSLRWStructuredBufferType,                "RWStructuredBuffer" },
-    { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer" },
+    { kIROp_HLSLRWStructuredBufferType, "SizedRWStructuredBuffer", "RWStructuredBuffer", false },
+    { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer", "RasterizerOrderedStructuredBuffer", false },
+    { kIROp_HLSLUnsizedRWStructuredBufferType, "UnsizedRWStructuredBuffer", "__UnsizedRWStructuredBuffer", true },
 };
 for(auto item : kMutableStructuredBufferCases) {
 $}
@@ -7910,7 +7988,7 @@ When generating code for other targets, this parameter is ignored and has no eff
  @see `StructuredBuffer`, `AppendStructuredBuffer`, `ConsumeStructuredBuffer`
  @category buffer_types
 **/
-struct $(item.name) : IRWArray<T>
+struct $(item.typeName)$(item.unsized ? "" : " : IRWArray<T>")
 {
     /// Decrements the object's hidden counter.
     /// @return The post-decremented counter value.
@@ -7919,6 +7997,17 @@ struct $(item.name) : IRWArray<T>
     [require(hlsl)]
     uint DecrementCounter();
 
+${
+    if (item.unsized) {
+$}
+    /// Discard the buffer length while preserving access to the same storage.
+    [__readNone]
+    __intrinsic_op($(kIROp_SizedBufferToUnsizedBuffer))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(RWStructuredBuffer<T, L> buffer);
+${
+    } else {
+$}
     /// Get the dimensions of the buffer.
     /// @param numStructs The number of structures in the buffer.
     /// @param stride The stride, in bytes, of each structure element.
@@ -7939,6 +8028,9 @@ struct $(item.name) : IRWArray<T>
         }
     }
 
+${
+    }
+$}
     /// Increment the object's hidden counter.
     /// @return The pre-incremented counter value.
     /// @remarks
@@ -7994,6 +8086,8 @@ struct $(item.name) : IRWArray<T>
 ${
 }
 $}
+
+typealias __SizedRWStructuredBuffer<T, L : IBufferDataLayout = DefaultDataLayout> = RWStructuredBuffer<T, L>;
 
 /// @category stage_io
 __generic<T>
@@ -11078,6 +11172,13 @@ StructuredBuffer<T> __getEquivalentStructuredBuffer<T>(ByteAddressBuffer b);
 __intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
 RasterizerOrderedStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(RasterizerOrderedByteAddressBuffer b);
 
+// Reinterpreting the element type must not invent a length for an unsized buffer.
+__intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
+__UnsizedRWStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(__UnsizedRWByteAddressBuffer b);
+
+__intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
+__UnsizedStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(__UnsizedByteAddressBuffer b);
+
 // Error message
 
 // void errorf( string format, ... );
@@ -13616,6 +13717,11 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
     }
 }
 
+// The floating-point overloads above lower to fused multiply-add intrinsics (`GLSL.std.450 Fma`,
+// GLSL `fma`, the prelude's `F*_fma` helpers, `llvm.fma`) that are defined only for
+// floating-point types. HLSL defines `mad` for integer operands, so the integer overloads use it
+// there and compute `mvalue * avalue + bvalue` in `T` on every other supported target, with
+// the same overflow behavior as any other integer arithmetic in `T`.
 __generic<T : __BuiltinIntegerType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
@@ -13623,13 +13729,7 @@ T mad(T mvalue, T avalue, T bvalue)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_fma($0, $1, $2)";
-    case cuda: __intrinsic_asm "$P_fma($0, $1, $2)";
-    case glsl: __intrinsic_asm "fma";
     case hlsl: __intrinsic_asm "mad";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Fma $mvalue $avalue $bvalue
-    };
     default:
         return mvalue * avalue + bvalue;
     }
@@ -13642,13 +13742,9 @@ vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "fma";
     case hlsl: __intrinsic_asm "mad";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Fma $mvalue $avalue $bvalue
-    };
     default:
-        VECTOR_MAP_TRINARY(T, N, mad, mvalue, avalue, bvalue);
+        return mvalue * avalue + bvalue;
     }
 }
 
@@ -25308,7 +25404,16 @@ struct HitObject
         }
     }
 
-    [require(hlsl, ser_dxr)]
+    // This helper deliberately carries no [require]: the DXR-native requirement
+    // belongs on its callers (currently only `Invoke`, whose
+    // `[require(hlsl, ser_dxr_raygen_closesthit_miss)]` implies everything the
+    // helper needs), and any future caller must declare the same. Re-declaring
+    // ser_dxr here would break callers that also serve the nvapi SER target: a
+    // callee's [require]s now join into the caller's inferred capability
+    // requirements, so `Invoke`'s `case hlsl:` arm would pick up
+    // {ser_hlsl_native} and, in the same hlsl target-family entry, fail
+    // `CapabilityTargetSet::compatibleMerge`'s subset-or-reject rule beside the
+    // `case hlsl_nvapi:` arm's {hlsl_nvapi} (TargetSwitchCapCasesConflict).
     __generic<payload_t>
     static void __InvokeHLSL_DXR(
         HitObject HitOrMiss,
@@ -25406,6 +25511,12 @@ struct HitObject
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    // Declares the nvapi SER target like the 3-argument Invoke above: an
+    // NVAPI-SER entry point passes the capability check and reaches the
+    // hlsl_nvapi arm's deliberate static_assert below, which explains that
+    // the 2-argument form has no NVAPI spelling, instead of failing with a
+    // capability error that gives no hint what to call instead.
+    [require(nvapi, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         HitObject HitOrMiss,
         inout payload_t Payload)
@@ -34477,7 +34588,16 @@ extension RWByteAddressBuffer : IRWPhysicalBuffer
 /// @param byteOffset16ByteAligned The byte offset from the start of the buffer. Must be 16-byte aligned.
 /// @return A new cooperative vector containing the loaded values.
 [ForceInline]
+// These three overloads (ByteAddressBuffer here, RWByteAddressBuffer and the
+// groupshared form below) declare the same alternatives as the
+// CoopVec<T, N>.load callees they wrap: those load forms have an OptiX arm,
+// so they carry optix_coopvec in addition to cooperative_vector. Plain CUDA
+// remains available through the cooperative_vector alternative. Without the
+// second alternative the wrapper's declared set no longer covers its inferred
+// usage — the callee's requirements now propagate into the wrapper — and the
+// wrapper itself fails capability checking.
 [require(cooperative_vector)]
+[require(optix_coopvec)]
 CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(ByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
@@ -34485,6 +34605,7 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(ByteAddressB
 
 [ForceInline]
 [require(cooperative_vector)]
+[require(optix_coopvec)]
 CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
@@ -34520,7 +34641,10 @@ CoopVec<T, N> coopVecLoadCoherent<let N : int, T : __BuiltinArithmeticType>(T* b
 
 // Groupshared
 [ForceInline]
+// Mirrors the groupshared CoopVec<T, N>.load callee's alternatives (see the
+// coopVecLoad comment above for the rule).
 [require(cooperative_vector)]
+[require(optix_coopvec)]
 CoopVec<T, N> coopVecLoadGroupshared<let N : int, T : __BuiltinArithmeticType, let M : int>(const groupshared T[M] data, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(data, byteOffset16ByteAligned);

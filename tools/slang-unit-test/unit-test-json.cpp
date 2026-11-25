@@ -107,7 +107,7 @@ static bool _areEqual(
     return true;
 }
 
-SLANG_UNIT_TEST(json)
+SLANG_UNIT_TEST(json, NoRenderApi)
 {
     SourceManager sourceManager;
     sourceManager.initialize(nullptr, nullptr);

@@ -156,7 +156,7 @@ static SlangResult _check()
     return SLANG_OK;
 }
 
-SLANG_UNIT_TEST(JSONNative)
+SLANG_UNIT_TEST(JSONNative, NoRenderApi)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_check()));
 }

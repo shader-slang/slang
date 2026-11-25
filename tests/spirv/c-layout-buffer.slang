@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -emit-spirv-directly -compute
+//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu+llvm, filecheck-buffer=CHECK):
 //TEST:SIMPLE(filecheck=SPIRV): -stage compute -entry computeMain -target spirv -fvk-use-c-layout
 struct A
 {

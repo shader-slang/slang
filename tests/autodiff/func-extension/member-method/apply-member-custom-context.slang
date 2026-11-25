@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -xslang -experimental-feature
 
 // Test: verify that __apply's custom context is ACTUALLY used for a member method.
 // The context stores a deliberately wrong value — if auto-synthesis kicked in,

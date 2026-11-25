@@ -7,10 +7,7 @@
 // atomic, so the counter ends at the group size only if every atomic reaches the same storage.
 
 //TEST:SIMPLE(filecheck=HLSL): -entry computeMain -stage compute -target hlsl
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-mtl -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=BUF):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

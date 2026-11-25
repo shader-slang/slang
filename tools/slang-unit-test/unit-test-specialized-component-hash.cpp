@@ -13,7 +13,7 @@ using namespace Slang;
 
 // Test that calling getHash on components specialized with Expr works fine.
 
-SLANG_UNIT_TEST(specializedComponentHash)
+SLANG_UNIT_TEST(specializedComponentHash, NoRenderApi)
 {
     // Shader with generic entrypoint that can be specialized with an expr.
     const char* userSourceBody = R"(

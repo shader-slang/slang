@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -capability cuda_sm_8_0
+//TEST:COMPARE_COMPUTE(targets=dx11+dx12+cuda+wgpu, filecheck-buffer=CHECK):-output-using-type -capability cuda_sm_8_0
 
 // CUDA `uint8_t` cooperative matrix multiply-add — the unsigned counterpart of
 // `int8.slang`.  Targets PTX `mma.sync.m16n8k16.s32.u8.u8.s32` at k=16.

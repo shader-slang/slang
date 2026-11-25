@@ -17,7 +17,7 @@ using namespace Slang;
 // instrumentation — needs that platform to reproduce. So the rule is pinned
 // directly.
 
-SLANG_UNIT_TEST(subtestIndexParsing)
+SLANG_UNIT_TEST(subtestIndexParsing, NoRenderApi)
 {
     const String file = "tests/compute/foo.slang";
 
@@ -35,7 +35,7 @@ SLANG_UNIT_TEST(subtestIndexParsing)
     SLANG_CHECK(TestToolUtil::getSubtestIndex("tests/other", file) == -1);
 }
 
-SLANG_UNIT_TEST(subtestEntryMatching)
+SLANG_UNIT_TEST(subtestEntryMatching, NoRenderApi)
 {
     const String file = "tests/compute/foo.slang";
     const String stem0 = "tests/compute/foo.slang"; // subtest 0 has no suffix
@@ -71,7 +71,7 @@ SLANG_UNIT_TEST(subtestEntryMatching)
 // refactor could drop one of the two lists and every committed test would still
 // pass, leaving "did the macOS coverage job crash again" as the only signal.
 
-SLANG_UNIT_TEST(subtestExclusionConsultsBothLists)
+SLANG_UNIT_TEST(subtestExclusionConsultsBothLists, NoRenderApi)
 {
     const String file = "tests/compute/foo.slang";
     const String stem6 = "tests/compute/foo.slang.6";
@@ -98,7 +98,7 @@ SLANG_UNIT_TEST(subtestExclusionConsultsBothLists)
     SLANG_CHECK(TestToolUtil::isSubtestExcluded(wholeFile, none, file, stem7, 7));
 }
 
-SLANG_UNIT_TEST(subtestIndexRejectsOutOfRangeSuffix)
+SLANG_UNIT_TEST(subtestIndexRejectsOutOfRangeSuffix, NoRenderApi)
 {
     const String file = "tests/compute/foo.slang";
 

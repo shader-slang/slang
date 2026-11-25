@@ -1,7 +1,7 @@
 // Test reading parameter block from a member function.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11 -profile sm_5_0 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx11):-profile sm_5_0 -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=gOutputBuffer
 RWStructuredBuffer<int> gOutputBuffer;

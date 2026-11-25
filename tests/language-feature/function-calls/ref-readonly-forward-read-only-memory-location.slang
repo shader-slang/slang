@@ -3,8 +3,7 @@
 // element, tuple element, or swizzle of one. A `__constref` parameter is a borrow rather than a memory location, but
 // the body may write to it like any `in` parameter, so its fields are passed as l-values.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -xslang -experimental-feature
 
 struct S
 {

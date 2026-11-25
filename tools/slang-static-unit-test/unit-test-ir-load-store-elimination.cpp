@@ -68,7 +68,7 @@ static void checkLoadStoreTestIR(IRModule* module)
 // We exercise a successful forwarding case so the search filter cannot silently disable load
 // replacement. We inspect the return operand as well as the load count because deleting the
 // load without substituting the stored value must not satisfy the test.
-SLANG_UNIT_TEST(irLoadStoreForwardsMatchingStore)
+SLANG_UNIT_TEST(irLoadStoreForwardsMatchingStore, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -93,7 +93,7 @@ SLANG_UNIT_TEST(irLoadStoreForwardsMatchingStore)
 // We also exercise forwarding through an array element inside a struct field so the pass must
 // handle a computed pointer as well as a parameter. We require both address operations to be
 // present before the pass so the test actually exercises forwarding through that projection.
-SLANG_UNIT_TEST(irLoadStoreForwardsMatchingProjectedAddress)
+SLANG_UNIT_TEST(irLoadStoreForwardsMatchingProjectedAddress, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -130,7 +130,7 @@ SLANG_UNIT_TEST(irLoadStoreForwardsMatchingProjectedAddress)
 // To check that the pass rejects stale values after a partial write, we build a whole-value
 // store followed by a field store. We require the final load to remain because replacing it
 // with the initial whole value would lose the field update.
-SLANG_UNIT_TEST(irLoadStoreRetainsWholeLoadAfterFieldStore)
+SLANG_UNIT_TEST(irLoadStoreRetainsWholeLoadAfterFieldStore, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -163,7 +163,7 @@ SLANG_UNIT_TEST(irLoadStoreRetainsWholeLoadAfterFieldStore)
 // We cannot assume that distinct pointer parameters refer to disjoint storage. We therefore
 // place a write through the second pointer between the first write and its load, and require
 // the pass to keep the load rather than reuse a value that may have been overwritten.
-SLANG_UNIT_TEST(irLoadStoreRetainsLoadAfterPossibleAlias)
+SLANG_UNIT_TEST(irLoadStoreRetainsLoadAfterPossibleAlias, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -191,7 +191,7 @@ SLANG_UNIT_TEST(irLoadStoreRetainsLoadAfterPossibleAlias)
 // write. We check that the pass requires the store's scope to cover the load's, using opposite
 // scope orderings: the pass must keep a workgroup-scoped load after an invocation-scoped store,
 // but can forward in the reverse case.
-SLANG_UNIT_TEST(irLoadStoreRespectsLoadMemoryScope)
+SLANG_UNIT_TEST(irLoadStoreRespectsLoadMemoryScope, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -232,7 +232,7 @@ SLANG_UNIT_TEST(irLoadStoreRespectsLoadMemoryScope)
 // To exercise a successful overwrite search, we write twice through the same pointer. We require
 // the pass to remove the first write and keep the last because the caller can still observe
 // that final value through the pointer parameter.
-SLANG_UNIT_TEST(irLoadStoreRemovesOverwrittenFirstStore)
+SLANG_UNIT_TEST(irLoadStoreRemovesOverwrittenFirstStore, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -256,7 +256,7 @@ SLANG_UNIT_TEST(irLoadStoreRemovesOverwrittenFirstStore)
 // We need the overwrite search to follow a cycle even when the destination has only one static
 // use. We therefore put a single store in an infinite loop and require its removal: following
 // the back edge lets the pass find that same instruction as an overwrite.
-SLANG_UNIT_TEST(irLoadStoreFollowsSingleUsePointerAroundBranchCycle)
+SLANG_UNIT_TEST(irLoadStoreFollowsSingleUsePointerAroundBranchCycle, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -291,7 +291,7 @@ SLANG_UNIT_TEST(irLoadStoreFollowsSingleUsePointerAroundBranchCycle)
 // We need the overwrite search to follow `IRLoop` as well as ordinary unconditional branches.
 // We therefore put an immediately exiting inner loop after the store. The search must follow
 // that loop's terminator to reach the store again through the outer loop and remove it.
-SLANG_UNIT_TEST(irLoadStoreFollowsSingleUsePointerThroughLoopTerminator)
+SLANG_UNIT_TEST(irLoadStoreFollowsSingleUsePointerThroughLoopTerminator, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -333,7 +333,7 @@ SLANG_UNIT_TEST(irLoadStoreFollowsSingleUsePointerThroughLoopTerminator)
 // To check the store-back rule independently of overwrite removal, we provide no later store.
 // We return the loaded value to make that load independently needed, then require the pass
 // to remove only the redundant store.
-SLANG_UNIT_TEST(irLoadStoreRemovesUnchangedValueStoredBack)
+SLANG_UNIT_TEST(irLoadStoreRemovesUnchangedValueStoredBack, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -358,7 +358,7 @@ SLANG_UNIT_TEST(irLoadStoreRemovesUnchangedValueStoredBack)
 // The pass must keep a copy from another pointer even when the destination's single use lets us
 // skip the overwrite search. We build that case with a load through one parameter and a store
 // through the other, and require both instructions to remain.
-SLANG_UNIT_TEST(irLoadStoreRetainsCopyThroughSingleUseDestination)
+SLANG_UNIT_TEST(irLoadStoreRetainsCopyThroughSingleUseDestination, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
@@ -387,7 +387,7 @@ SLANG_UNIT_TEST(irLoadStoreRetainsCopyThroughSingleUseDestination)
 // that dependency by loading a pointer from a pointer cell, storing through the loaded pointer,
 // and then loading the stored value. The pass must forward the pointer load first and record the
 // updated store address so the final load can be forwarded too.
-SLANG_UNIT_TEST(irLoadStoreTracksStoreAddressAfterPointerForwarding)
+SLANG_UNIT_TEST(irLoadStoreTracksStoreAddressAfterPointerForwarding, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());

@@ -15,7 +15,6 @@
 // sampling gradients not available. Implicit LOD sampling translates to OpImageSampleExplicitLod with Lod=0 and similar
 //TEST:SIMPLE_EX(filecheck=SPIR_NOGRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage vertex -entry vertexMain -target spirv -DSPIRV -DVERTEX_STAGE -DNO_GRADS -O3
 
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -xslang -DSPIRV
 
 // TODO: This test revealed a few problems for a path from GLSL to HLSL
 //T-EST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -compute -entry computeMain -source-language glsl -output-using-type -profile cs_6_6 -xslang -DHLSL

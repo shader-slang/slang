@@ -36,6 +36,7 @@
 #include "test-context.h"
 #include "test-output-path-util.h"
 #include "test-reporter.h"
+#include "test-target-util.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -117,7 +118,19 @@ struct TestOptions
     List<TestCategory*> categories;
 
     bool isEnabled = true;
+    // True for a test that the synthesis of other APIs, or the synthesis of compile-only tests,
+    // made from another test line. The test of one target of a line with `targets=` is not one of
+    // them: it has `target`.
     bool isSynthesized = false;
+
+    // For the test of one target of a line with `targets=`, the index of that line in the test list
+    // of the file. The test reads the expected file of the line, for example
+    // `foo.slang.1.expected.txt` for the line at index 1. It is -1 for any other test.
+    Index sourceIndex = -1;
+
+    // The target (a `TestTargetFlag`, for example `Vk`) that this test runs for. It is one bit for
+    // the test of one target of a line with `targets=`, and 0 for any other test.
+    TestTargetFlags target = 0;
 };
 
 struct FileTestInfoImpl : public FileTestInfo
@@ -180,10 +193,27 @@ static void _addRenderTestOptions(
 // Tries to read in order
 // - The file specific to this test:      input.outputStem + suffix
 // - The general file for a set of tests: input.fileName + suffix;
+//
+// The test of one target of a line reads the expected file of the line, for example
+// `foo.slang.1.expected.txt` for the line at index 1. It does not read the file of its position in
+// the test list. That position is not an index that the author wrote, and it can be the index of
+// another line. For example, in a file with a `COMPARE_COMPUTE` line at index 0 and a
+// `CROSS_COMPILE` line at index 1, the test of a target of the line 0 is at position 2, and it must
+// not read `foo.slang.2.expected`, which belongs to the line at index 2.
 static SlangResult _readTestFile(const TestInput& input, const String& suffix, String& out)
 {
     StringBuilder buf;
-    buf << input.outputStem << suffix;
+    if (input.testOptions && input.testOptions->sourceIndex >= 0)
+    {
+        buf << input.filePath;
+        if (input.testOptions->sourceIndex != 0)
+            buf << "." << input.testOptions->sourceIndex;
+    }
+    else
+    {
+        buf << input.outputStem;
+    }
+    buf << suffix;
     if (auto r = Slang::File::readAllText(buf, out); SLANG_SUCCEEDED(r))
     {
         return r;
@@ -587,6 +617,212 @@ static SlangResult _normalizeTestOutputPaths(
     return res;
 }
 
+static RenderApiType _getRenderApiFromArgs(const List<String>& args);
+
+// Returns the first target that runs on the render API of the arguments, for example `vk` for `-vk`
+// and `metal` for `-mtl`. It returns null if the arguments have no render API. The function only
+// tells the author which option replaces the argument. The target of a test is
+// `TestOptions::target`.
+static const TestTarget* _findTestTargetOfArgs(const List<String>& args)
+{
+    const RenderApiType api = _getRenderApiFromArgs(args);
+    for (Index i = 0; i < getTestTargetCount(); ++i)
+    {
+        if (getTestTargetAt(i).api == api)
+            return &getTestTargetAt(i);
+    }
+    return nullptr;
+}
+
+// Returns true if an argument of `args` names a language that implies a render API, for example
+// `-hlsl-rewrite` (Direct3D 11) or `-wgsl` (WebGPU). The language `slang` does not count, because
+// it is the default.
+static bool _hasImplicitDeviceLanguageArg(const List<String>& args)
+{
+    for (const auto& arg : args)
+    {
+        if (arg.getLength() < 2 || arg[0] != '-')
+            continue;
+
+        const UnownedStringSlice name(
+            arg.getUnownedSlice().begin() + 1,
+            arg.getUnownedSlice().end());
+        if (name == "slang")
+            continue;
+        if (name == "glsl" ||
+            RenderApiUtil::findImplicitLanguageRenderApiType(name) != RenderApiType::Unknown)
+            return true;
+    }
+    return false;
+}
+
+// Returns the option `targets=` that replaces the arguments of the test line that choose the
+// target, for example `targets=vk` for `-vk`, or `targets=glsl` for `-emit-spirv-via-glsl`. The
+// arguments are a render API (`-vk`), a language that implies one (`-wgsl`), or the path of the
+// compiler to the code of the target (`-emit-spirv-via-glsl`). It returns an empty string if the
+// arguments do not choose the target.
+static String _getTargetsOptionForArgs(const List<String>& args)
+{
+    // The path of the compiler is part of the target: `vk` and `glsl` differ in this path, and so
+    // do `cpu` and `llvm`.
+    static const struct
+    {
+        const char* argument;
+        const char* target;
+    } kPathArguments[] = {
+        {"-emit-spirv-directly", "vk"},
+        {"-emit-spirv-via-glsl", "glsl"},
+        {"-emit-cpu-via-cpp", "cpu"},
+        {"-emit-cpu-via-llvm", "llvm"},
+    };
+    for (const auto& path : kPathArguments)
+    {
+        if (args.contains(path.argument))
+            return String("targets=") + path.target;
+    }
+
+    if (const TestTarget* target = _findTestTargetOfArgs(args))
+    {
+        StringBuilder option;
+        option << "targets=" << target->label;
+        return option.produceString();
+    }
+    return _hasImplicitDeviceLanguageArg(args) ? String("targets=<name>") : String();
+}
+
+// Returns true if the test is a line that runs once for each of its targets: a line of a
+// COMPARE_COMPUTE command that does not choose its target with an argument.
+//
+// Consider this line:
+//
+//     //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type
+//
+// The author does not choose an API. `slang-test` runs the line for each target (`targets=all`),
+// and the line itself does not run. A line with an argument that chooses the target, as in
+// `-output-using-type -vk`, has the old format. It is not a line of this kind: `slang-test` runs
+// it as one test, like the lines of the other commands, and `_addTestLine` prints a warning. The
+// test of one target has the same command, but it has the target in `TestOptions::target`, so it
+// is not a line.
+static bool _isMultiTargetLine(const TestOptions& options)
+{
+    return isTargetsOptionSupportedByCommand(options.command.getUnownedSlice()) &&
+           options.target == 0 && _getTargetsOptionForArgs(options.args).getLength() == 0;
+}
+
+// Adds the test line `testDetails` to `outTestList`, after it checks the line.
+//
+// The author of a COMPARE_COMPUTE line chooses the targets with the `targets=` option, and
+// `slang-test` makes one test for each target. A line that still names a render API in its
+// arguments (`-vk`) has the old format. It runs as one test on that API, and the function prints a
+// warning that tells the author to write `targets=vk`. A line that has both `targets=` and such an
+// argument is an error, because the two choose the target twice.
+//
+// Returns a failure, after it reports a run error, if the line is wrong. A test line that is wrong
+// must fail, because a silent skip would run the test on fewer targets than the author wants.
+static SlangResult _addTestLine(
+    const String& filePath,
+    TestDetails& testDetails,
+    FileTestList* outTestList,
+    TestContext* context)
+{
+    auto reportError = [&](const char* message, const String& detail)
+    {
+        if (context && context->getTestReporter())
+        {
+            context->getTestReporter()->messageFormat(
+                TestMessageType::RunError,
+                "Invalid test line in file '%s': %s%s",
+                filePath.getBuffer(),
+                message,
+                detail.getBuffer());
+        }
+        else
+        {
+            fprintf(
+                stderr,
+                "Invalid test line in file '%s': %s%s\n",
+                filePath.getBuffer(),
+                message,
+                detail.getBuffer());
+        }
+        return SLANG_E_INVALID_ARG;
+    };
+
+    const bool isMultiTargetLine = _isMultiTargetLine(testDetails.options);
+
+    String targetsValue;
+    const bool hasTargetsOption =
+        testDetails.options.commandOptions.tryGetValue("targets", targetsValue);
+
+    // A line of the old format chooses its target with an argument. `targets=` would choose it a
+    // second time.
+    if (isTargetsOptionSupportedByCommand(testDetails.options.command.getUnownedSlice()) &&
+        !isMultiTargetLine)
+    {
+        const String option = _getTargetsOptionForArgs(testDetails.options.args);
+        if (option.getLength())
+        {
+            if (hasTargetsOption)
+            {
+                return reportError(
+                    "the test line has the option 'targets=' and an argument that chooses the "
+                    "target. Remove the argument. The value of 'targets=' is ",
+                    targetsValue);
+            }
+
+            // A line that `DISABLE_TEST` disables does not run, so it needs no warning.
+            if (testDetails.options.isEnabled)
+            {
+                fprintf(
+                    stderr,
+                    "warning: the test line in file '%s' chooses the target with a render API or "
+                    "a SPIR-V path in its arguments. Remove the argument and add the option "
+                    "'%s'.\n",
+                    filePath.getBuffer(),
+                    option.getBuffer());
+                fflush(stderr);
+            }
+            outTestList->tests.add(testDetails);
+            return SLANG_OK;
+        }
+    }
+
+    if (!hasTargetsOption)
+    {
+        outTestList->tests.add(testDetails);
+        return SLANG_OK;
+    }
+
+    if (!isMultiTargetLine)
+    {
+        return reportError(
+            "the 'targets=' option is not supported by the command. Use it with COMPARE_COMPUTE, "
+            "COMPARE_COMPUTE_EX or COMPARE_RENDER_COMPUTE, not with ",
+            testDetails.options.command);
+    }
+
+    // A comma ends the value of `targets=`, because it also separates the options. In
+    // `(targets=vk,cpu)` the option `cpu` is a bare option, and the test would run on `vk` only.
+    for (const auto& [key, value] : testDetails.options.commandOptions)
+    {
+        if (isTestTargetName(key.getUnownedSlice()))
+        {
+            return reportError(
+                "the list of targets has a comma. Separate the names with '+', for example "
+                "targets=vk+cpu. The unexpected option is ",
+                key);
+        }
+    }
+
+    TestTargetFlags targets;
+    String error;
+    if (SLANG_FAILED(parseTestTargets(targetsValue.getUnownedSlice(), targets, error)))
+        return reportError("the 'targets=' option is wrong: ", error);
+
+    outTestList->tests.add(testDetails);
+    return SLANG_OK;
+}
+
 // Try to read command-line options from the test file itself
 static SlangResult _gatherTestsForFile(
     TestCategorySet* categorySet,
@@ -772,7 +1008,7 @@ static SlangResult _gatherTestsForFile(
             SLANG_RETURN_ON_FAIL(
                 _normalizeTestOutputPaths(filePath, testDetails.options.args, context));
 
-            outTestList->tests.add(testDetails);
+            SLANG_RETURN_ON_FAIL(_addTestLine(filePath, testDetails, outTestList, context));
         }
         else if (command == "DIAGNOSTIC_TEST")
         {
@@ -806,7 +1042,7 @@ static SlangResult _gatherTestsForFile(
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;
-            outTestList->tests.add(testDetails);
+            SLANG_RETURN_ON_FAIL(_addTestLine(filePath, testDetails, outTestList, context));
         }
         else
         {
@@ -5111,6 +5347,14 @@ TestResult runComputeComparisonImpl(
         cmdLine.addArg(arg);
     }
 
+    // The test of a target defines `SLANG_TEST_<TARGET>`, so that the shader can pick the code for
+    // one target.
+    if (input.testOptions->target)
+    {
+        cmdLine.addArg("-Xslang");
+        cmdLine.addArg(getTestTargetDefinition(getTestTarget(input.testOptions->target)));
+    }
+
     for (int i = 0; i < int(numLangOpts); ++i)
     {
         cmdLine.addArg(langOpts[i]);
@@ -5174,9 +5418,22 @@ TestResult runComputeComparisonImpl(
     return TestReporter::combine(compileResult, bufferResult);
 }
 
+// Returns true if the test file is a Slang file. The option `-slang` of `render-test` sets the
+// input language, and the default is Slang, so only a test file of another kind, for example a
+// `.hlsl` file, needs `-slang`. The last language option of the command line wins, so the runner
+// still adds `-slang` after another language option, such as `-hlsl`, which would make the file
+// native.
+static bool _isSlangSourceFile(const String& filePath)
+{
+    return Path::getPathExt(filePath) == "slang";
+}
+
 TestResult runSlangComputeComparisonTest(TestContext* context, TestInput& input)
 {
     const char* langOpts[] = {"-slang", "-compute"};
+    if (_isSlangSourceFile(input.filePath) &&
+        !_hasImplicitDeviceLanguageArg(input.testOptions->args))
+        return runComputeComparisonImpl(context, input, langOpts + 1, SLANG_COUNT_OF(langOpts) - 1);
     return runComputeComparisonImpl(context, input, langOpts, SLANG_COUNT_OF(langOpts));
 }
 
@@ -5194,6 +5451,9 @@ TestResult runHLSLComputeTest(TestContext* context, TestInput& input)
 TestResult runSlangRenderComputeComparisonTest(TestContext* context, TestInput& input)
 {
     const char* langOpts[] = {"-slang", "-gcompute"};
+    if (_isSlangSourceFile(input.filePath) &&
+        !_hasImplicitDeviceLanguageArg(input.testOptions->args))
+        return runComputeComparisonImpl(context, input, langOpts + 1, SLANG_COUNT_OF(langOpts) - 1);
     return runComputeComparisonImpl(context, input, langOpts, SLANG_COUNT_OF(langOpts));
 }
 
@@ -6359,6 +6619,10 @@ static void _calcSynthesizedTests(
     // Add the explicit parameter
     for (const auto& srcTest : srcTests)
     {
+        // A line with targets does not run. `_calcTargetTests` makes the test of each target.
+        if (_isMultiTargetLine(srcTest.options))
+            continue;
+
         const auto& requirements = srcTest.requirements;
 
         // Render tests use renderApis...
@@ -6427,6 +6691,7 @@ static void _calcSynthesizedTests(
         // Mark as synthesized
         synthOptions.isSynthesized = true;
 
+
         StringBuilder builder;
         builder << "-";
         builder << RenderApiUtil::getApiName(synthRenderApiType);
@@ -6463,6 +6728,99 @@ static void _calcSynthesizedTests(
     }
 }
 
+// Adds the test of each target of each line with targets to `ioTests`, like a loop over the targets
+// of the line.
+//
+// Consider this line:
+//
+//     //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type
+//
+// The line has no `targets=`, so it means `targets=all`. The function adds a copy of the line for
+// each target of `all`: `... -vk`, `... -dx11`, and so on. A line with `targets=all-vk-cuda` gets
+// the targets of that list, and a line with `targets=vk+cpu` gets exactly these two.
+//
+// A line makes the tests of all its targets. Another line of the file does not change that, even if
+// the line tests the same target. Consider these two lines:
+//
+//     //TEST:COMPARE_COMPUTE(targets=all): -option-a
+//     //TEST:COMPARE_COMPUTE(targets=cuda): -option-b
+//
+// The first line makes a `cuda` test with `-option-a`, and the second line makes a `cuda` test with
+// `-option-b`. They are two different tests. The option `-synthesizedTestApi` of `slang-test`, and
+// the APIs that the machine has, limit every line. The function sets `outTargetApis` to the APIs
+// that it made tests for.
+static void _calcTargetTests(
+    TestContext* context,
+    const List<TestDetails>& srcTests,
+    List<TestDetails>& ioTests,
+    RenderApiFlags& outTargetApis)
+{
+    struct TargetLine
+    {
+        const TestDetails* test;
+        Index index;
+        TestTargetFlags targets;
+    };
+    List<TargetLine> lines;
+
+    for (Index srcIndex = 0; srcIndex < srcTests.getCount(); ++srcIndex)
+    {
+        const TestDetails& srcTest = srcTests[srcIndex];
+
+        // A line that `DISABLE_TEST` disables does not run, and it makes no test.
+        if (!_isMultiTargetLine(srcTest.options) || !srcTest.options.isEnabled)
+            continue;
+
+        TargetLine line;
+        line.test = &srcTest;
+        line.index = srcIndex;
+
+        // The gather step checked the value, so the expansion cannot fail.
+        String value = "all";
+        srcTest.options.commandOptions.tryGetValue("targets", value);
+        String error;
+        SLANG_RETURN_VOID_ON_FAIL(parseTestTargets(value.getUnownedSlice(), line.targets, error));
+        lines.add(line);
+    }
+
+    // The tests of the highest API come first, as the tests of the other commands do.
+    for (int apiIndex = int(RenderApiType::CountOf) - 1; apiIndex >= 0; --apiIndex)
+    {
+        const RenderApiFlags apiBit = RenderApiFlags(1) << apiIndex;
+        if (!(context->options.synthesizedTestApis & apiBit))
+            continue;
+
+        const RenderApiType api = RenderApiType(apiIndex);
+        for (const auto& line : lines)
+        {
+            for (Index targetIndex = 0; targetIndex < getTestTargetCount(); ++targetIndex)
+            {
+                const TestTarget& target = getTestTargetAt(targetIndex);
+                if (!(line.targets & target.flag) || target.api != api)
+                    continue;
+
+                TestDetails targetTest(line.test->options);
+                TestOptions& targetOptions = targetTest.options;
+                targetOptions.commandOptions.remove("targets");
+                targetOptions.target = target.flag;
+                targetOptions.sourceIndex = line.index;
+                if (auto c = context->categorySet.find(RenderApiUtil::getApiName(api)))
+                    targetOptions.addCategory(c);
+                appendTestTargetArgs(target, targetOptions.args);
+
+                // Work out the info about this test
+                context->setTestRequirements(&targetTest.requirements);
+                runTest(context, "", "", "", targetOptions);
+                context->setTestRequirements(nullptr);
+
+                SLANG_ASSERT(targetTest.requirements.explicitRenderApi == api);
+                ioTests.add(targetTest);
+                outTargetApis |= apiBit;
+            }
+        }
+    }
+}
+
 static bool _isGpuComputeCommand(const String& command)
 {
     return command == "COMPARE_COMPUTE" || command == "COMPARE_COMPUTE_EX" ||
@@ -6496,6 +6854,8 @@ static void _calcSynthesizedCompileTargetTests(
 
     for (const auto& srcTest : srcTests)
     {
+        // The test of one target of a line has an explicit API and a target, so it is a source of a
+        // compile-only test. The tests that the old synthesis made are copies, and they are not.
         if (!srcTest.options.isEnabled || srcTest.options.isSynthesized ||
             !_isGpuComputeCommand(srcTest.options.command))
             continue;
@@ -6550,7 +6910,24 @@ static void _calcSynthesizedCompileTargetTests(
     }
 }
 
-static bool _canIgnore(TestContext* context, const TestDetails& details)
+// The backends that only a machine with a GPU has. The CUDA toolkit, which has NVRTC, is installed
+// on the GPU hosts only, so a test line that uses NVRTC cannot run in the job that has no GPU, even
+// when the line needs no GPU API. For example, `-target ptx` compiles with NVRTC and does not
+// run the result.
+static const PassThroughFlags kGpuHostOnlyBackends = PassThroughFlag::NVRTC;
+
+// Returns true if the test `details` can be ignored in this run.
+//
+// `fileHasRunnableApiTest` tells whether the file of the test has a test line that uses a render
+// API and can run (see _hasRunnableApiTest). It matters only with `-compile-test false`, which
+// skips the compile tests, which are the test lines that use no API. A COMPILE line is not a
+// compile test in that case when the file has such a line, because the COMPILE line can prepare
+// the input of it. A line that uses a backend that only the GPU hosts have is not one either
+// (kGpuHostOnlyBackends).
+static bool _canIgnore(
+    TestContext* context,
+    const TestDetails& details,
+    bool fileHasRunnableApiTest)
 {
     if (details.options.isEnabled == false)
     {
@@ -6561,7 +6938,10 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
 
     // Check if it's possible in principal to run this test with the render api flags used by this
     // test
-    if (!context->canRunTestWithRenderApiFlags(requirements.usedRenderApiFlags))
+    const bool isCompileStep = details.options.command == "COMPILE";
+    const bool isNeededByGpuTests = (isCompileStep && fileHasRunnableApiTest) ||
+                                    (requirements.usedBackendFlags & kGpuHostOnlyBackends) != 0;
+    if (!context->canRunTestWithRenderApiFlags(requirements.usedRenderApiFlags, isNeededByGpuTests))
     {
         return true;
     }
@@ -6590,6 +6970,41 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
         return true;
     }
 
+    return false;
+}
+
+// Returns true if a test line in `tests` uses a render API and can run in this run.
+//
+// The `-compile-test false` option exists to keep the compile tests, which need no GPU, out of the
+// jobs that have a GPU, because the CPU job runs them. A test file can still use a COMPILE line to
+// prepare the input for a line that uses an API. Consider this example:
+//
+//     //TEST:COMPILE: tests/library/library.slang -o tests/library/library.slang-module
+//     //TEST:COMPARE_COMPUTE(targets=cuda): -r tests/library/library.slang-module
+//
+// The COMPILE line needs no API, but the COMPARE_COMPUTE line loads its output. If
+// `-compile-test false` skipped the COMPILE line, the COMPARE_COMPUTE line would fail. So when a
+// file has a line that uses an API and can run, the COMPILE lines of the file run too. The other
+// lines of the file that need no API, such as a SIMPLE line, are compile tests, and they do not
+// run.
+//
+// A COMPILE line that this keeps can run in the CPU job too, if the file also has a line for the
+// CPU. We do not look at which line reads the output of which, because the lines pass the files by
+// their names in the arguments, and the names do not tell us the producer.
+static bool _hasRunnableApiTest(TestContext* context, const List<TestDetails>& tests)
+{
+    for (const auto& details : tests)
+    {
+        // A line with targets does not run. The test of each target is in the list too.
+        if (_isMultiTargetLine(details.options))
+            continue;
+
+        if (details.requirements.usedRenderApiFlags == 0)
+            continue;
+
+        if (!_canIgnore(context, details, false))
+            return true;
+    }
     return false;
 }
 
@@ -6684,6 +7099,49 @@ static String insertSubtestIndex(const String& testName, int index)
 
 // Check if a prefix specifies a subtest index (e.g., "foo.slang.1" or "foo.slang.0")
 // Returns the subtest index if found, or -1 if not a subtest prefix.
+// Returns true if an entry of `entries` is the whole name of the test, for example
+// `tests/compute/parameter-block.slang (llvm)`. An entry that is a path or a path with an index
+// (`foo.slang.1`) selects the tests of a file or of a line, and an entry with the target selects
+// the one copy of a line for that target.
+static bool _isTestNameInList(const List<String>& entries, const UnownedStringSlice& testName)
+{
+    for (const auto& entry : entries)
+    {
+        if (entry.getUnownedSlice() == testName)
+            return true;
+    }
+    return false;
+}
+
+// The index that names a test in the test list, and in the command line entries that select it.
+//
+// The test of one target of a line has the index of that line, so that the name
+// `foo.slang.1 (vk)` says "the line 1 for the target vk", and it does not depend on the APIs that
+// the machine has. The target tells the tests of one line apart. Any other test has its position in
+// the list.
+static Index _getTestNameIndex(const TestOptions& options, Index positionInList)
+{
+    return options.sourceIndex >= 0 ? options.sourceIndex : positionInList;
+}
+
+// Returns the path that the file output of a test has as its prefix, for example `foo.slang.1`. The
+// test of one target of a line adds the target (`foo.slang.1.vk`), because the tests of one line
+// have the same name index, and they must not write the same files.
+static String _getTestOutputStem(
+    const String& filePath,
+    const TestOptions& options,
+    Index positionInList)
+{
+    StringBuilder stem;
+    stem << filePath;
+    const Index nameIndex = _getTestNameIndex(options, positionInList);
+    if (nameIndex != 0)
+        stem << "." << nameIndex;
+    if (options.sourceIndex >= 0 && options.target)
+        stem << "." << getTestTarget(options.target).label;
+    return stem.produceString();
+}
+
 static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 {
     // Gather a list of tests to run
@@ -6711,6 +7169,10 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         // We can get the test info for each of them
         for (auto& testDetails : testList.tests)
         {
+            // A line with targets does not run. The test of each target has its own requirements.
+            if (_isMultiTargetLine(testDetails.options))
+                continue;
+
             auto& requirements = testDetails.requirements;
 
             // Collect what the test needs (by setting restRequirements the test isn't actually run)
@@ -6735,8 +7197,14 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
     {
         List<TestDetails> synthesizedTests;
 
+        // The lines with targets (the lines of the COMPARE_COMPUTE commands) make their tests
+        // first.
+        RenderApiFlags targetApis = 0;
+        _calcTargetTests(context, testList.tests, synthesizedTests, targetApis);
+
         // What render options do we want to synthesize
-        RenderApiFlags missingApis = (~apiUsedFlags) & context->options.synthesizedTestApis;
+        RenderApiFlags missingApis =
+            (~(apiUsedFlags | targetApis)) & context->options.synthesizedTestApis;
 
         // const Index numInitialTests = testList.tests.getCount();
 
@@ -6774,17 +7242,19 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         auto& prefixes = context->options.testPrefixes;
         auto getTestPrefixIndex = [&](Index testIdx) -> Index
         {
-            // Build the outputStem for this test
+            // Build the name of this test, as the loop below does
+            const TestOptions& testOptions = testList.tests[testIdx].options;
+            const Index nameIndex = _getTestNameIndex(testOptions, testIdx);
             StringBuilder stem;
             stem << filePath;
-            if (testIdx != 0)
-                stem << "." << testIdx;
+            if (nameIndex != 0)
+                stem << "." << nameIndex;
             String outputStem = stem.produceString();
 
             for (Index i = 0; i < prefixes.getCount(); i++)
             {
                 // Check if prefix matches this specific subtest
-                if (TestToolUtil::entryMatchesSubtest(prefixes[i], filePath, outputStem, testIdx))
+                if (TestToolUtil::entryMatchesSubtest(prefixes[i], filePath, outputStem, nameIndex))
                     return i;
             }
             return prefixes.getCount();
@@ -6796,6 +7266,12 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             [&](Index a, Index b) { return getTestPrefixIndex(a) < getTestPrefixIndex(b); });
     }
 
+    // With `-compile-test false`, a COMPILE line runs only to prepare the input of a line that
+    // needs an API, so we need to know whether this file has such a line (see
+    // _hasRunnableApiTest).
+    const bool fileHasRunnableApiTest =
+        !context->options.compileTest && _hasRunnableApiTest(context, testList.tests);
+
     // We have found a test to run!
     for (Index orderIdx = 0; orderIdx < testOrder.getCount(); orderIdx++)
     {
@@ -6805,6 +7281,12 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
         Index subTestIndex = testOrder[orderIdx];
         auto& testDetails = testList.tests[subTestIndex];
+
+        // A line with targets does not run. The test of each target is in the list after the lines.
+        if (_isMultiTargetLine(testDetails.options))
+        {
+            continue;
+        }
 
         // When -only-synthesized is set, only run synthesized compile-target tests
         if (context->options.onlySynthesized &&
@@ -6821,20 +7303,17 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
         // Work out the test stem
 
-        StringBuilder outputStem;
-        outputStem << filePath;
-        if (subTestIndex != 0)
+        const Index nameIndex = _getTestNameIndex(testDetails.options, subTestIndex);
+        StringBuilder nameStem;
+        nameStem << filePath;
+        if (nameIndex != 0)
         {
-            outputStem << "." << subTestIndex;
+            nameStem << "." << nameIndex;
         }
+        const String outputStem = _getTestOutputStem(filePath, testDetails.options, subTestIndex);
 
         // Work out the test name - taking into account render api / if synthesized
-        StringBuilder testName(outputStem);
-
-        if (testDetails.options.isSynthesized)
-        {
-            testName << " syn";
-        }
+        StringBuilder testName(nameStem);
 
         const auto& requirements = testDetails.requirements;
 
@@ -6848,8 +7327,14 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             }
         }
 
+        // A test line with `targets=` shows its target. The label tells `vk` from `glsl`,
+        // which use the same render API.
+        if (testDetails.options.target)
+        {
+            testName << " (" << getTestTarget(testDetails.options.target).label << ")";
+        }
         // Display list of used apis on render test
-        if (requirements.usedRenderApiFlags)
+        else if (requirements.usedRenderApiFlags)
         {
             RenderApiFlags usedFlags = requirements.usedRenderApiFlags;
             testName << " (";
@@ -6874,16 +7359,18 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         // Per-subtest exclusion, and it has to happen HERE rather than in
         // shouldRunTest(): that runs before subtests are expanded, so it can
         // only see the source path. A synthesized variant such as
-        // `tests/compute/parameter-block.slang.6 syn (llvm)` can crash the
+        // `tests/compute/parameter-block.slang (llvm)` can crash the
         // worker outright, which also rules out -expected-failure-list —
         // that reclassifies a result only after the test returns, and this
         // one never does. The skip must be pre-dispatch, so it is.
-        if (TestToolUtil::isSubtestExcluded(
+        if (_isTestNameInList(context->options.excludePrefixes, testName.getUnownedSlice()) ||
+            _isTestNameInList(context->options.skipList, testName.getUnownedSlice()) ||
+            TestToolUtil::isSubtestExcluded(
                 context->options.excludePrefixes,
                 context->options.skipList,
                 filePath,
-                outputStem,
-                subTestIndex))
+                nameStem,
+                nameIndex))
         {
             if (context->options.verbosity >= VerbosityLevel::Info)
             {
@@ -6910,7 +7397,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
                 {
                     hasSpecificPrefix = true;
                 }
-                if (TestToolUtil::entryMatchesSubtest(p, filePath, outputStem, subTestIndex))
+                if (TestToolUtil::entryMatchesSubtest(p, filePath, nameStem, nameIndex))
                 {
                     matchesSpecificPrefix = true;
                     break;
@@ -6928,7 +7415,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         {
             // For the first test, show .0 suffix only if there are multiple tests
             // so users know what to type to select just this test
-            if (subTestIndex == 0 && testList.tests.getCount() > 1)
+            if (nameIndex == 0 && testList.tests.getCount() > 1)
             {
                 printf("%s\n", insertSubtestIndex(testName, 0).getBuffer());
             }
@@ -6948,12 +7435,12 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             // A `.expected` file that the test line never reads is an error, so that
             // such files do not stay in the repository.
             const String unusedExpectedFile =
-                testDetails.options.isSynthesized
+                (testDetails.options.isSynthesized || testDetails.options.target)
                     ? String()
                     : _findUnusedExpectedFile(filePath, subTestIndex, testList);
 
             // If this test can be ignored
-            if (_canIgnore(context, testDetails))
+            if (_canIgnore(context, testDetails, fileHasRunnableApiTest))
             {
                 testResult = TestResult::Ignored;
                 context->getTestReporter()->addResult(testResult);
@@ -7308,6 +7795,9 @@ static TestResult _asTestResult(ToolReturnCode retCode)
 }
 
 /// Loads a DLL containing unit test functions and run them one by one.
+///
+/// A test declares the render APIs that it uses (SLANG_UNIT_TEST), and a test that declares
+/// `NoRenderApi` is a compile test, so `-compile-test false` skips it.
 static SlangResult runUnitTestModule(
     TestContext* context,
     TestOptions& testOptions,
@@ -7350,6 +7840,7 @@ static SlangResult runUnitTestModule(
         UnitTestFunc testFunc;
         String testName;
         String command;
+        RenderApiFlags usedApis; ///< The render APIs that the test declares, or 0 for none
     };
 
     List<TestItem> tests;
@@ -7367,7 +7858,7 @@ static SlangResult runUnitTestModule(
         {
             if (testPassesCategoryMask(context, testOptions))
             {
-                tests.add(TestItem{testFunc, testName, command});
+                tests.add(TestItem{testFunc, testName, command, testModule->getTestUsedApis(i)});
             }
         }
     }
@@ -7383,6 +7874,15 @@ static SlangResult runUnitTestModule(
         auto reporter = context->getTestReporter();
         TestOptions options = testOptions;
         options.command = test.command;
+
+        // A unit test that uses no API that `-api` has enabled, or that uses no API when
+        // `-compile-test false` is set, belongs to another kind of job, so we do not spawn it.
+        if (!context->canRunUnitTestUsingRenderApis(test.usedApis))
+        {
+            TestReporter::TestScope scopeTest(reporter, options.command);
+            reporter->addResult(TestResult::Ignored);
+            return;
+        }
 
         if (spawnType == SpawnType::UseTestServer ||
             spawnType == SpawnType::UseFullyIsolatedTestServer)
@@ -7819,10 +8319,10 @@ SlangResult innerMain(int argc, char** argv)
         }
 
         // Run the unit tests (these are internal C++ tests - not specified via files in a
-        // directory) They are registered with SLANG_UNIT_TEST macro
+        // directory) They are registered with SLANG_UNIT_TEST macro.
         //
-        //
-        if (context.canRunUnitTests())
+        // With `-compile-test false`, runUnitTestModule still runs the unit tests that declare an
+        // enabled API, and it ignores the others.
         {
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);
@@ -7960,10 +8460,8 @@ int main(int argc, char** argv)
     signal(SIGPIPE, SIG_IGN);
 #endif
 
-#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
-    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
-    _set_abort_behavior(0, _WRITE_ABORT_MSG);
-#endif
+    // Suppress modal dialogs in unattended/LLM-driven builds.
+    Slang::TestToolUtil::suppressDebugDialogs();
 
     // Fallback: run without cleanup if context initialization fails
     SlangResult res = innerMain(argc, argv);

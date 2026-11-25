@@ -411,6 +411,7 @@ struct ResourceSelectionContext
         case kIROp_FieldAddress:
         case kIROp_RWStructuredBufferGetElementPtr:
         case kIROp_GetEquivalentStructuredBuffer:
+        case kIROp_SizedBufferToUnsizedBuffer:
             return true;
         default:
             return false;
@@ -1425,6 +1426,12 @@ struct ResourceSelectionContext
     /// operation or the block parameter merging its result; a conditional operation without a
     /// result returns null. Leaves the builder in the final merge block when dispatch is emitted,
     /// or at the insertion point after the cloned operation otherwise.
+    ///
+    /// On entry the builder must be inserting into the block that will receive the dispatch
+    /// terminator — the split block at the top level, the current arm block during recursion.
+    /// The emitted arm and merge blocks are spliced in contiguously starting immediately after
+    /// that block, so the function's block list keeps definitions ahead of their uses for
+    /// later IR passes.
     IRInst* emitConsumer(
         IRBuilder& builder,
         ResourceSelectionConsumer& consumer,
@@ -1483,14 +1490,26 @@ struct ResourceSelectionContext
         }
 
         auto after = builder.createBlock();
-        func->addBlock(after);
         List<IRBlock*> arms;
         for (Index i = 0; i < alternatives.getCount(); i++)
         {
-            auto arm = builder.createBlock();
-            func->addBlock(arm);
-            arms.add(arm);
+            arms.add(builder.createBlock());
         }
+        // The arms and their merge block are inserted right after the block being split
+        // instead of being appended to the end of the function. The final merge block
+        // receives the instructions that follow the split point, and later IR passes (most
+        // notably the function cloner that call specialization uses) require every
+        // definition to precede its uses in the block list; appending would place those
+        // instructions' definitions after the existing blocks that use them. The inliner
+        // keeps the same adjacency when it splits a block around an inlined call.
+        IRBlock* insertAfterBlock = builder.getBlock();
+        SLANG_ASSERT(insertAfterBlock && getParentFunc(insertAfterBlock) == func);
+        for (auto arm : arms)
+        {
+            arm->insertAfter(insertAfterBlock);
+            insertAfterBlock = arm;
+        }
+        after->insertAfter(insertAfterBlock);
         if (condition)
             builder.emitIfElse(condition, arms[0], arms[1], after);
         else
@@ -1623,6 +1642,14 @@ struct ResourceSelectionContext
         {
             // We split at the operation, after all ordinary argument calculations. The original
             // continuation remains shared by all arms, so no unrelated work is duplicated.
+            // The continuation is appended at the end of the block list rather than adjacent to
+            // the split block, which is safe for two reasons. It is transient: every
+            // instruction after `original` is moved into the final merge block, and `original`
+            // itself is deallocated alongside the now-empty continuation before this function
+            // returns, so no later IR pass observes the out-of-order placement. And because
+            // the split point follows all argument calculations, nothing emitted while the
+            // continuation sits out of order can reference an instruction inside the moved
+            // tail.
             auto continuation = builder.createBlock();
             func->addBlock(continuation);
             temporaryContinuation = continuation;

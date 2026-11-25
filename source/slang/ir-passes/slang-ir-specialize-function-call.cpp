@@ -10,6 +10,14 @@
 namespace Slang
 {
 
+// Returns true if `inst` is the module-scope SPIR-V resource-heap instruction.
+// It is hoisted to module scope, so a specialized callee can refer to it
+// directly, like a global parameter.
+static bool isSPIRVResourceHeapInst(IRInst* inst)
+{
+    return as<IRSPIRVResourceHeap>(inst) != nullptr;
+}
+
 bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
     IRParam* param,
     IRInst* inArg)
@@ -46,6 +54,29 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         if (as<IRCastDescriptorHandleToResource>(arg))
             return true;
 
+        // The resource heap is a module-scope instruction a specialized callee
+        // can refer to directly (see `isSPIRVResourceHeapInst`).
+        if (isSPIRVResourceHeapInst(arg))
+            return true;
+
+        // A `SPIRVLoadDescriptorFromHeap` is a pure `heap[index]` selection over the
+        // module-scope resource heap, so it is safe to move into a specialized
+        // callee exactly like an element access. We accept it for every resource
+        // type: `canSpecializeCall` accepts a call only when every wanting
+        // parameter's argument is suitable, so leaving any fetch unsuitable keeps
+        // a mixed-signature call — and with it a byte-address-buffer parameter
+        // that byte-address legalization would retype — entirely unspecialized.
+        // A fetch from the sampler heap traces to `IRSPIRVSamplerHeap`, which is
+        // not a leaf here, so such a call stays unspecialized; that is safe
+        // today because scalar sampler parameters never want specialization on
+        // SPIR-V and array-sampler parameters receive array values, never a
+        // scalar fetch.
+        if (auto loadDescriptorFromHeap = as<IRSPIRVLoadDescriptorFromHeap>(arg))
+        {
+            arg = loadDescriptorFromHeap->getHeap();
+            continue;
+        }
+
         // As we will see later, we can also
         // specialize a call when the argument
         // is the result of indexing into an
@@ -62,12 +93,10 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         case kIROp_FieldAddress:
         case kIROp_FieldExtract:
         case kIROp_Load:
-        // A `CastDynamicResource` wraps a bindless/dynamic resource access in a
-        // concrete resource type. Like the indexing ops above, its result is
-        // suitable for specialization exactly when its underlying value (operand
-        // 0) is, so we trace through it to that base. Without this case a bindless
-        // resource argument would not be recognized as specializable.
+        // A resource conversion retains its underlying resource. Like indexing, it is
+        // suitable for specialization when its base is; the callee reconstructs the view.
         case kIROp_CastDynamicResource:
+        case kIROp_SizedBufferToUnsizedBuffer:
             {
                 auto base = arg->getOperand(0);
 
@@ -573,6 +602,13 @@ struct FunctionParameterSpecializationContext
             // Similarly for other global constants
             ioInfo.key.vals.add(globalConstant);
         }
+        else if (isSPIRVResourceHeapInst(oldArg))
+        {
+            // The heap needs no new parameter (see `isSPIRVResourceHeapInst`);
+            // its identity keys the specialization, mirroring the global cases
+            // above.
+            ioInfo.key.vals.add(oldArg);
+        }
         else if (isUserPointerType(oldArg->getDataType()))
         {
             // If the arg is a user pointer, we can pass it as an ordinary argument,
@@ -647,13 +683,12 @@ struct FunctionParameterSpecializationContext
             auto oldBase = oldArg->getOperand(0);
             getCallInfoForArg(ioInfo, oldBase);
         }
-        else if (oldArg->getOp() == kIROp_CastDynamicResource)
+        else if (
+            oldArg->getOp() == kIROp_CastDynamicResource ||
+            oldArg->getOp() == kIROp_SizedBufferToUnsizedBuffer)
         {
-            // `CastDynamicResource` is a transparent wrapper that views a
-            // dynamic/bindless resource as a concrete resource type. It
-            // contributes nothing to the specialization key itself, so we just
-            // recurse into its underlying value (operand 0), mirroring the
-            // `Load`/`FieldAddress` cases above.
+            // Resource views are reconstructed in the callee with the original result
+            // type. Their underlying resource determines the specialization key.
             auto oldBase = oldArg->getOperand(0);
             getCallInfoForArg(ioInfo, oldBase);
         }
@@ -840,8 +875,12 @@ struct FunctionParameterSpecializationContext
         }
     }
 
-    // Returns true if `inst` is an instruction that accesses an element from an array or a buffer.
-    //
+    // Returns true if `inst` is an instruction of the form `base[index]`: an
+    // element access into an array or structured buffer, or a descriptor
+    // selection from the resource heap. The predicate tests only the opcode; the
+    // callers separately guarantee that `base` is a value a callee can be
+    // specialized on, because `isParamSuitableForSpecialization` traced to that
+    // base before any of them run.
     static bool isElementAccessInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -850,6 +889,10 @@ struct FunctionParameterSpecializationContext
         case kIROp_GetElement:
         case kIROp_RWStructuredBufferGetElementPtr:
         case kIROp_StructuredBufferLoad:
+        // `SPIRVLoadDescriptorFromHeap` has the same `(heap, index)` operand
+        // layout as the element accesses above, so the existing
+        // base/index specialization logic applies to it unchanged.
+        case kIROp_SPIRVLoadDescriptorFromHeap:
             return true;
         }
         return false;
@@ -902,6 +945,12 @@ struct FunctionParameterSpecializationContext
             // As above, the identity of the specialized function is sufficient
             // to resolve the uses
             return globalFunc;
+        }
+        if (isSPIRVResourceHeapInst(oldArg))
+        {
+            // The specialized callee refers to the same heap instruction the
+            // original argument did (see `isSPIRVResourceHeapInst`).
+            return oldArg;
         }
         else if (isElementAccessInst(oldArg))
         {
@@ -990,11 +1039,13 @@ struct FunctionParameterSpecializationContext
 
             return newVal;
         }
-        else if (oldArg->getOp() == kIROp_CastDynamicResource)
+        else if (
+            oldArg->getOp() == kIROp_CastDynamicResource ||
+            oldArg->getOp() == kIROp_SizedBufferToUnsizedBuffer)
         {
             // Reconstruct the wrapper inside the specialized body: first obtain the
             // specialized value for the wrapped operand, then re-apply the
-            // `CastDynamicResource` cast over it so the specialized callee sees the
+            // resource conversion over it so the specialized callee sees the
             // same concrete resource type the original argument had.
             //
             // Decorations (including IRSPIRVNonUniformResourceDecoration) are not
@@ -1008,11 +1059,8 @@ struct FunctionParameterSpecializationContext
             auto builder = getBuilder();
             builder->setInsertInto(ioInfo.newBodyInsts);
             IRInst* newOperands[] = {newBase};
-            auto newVal = builder->emitIntrinsicInst(
-                oldArg->getFullType(),
-                kIROp_CastDynamicResource,
-                1,
-                newOperands);
+            auto newVal =
+                builder->emitIntrinsicInst(oldArg->getFullType(), oldArg->getOp(), 1, newOperands);
             return newVal;
         }
         else if (auto oldCombined = as<IRMakeCombinedTextureSampler>(oldArg))

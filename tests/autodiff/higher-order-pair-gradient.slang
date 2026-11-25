@@ -1,6 +1,5 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -validate-ir
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=NUMERIC): -cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=NUMERIC): -cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=NUMERIC): -output-using-type
 
 // CUDA: __global__ void computeMain(
 

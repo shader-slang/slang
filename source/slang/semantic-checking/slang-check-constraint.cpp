@@ -309,7 +309,23 @@ Type* SemanticsVisitor::TryJoinTypes(
     if (left->equals(right))
         return left;
 
-    // We can join two basic types by picking the "better" of the two
+    // An equal-cost tie has no better side (the strictly-better rule is
+    // stated at the declaration): returning either operand would let the
+    // constraint-merging caller's accumulated result depend on the order in
+    // which it folds constraints. Failing the join is not itself a
+    // diagnostic: same-priority constraints merge into a
+    // conflicting-requirements error, mixed-priority constraints fall back
+    // to the caller's priority arbitration, and other callers treat a
+    // failed join as no new information. The rule governs element types,
+    // so composite joins (vector/scalar, vector/vector, type packs) behave
+    // the same way when their element types tie.
+    //
+    // The `bool` tie is a one-off exception: when exactly one side is
+    // `bool`, the other side wins. This is not a principled rule — the two
+    // conversion costs are equal — but existing code relies on mixed
+    // bool/number inference (e.g. `?:` and `select` arms) compiling, the
+    // way `unifyBaseType` already promotes `bool` to the other operand's
+    // type for built-in operators. All other equal-cost ties still fail.
     if (auto leftBasic = as<BasicExpressionType>(left))
     {
         if (auto rightBasic = as<BasicExpressionType>(right))
@@ -317,13 +333,18 @@ Type* SemanticsVisitor::TryJoinTypes(
             auto costConvertRightToLeft = getConversionCost(leftBasic, right);
             auto costConvertLeftToRight = getConversionCost(rightBasic, left);
 
-            // Return the one that had lower conversion cost.
+            // Return the one that had strictly lower conversion cost.
             if (costConvertRightToLeft > costConvertLeftToRight)
                 return right;
-            else
-            {
+            if (costConvertLeftToRight > costConvertRightToLeft)
                 return left;
-            }
+
+            // Equal cost: the `bool` side loses; any other tie fails.
+            if (leftBasic->getBaseType() == BaseType::Bool)
+                return right;
+            if (rightBasic->getBaseType() == BaseType::Bool)
+                return left;
+            return nullptr;
         }
 
         // We can also join a vector and a scalar
@@ -2010,11 +2031,13 @@ private:
             return true;
         }
 
-        // Non-exact type constraints use the join path. This preserves existing
-        // common-type behavior for ordinary call inference, such as picking a
-        // type that several arguments can convert to. This is the one place an
-        // enum may decay to its tag type to join with a scalar, since here the
-        // join proposes a type both arguments will be coerced to.
+        // Non-exact type constraints use the join path. This preserves common-type
+        // behavior for ordinary call inference: the join picks a type that
+        // several arguments can convert to when one side is strictly better,
+        // and a same-priority conflict is reported when neither side is. This
+        // is the one place an enum may decay to its tag type to join with a
+        // scalar, since here the join proposes a type both arguments will be
+        // coerced to.
         auto joinType =
             m_visitor->TryJoinTypes(&m_context, ioType, cType, /*allowEnumScalarJoin*/ true);
         if (!joinType)

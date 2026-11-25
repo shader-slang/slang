@@ -63,7 +63,7 @@ ModuleCompileResult compileModuleContainer(
 }
 } // namespace
 
-SLANG_UNIT_TEST(moduleFormatNotFinalizedCliGate)
+SLANG_UNIT_TEST(moduleFormatNotFinalizedCliGate, NoRenderApi)
 {
     String tempBase;
     SLANG_CHECK_ABORT(

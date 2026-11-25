@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -xslang -DDEFAULT_UNSCOPED=0
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -xslang -DDEFAULT_UNSCOPED=1 -xslang -unscoped-enum
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -xslang -DDEFAULT_UNSCOPED=0
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -xslang -DDEFAULT_UNSCOPED=1 -xslang -unscoped-enum
 
 // Verifies that an enumeration is unscoped either by the attribute or
 // by the compiler switch.

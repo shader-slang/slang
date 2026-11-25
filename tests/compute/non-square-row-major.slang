@@ -1,16 +1,13 @@
 // non-square-row-major.slang
 
-// Note! This test doesn't work on CUDA or CPU targets, because both these targets 
+// Note! This test doesn't work on CUDA or CPU targets, because both these targets
 // assume matrices are tightly packed, whereas GPU targets align rows to 16 bytes.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=ALIGNED):-slang -compute -wgpu -output-using-type -xslang -matrix-layout-row-major -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=PACKED):-cpu -compute -output-using-type -compile-arg -O3 -xslang -matrix-layout-row-major -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=ALIGNED):-slang -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=ALIGNED):-slang -compute -dx12 -output-using-type -xslang -matrix-layout-row-major -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=ALIGNED):-vk -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=PACKED):-cuda -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PACKED): -slang -output-using-type -shaderobj -mtl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=PACKED):-llvm -compute -output-using-type -xslang -fvk-use-scalar-layout -xslang -matrix-layout-row-major -shaderobj
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=PACKED):-output-using-type -compile-arg -O3 -xslang -matrix-layout-row-major
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu-llvm-metal, filecheck-buffer=ALIGNED):-output-using-type -xslang -matrix-layout-row-major
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=PACKED):-output-using-type -xslang -matrix-layout-row-major
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=PACKED): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=llvm, filecheck-buffer=PACKED):-output-using-type -xslang -fvk-use-scalar-layout -xslang -matrix-layout-row-major
 
 // matrix<R, C>
 //TEST_INPUT:cbuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 0.0 0.0  10.0 20.0 0.0 0.0 ]):name matrixBuffer
@@ -25,7 +22,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float3 v = float3(1, 2, 1);
 
     float3x2 M = matrixBuffer;
-    
+
     float2 r = mul(v, M);
 
     // ALIGNED: 21

@@ -623,6 +623,26 @@ struct ValVisitor : TypeVisitor<Derived, TypeResult>
 #endif // FIDDLE END
 };
 
+/// A visitor with a handler for each concrete form of a condition clause.
+template<typename Derived, typename Result = void>
+struct ConditionClauseVisitor
+{
+    Result dispatch(ConditionClause* conditionClause)
+    {
+        SLANG_RELEASE_ASSERT(conditionClause);
+        return ASTNodeDispatcher<ConditionClause, Result>::dispatch(
+            conditionClause,
+            [&](auto concreteCondition) { return _dispatchImpl(concreteCondition); });
+    }
+
+#if 0 // FIDDLE TEMPLATE:
+    % SLANG_VISITOR_DISPATCH_RESULT_IMPL(Slang.ConditionClause)
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 13
+#include "ast/slang-visitor.h.fiddle"
+#endif // FIDDLE END
+};
+
 // Re-activate VS2017 warning settings
 #ifdef _MSC_VER
 #pragma warning(pop)

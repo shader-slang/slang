@@ -2,10 +2,7 @@
 //
 // Test trivial fall-through where a case label shares block with default.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // Verify HLSL output preserves case grouping structure for SM 6.0
 //TEST:SIMPLE(filecheck=CHECK-HLSL): -target hlsl -profile cs_6_0 -entry computeMain -stage compute

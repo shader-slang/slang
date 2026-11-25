@@ -10,7 +10,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(modulePtr)
+SLANG_UNIT_TEST(modulePtr, NoRenderApi)
 {
     const char* testModuleSource = R"(
         module test_module;
@@ -91,7 +91,7 @@ SLANG_UNIT_TEST(modulePtr)
     }
 }
 
-SLANG_UNIT_TEST(precompiledModuleWithoutSourceWithUpToDateCheck)
+SLANG_UNIT_TEST(precompiledModuleWithoutSourceWithUpToDateCheck, NoRenderApi)
 {
     const char* testModuleSource = R"(
         module test_module;

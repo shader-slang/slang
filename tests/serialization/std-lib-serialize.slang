@@ -1,7 +1,7 @@
 //TEST:COMPILE: -save-core-module tests/serialization/slang-core-module.zip
 //TEST:COMPILE: -load-core-module tests/serialization/slang-core-module.zip -save-glsl-module-bin-source tests/serialization/slang-glsl-module-generated.actual
 //TEST:COMPILE: -save-core-module-bin-source tests/serialization/slang-core-module-generated.actual
-//TEST:COMPARE_COMPUTE: -compile-arg -load-core-module -compile-arg tests/serialization/slang-core-module.zip -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all): -compile-arg -load-core-module -compile-arg tests/serialization/slang-core-module.zip
 
 struct A
 {

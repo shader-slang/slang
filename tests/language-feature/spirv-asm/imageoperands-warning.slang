@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=DIAG):
 
 //TEST_INPUT:ubuffer(data=[1 2 3 4], stride=4):out,name=outputBuffer

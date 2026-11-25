@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -slang -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -30,8 +30,8 @@ float df(float x)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    // Given f(x) = (x^2) * (x^2), and 
-    // f'(x) = (3x * x^2) + (x^2 * 3x) 
+    // Given f(x) = (x^2) * (x^2), and
+    // f'(x) = (3x * x^2) + (x^2 * 3x)
     // Note: intentionally wrong to catch errors where the custom derivative is not used
     //
     // f''(x) = 2 * ((6x^2) + (3x^2))

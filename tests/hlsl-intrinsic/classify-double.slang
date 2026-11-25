@@ -1,12 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -render-feature double
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -render-feature double
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda+cpu+llvm):
+//TEST:COMPARE_COMPUTE(targets=all-metal-wgpu):-render-feature double
 // Not supported in WGSL: Double and other unsupported scalar types
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
-//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
 
 // inf, -inf, nan, finite
 //TEST_INPUT:ubuffer(data=[ 0 0x7ff00000 0 0xfff00000 0xffffffff 0x7fffffff 1 0], stride=4):name inputBuffer
@@ -24,12 +18,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint high = inputBuffer[idx * 2 + 1];
 
     double v = asdouble(low, high);
-    
+
     int flags = 0;
-    
+
     flags |= isnan(v) ? 1 : 0;
     flags |= isfinite(v) ? 2 : 0;
     flags |= isinf(v) ? 4 : 0;
-    
+
     outputBuffer[idx] = flags;
 }

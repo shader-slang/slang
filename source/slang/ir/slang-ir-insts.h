@@ -3531,6 +3531,9 @@ $(type_info.return_type) $(type_info.method_name)(
         AccessQualifier accessQualifier,
         AddressSpace addrSpace);
     IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
+    IRByValueBorrowInParamType* getByValueBorrowInParamType(
+        IRType* valueType,
+        AddressSpace addrSpace);
     IRPtrType* getPtrType(
         IROp op,
         IRType* valueType,

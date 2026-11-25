@@ -13,9 +13,7 @@
 //
 // Check that the shader compiles for SPIR-V, GLSL, Metal and WGSL.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12, filecheck-buffer=CHECK): -output-using-type
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute

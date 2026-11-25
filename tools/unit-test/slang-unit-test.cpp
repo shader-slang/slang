@@ -7,6 +7,7 @@ struct SlangUnitTest
 {
     const char* name;
     UnitTestFunc func;
+    Slang::RenderApiFlags usedApis;
 };
 
 class SlangUnitTestModule : public IUnitTestModule
@@ -32,6 +33,12 @@ public:
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL destroy() override { tests = decltype(tests)(); }
+
+    virtual SLANG_NO_THROW Slang::RenderApiFlags SLANG_MCALL
+    getTestUsedApis(SlangInt index) override
+    {
+        return tests[index].usedApis;
+    }
 };
 
 SlangUnitTestModule* _getTestModule()
@@ -53,7 +60,10 @@ extern "C"
     }
 }
 
-UnitTestRegisterHelper::UnitTestRegisterHelper(const char* name, UnitTestFunc testFunc)
+UnitTestRegisterHelper::UnitTestRegisterHelper(
+    const char* name,
+    UnitTestFunc testFunc,
+    Slang::RenderApiFlags usedApis)
 {
-    _getTestModule()->tests.add(SlangUnitTest{name, testFunc});
+    _getTestModule()->tests.add(SlangUnitTest{name, testFunc, usedApis});
 }

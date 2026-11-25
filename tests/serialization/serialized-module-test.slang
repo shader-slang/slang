@@ -4,7 +4,7 @@
 // serialization.
 
 //TEST:COMPILE: tests/serialization/serialized-module.slang -o tests/serialization/serialized-module.slang-module
-//TEST:COMPARE_COMPUTE_EX:-slang -compute -xslang -r -xslang tests/serialization/serialized-module.slang-module -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):-xslang -r -xslang tests/serialization/serialized-module.slang-module
 
 //import serialized_module;
 
@@ -22,7 +22,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     Thing thing;
 
     int index = (int)dispatchThreadID.x;
-        
+
     thing.a = index;
     thing.b = -index;
 

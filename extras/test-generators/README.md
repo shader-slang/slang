@@ -46,7 +46,7 @@ In the template below, a marker like `<<NAME>>` is a part that the script replac
 
 <<DISABLE_COMMENTS>>
 //<<DISABLE_POS>>TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target <<POSITIVE_TARGET>>
-//<<DISABLE_CMP>>TEST:COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): <<COMPUTE_TARGET>>
+//<<DISABLE_CMP>>TEST:COMPARE_COMPUTE(targets=<<COMPUTE_TARGET>>, filecheck-buffer=POSITIVE_RESULT):
 //<<DISABLE_NEG>>TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target <<NEGATIVE_TARGET>>
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
@@ -91,7 +91,7 @@ void computeMain()
 | `<<DISABLE_COMMENTS>>`                                  | Zero or more comment lines with an issue link, one for each disabled test. Empty when no test is disabled.               | `TestInfo` disable flags              |
 | `<<DISABLE_POS>>`, `<<DISABLE_CMP>>`, `<<DISABLE_NEG>>` | `DISABLE_` or nothing. `DISABLE_` turns the line into a comment that `slang-test` ignores.                               | See "When a test is disabled"         |
 | `<<POSITIVE_TARGET>>`                                   | The compiler options for the positive test, for example `glsl -profile glsl_450`.                                        | Second item of the version tuple      |
-| `<<COMPUTE_TARGET>>`                                    | The `slang-test` options for the compute test, for example `-vk -emit-spirv-via-glsl`.                                   | Third item of the version tuple       |
+| `<<COMPUTE_TARGET>>`                                    | The target of `slang-test` for the compute test, for example `glsl`. `none` when the test has no target.                 | Third item of the version tuple       |
 | `<<NEGATIVE_TARGET>>`                                   | The compiler options for the negative test.                                                                              | Second item of the version tuple      |
 | `<<TEXTURE_INPUT>>`                                     | The `TEST_INPUT` description of the texture, for example `Texture3D(size=4, content = one)`.                             | `testInputForTestType`                |
 | `<<EXTRA_INPUT>>`                                       | Extra resources that some operations need. Empty for most operations.                                                    | See "Extra resources"                 |
@@ -128,8 +128,8 @@ backend = {
     "positive-label" : "main",         # <<LABEL>> (optional, default "fragMain")
     "versions" : [                     # in ascending order
         ("1.0", None, None),           # not supported by Slang: no test target
-        ("2.3", "metal -profile metallib_2_3", "-mtl"),
-        #  ^ version   ^ <<*_TARGET>> for SIMPLE tests   ^ <<COMPUTE_TARGET>>
+        ("2.3", "metal -profile metallib_2_3", "metal"),
+        #  ^ version   ^ <<*_TARGET>> for SIMPLE tests   ^ targets= of the compute test
     ],
 }
 ```
@@ -230,7 +230,7 @@ The markers get these values:
 | `<<DISABLE_POS>>`                         | Nothing                                                              |
 | `<<DISABLE_CMP>>`, `<<DISABLE_NEG>>`      | `DISABLE_`                                                           |
 | `<<POSITIVE_TARGET>>`                     | `glsl -profile glsl_450`                                             |
-| `<<COMPUTE_TARGET>>`                      | `-vk -emit-spirv-via-glsl`                                           |
+| `<<COMPUTE_TARGET>>`                      | `glsl`                                                               |
 | `<<NEGATIVE_TARGET>>`                     | `glsl -profile glsl_440`                                             |
 | `<<TEXTURE_INPUT>>`                       | `Texture3D(size=4, content = one)`                                   |
 | `<<EXTRA_INPUT>>`                         | Empty (operation 23 needs no extra resource)                         |

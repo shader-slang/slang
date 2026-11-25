@@ -1,6 +1,7 @@
 // slang-ir-sccp.cpp
 #include "slang-ir-sccp.h"
 
+#include "core/slang-math-int-ops.h"
 #include "slang-ir-translate.h"
 #include "slang/ir/slang-ir-insts.h"
 #include "slang/ir/slang-ir.h"
@@ -9,6 +10,34 @@
 namespace Slang
 {
 
+/// Return the `MathIntType` of the IR integer type with opcode `op`. Pointer-sized integer
+/// types are 64 bits wide.
+static MathIntType getMathIntTypeOfIRIntType(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_Int8Type:
+        return MathIntType::Int8Type;
+    case kIROp_Int16Type:
+        return MathIntType::Int16Type;
+    case kIROp_IntType:
+        return MathIntType::Int32Type;
+    case kIROp_Int64Type:
+    case kIROp_IntPtrType:
+        return MathIntType::Int64Type;
+    case kIROp_UInt8Type:
+        return MathIntType::UInt8Type;
+    case kIROp_UInt16Type:
+        return MathIntType::UInt16Type;
+    case kIROp_UIntType:
+        return MathIntType::UInt32Type;
+    case kIROp_UInt64Type:
+    case kIROp_UIntPtrType:
+        return MathIntType::UInt64Type;
+    default:
+        SLANG_UNEXPECTED("not an IR integer type");
+    }
+}
 
 // This file implements the Spare Conditional Constant Propagation (SCCP) optimization.
 //
@@ -355,8 +384,18 @@ struct SCCPContext
             switch (irConstant->getOp())
             {
             case kIROp_FloatLit:
-                resultVal =
-                    getBuilder()->getIntValue(type, (IRIntegerValue)irConstant->value.floatVal);
+                {
+                    // A float value whose truncation does not fit in the destination type
+                    // converts to a target-defined value, and converting it in C++ would be
+                    // undefined behavior. For example, `(uint64_t)9223372036854775808.0` fits,
+                    // but `(IRIntegerValue)` of 2^63 does not. We leave such a cast unfolded.
+                    const MathIntResult res = MathIntOps::convertFloatValue(
+                        getMathIntTypeOfIRIntType(type->getOp()),
+                        irConstant->value.floatVal);
+                    if (res.flags & MathIntResult::TargetDefined)
+                        return LatticeVal::getAny();
+                    resultVal = getBuilder()->getIntValue(type, res.value.getSignedValue());
+                }
                 break;
             case kIROp_IntLit:
             case kIROp_BoolLit:
@@ -378,9 +417,16 @@ struct SCCPContext
             switch (irConstant->getOp())
             {
             case kIROp_FloatLit:
-                resultVal = getBuilder()->getFloatValue(
-                    type,
-                    (IRFloatingPointValue)irConstant->value.floatVal);
+                {
+                    IRFloatingPointValue value = irConstant->value.floatVal;
+                    // A conversion between floating-point types quiets a signaling NaN at run
+                    // time, so the folded conversion does too. `getFloatValue` keeps the bits of
+                    // a `float` or `double` NaN, so set the quiet bit here. Bit 51 is the quiet
+                    // bit of a double, and of a `float` NaN held as one.
+                    if (type->getOp() != irConstant->getDataType()->getOp() && Math::IsNaN(value))
+                        value = Int64AsDouble(DoubleAsInt64(value) | (int64_t(1) << 51));
+                    resultVal = getBuilder()->getFloatValue(type, value);
+                }
                 break;
             case kIROp_IntLit:
             case kIROp_BoolLit:
@@ -651,13 +697,23 @@ struct SCCPContext
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 * c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 * c1; });
     }
+    // Signed `INT64_MIN / -1` and `INT64_MIN % -1` overflow `IRIntegerValue`, and a host division
+    // instruction such as x86-64 `idiv` traps on them. We fold a division by -1 without dividing:
+    // the quotient is the wrapped negation, so `INT64_MIN / -1` is `INT64_MIN`, and the remainder
+    // is 0. These are the values narrower signed types already fold to, because their quotient is
+    // computed in 64 bits and wraps when truncated to the type.
     LatticeVal evalDiv(IRType* type, LatticeVal v0, LatticeVal v1)
     {
         return evalBinaryImpl(
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 / c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                if (c1 == -1)
+                    return IRIntegerValue(IRUnsignedIntegerValue(0) - IRUnsignedIntegerValue(c0));
+                return c0 / c1;
+            },
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 / c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 / c1; });
     }
@@ -667,7 +723,12 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 % c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                if (c1 == -1)
+                    return IRIntegerValue(0);
+                return c0 % c1;
+            },
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 % c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return fmod(c0, c1); });
     }
@@ -854,7 +915,11 @@ struct SCCPContext
         case kIROp_UIntType:
         case kIROp_UInt64Type:
         case kIROp_UIntPtrType:
-            resultVal = getBuilder()->getIntValue(type, -c0->value.intVal);
+            // We negate in `uint64_t`, which wraps, so that negating `INT64_MIN` gives
+            // `INT64_MIN` instead of signed-overflow undefined behavior.
+            resultVal = getBuilder()->getIntValue(
+                type,
+                IRIntegerValue(uint64_t(0) - uint64_t(c0->value.intVal)));
             break;
         case kIROp_FloatType:
         case kIROp_DoubleType:
@@ -879,8 +944,9 @@ struct SCCPContext
         {
         case kIROp_FloatType:
             {
-                float fval = (float)c0->value.floatVal;
-                memcpy(&sourceValueBits, &fval, sizeof(fval));
+                // A `float` literal is read back by its bits; a `(float)` cast would quiet a
+                // signaling NaN.
+                sourceValueBits = DoubleToFloatBits(c0->value.floatVal);
                 break;
             }
         case kIROp_DoubleType:
@@ -932,9 +998,9 @@ struct SCCPContext
             break;
         case kIROp_FloatType:
             {
-                uint32_t val = (uint32_t)sourceValueBits;
-                float floatVal = IntAsFloat((int)val);
-                resultVal = getBuilder()->getFloatValue(type, floatVal);
+                // Widening the bits through a `float` would quiet a signaling NaN.
+                resultVal =
+                    getBuilder()->getFloatValue(type, FloatBitsToDouble((uint32_t)sourceValueBits));
             }
             break;
         case kIROp_DoubleType:

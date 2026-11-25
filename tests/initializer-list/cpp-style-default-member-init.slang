@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj -vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUFFER):-output-using-type
 
 struct NonCStyle
 {

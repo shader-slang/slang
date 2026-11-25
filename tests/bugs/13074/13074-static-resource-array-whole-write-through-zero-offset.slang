@@ -3,7 +3,7 @@
 // element.
 
 //TEST:SIMPLE: -target cpp -entry computeMain -stage compute -validate-ir -o 13074-static-resource-array-whole-write-through-zero-offset.cpp
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -entry computeMain -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -entry computeMain -output-using-type
 
 // CHECK: type: float
 // CHECK-NEXT: {{^}}1.000000{{$}}

@@ -1,12 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all-wgpu):
 // Integer matrices are not supported in WGSL.
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-mtl -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
 //TEST:SIMPLE(filecheck=CONCRETE): -target spirv-asm -entry concreteMain -stage compute
 //TEST:SIMPLE(filecheck=GENERIC): -target spirv-asm -entry genericCodegenMain -stage compute
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry genericMatrixCodegenMain -stage compute

@@ -1,4 +1,4 @@
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type -Xslang -DMETAL
+//TEST(metal):COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=CHECK):-output-using-type -Xslang -DMETAL
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outStructuredBuffer
 RWStructuredBuffer<float> outStructuredBuffer;

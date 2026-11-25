@@ -1,7 +1,6 @@
 // A combined Sampler2D gather must read the same four texels as a separate-sampler gather of the
 // same texture data at the same location, for every component (#14073).
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: TextureSampler2D(size=4, content=gradient):name stex
 Sampler2D<float4> stex;
