@@ -1,9 +1,11 @@
 // slang-crash-report.cpp
 #include "slang-crash-report.h"
 
+#include "slang-crash-report-file.h"
 #include "slang-signal.h"
 
 #include <atomic>
+#include <string.h>
 
 // This file uses only C library calls and fixed storage. Slang's own containers allocate and
 // assert, and both are off limits on the paths that produce a crash report.
@@ -266,6 +268,101 @@ static std::atomic<bool> g_areReportsEnabled{false};
     return g_areReportsEnabled.load();
 }
 
+// The directory that reports are saved in. Like the strings above, it is written at start-up,
+// before the flag that publishes it.
+static char g_reportDirectory[CrashReportUtil::kMaxReportDirectoryLength + 1];
+static std::atomic<bool> g_hasReportDirectory{false};
+
+/* static */ void CrashReportUtil::setReportDirectory(const char* directory)
+{
+    g_hasReportDirectory.store(false);
+    if (!directory)
+        return;
+
+    const size_t length = strlen(directory);
+    if (length == 0 || length > size_t(kMaxReportDirectoryLength))
+        return;
+    memcpy(g_reportDirectory, directory, length + 1);
+    g_hasReportDirectory.store(true);
+}
+
+/// The longest path of a saved report. It holds a directory of the greatest length that
+/// `setReportDirectory` accepts, and the file name.
+static const size_t kMaxReportPathLength = CrashReportUtil::kMaxReportDirectoryLength + 64;
+
+/// Append `text` to the path in `ioPath`, which holds `ioLength` characters. Return false,
+/// and leave the path unchanged, if the result does not fit `kMaxReportPathLength`.
+static bool _appendToPath(char* ioPath, size_t& ioLength, const char* text)
+{
+    const size_t textLength = strlen(text);
+    if (ioLength + textLength > kMaxReportPathLength)
+        return false;
+    memcpy(ioPath + ioLength, text, textLength + 1);
+    ioLength += textLength;
+    return true;
+}
+
+/// Save `report` in `directory` under the name that `signature` gives it, and write the path
+/// of the file to `outPath`. Return true if the file exists afterwards: either this call wrote
+/// it, or an earlier report of the same bug did.
+static bool _saveReportIn(
+    const char* directory,
+    const char* signature,
+    const char* report,
+    size_t reportLength,
+    char* outPath)
+{
+    size_t pathLength = 0;
+    outPath[0] = 0;
+    if (!_appendToPath(outPath, pathLength, directory) ||
+        !_appendToPath(outPath, pathLength, "/slang-report-") ||
+        !_appendToPath(outPath, pathLength, signature) ||
+        !_appendToPath(outPath, pathLength, ".txt"))
+    {
+        return false;
+    }
+    return CrashReportFile::writeNew(outPath, report, reportLength) !=
+           CrashReportFileResult::Failed;
+}
+
+/// Save the report of the internal error `desc`, which is the last `reportLength` characters
+/// of `ioText`, and append the line that tells the user where it is.
+static void _saveReportAndAppendPath(
+    const InternalErrorReportDesc& desc,
+    size_t reportLength,
+    CrashReportText& ioText)
+{
+    CrashReportText signature;
+    CrashReportUtil::appendInternalErrorSignature(desc, signature);
+    const char* report = ioText.getBuffer() + ioText.getLength() - reportLength;
+
+    char path[kMaxReportPathLength + 1];
+    bool isSaved =
+        _saveReportIn(g_reportDirectory, signature.getBuffer(), report, reportLength, path);
+    if (!isSaved)
+    {
+        // The directory can be read-only, as a source tree on a build machine often is. The
+        // directory for temporary files is the one place that we can expect to write.
+        char temporaryDirectory[CrashReportUtil::kMaxReportDirectoryLength + 1];
+        if (CrashReportFile::getTemporaryDirectory(temporaryDirectory, sizeof(temporaryDirectory)))
+        {
+            isSaved = _saveReportIn(
+                temporaryDirectory,
+                signature.getBuffer(),
+                report,
+                reportLength,
+                path);
+        }
+    }
+
+    if (isSaved)
+    {
+        ioText.append("Saved as:    ");
+        ioText.append(path);
+        ioText.append("\n");
+    }
+}
+
 /* static */ bool CrashReportUtil::appendReportOfLastInternalError(
     const char* message,
     CrashReportText& ioText)
@@ -289,8 +386,12 @@ static std::atomic<bool> g_areReportsEnabled{false};
         desc.stackTrace = record.stackTrace;
     }
 
+    const int lengthBeforeReport = ioText.getLength();
     appendInternalErrorReport(desc, ioText);
     clearLastSignalRecord();
+
+    if (g_hasReportDirectory.load())
+        _saveReportAndAppendPath(desc, size_t(ioText.getLength() - lengthBeforeReport), ioText);
     return true;
 }
 

@@ -130,7 +130,23 @@ int MAIN(int argc, char** argv)
     // a compile stops on an internal error, the diagnostics on stderr end with a crash report
     // that the user can file as an issue.
     if (_areCrashReportsWanted())
+    {
         slang_enableCrashReports("slangc");
+
+        // The report is also saved, so that the user still has it after the terminal output
+        // is gone: in the directory that `SLANG_CRASH_REPORT_DIR` names, or else in the
+        // working directory.
+        StringBuilder directory;
+        if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice("SLANG_CRASH_REPORT_DIR"),
+                directory)) ||
+            directory.getLength() == 0)
+        {
+            directory.clear();
+            directory << ".";
+        }
+        slang_setCrashReportDirectory(directory.getBuffer());
+    }
 
     auto stdWriters = StdWriters::initDefaultSingleton();
     SlangResult res = innerMain(stdWriters, nullptr, argc, argv);

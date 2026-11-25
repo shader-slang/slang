@@ -1,6 +1,8 @@
 // unit-test-crash-report.cpp
 
+#include "core/slang-crash-report-file.h"
 #include "core/slang-crash-report.h"
+#include "core/slang-io.h"
 #include "core/slang-string.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -201,4 +203,52 @@ SLANG_UNIT_TEST(crashReportInternalErrorStack, NoRenderApi)
     StringBuilder firstFrame;
     firstFrame << "\n#0  " << module.moduleName << "+0x";
     SLANG_CHECK(strstr(stack, firstFrame.getBuffer()) != nullptr);
+}
+
+SLANG_UNIT_TEST(crashReportFileIsWrittenOnce, NoRenderApi)
+{
+    // `generateTemporary` gives a name that no other test uses. We remove the file that it
+    // creates, so that the name is free.
+    String path;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::generateTemporary(toSlice("slang-report-"), path)));
+    File::remove(path);
+
+    static const char kFirst[] = "the first report\n";
+    static const char kSecond[] = "another report of the same bug\n";
+
+    SLANG_CHECK(
+        CrashReportFile::writeNew(path.getBuffer(), kFirst, strlen(kFirst)) ==
+        CrashReportFileResult::Written);
+
+    // A second report of the same bug finds the file there and leaves it alone, which is what
+    // makes one file per signature safe when many compiles fail at once.
+    SLANG_CHECK(
+        CrashReportFile::writeNew(path.getBuffer(), kSecond, strlen(kSecond)) ==
+        CrashReportFileResult::AlreadyExists);
+
+    String content;
+    SLANG_CHECK(SLANG_SUCCEEDED(File::readAllText(path, content)));
+    SLANG_CHECK(content == kFirst);
+    File::remove(path);
+
+    // A file in a directory that does not exist cannot be created.
+    const String missing = Path::combine(path + ".missing", "report.txt");
+    SLANG_CHECK(
+        CrashReportFile::writeNew(missing.getBuffer(), kFirst, strlen(kFirst)) ==
+        CrashReportFileResult::Failed);
+}
+
+SLANG_UNIT_TEST(crashReportTemporaryDirectory, NoRenderApi)
+{
+    // The fallback directory exists, and it is given without a separator at its end, so that
+    // a file name joins to it in the same way as to any other directory.
+    char directory[512];
+    SLANG_CHECK_ABORT(CrashReportFile::getTemporaryDirectory(directory, sizeof(directory)));
+    SLANG_CHECK(File::exists(directory));
+    const size_t length = strlen(directory);
+    SLANG_CHECK_ABORT(length > 0);
+    SLANG_CHECK(length == 1 || (directory[length - 1] != '/' && directory[length - 1] != '\\'));
+
+    char tooSmall[2];
+    SLANG_CHECK(!CrashReportFile::getTemporaryDirectory(tooSmall, sizeof(tooSmall)));
 }

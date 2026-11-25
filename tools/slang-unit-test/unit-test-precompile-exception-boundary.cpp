@@ -1,5 +1,6 @@
 // unit-test-precompile-exception-boundary.cpp
 
+#include "core/slang-io.h"
 #include "core/slang-memory-file-system.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -151,5 +152,53 @@ SLANG_UNIT_TEST(internalErrorEndsWithCrashReportWhenEnabled, NoRenderApi)
     // Turning reports off again restores the default.
     SLANG_CHECK(SLANG_FAILED(_precompileModuleThatRaisesInternalError(diagnostics)));
     SLANG_CHECK(_getText(diagnostics).indexOf(toSlice("Slang crash report")) < 0);
+}
+// With a report directory set, the report is also saved as a file that is named after its
+// signature, and the diagnostics say where.
+SLANG_UNIT_TEST(internalErrorSavesCrashReportFile, NoRenderApi)
+{
+    // `generateTemporary` gives a name that no other test uses. We turn it into a directory.
+    String directory;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::generateTemporary(toSlice("slang-crash-report-"), directory)));
+    File::remove(directory);
+    SLANG_CHECK_ABORT(Path::createDirectory(directory));
+
+    ComPtr<slang::IBlob> diagnostics;
+    {
+        ScopedCrashReports crashReports("unit-test");
+        slang_setCrashReportDirectory(directory.getBuffer());
+        _precompileModuleThatRaisesInternalError(diagnostics);
+        slang_setCrashReportDirectory(nullptr);
+    }
+    const String text = _getText(diagnostics);
+
+    // The line after the report names the file.
+    static const char kSavedAs[] = "\nSaved as:    ";
+    const Index reportStart = text.indexOf(toSlice("==== Slang crash report (format 1) ===="));
+    const Index savedAsStart = text.indexOf(toSlice(kSavedAs));
+    SLANG_CHECK_ABORT(reportStart >= 0 && savedAsStart > reportStart);
+
+    const UnownedStringSlice afterSavedAs =
+        text.getUnownedSlice().tail(savedAsStart + Index(strlen(kSavedAs)));
+    const Index pathEnd = afterSavedAs.indexOf('\n');
+    SLANG_CHECK_ABORT(pathEnd > 0);
+    const String path = afterSavedAs.head(pathEnd);
+
+    // The file is in the directory that we set, and its name holds the signature.
+    SLANG_CHECK(path.startsWith(directory));
+    SLANG_CHECK(path.indexOf(toSlice("slang-report-ice-")) >= 0);
+    SLANG_CHECK(path.endsWith(".txt"));
+
+    // The file holds the report exactly as the diagnostics show it, without the line that
+    // names the file.
+    String content;
+    SLANG_CHECK(SLANG_SUCCEEDED(File::readAllText(path, content)));
+    const UnownedStringSlice report =
+        text.getUnownedSlice().subString(reportStart, savedAsStart + 1 - reportStart);
+    SLANG_CHECK(content.getUnownedSlice() == report);
+
+    File::remove(path);
+    Path::remove(directory);
 }
 #endif // SLANG_HAS_EXCEPTIONS

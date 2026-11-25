@@ -110,12 +110,28 @@ struct CrashReportUtil
 
     static bool areReportsEnabled();
 
+    /// Set the directory in which every report is also saved, or pass null to save none.
+    ///
+    /// A report is saved as `slang-report-<signature>.txt`. The name holds the signature, so
+    /// one bug leaves one file however many times, threads or processes hit it; a parallel
+    /// build that fails in a hundred compiles does not leave a hundred files. If the directory
+    /// cannot be written, the report goes to the directory for temporary files instead.
+    ///
+    /// The path is UTF-8 and is copied. A path longer than `kMaxReportDirectoryLength` saves
+    /// no file. A program calls this once at start-up, like `enableReports`.
+    static void setReportDirectory(const char* directory);
+
+    static const int kMaxReportDirectoryLength = 767;
+
     /// Append the report of the internal error that the calling thread just caught.
     ///
     /// The report describes the thread's signal record, so the caller is the `catch` that
     /// handles the error, on the thread that raised it. `message` is the message of the caught
     /// error and can be null. The call uses the record up: a later error that was not raised
     /// through `handleSignal` then reports an unknown location instead of this one.
+    ///
+    /// If a report directory is set, the call also saves the report there, and the appended
+    /// text ends with a `Saved as:` line that names the file.
     ///
     /// Return false, and append nothing, if crash reports are off.
     static bool appendReportOfLastInternalError(const char* message, CrashReportText& ioText);
