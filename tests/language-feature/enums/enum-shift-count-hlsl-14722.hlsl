@@ -5,6 +5,8 @@
 // that already lets `+` take an enum operand. Before the fix this failed with
 // `no overload for '<<' applicable to arguments of type (int, Options)`.
 
+// Positive (compile, GPU target): the shifts compile on the Vulkan path.
+// Value verification lives in the .slang CPU leg and the HLSL leg below.
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute -unscoped-enum
 
 // Positive (emitted value): the shifts must const-fold to the correct results,
