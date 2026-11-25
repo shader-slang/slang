@@ -4216,6 +4216,7 @@ Type* Linkage::specializeType(
     DiagnosticSink* sink)
 {
     SLANG_ASSERT(unspecializedType);
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     // TODO: We should cache and re-use specialized types
     // when the exact same arguments are provided again later.
