@@ -1,7 +1,10 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
+#ifdef SERIALIZED_LIBRARY
+import "transitive-attribute-extensions-serialized-facade";
+#else
 import "transitive-attribute-extensions-facade";
+#endif
 #ifdef DIRECT_IMPORT
 import "transitive-attribute-extensions-lib";
 #endif

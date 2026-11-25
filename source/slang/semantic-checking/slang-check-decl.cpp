@@ -19472,14 +19472,8 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
             // importing only the facade can find square through that field's type. Its generated
             // fwd_diff/apply_bwd extensions must be discoverable too, even though the library's
             // ordinary names and handwritten extensions are not imported into the caller.
-            // Module dependencies already include the transitive closure of imports. Modules
-            // whose full extension lists are visible above must not contribute duplicates here.
-            for (auto dependency : m_module->getModuleDependencies())
+            for (auto moduleDecl : _getTransitiveOnlyModuleDependencies())
             {
-                auto moduleDecl = dependency->getModuleDecl();
-                if (dependency == m_module || importedModulesSet.contains(moduleDecl) ||
-                    getSession()->coreModules.contains(dependency))
-                    continue;
                 _addCandidateExtensionsFromModule(moduleDecl, true);
             }
         }
@@ -19614,6 +19608,24 @@ void SharedSemanticsContext::registerSynthesizedDeclRoot(Decl* decl)
         m_synthesizedDeclRoots.add(decl);
 }
 
+List<ModuleDecl*> SharedSemanticsContext::_getTransitiveOnlyModuleDependencies()
+{
+    // `getModuleDependencies` already holds the transitive closure of the primary module's
+    // imports. We skip the primary module, the core modules, and the modules it imports directly
+    // or through `__exported import`, because callers include everything from those modules.
+    SLANG_ASSERT(m_module);
+    List<ModuleDecl*> result;
+    for (auto dependency : m_module->getModuleDependencies())
+    {
+        auto moduleDecl = dependency->getModuleDecl();
+        if (dependency == m_module || importedModulesSet.contains(moduleDecl) ||
+            getSession()->coreModules.contains(dependency))
+            continue;
+        result.add(moduleDecl);
+    }
+    return result;
+}
+
 void SharedSemanticsContext::_addCandidateExtensionsFromModule(
     ModuleDecl* moduleDecl,
     bool onlyAttributeExtensions)
@@ -19688,6 +19700,17 @@ List<RefPtr<DeclAssociation>> const& SharedSemanticsContext::getAssociatedDeclsF
         {
             _addDeclAssociationsFromModule(m_module->getModuleDecl());
             for (auto moduleDecl : this->importedModulesList)
+            {
+                _addDeclAssociationsFromModule(moduleDecl);
+            }
+
+            // Associations are recorded only by derivative attributes such as
+            // `[BackwardDerivativeOf(primal)]`, so they follow the same transitive imports as the
+            // attribute-generated extensions in `getCandidateExtensionsForTypeDecl`. Otherwise a
+            // caller that reaches `primal` through a facade would find its derivative extension
+            // but miss the association, and with it the derivative's `[require]` capabilities at
+            // the differentiation use-site.
+            for (auto moduleDecl : _getTransitiveOnlyModuleDependencies())
             {
                 _addDeclAssociationsFromModule(moduleDecl);
             }

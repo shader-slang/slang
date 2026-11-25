@@ -38,6 +38,26 @@ public struct Operations
         x = diffPair(x.p, 11.0 * x.p * derivative);
     }
 
+    // Derivatives attached through inverse placement record an association on the primal, and
+    // their `[require]` capabilities apply where the primal is differentiated.
+    public static float spirvBackwardPrimal(float x) { return x * x; }
+
+    [require(spirv)]
+    [BackwardDerivativeOf(spirvBackwardPrimal)]
+    public static void spirvBackward(inout DifferentialPair<float> x, float derivative)
+    {
+        x = diffPair(x.p, 13.0 * x.p * derivative);
+    }
+
+    public static float spirvForwardPrimal(float x) { return x * x; }
+
+    [require(spirv)]
+    [ForwardDerivativeOf(spirvForwardPrimal)]
+    public static DifferentialPair<float> spirvForward(DifferentialPair<float> x)
+    {
+        return diffPair(x.p * x.p, 13.0 * x.p * x.d);
+    }
+
     [ForwardDerivative(internalForward)]
     public float restricted(float x) { return x * x; }
 

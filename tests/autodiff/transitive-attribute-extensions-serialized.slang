@@ -1,9 +1,9 @@
-//TEST:COMPILE: tests/autodiff/transitive-attribute-extensions-lib.slang -o tests/autodiff/transitive-attribute-extensions-lib.slang-module
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPILE: tests/autodiff/transitive-attribute-extensions-serialized-lib.slang -o tests/autodiff/transitive-attribute-extensions-serialized-lib.slang-module
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
-// Import prefers the compiled library. Attribute provenance must survive AST
-// serialization, even though the consumer imports only the facade module.
+// The consumer imports only a facade whose library loads from the precompiled module above, so
+// the provenance of attribute-generated extensions must survive AST serialization.
+#define SERIALIZED_LIBRARY 1
 #include "transitive-attribute-extensions.slang"
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 // CHECK: 6.0

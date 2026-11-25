@@ -1273,6 +1273,12 @@ private:
     /// Used to detect when loadedModulesList has changed and the cache needs updating.
     Index m_candidateExtensionListsBuiltForModuleCount = 0;
 
+    /// Return the modules that the primary module `m_module` reaches only through other modules'
+    /// imports. For example, if `consumer` imports `facade` and `facade` imports `lib`, the result
+    /// for `consumer` is `lib`. Attribute-generated derivative extensions and derivative
+    /// associations from these modules remain visible, while their ordinary names do not.
+    List<ModuleDecl*> _getTransitiveOnlyModuleDependencies();
+
     /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`.
     void _addCandidateExtensionsFromModule(
         ModuleDecl* moduleDecl,
