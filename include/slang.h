@@ -555,6 +555,8 @@ SLANG_COMPILE_TIME_ASSERT((SLANG_PTR_IS_64 ? 8 : 4) == sizeof(void*));
     #else
         #define SLANG_HAS_BACKTRACE 0
     #endif
+#elif SLANG_APPLE_FAMILY
+    #define SLANG_HAS_BACKTRACE 1
 #else
     #define SLANG_HAS_BACKTRACE 0
 #endif
