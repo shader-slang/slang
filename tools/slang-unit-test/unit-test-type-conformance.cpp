@@ -146,11 +146,13 @@ SLANG_UNIT_TEST(typeConformance, NoRenderApi)
         meshIShape.writeRef(),
         0,
         diagnosticBlob.writeRef());
+    // Mesh and Sphere both conform to IShape, so they need distinct sequential IDs; sharing one
+    // would make dynamic dispatch on that ID ambiguous.
     session->createTypeConformanceComponentType(
         sphere,
         ishape,
         sphereIShape.writeRef(),
-        0,
+        1,
         diagnosticBlob.writeRef());
 
     slang::IComponentType* componentTypes[5] =

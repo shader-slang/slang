@@ -886,10 +886,33 @@ void lowerUntaggedUnionTypes(IRModule* module, TargetProgram* targetProgram, Dia
 //
 struct SequentialIDTagLoweringContext : public InstPassBase
 {
-    SequentialIDTagLoweringContext(Linkage* linkage, IRModule* module)
-        : InstPassBase(module), m_linkage(linkage)
+    SequentialIDTagLoweringContext(Linkage* linkage, IRModule* module, DiagnosticSink* sink)
+        : InstPassBase(module), m_linkage(linkage), m_sink(sink)
     {
+        SLANG_ASSERT(sink);
     }
+
+    // Reports that `firstTable` and `secondTable`, two different conformances to the interface
+    // that `inst` dispatches over, carry the same sequential ID. The ID-to-tag mapping can route
+    // that ID to only one of them, so the other would be unreachable.
+    void diagnoseDuplicateSequentialID(
+        IRGetTagFromSequentialID* inst,
+        IRInst* firstTable,
+        IRInst* secondTable,
+        UInt sequentialID)
+    {
+        StringBuilder firstTypeStr, secondTypeStr, interfaceTypeStr;
+        printDiagnosticArg(firstTypeStr, cast<IRWitnessTable>(firstTable)->getConcreteType());
+        printDiagnosticArg(secondTypeStr, cast<IRWitnessTable>(secondTable)->getConcreteType());
+        printDiagnosticArg(interfaceTypeStr, inst->getOperand(0));
+        m_sink->diagnose(Diagnostics::DuplicateTypeConformanceSequentialId{
+            .id = (int64_t)sequentialID,
+            .firstType = firstTypeStr.produceString(),
+            .secondType = secondTypeStr.produceString(),
+            .interfaceType = interfaceTypeStr.produceString(),
+            .location = inst->sourceLoc});
+    }
+
     void lowerGetTagFromSequentialID(IRGetTagFromSequentialID* inst)
     {
         // We use the result type to figure out the destination collection
@@ -908,6 +931,10 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
         Dictionary<UInt, UInt> mapping;
 
+        // The witness table that each sequential ID maps to, used to report two different
+        // tables that share one ID instead of silently keeping only one of them.
+        Dictionary<UInt, IRInst*> tableForSequentialID;
+
         // Map from sequential ID to unique ID
         auto destSet = cast<IRSetTagType>(inst->getDataType())->getSet();
 
@@ -924,8 +951,14 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                 auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
                 if (seqDecoration)
                 {
-                    auto inputId = seqDecoration->getSequentialID();
-                    mapping[inputId] = outputId; // Map ID to itself for now
+                    UInt inputId = (UInt)seqDecoration->getSequentialID();
+                    if (auto firstTable = tableForSequentialID.tryGetValue(inputId))
+                    {
+                        diagnoseDuplicateSequentialID(inst, *firstTable, table, inputId);
+                        return;
+                    }
+                    tableForSequentialID.add(inputId, table);
+                    mapping[inputId] = outputId;
                 }
             });
 
@@ -990,19 +1023,49 @@ struct SequentialIDTagLoweringContext : public InstPassBase
     }
 
 
+    // Returns, for each interface, the sequential IDs that witness tables in this module already
+    // carry. Those IDs come from explicit overrides, such as
+    // `createTypeConformanceComponentType(..., conformanceIdOverride)` or the
+    // `-conformance Type:Interface=ID` option, which put an `IRSequentialIDDecoration` on the
+    // conformance's witness table before this pass runs.
+    //
+    // Consider `-conformance TriHit:IHit=0 -conformance CurveHit:IHit=1` in a program that also
+    // constructs `InvalidHit : IHit` statically. The result maps `IHit` to {0, 1}, so
+    // `InvalidHit` is numbered 2 rather than taking `TriHit`'s 0.
+    Dictionary<IRInst*, HashSet<UInt>> collectExplicitSequentialIDsByInterface()
+    {
+        Dictionary<IRInst*, HashSet<UInt>> result;
+        for (auto inst : module->getGlobalInsts())
+        {
+            auto witnessTable = as<IRWitnessTable>(inst);
+            if (!witnessTable)
+                continue;
+            auto seqDecoration = witnessTable->findDecoration<IRSequentialIDDecoration>();
+            if (!seqDecoration)
+                continue;
+            result[witnessTable->getConformanceType()].add((UInt)seqDecoration->getSequentialID());
+        }
+        return result;
+    }
+
     // Ensures every witness table object has been assigned a sequential ID.
     //
     // All witness tables will have a SequentialID decoration after this function is run.
     //
-    // The sequential ID in the decoration will be the same as the one specified in the Linkage.
+    // A table that already has a decoration keeps it. Otherwise, if the Linkage already holds
+    // an ID for the table, that ID is used. Otherwise, a new ID is taken from the interface's
+    // counter in the Linkage, skipping IDs that explicitly decorated tables of the same
+    // interface in this module already use, and the Linkage's sequential ID map is updated so
+    // the ID can be looked up through later Slang API calls.
     //
-    // Otherwise, a new ID will be generated and assigned to the witness table object, and
-    // the sequential ID map in the Linkage will be updated to include the new ID, so they
-    // can be looked up by the user via future Slang API calls.
+    // An ID the Linkage recorded earlier (from a query, or from compiling another program) can
+    // still equal an explicit ID in this module; `lowerGetTagFromSequentialID` reports that
+    // collision when both tables meet in one dispatch.
     //
     void ensureWitnessTableSequentialIDs()
     {
         auto linkage = getLinkage();
+        auto explicitIDsByInterface = collectExplicitSequentialIDsByInterface();
         for (auto inst : module->getGlobalInsts())
         {
             if (inst->getOp() == kIROp_WitnessTable)
@@ -1087,6 +1150,12 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                                 idAllocator = linkage->mapInterfaceMangledNameToSequentialIDCounters
                                                   .tryGetValue(interfaceName);
                             }
+                            if (auto explicitIDs =
+                                    explicitIDsByInterface.tryGetValue(interfaceType))
+                            {
+                                while (explicitIDs->contains(UInt(*idAllocator)))
+                                    ++(*idAllocator);
+                            }
                             seqID = *idAllocator;
                             ++(*idAllocator);
                         }
@@ -1124,12 +1193,12 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
 private:
     Linkage* m_linkage;
+    DiagnosticSink* m_sink;
 };
 
 void lowerSequentialIDTagCasts(IRModule* module, Linkage* linkage, DiagnosticSink* sink)
 {
-    SLANG_UNUSED(sink);
-    SequentialIDTagLoweringContext context(linkage, module);
+    SequentialIDTagLoweringContext context(linkage, module, sink);
     context.processModule();
 }
 
