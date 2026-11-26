@@ -900,3 +900,55 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionWithLoadedButNotLinkedModule, NoRenderApi)
 
     SLANG_CHECK(spirvStr.indexOf(toSlice("OpDecorate %tex Binding 0")) != -1);
 }
+
+SLANG_UNIT_TEST(getTypeLayoutOfExternTypeWithoutProgramLayout, NoRenderApi)
+{
+    // Asking the reflection API for a layout of an arbitrary type goes through
+    // TargetRequest::getTypeLayout, which has no ProgramLayout. Laying out an
+    // extern type on that path used to dereference the missing ProgramLayout
+    // while resolving the extern declaration; it must instead leave the type
+    // as declared.
+    const char* userSourceBody = R"(
+        interface IFoo { float getVal(); }
+        struct DefaultFoo : IFoo { float getVal() { return 0.0f; } }
+        extern struct Foo : IFoo = DefaultFoo;
+
+        uniform Foo gFoo;
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "getTypeLayoutOfExternType",
+        "getTypeLayoutOfExternType.slang",
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    module->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+
+    auto programLayout = linkedProgram->getLayout();
+    auto var0 = programLayout->getParameterByIndex(0);
+    auto varType = var0->getType();
+
+    // This call goes through the layout path without a program layout.
+    auto typeLayout = programLayout->getTypeLayout(varType, slang::LayoutRules::Default);
+    SLANG_CHECK_ABORT(typeLayout != nullptr);
+
+    // No module defining `Foo` is linked, so the extern type stays as declared
+    // and the layout falls back to the default implementation, which has no
+    // fields.
+    SLANG_CHECK(typeLayout->getSize() == 0);
+}

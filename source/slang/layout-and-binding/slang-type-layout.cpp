@@ -6625,7 +6625,7 @@ Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
     if (isExtern)
     {
         // Without a program layout (e.g. `TargetRequest::getTypeLayout`) there is no
-        // linked program to resolve against, so leave the type as declared.
+        // linked program to resolve against, so leave the extern type as declared.
         if (programLayout)
         {
             if (!programLayout->externTypeMapBuilt)
@@ -6670,10 +6670,8 @@ void TypeLayoutContext::buildExternTypeMap()
 {
     // The map is a pure function of the program's module dependencies, so we build
     // it once on the owning ProgramLayout and read it back from every
-    // TypeLayoutContext copy. Only `extern` declarations and type declarations can
-    // take part in a match, so we skip mangling every other declaration: the map
-    // is only consulted when laying out a type, and only a type declaration can
-    // serve as a linked-in type definition.
+    // TypeLayoutContext copy.
+    SLANG_ASSERT(programLayout);
     auto& externTypeMap = programLayout->externTypeMap;
 
     HashSet<String> externNames;
@@ -6689,7 +6687,12 @@ void TypeLayoutContext::buildExternTypeMap()
             decl->hasModifier<ExternAttribute>() || decl->hasModifier<ExternModifier>();
         const auto isTypeDecl = as<AggTypeDecl>(decl) || as<SimpleTypeDecl>(decl);
 
-        if (isExtern || isTypeDecl)
+        // Only type declarations can take part in a match: the map is only
+        // consulted when laying out a type, an extern type is itself a type
+        // declaration, and only a type declaration can serve as a linked-in
+        // type definition. Names of functions, variables and other declarations
+        // can never match, so we skip mangling them entirely.
+        if (isTypeDecl)
         {
             if (auto declRefType = as<DeclRefType>(DeclRefType::create(astBuilder, decl)))
             {
@@ -6732,6 +6735,9 @@ void TypeLayoutContext::buildExternTypeMap()
             externTypeMap[externName] = allTypes[externName];
         }
     }
+    // The flag is set only after the map is complete, so a caller that recurses
+    // back into lookupExternDeclRefType during the build never reads a
+    // partially-filled map.
     programLayout->externTypeMapBuilt = true;
 }
 

@@ -1280,6 +1280,11 @@ public:
     /// `withSpecializationArgs()`, ...), so a cache stored on the context itself
     /// would be built on a temporary copy and thrown away, once per lookup.
     ///
+    /// It is built lazily on the first extern type lookup, during layout
+    /// generation, which runs under the component-type operation mutex that
+    /// serializes layout for the program; the one entry point that has no
+    /// program layout (`TargetRequest::getTypeLayout`) never reaches the build.
+    ///
     Dictionary<String, Type*> externTypeMap;
 
     /// Whether `externTypeMap` has been built for this program layout yet.
