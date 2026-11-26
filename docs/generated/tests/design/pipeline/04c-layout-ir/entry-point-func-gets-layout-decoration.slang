@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#per-entry-point-steps
-//META: doc_section_digest=2051f00317fddb1d324980572e90d6c58961dbf4384bdc38e7d5acf46a5ce786
+//META: doc_section_digest=50f231e064e3daa3393bbf07163d90d3c1b16b2a86c39bdb81116cc094d1f311
 //META: purpose=The final per-entry-point step attaches an IRLayoutDecoration to the stub entry-point function, observable as a [layout(%N)] on func %main.
 //META: intent=functional
 //META: pipeline_stage=layout

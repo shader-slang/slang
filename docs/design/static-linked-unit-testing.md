@@ -75,7 +75,7 @@ Two helpers in `static-unit-test-env.h` cover the common needs.
 `StaticUnitTestEnv` owns a `Linkage` and exposes the internal handles:
 
 ```cpp
-SLANG_UNIT_TEST(astVectorTypesAreDeduplicated)
+SLANG_UNIT_TEST(astVectorTypesAreDeduplicated, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     ASTBuilder* astBuilder = env.getASTBuilder();
@@ -100,7 +100,7 @@ measurable and makes the suite order-dependent.
 becomes expressible:
 
 ```cpp
-SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedFunction)
+SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedFunction, NoRenderApi)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSessionImpl());

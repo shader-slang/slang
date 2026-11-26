@@ -14,7 +14,7 @@ static const String fileName = Path::simplify(
     Path::getParentDirectory(Path::getExecutablePath()) + "/test_lock_file" +
     String(Process::getId()));
 
-SLANG_UNIT_TEST(lockFileOpenClose)
+SLANG_UNIT_TEST(lockFileOpenClose, NoRenderApi)
 {
     LockFile file;
     SLANG_CHECK(file.isOpen() == false);
@@ -29,7 +29,7 @@ SLANG_UNIT_TEST(lockFileOpenClose)
     SLANG_CHECK(File::exists(fileName) == false);
 }
 
-SLANG_UNIT_TEST(lockFileSync)
+SLANG_UNIT_TEST(lockFileSync, NoRenderApi)
 {
     // aarch64/linux builds currently fail to run multi-threaded tests within the test-server.
     // Tests work fine without the test-server, which is puzzling. For now we disable them.

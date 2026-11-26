@@ -1,12 +1,10 @@
 // Float16 not supported on CPU currently
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
 // Doesn't work on FXC
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_2 -render-feature half -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-feature int16,half -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -render-features half -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12):-profile sm_6_2 -render-feature half -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk):-render-feature int16,half -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda):-render-features half -output-using-type
+//TEST:COMPARE_COMPUTE(targets=llvm):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0  0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;

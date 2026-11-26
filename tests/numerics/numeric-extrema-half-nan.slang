@@ -1,7 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature -Xslang -floating-point-mode -Xslang precise
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-llvm -output-using-type -Xslang -experimental-feature
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-features half -output-using-type -Xslang -experimental-feature
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -render-features half -output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature -Xslang -floating-point-mode -Xslang precise
+//TEST:COMPARE_COMPUTE(targets=llvm, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda, filecheck-buffer=CHECK):-render-features half -output-using-type -Xslang -experimental-feature
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute -experimental-feature
 
 // Verify the half both-NaN result through public extrema witnesses on NaN-preserving paths.

@@ -8,6 +8,9 @@
 
 // Verify the compiler rejects unsupported CoopMat operations on Metal.
 // Metal's simdgroup_matrix only supports fill, Load, Store, and coopMatMulAdd.
+// The instance-member cases (getCount, operator[]) and the static-member case
+// (GetLength) reach the capability checker through different visitor paths;
+// both must reject Metal here.
 
 using namespace linalg;
 

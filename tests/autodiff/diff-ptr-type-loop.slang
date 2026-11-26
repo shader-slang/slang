@@ -1,7 +1,7 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-dx12 -compute -shaderobj -profile cs_6_6 -xslang -experimental-feature -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUFFER):-xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=BUFFER):-profile cs_6_6 -xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUFFER):-output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
 
 //TEST_INPUT: set storageBuffer = ubuffer(data=[0.0 0.0 0.0 0.0], stride=4)
 uniform RWStructuredBuffer<float>.Handle storageBuffer;
@@ -36,7 +36,7 @@ void load_bwd(DifferentialPtrPair<MyPtrType> b, uint idx, float grad)
 // ------
 [Differentiable]
 float reduce(MyPtrType a, uint num)
-{   
+{
     float sum = 0;
     [MaxIters(3)]
     for (uint i = 0; i < num; i++)

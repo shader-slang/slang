@@ -6,7 +6,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(bitfieldPackingRulesCompilerOption)
+SLANG_UNIT_TEST(bitfieldPackingRulesCompilerOption, NoRenderApi)
 {
     // Consider this example: Default puts both fields in one uint16_t backing word,
     // while the two type-size-splitting rules allocate a uint8_t and a uint16_t word.
@@ -102,7 +102,7 @@ SLANG_UNIT_TEST(bitfieldPackingRulesCompilerOption)
     }
 }
 
-SLANG_UNIT_TEST(bitfieldPackingRulesInheritedCommandLineOptions)
+SLANG_UNIT_TEST(bitfieldPackingRulesInheritedCommandLineOptions, NoRenderApi)
 {
     auto globalSession = unitTestContext->slangGlobalSession;
     SLANG_CHECK_ABORT(globalSession != nullptr);
@@ -170,7 +170,7 @@ SLANG_UNIT_TEST(bitfieldPackingRulesInheritedCommandLineOptions)
     SLANG_CHECK(diagnostics.indexOf(toSlice("error[E31302]")) >= 0);
 }
 
-SLANG_UNIT_TEST(bitfieldPackingRulesDebugInfo)
+SLANG_UNIT_TEST(bitfieldPackingRulesDebugInfo, NoRenderApi)
 {
     auto globalSession = unitTestContext->slangGlobalSession;
     SLANG_CHECK_ABORT(globalSession != nullptr);

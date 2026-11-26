@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=PRODUCE): -o tests/bugs/gh-10445.slang-module
 //PRODUCE: note[E00088]
 //TEST:SIMPLE(filecheck=MODULE-CHECK): -target hlsl -stage compute -entry computeMain tests/bugs/gh-10445.slang-module
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name outputBuffer
 
@@ -9,11 +9,11 @@
 // definition crashes when compiling to a binary module.
 
 // Verify round-trip through binary module produces correct constants.
-// MODULE-CHECK: int(4)
-// MODULE-CHECK: int(4)
-// MODULE-CHECK: int(3)
-// MODULE-CHECK: int(5)
-// MODULE-CHECK: int(40)
+// MODULE-CHECK: = 4L
+// MODULE-CHECK: = 4L
+// MODULE-CHECK: = 3L
+// MODULE-CHECK: = 5L
+// MODULE-CHECK: = 40L
 
 RWStructuredBuffer<int> outputBuffer;
 

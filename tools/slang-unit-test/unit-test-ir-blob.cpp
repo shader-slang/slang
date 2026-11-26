@@ -3,8 +3,9 @@
 #include "core/slang-memory-file-system.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
-#include "slang/slang-fossil.h"
-#include "slang/slang-serialize-types.h"
+#include "slang/ir/slang-ir.h"
+#include "slang/serialization/slang-fossil.h"
+#include "slang/serialization/slang-serialize-types.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
@@ -14,7 +15,7 @@
 using namespace Slang;
 
 // Test the slang_loadModuleFromIRBlob and slang_loadModuleInfoFromIRBlob functions
-SLANG_UNIT_TEST(irBlob)
+SLANG_UNIT_TEST(irBlob, NoRenderApi)
 {
     // Test source code for creating IR data
     const char* testModuleSource = R"(
@@ -477,14 +478,12 @@ SLANG_UNIT_TEST(irBlob)
     }
 }
 
-// Check current module loading and rejection of version-36 modules.
+// Check that current modules load and modules older than the supported range are rejected.
 //
-// Adding `RefReadOnlyModifier` and `RefWriteOnlyModifier` changes the numeric AST node IDs in
-// version 37. This test verifies that a current module loads, then changes only its module version
-// to 36 and requires rejection with the specific unsupported-version diagnostic.
-SLANG_UNIT_TEST(irBlobRejectsVersion36)
+// We change only a valid module's version to the value immediately below the supported range
+// and require the unsupported-version diagnostic, so incompatible AST IDs are never decoded.
+SLANG_UNIT_TEST(irBlobRejectsOlderModuleVersion, NoRenderApi)
 {
-    // The fixture includes a function parameter, whose AST node ID changed in version 37.
     const char* moduleText = R"(
         module version_guard;
         public uint readValue(uint input) { return input + 1; }
@@ -567,7 +566,7 @@ SLANG_UNIT_TEST(irBlobRejectsVersion36)
     auto moduleFields = reinterpret_cast<FossilizedRecordElementLayout*>(moduleLayout + 1);
     SLANG_CHECK_ABORT(moduleFields[1].layout.get()->kind == FossilizedValKind::UInt64);
     auto versionAddress = static_cast<Byte*>(modulePointer->get()) + moduleFields[1].offset;
-    const UInt64 olderVersion = 36;
+    const UInt64 olderVersion = IRModule::k_minSupportedModuleVersion - 1;
     memcpy(versionAddress, &olderVersion, sizeof(olderVersion));
 
     // Another fresh session must reject the older version with its specific diagnostic.
@@ -589,7 +588,9 @@ SLANG_UNIT_TEST(irBlobRejectsVersion36)
     diagnosticText.append(
         static_cast<char const*>(diagnostics->getBufferPointer()),
         diagnostics->getBufferSize());
-    SLANG_CHECK(diagnosticText.contains("cannot load IR module version 36"));
+    StringBuilder expectedDiagnostic;
+    expectedDiagnostic << "cannot load IR module version " << olderVersion;
+    SLANG_CHECK(diagnosticText.contains(expectedDiagnostic.getUnownedSlice()));
 }
 
 // Regression test for #6557 that mirrors the reporter's exact deployment shape:
@@ -615,7 +616,7 @@ SLANG_UNIT_TEST(irBlobRejectsVersion36)
 //
 // The scenario was requested on the issue by @pdeayton-nv; running it is both the
 // empirical answer and the regression lock.
-SLANG_UNIT_TEST(irBlobImportUpToDateCheck)
+SLANG_UNIT_TEST(irBlobImportUpToDateCheck, NoRenderApi)
 {
     // A dependency module exposing a public function, and an importer that calls
     // it -- the call makes the importer genuinely depend on the dependency.

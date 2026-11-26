@@ -1,10 +1,10 @@
 // spirv-instruction.slang
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute 
+//TEST:COMPARE_COMPUTE(targets=vk+glsl):
 
 // Test using a spirv op. 128 is SpvOpIAdd
 
 [[vk::spirv_instruction(128)]]
-uint add(uint a, uint b); 
+uint add(uint a, uint b);
 
 //TEST_INPUT:set resultBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<uint> resultBuffer;

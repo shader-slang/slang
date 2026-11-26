@@ -312,13 +312,13 @@ jobs:
   # configuration no other CI job builds, so they get their own workflow. They
   # build only the slang-static-unit-test target and run on GitHub-hosted runners
   # (no GPU needed), so they add no load to the self-hosted Windows pool.
-  static-unit-test-linux-debug-gcc-aarch64:
+  static-linux-debug-gcc-aarch64:
     needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    uses: ./.github/workflows/ci-slang-static.yml
     with:
       os: linux
       compiler: gcc
@@ -326,13 +326,29 @@ jobs:
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
 
-  static-unit-test-macos-debug-clang-aarch64:
+  # Release coverage for the same tests. A release build compiles out SLANG_ASSERT and enables
+  # optimizations, which a debug build cannot check.
+  static-linux-release-gcc-aarch64:
     needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    uses: ./.github/workflows/ci-slang-static.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: release
+      runs-on: '["ubuntu-24.04-arm"]'
+
+  static-macos-debug-clang-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static.yml
     with:
       os: macos
       compiler: clang
@@ -340,13 +356,13 @@ jobs:
       config: debug
       runs-on: '["macos-latest"]'
 
-  static-unit-test-windows-debug-cl-x86_64:
+  static-windows-debug-cl-x86_64:
     needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    uses: ./.github/workflows/ci-slang-static.yml
     with:
       os: windows
       compiler: cl
@@ -354,8 +370,36 @@ jobs:
       config: debug
       runs-on: '["windows-2022"]'
 
+  static-macos-release-clang-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
+
+  static-windows-release-cl-x86_64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["windows-2022"]'
+
   # Windows builds (self-hosted)
-  build-windows-debug-cl-x86_64-gpu:
+  build-windows-debug-cl-x86_64:
     needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
@@ -369,7 +413,7 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "build"]'
 
-  build-windows-release-cl-x86_64-gpu:
+  build-windows-release-cl-x86_64:
     needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
@@ -384,12 +428,6 @@ jobs:
       runs-on: '["Windows", "self-hosted", "build"]'
 
   # Windows ARM64 build. GitHub-hosted, native — not cross-compiled.
-  # Deliberately NOT added to check-ci's required needs list below: this
-  # repo has zero real-world CI runs on this image yet (only
-  # workflow_dispatch spikes during validation, before it merged). A
-  # day-old GA image can still have rough edges a required check
-  # shouldn't gate every PR merge on. Promote to required once it has run
-  # cleanly across several PRs.
   build-windows-debug-cl-aarch64:
     needs: [filter, wait-for-human-priority]
     if: >-
@@ -468,7 +506,7 @@ jobs:
   # long before a PR sitting in the Falcor approval queue gets looked at.
   # Building again here, only once approved, means the artifact this job
   # produces is always fresh when test-falcor actually needs it. The
-  # other six consumers of build-windows-release-cl-x86_64-gpu's artifact
+  # other six consumers of build-windows-release-cl-x86_64's artifact
   # (dx/vk/cuda/rhi tests, MaterialX, compile-regression, benchmark) are
   # unaffected -- they keep using the eagerly-built, ungated artifact.
   #
@@ -511,7 +549,7 @@ jobs:
       artifact-name-suffix: "-falcor"
 
   # Linux tests (self-hosted GPU runner, containerized)
-  test-linux-debug-gcc-x86_64:
+  test-linux-debug-gcc-x86_64-t4:
     needs: [filter, build-linux-debug-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test-container.yml
@@ -526,7 +564,7 @@ jobs:
     with:
       config: debug
 
-  test-linux-release-gcc-x86_64:
+  test-linux-release-gcc-x86_64-t4:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test-container.yml
@@ -554,6 +592,37 @@ jobs:
       gpu-tier: sm80plus
       server-count: 8
 
+  # Linux x86_64 debug SM80+ capability tests. The T4 jobs skip
+  # tests/cooperative-matrix/ and tests/neural/, so without this job no debug
+  # build runs them on a GPU. ci-slang-test-container.yml still applies
+  # tests/skip-list-debug.txt to this tier, so the slow neural tests stay
+  # skipped in debug builds.
+  test-linux-debug-gcc-x86_64-sm80:
+    needs: [filter, build-linux-debug-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test-container.yml
+    with:
+      config: debug
+      runs-on: '["Linux", "self-hosted", "SM80Plus"]'
+      gpu-tier: sm80plus
+      server-count: 8
+
+  # Linux x86_64 debug CPU-only tests (GitHub-hosted; no GPU).
+  # Same as the release CPU job below, but with a debug build, so that
+  # SLANG_ASSERT checks run on the CPU and LLVM tests.
+  test-linux-debug-gcc-x86_64-cpu:
+    needs: [filter, build-linux-debug-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: x86_64
+      config: debug
+      runs-on: '["ubuntu-24.04"]'
+      gpu-tier: nogpu
+      server-count: 4
+
   # Linux x86_64 CPU-only tests (GitHub-hosted; no GPU).
   # Runs the test suite filtered to CPU and LLVM backends via
   # -api cpu+llvm, so GPU-targeted test variants are ignored rather than run.
@@ -569,11 +638,9 @@ jobs:
       platform: x86_64
       config: release
       runs-on: '["ubuntu-24.04"]'
-      full-gpu-tests: false
-      cpu-only: true
+      gpu-tier: nogpu
       slang-user-skills: true
       server-count: 4
-      run-via-glsl: false
 
   # macOS tests
   test-macos-debug-clang-aarch64:
@@ -586,10 +653,8 @@ jobs:
       platform: aarch64
       config: debug
       runs-on: '["macos-latest"]'
-      full-gpu-tests: true
       server-count: 3
-      # Vulkan is not available on macOS, so the via-glsl pass (-api vk) cannot run here.
-      run-via-glsl: false
+      gpu-tier: metal
 
   test-macos-debug-clang-aarch64-rhi:
     needs: [filter, build-macos-debug-clang-aarch64]
@@ -612,10 +677,8 @@ jobs:
       platform: aarch64
       config: release
       runs-on: '["macos-latest"]'
-      full-gpu-tests: true
       server-count: 3
-      # Vulkan is not available on macOS, so the via-glsl pass (-api vk) cannot run here.
-      run-via-glsl: false
+      gpu-tier: metal
 
   test-macos-release-clang-aarch64-rhi:
     needs: [filter, build-macos-release-clang-aarch64]
@@ -629,7 +692,7 @@ jobs:
       runs-on: '["macos-latest"]'
 
   # Linux ARM64 tests (GitHub-hosted, CPU only)
-  test-linux-debug-gcc-aarch64:
+  test-linux-debug-gcc-aarch64-cpu:
     needs: [filter, build-linux-debug-gcc-aarch64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -639,10 +702,9 @@ jobs:
       platform: aarch64
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
-      full-gpu-tests: false
-      run-via-glsl: false
+      gpu-tier: nogpu
 
-  test-linux-release-gcc-aarch64:
+  test-linux-release-gcc-aarch64-cpu:
     needs: [filter, build-linux-release-gcc-aarch64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -652,12 +714,11 @@ jobs:
       platform: aarch64
       config: release
       runs-on: '["ubuntu-24.04-arm"]'
-      full-gpu-tests: false
-      run-via-glsl: false
+      gpu-tier: nogpu
 
   # Windows ARM64 test (GitHub-hosted, native, CPU only — no GPU on this
   # hosted image).
-  test-windows-debug-cl-aarch64:
+  test-windows-debug-cl-aarch64-cpu:
     needs: [filter, build-windows-debug-cl-aarch64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -667,17 +728,9 @@ jobs:
       platform: aarch64
       config: debug
       runs-on: '["windows-11-vs2026-arm"]'
-      full-gpu-tests: false
-      # full-gpu-tests: false alone only disables full-GPU-test setup; the
-      # -api expression it selects still defaults to "all", which the
-      # Linux ARM64 jobs above handle via tests/expected-failure-no-gpu.txt.
-      # That denylist hasn't been validated against this new, GPU-less
-      # platform, so restrict directly to cpu+llvm via cpu-only instead of
-      # relying on it.
-      cpu-only: true
-      run-via-glsl: false
+      gpu-tier: nogpu
 
-  test-windows-release-cl-aarch64:
+  test-windows-release-cl-aarch64-cpu:
     needs: [filter, build-windows-release-cl-aarch64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -687,13 +740,38 @@ jobs:
       platform: aarch64
       config: release
       runs-on: '["windows-11-vs2026-arm"]'
-      full-gpu-tests: false
-      cpu-only: true
-      run-via-glsl: false
+      gpu-tier: nogpu
+
+  # Windows x86_64 CPU-only tests (GitHub-hosted; no GPU).
+  # They use the artifact from the self-hosted build job and run only the
+  # (cpu) and (llvm) tests, so the paid T4 jobs below do not need to run them.
+  test-windows-debug-cl-x86_64-cpu:
+    needs: [filter, build-windows-debug-cl-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["windows-2022"]'
+      gpu-tier: nogpu
+
+  test-windows-release-cl-x86_64-cpu:
+    needs: [filter, build-windows-release-cl-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["windows-2022"]'
+      gpu-tier: nogpu
 
   # Windows GPU tests (self-hosted)
-  test-windows-debug-cl-x86_64-gpu:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+  test-windows-debug-cl-x86_64-t4:
+    needs: [filter, build-windows-debug-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
@@ -702,12 +780,10 @@ jobs:
       platform: x86_64
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
       gpu-tier: t4
-      run-via-glsl: true
 
-  test-windows-debug-cl-x86_64-gpu-rhi:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+  test-windows-debug-cl-x86_64-rhi:
+    needs: [filter, build-windows-debug-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-rhi-test.yml
     with:
@@ -717,8 +793,8 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
-  test-windows-release-cl-x86_64-gpu:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+  test-windows-release-cl-x86_64-t4:
+    needs: [filter, build-windows-release-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
@@ -727,12 +803,10 @@ jobs:
       platform: x86_64
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
       gpu-tier: t4
-      run-via-glsl: true
 
-  test-windows-release-cl-x86_64-gpu-rhi:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+  test-windows-release-cl-x86_64-rhi:
+    needs: [filter, build-windows-release-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-rhi-test.yml
     with:
@@ -744,7 +818,7 @@ jobs:
 
   # MaterialX integration test (Windows only for initial validation).
   test-materialx-windows-release:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    needs: [filter, build-windows-release-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-materialx-regression-test.yml
     with:
@@ -865,15 +939,15 @@ jobs:
 
   # Not gated behind falcor-ci approval (runs on an ungated Windows perf
   # runner, not the KVM bridge), so it depends directly on the eagerly-built,
-  # ungated artifact from build-windows-release-cl-x86_64-gpu rather than
+  # ungated artifact from build-windows-release-cl-x86_64 rather than
   # waiting on the approval-gated build-windows-release-cl-x86_64-gpu-falcor.
   # A single `uses:` job can only carry one `needs:` list, so this needed its
   # own caller job separate from test-falcor above, fixing an artifact-not-
   # found failure: test-falcor-perf previously had no needs: at all and
-  # could start before build-windows-release-cl-x86_64-gpu had finished
+  # could start before build-windows-release-cl-x86_64 had finished
   # uploading its artifact.
   test-falcor-perf:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    needs: [filter, build-windows-release-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     permissions:
       contents: read
@@ -883,7 +957,7 @@ jobs:
       slang-artifact-name: slang-tests-windows-x86_64-cl-release
 
   test-compile-regression:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    needs: [filter, build-windows-release-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     permissions:
       contents: read
@@ -891,7 +965,7 @@ jobs:
     uses: ./.github/workflows/ci-slang-regression-test.yml
 
   test-benchmark:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    needs: [filter, build-windows-release-cl-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     permissions:
       contents: read
@@ -905,46 +979,60 @@ jobs:
   # Actions marks the dependent jobs "skipped" (not "failed"). Once the
   # filter says CI should run, requiring every needed job to succeed
   # ensures skipped jobs cannot hide a failed dependency (see #11553).
+  # The SM80 jobs (test-linux-{debug,release}-gcc-x86_64-sm80) are not in this
+  # list on purpose. The SM80Plus runners are often not available for hours (see
+  # issue 14252), and a required job that waits for a runner removes the pull
+  # request from the merge queue. The SM80 jobs still run and report their own
+  # result, but they do not block a merge.
   check-ci:
     needs:
       [
         filter,
-        build-linux-debug-gcc-x86_64,
-        build-linux-release-gcc-x86_64,
-        build-linux-release-gcc-wasm,
         build-linux-debug-gcc-aarch64,
+        build-linux-debug-gcc-x86_64,
         build-linux-release-gcc-aarch64,
+        build-linux-release-gcc-wasm,
+        build-linux-release-gcc-x86_64,
+        build-macos-27-release-clang-aarch64,
         build-macos-debug-clang-aarch64,
         build-macos-release-clang-aarch64,
-        build-macos-27-release-clang-aarch64,
-        build-windows-debug-cl-x86_64-gpu,
-        build-windows-release-cl-x86_64-gpu,
-        static-unit-test-linux-debug-gcc-aarch64,
-        static-unit-test-macos-debug-clang-aarch64,
-        static-unit-test-windows-debug-cl-x86_64,
-        test-windows-release-cl-x86_64-gpu,
-        test-windows-release-cl-x86_64-gpu-rhi,
-        test-windows-debug-cl-x86_64-gpu,
-        test-windows-debug-cl-x86_64-gpu-rhi,
-        test-macos-release-clang-aarch64,
-        test-macos-release-clang-aarch64-rhi,
+        build-windows-debug-cl-aarch64,
+        build-windows-debug-cl-x86_64,
+        build-windows-release-cl-aarch64,
+        build-windows-release-cl-x86_64,
+        static-linux-debug-gcc-aarch64,
+        static-linux-release-gcc-aarch64,
+        static-macos-debug-clang-aarch64,
+        static-macos-release-clang-aarch64,
+        static-windows-debug-cl-x86_64,
+        static-windows-release-cl-x86_64,
+        test-benchmark,
+        test-compile-regression,
+        test-falcor-perf,
+        test-linux-debug-gcc-aarch64-cpu,
+        test-linux-debug-gcc-x86_64-cpu,
+        test-linux-debug-gcc-x86_64-rhi,
+        test-linux-debug-gcc-x86_64-t4,
+        test-linux-release-gcc-aarch64-cpu,
+        test-linux-release-gcc-x86_64-cpu,
+        test-linux-release-gcc-x86_64-rhi,
+        test-linux-release-gcc-x86_64-t4,
         test-macos-debug-clang-aarch64,
         test-macos-debug-clang-aarch64-rhi,
-        test-linux-release-gcc-x86_64,
-        test-linux-release-gcc-x86_64-rhi,
-        test-linux-release-gcc-x86_64-sm80,
-        test-linux-release-gcc-x86_64-cpu,
-        test-linux-debug-gcc-x86_64,
-        test-linux-debug-gcc-x86_64-rhi,
-        test-linux-release-gcc-aarch64,
-        test-linux-debug-gcc-aarch64,
+        test-macos-release-clang-aarch64,
+        test-macos-release-clang-aarch64-rhi,
         test-materialx-windows-release,
+        test-windows-debug-cl-aarch64-cpu,
+        test-windows-debug-cl-x86_64-cpu,
+        test-windows-debug-cl-x86_64-rhi,
+        test-windows-debug-cl-x86_64-t4,
+        test-windows-release-cl-aarch64-cpu,
+        test-windows-release-cl-x86_64-cpu,
+        test-windows-release-cl-x86_64-rhi,
+        test-windows-release-cl-x86_64-t4,
         sanitizer-linux-clang-x86_64,
         check-cmdline-ref,
         check-capability-atoms-ref,
-        test-falcor-perf,
-        test-compile-regression,
-        test-benchmark,
         wait-for-human-priority,
       ]
     runs-on: ubuntu-latest

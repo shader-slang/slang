@@ -1,5 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[2], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;

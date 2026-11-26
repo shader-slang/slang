@@ -122,7 +122,7 @@ void linkTimeOptionTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, numbersBuffer, std::array{4.0f});
 }
 
-SLANG_UNIT_TEST(linkTimeOptionD3D12)
+SLANG_UNIT_TEST(linkTimeOptionD3D12, D3D12)
 {
     runTestImpl(linkTimeOptionTestImpl, unitTestContext, DeviceType::D3D12);
 }

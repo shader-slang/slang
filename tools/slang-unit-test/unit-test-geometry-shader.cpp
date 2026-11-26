@@ -15,7 +15,7 @@ using namespace Slang;
 
 #if SLANG_WINDOWS_FAMILY && SLANG_ENABLE_DXIL_SUPPORT
 
-SLANG_UNIT_TEST(geometryShader)
+SLANG_UNIT_TEST(geometryShader, NoRenderApi)
 {
     const char* userSourceBody = R"(
         struct GS_INPUT

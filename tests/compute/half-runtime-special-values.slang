@@ -1,12 +1,11 @@
 // SPDX-FileCopyrightText: The Khronos Group, Inc.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -O0
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -O3
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -O3
 
 // NaN payload encodings are backend-specific. Prevent the harness from synthesizing
 // CUDA runs with the CPU prelude's expected payloads.
-//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
 // Exercise the CPU prelude with runtime inputs. Its existing NaN policy retains the
 // high payload bits, including the quiet/signaling bit, and keeps a nonzero payload

@@ -194,10 +194,10 @@ in `README.md`.
 
 ## Source files you may consult for verification only
 
-- `source/slang/slang-ast-val.h`
-- `source/slang/slang-ast-val.cpp`
-- `source/slang/slang-ast-base.h`
-- `source/slang/slang-ast-support-types.h`
+- `source/slang/ast/slang-ast-val.h`
+- `source/slang/ast/slang-ast-val.cpp`
+- `source/slang/ast/slang-ast-base.h`
+- `source/slang/ast/slang-ast-support-types.h`
 
 You may look at these files to confirm the surface form that
 produces a given `Val` class (e.g. that `let N : int` produces a

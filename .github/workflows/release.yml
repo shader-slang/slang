@@ -44,11 +44,15 @@ jobs:
               runs-on: windows-latest,
               compiler: cl,
             }
+          # This job builds natively on a Windows ARM64 runner instead of
+          # cross-compiling from windows-latest. common-setup pins MSVC 14.44 on
+          # that runner because the default MSVC 14.52.37025 crashes with C1001
+          # (actions/runner-images#15328). The x64 images ship 14.44 without its
+          # ARM64 target tools, so a cross-compile cannot use the pin.
           - {
               os: windows,
               platform: aarch64,
-              arch: amd64_arm64,
-              runs-on: windows-latest,
+              runs-on: windows-11-vs2026-arm,
               compiler: cl,
               extra-cmake-flags: "-DSLANG_ENABLE_CUDA=0",
             }
@@ -126,8 +130,11 @@ jobs:
           mkdir build-platform-generators
           cmake --install build --config Release --component generators --prefix build-platform-generators
 
+      # A native ARM64 runner already has the target toolchain from common-setup.
+      # Running msvc-dev-cmd again would replace the pinned MSVC toolset with the
+      # default one.
       - name: Setup Windows dev tools for target architecture
-        if: matrix.os == 'windows'
+        if: matrix.os == 'windows' && runner.arch != 'ARM64'
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
         # msvc-dev-cmd has no Node 24 release yet (upstream ilammy/msvc-dev-cmd#105);
         # run its node20 bundle on the node24 runtime. This restates the

@@ -73,8 +73,10 @@ struct Options
     // When true results from ignored tests are not shown
     bool hideIgnored = false;
 
-    // When true only tests that use an api that matches the enabledApis flags will run
-    bool apiOnly = false;
+    // When false the compile tests, which are the tests that use no render API, do not run. Such
+    // a test line (for example a SIMPLE line) compiles code and checks the output. The compile
+    // tests that GPU tests need still run (see TestContext::canRunTestWithRenderApiFlags).
+    bool compileTest = true;
 
     // Use verbose paths
     bool verbosePaths = false;
@@ -121,12 +123,11 @@ struct Options
     // always the subCommand itself.
     Slang::List<Slang::String> subCommandArgs;
 
-    // By default we potentially synthesize test for all
-    // TODO: Vulkan is disabled by default for now as the majority as vulkan synthesized tests
-    // CPU is disabled by default
-    // CUDA is disabled by default
-    Slang::RenderApiFlags synthesizedTestApis =
-        Slang::RenderApiFlag::AllOf & ~(Slang::RenderApiFlag::Vulkan | Slang::RenderApiFlag::CPU);
+    // The APIs for which `slang-test` runs the lines of COMPARE_COMPUTE, COMPARE_COMPUTE_EX and
+    // COMPARE_RENDER_COMPUTE, and for which it adds tests of the other commands that do not name an
+    // API. The default is all APIs. A line chooses its own targets with `targets=`, and a test that
+    // cannot run on a target writes `targets=all-<name>`.
+    Slang::RenderApiFlags synthesizedTestApis = Slang::RenderApiFlag::AllOf;
 
     // If true, print detailed adapter information
     bool showAdapterInfo = false;
@@ -154,8 +155,13 @@ struct Options
     };
     Slang::List<TestListFileInfo> expectedFailureFiles;
 
+    // The entries of the `-skip-list` and `-exclude-list` files
     Slang::List<Slang::String> skipList;
     Slang::List<TestListFileInfo> skipListFiles;
+
+    // The entries of the `-include-list` files. Options::parse adds them to testPrefixes.
+    Slang::List<Slang::String> includeList;
+    Slang::List<TestListFileInfo> includeListFiles;
 
     /// Parse the args, report any errors into stdError, and write the results into optionsOut
     static SlangResult parse(

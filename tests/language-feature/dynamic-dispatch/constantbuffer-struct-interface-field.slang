@@ -8,7 +8,7 @@
 // stored in separate constant buffers to verify that the dispatch reads
 // the correct concrete type from each buffer independently.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-vk-glsl-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 [anyValueSize(8)]
 interface IFoo

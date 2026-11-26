@@ -6,8 +6,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda+cpu, filecheck-buffer=BUF):-output-using-type
 
 // CHECK-NOT: {{error\[E[0-9]+\]}}
 // CHECK-NOT: OpTypeMatrix %v{{[0-9]}}{{u?(short|char|long)}}

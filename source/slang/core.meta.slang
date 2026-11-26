@@ -1189,6 +1189,12 @@ struct $(kBaseTypes[tt].name)
     : __BuiltinType
 
 ${
+    // Each base type declares every builtin marker interface it implements, including those
+    // that its other markers already refine. A declared conformance gives a constraint such as
+    // `T : __BuiltinScalarType` a direct witness, which adds no upcast cost in overload ranking.
+    // The scalar-to-vector splat on `vector<ToType,N>` depends on this: with a transitive witness
+    // it would rank below the exact-match, explicit-only `__init(int)` of `vector<float,N>`, and
+    // `float4 v = i;` (as well as `msad4` in the core module) would fail to type-check.
     switch (kBaseTypes[tt].tag)
     {
     case BaseType::Half:
@@ -1199,6 +1205,7 @@ $}
     ,  __BuiltinRealType
     ,  __BuiltinSignedArithmeticType
     ,  __BuiltinArithmeticType
+    ,  __BuiltinScalarType
 ${
         break;
     case BaseType::Int8:
@@ -1231,6 +1238,7 @@ ${
     case BaseType::Bool:
 $}
     ,  __BuiltinLogicalType
+    ,  __BuiltinScalarType
 ${
         break;
 
@@ -1283,8 +1291,14 @@ ${
     case BaseType::Bool:
 $}
         [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Eql)) bool equals(This other);
-        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
-        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Leq)) bool lessThanOrEquals(This other);
+        // SPIR-V has no ordering comparison for Boolean operands, and GLSL and
+        // WGSL do not allow relational operators on Booleans, so the ordering
+        // `false < true` is defined with the logical operators that every
+        // target supports: `a < b` is `!a && b`, `a <= b` is `!a || b`. The
+        // non-short-circuit `and`/`or` keep both operands evaluated and the
+        // comparison branchless, as ordering comparisons are on other types.
+        [__unsafeForceInlineEarly] bool lessThan(This other) { return and(!this, other); }
+        [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return or(!this, other); }
         [__unsafeForceInlineEarly] This shl(int other) { return __intCast<This>(__shl(__intCast<int>(this), other)); }
         [__unsafeForceInlineEarly] This shr(int other) { return __intCast<This>(__shr(__intCast<int>(this), other)); }
         [__unsafeForceInlineEarly] This bitAnd(This other) { return __intCast<This>(__and(__intCast<int>(this), __intCast<int>(other))); }
@@ -2985,13 +2999,41 @@ __generic<ToType, let N : int> extension vector<ToType,N>
     __intrinsic_op(BuiltinCast)
     __init<FromType>(vector<FromType,N> value) where ToType(FromType) implicit;
 
+    // The scalar-to-vector splats build `vector<FromType,N>` and convert it with `__builtin_cast`
+    // instead of calling the coercion witness, so a source must be a valid vector element whose
+    // conversion `BuiltinCast` performs: a builtin scalar or an enum. The `where` clause still
+    // decides which element types a source can splat into, and supplies the `constraint+` cost.
+    // A user-defined conversion such as `float.__init(float3)` therefore does not make `float3`
+    // implicitly convertible to `float4`, and an enum source always splats its tag value. The enum
+    // splat is a separate overload because `__EnumType` does not refine `__BuiltinScalarType`.
     __implicit_conversion(constraint+)
     [__unsafeForceInlineEarly]
     [__readNone]
     [TreatAsDifferentiable]
-    __init<FromType>(FromType value) where ToType(FromType) implicit
+    __init<FromType : __BuiltinScalarType>(FromType value) where ToType(FromType) implicit
     {
         this = __builtin_cast<vector<ToType,N>>(vector<FromType,N>(value));
+    }
+
+    __implicit_conversion(constraint+)
+    [__unsafeForceInlineEarly]
+    [__readNone]
+    [TreatAsDifferentiable]
+    __init<FromType : __EnumType>(FromType value) where ToType(FromType) implicit
+    {
+        this = __builtin_cast<vector<ToType,N>>(vector<FromType,N>(value));
+    }
+
+    // A one-element vector of the element type splats through its own overload, because the
+    // splats above accept only scalar and enum sources. Its cost equals that of the
+    // `vector<T,1>` -> `T` -> `vector<T,N>` path, so overload ranking does not change.
+    __implicit_conversion($(kConversionCost_OneVectorToScalar + kConversionCost_ScalarToVector))
+    [__unsafeForceInlineEarly]
+    [__readNone]
+    [TreatAsDifferentiable]
+    __init(vector<ToType,1> value)
+    {
+        this = vector<ToType,N>(value[0]);
     }
 }
 
@@ -4859,6 +4901,25 @@ enum _AttributeTargets
 /// @param target The type of declarations to which the attribute can be applied.
 __attributeTarget(StructDecl)
 attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsageAttribute;
+
+/// Associate a root signature with a function declaration.
+///
+/// @param value A string that defines the root signature.
+///
+/// This attribute is allowed on any function declaration, but is intended
+/// for use with function declarations used as entry points.
+///
+/// This attribute is currently only intended for use when compiling for D3D12,
+/// in which case the string argument is expected to define a root signature
+/// using the root-signature DSL syntax introduced by HLSL.
+///
+/// An application can query for a root signature attribute and inspect
+/// its argument using the reflection API for user-defined attributes.
+[__AttributeUsage(_AttributeTargets.Function)]
+struct RootSignatureAttribute
+{
+    String value;
+};
 
 /// Specify the storage format of a read-write texture. Can only be used on a texture typed struct field or global parameter.
 /// @param format The storage format of the texture.

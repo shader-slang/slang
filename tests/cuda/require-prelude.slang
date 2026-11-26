@@ -1,7 +1,5 @@
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx11+dx12+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 int myIntrinsicFunc()
 {

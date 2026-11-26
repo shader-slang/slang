@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#explicit-vkbinding-on-entry-point-parameters
-//META: doc_section_digest=bf32037fa507cbeb6ecd1bff82b6f0089c3bf4c3ba27b7837b9aa2e5aef0aa85
+//META: doc_section_digest=7930b59a5db8b58898ed60da92091df42c2b4b04db9da6322c28c80beab5efe4
 //META: purpose=Even on a target that honors the attribute, a vk::binding placed on a parameter type that consumes no descriptor-shaped resource is reported as ignored.
 //META: intent=boundary
 //META: pipeline_stage=layout

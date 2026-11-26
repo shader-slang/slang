@@ -15,8 +15,8 @@
 #include "core/slang-string.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
-#include "slang/slang-ir-insts.h"
-#include "slang/slang-ir.h"
+#include "slang/ir/slang-ir-insts.h"
+#include "slang/ir/slang-ir.h"
 #include "unit-test/slang-unit-test.h"
 
 namespace Slang

@@ -1,8 +1,8 @@
 // Test for a missing capability: error, warn, or no diagnostics based on commandline flags
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK-ERR):-stage compute -entry main -target hlsl -profile sm_5_0 -restrictive-capability-check -DERROR=1 -DWARN=0
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK-WARN):-stage compute -entry main -target hlsl -profile sm_5_0 -DERROR=0 -DWARN=1
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK-NOERR):-stage compute -entry main -target hlsl -profile sm_5_0 -ignore-capabilities -DERROR=0 -DWARN=0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK-WARN,exit-code=0):-stage compute -entry main -target hlsl -profile sm_5_0 -DERROR=0 -DWARN=1
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK-NOERR,exit-code=0):-stage compute -entry main -target hlsl -profile sm_5_0 -ignore-capabilities -DERROR=0 -DWARN=0
 
 #if ERROR
 

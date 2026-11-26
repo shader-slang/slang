@@ -196,7 +196,7 @@ void linkTimeTypeLayoutCacheImpl(rhi::IDevice* device, UnitTestContext* context)
     validateStructSLayout(context, updatedReflection, 1);
 }
 
-SLANG_UNIT_TEST(linkTimeTypeLayoutCache)
+SLANG_UNIT_TEST(linkTimeTypeLayoutCache, Vulkan)
 {
     runTestImpl(linkTimeTypeLayoutCacheImpl, unitTestContext, DeviceType::Vulkan);
 }

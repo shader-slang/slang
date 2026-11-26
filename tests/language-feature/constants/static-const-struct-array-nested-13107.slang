@@ -13,9 +13,13 @@
 // `makeStruct`s would produce a different value and fail the buffer check. The
 // table is indexed by `tid.x` (a runtime value) so it stays a real global rather
 // than being constant-folded away.
+//
+// The `-g2` lane checks that debug instructions in the generated constructors
+// don't prevent folding.
 
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none -g2 -O0
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 struct Inner
 {

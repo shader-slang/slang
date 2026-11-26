@@ -1,12 +1,7 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -d3d12
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -vk
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -metal
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cuda
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -wgpu
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 // Note: there is a bug in fxc compiler errorneously reporting infinite loop for this shader.
 // Skipping d3d11 test to avoid the bug.
-//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -d3d11
 
 struct GradientBuffer<let D : int>
 {

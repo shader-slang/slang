@@ -1,7 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 struct Functor : IMutatingFunc<float, float>
 {
@@ -28,7 +25,7 @@ void computeMain(uint tid: SV_DispatchThreadID)
 {
     Functor f;
     f.context = 0;
-    
+
     f(1.0f);
     f.operator()(1.0f); // explicit operator () call should also work.
 

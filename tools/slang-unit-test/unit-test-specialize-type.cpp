@@ -13,7 +13,7 @@ using namespace Slang;
 // reflection valid for the unspecialized type, but specializing `LoopNode<int>` forces the
 // non-empty branch and produces an infinitely recursive type. The API should report the
 // recursion diagnostic and return `nullptr` instead of leaking an exception.
-SLANG_UNIT_TEST(specializeTypeInfiniteRecursion)
+SLANG_UNIT_TEST(specializeTypeInfiniteRecursion, NoRenderApi)
 {
     const char* source = R"(
         struct EmptyNode
@@ -74,4 +74,73 @@ SLANG_UNIT_TEST(specializeTypeInfiniteRecursion)
         (const char*)diagnosticBlob->getBufferPointer(),
         diagnosticBlob->getBufferSize());
     SLANG_CHECK(diagnostics.indexOf(toSlice("maximum type nesting level exceeded")) != -1);
+}
+
+// This test exercises the public reflection `specializeType` API success path: an
+// existential-typed field concretized through `ProgramLayout::specializeType`.
+//
+// `Holder` has an `INode` field, so specializing `Holder` with `Leaf` (a concrete
+// `INode`) must succeed: the call returns the specialized type and no diagnostics,
+// and the result reflects as `Kind::Specialized` — the documented kind for a type
+// produced by this API — rather than an error or the unspecialized input.
+SLANG_UNIT_TEST(specializeTypeSuccessPath, NoRenderApi)
+{
+    const char* source = R"(
+        interface INode
+        {
+            int getValue();
+        }
+
+        struct Leaf : INode
+        {
+            int value;
+            int getValue() { return value; }
+        }
+
+        struct Holder
+        {
+            INode node;
+            int extra;
+        }
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "specializeTypeSuccessPath",
+        "specializeTypeSuccessPath.slang",
+        source,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto layout = module->getLayout();
+    SLANG_CHECK_ABORT(layout != nullptr);
+
+    auto holderType = layout->findTypeByName("Holder");
+    SLANG_CHECK_ABORT(holderType != nullptr);
+
+    auto leafType = layout->findTypeByName("Leaf");
+    SLANG_CHECK_ABORT(leafType != nullptr);
+
+    diagnosticBlob = nullptr;
+    slang::TypeReflection* typeArgs[] = {leafType};
+    auto specializedType =
+        layout->specializeType(holderType, 1, typeArgs, diagnosticBlob.writeRef());
+    SLANG_CHECK(specializedType != nullptr);
+    SLANG_CHECK(diagnosticBlob == nullptr);
+    SLANG_CHECK(specializedType->getKind() == slang::TypeReflection::Kind::Specialized);
 }

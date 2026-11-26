@@ -1,17 +1,17 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUFFER):-xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-struct Test : IDifferentiable 
+struct Test : IDifferentiable
 {
     no_diff Ptr<float> value;
 
     [Differentiable]
-    float foo() 
+    float foo()
     {
-        if (value != nullptr) 
+        if (value != nullptr)
         {
             return *value;
         }

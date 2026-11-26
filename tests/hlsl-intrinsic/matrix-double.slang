@@ -7,12 +7,7 @@
 // TODO(JS):
 // NOTE! war-double-host-callable category is a work around for issues with x86 & host-callable
 
-//TEST(compute, war-double-host-callable):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -render-feature double
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<double> outputBuffer;
@@ -29,8 +24,8 @@ Float calcTotal(FloatVector v)
     return v.x + v.y;
 }
 
-Float calcTotal(FloatMatrix v) 
-{ 
+Float calcTotal(FloatMatrix v)
+{
     return calcTotal(v[0]) + calcTotal(v[1]);
 }
 
@@ -128,9 +123,9 @@ void test2(inout FloatMatrix ft, inout FloatMatrix f)
     ft += step(f, makeFloatMatrix(0.5));
 
 #if 0
-    IntMatrix vi = asint(makeFloatMatrix(idx)); 
+    IntMatrix vi = asint(makeFloatMatrix(idx));
     ft += asfloat(vi);
-    
+
     UIntMatrix vu = asuint(f);
     ft += asfloat(vu);
 #endif
@@ -143,12 +138,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     Float scalarF = idx * (1.0f / (4.0f));
 
-    FloatMatrix ft = {}; 
+    FloatMatrix ft = {};
 
     FloatMatrix f = { { scalarF + 0.01, scalarF + 0.02}, { scalarF + 0.011, scalarF + 0.022}};
 
     test1(ft, f, idx);
     test2(ft, f);
-    
+
     outputBuffer[idx] = calcTotal(ft);
 }

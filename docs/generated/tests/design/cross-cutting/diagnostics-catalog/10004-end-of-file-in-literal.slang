@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/compiler-core/slang-lexer-diagnostic-defs.h
-//META: doc_section_digest=f004998f3bf790529ba3e2db6c6b480908b33b40f429b48e302db06256be33a3
+//META: doc_section_digest=f5e45e53f82837da69e27ec2cab80c5e1444c6de61bad520e51f53ee597b64d1
 //META: purpose=Fires diagnostic E10004 (end-of-file-in-literal) from a minimum-reproduction input.
 //META: intent=negative
 //META: pipeline_stage=parse

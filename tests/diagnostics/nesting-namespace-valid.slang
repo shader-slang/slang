@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 
 // Namespace scope is treated like module scope.
 // All module-level declarations should be valid inside a namespace.

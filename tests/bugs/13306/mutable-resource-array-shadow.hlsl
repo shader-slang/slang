@@ -1,5 +1,5 @@
 //DIAGNOSTIC_TEST(dxc):SIMPLE(diag=DXIL): -Gec -target dxil -profile cs_6_0 -entry computeMain -O0 -validate-ir
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -source-language hlsl -xslang -Gec -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -source-language hlsl -xslang -Gec -output-using-type
 
 // With `-Gec`, the compiler gives the fixed-size resource array `selectedTextures` a writable
 // shadow. Resource-global legalization must initialize the entire entry-point local from the

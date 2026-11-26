@@ -1,13 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-dx12 -compute -shaderobj -output-using-type -xslang -matrix-layout-column-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-dx12 -compute -shaderobj -output-using-type -xslang -matrix-layout-row-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -shaderobj -output-using-type -xslang -matrix-layout-column-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -shaderobj -output-using-type -xslang -matrix-layout-row-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-mtl -compute -output-using-type -xslang -matrix-layout-column-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-mtl -compute -output-using-type -xslang -matrix-layout-row-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-wgpu -compute -output-using-type -xslang -matrix-layout-column-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-wgpu -compute -output-using-type -xslang -matrix-layout-row-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-llvm -compute -output-using-type -xslang -matrix-layout-column-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-llvm -compute -output-using-type -xslang -matrix-layout-row-major
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK):-output-using-type -xslang -matrix-layout-column-major
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK):-output-using-type -xslang -matrix-layout-row-major
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -44,4 +36,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // CHK: 324
     outputBuffer[0] = s;
-} 
+}

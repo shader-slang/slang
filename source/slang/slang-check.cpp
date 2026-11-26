@@ -1,13 +1,13 @@
 // slang-check.cpp
-#include "slang-check.h"
+#include "slang/semantic-checking/slang-check.h"
 
 // This file provides general facilities related to semantic
 // checking that don't cleanly land in one of the more
 // specialized `slang-check-*` files.
 
 #include "core/slang-type-text-util.h"
-#include "slang-check-impl.h"
 #include "slang-rich-diagnostics.h"
+#include "slang/semantic-checking/slang-check-impl.h"
 
 namespace Slang
 {

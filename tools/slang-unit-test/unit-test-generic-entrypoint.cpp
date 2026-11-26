@@ -331,7 +331,7 @@ static void _runParallelGenericEntryPointCompileForTarget(
 
 // Test the compilation API for compiling a specialized generic entrypoint.
 
-SLANG_UNIT_TEST(genericEntryPointCompile)
+SLANG_UNIT_TEST(genericEntryPointCompile, NoRenderApi)
 {
     const char* userSourceBody = R"(
             interface I { int getValue(); }
@@ -459,7 +459,7 @@ SLANG_UNIT_TEST(genericEntryPointCompile)
     }
 }
 
-SLANG_UNIT_TEST(genericEntryPointSpecializationCapabilities)
+SLANG_UNIT_TEST(genericEntryPointSpecializationCapabilities, NoRenderApi)
 {
     const char* userSourceBody = R"(
         [require(metal)]
@@ -599,7 +599,7 @@ SLANG_UNIT_TEST(genericEntryPointSpecializationCapabilities)
     }
 }
 
-SLANG_UNIT_TEST(genericEntryPointSpecializationUpgradeWarnings)
+SLANG_UNIT_TEST(genericEntryPointSpecializationUpgradeWarnings, NoRenderApi)
 {
     const char* source = R"(
         [require(sm_6_7)] struct Needs67 { uint value; }
@@ -640,7 +640,7 @@ SLANG_UNIT_TEST(genericEntryPointSpecializationUpgradeWarnings)
     }
 }
 
-SLANG_UNIT_TEST(genericEntryPointSpecializationExecutionModes)
+SLANG_UNIT_TEST(genericEntryPointSpecializationExecutionModes, NoRenderApi)
 {
     const char* source = R"(
         [require(spvShader64BitIndexingEXT)]
@@ -759,7 +759,7 @@ SLANG_UNIT_TEST(genericEntryPointSpecializationExecutionModes)
     }
 }
 
-SLANG_UNIT_TEST(parallelGenericEntryPointCompile)
+SLANG_UNIT_TEST(parallelGenericEntryPointCompile, NoRenderApi)
 {
     const int iterationCount = _getParallelGenericEntryPointIterationCount();
 

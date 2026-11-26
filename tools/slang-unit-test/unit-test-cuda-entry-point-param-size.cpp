@@ -13,7 +13,7 @@ using namespace Slang;
 
 // Test that CUDA entry point parameter layout does not include trailing padding.
 
-SLANG_UNIT_TEST(CudaEntryPointParamSizeWithoutPadding)
+SLANG_UNIT_TEST(CudaEntryPointParamSizeWithoutPadding, NoRenderApi)
 {
     // Shader with entry point parameters where the last parameter (uint) comes after
     // buffer handles with a larger size. Normally with a CUDA struct the layout would

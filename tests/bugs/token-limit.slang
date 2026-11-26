@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // To test we want to generate names for things that are really long. Instead of repeated typing, we'll use macros here
 // Build up a 2048 byte name
@@ -27,7 +25,7 @@ int addFunc(int a, int b) { return a + b; }
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 	uint tid = dispatchThreadID.x;
-    
+
     int value = inputBuffer[tid];
 
     outputBuffer[tid] = addFunc(workBuffer[tid], value);

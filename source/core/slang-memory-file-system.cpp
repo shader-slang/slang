@@ -121,7 +121,13 @@ SlangResult MemoryFileSystem::calcCombinedPath(
             combinedPath = Path::combine(fromPath, path);
             break;
         }
+    default:
+        return SLANG_E_INVALID_ARG;
     }
+
+    // The ISlangFileSystemExt contract for calcCombinedPath promises the simplified form, so
+    // callers holding the interface see one spelling whichever implementation answers.
+    combinedPath = Path::simplify(combinedPath);
 
     *pathOut = StringBlob::moveCreate(combinedPath).detach();
     return SLANG_OK;

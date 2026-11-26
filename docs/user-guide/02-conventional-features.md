@@ -373,6 +373,66 @@ Structured buffer types like `StructuredBuffer<T>` include an explicit element t
 Byte-addressed buffer types like `ByteAddressBuffer` do not specify any particular element type, and instead allow for values to be loaded or stored from any (suitably aligned) byte offset in the buffer.
 Both structured and byte-addressed buffers can use an _access_ to distinguish between read-only and read-write usage.
 
+##### Provisional Unsized Buffers
+
+Slang provides provisional unsized views of structured and byte-addressed buffers. Their names and API may change:
+
+| Unsized type                        | Matching sized type        |
+| ----------------------------------- | -------------------------- |
+| `__UnsizedStructuredBuffer<T, L>`   | `StructuredBuffer<T, L>`   |
+| `__UnsizedRWStructuredBuffer<T, L>` | `RWStructuredBuffer<T, L>` |
+| `__UnsizedByteAddressBuffer`        | `ByteAddressBuffer`        |
+| `__UnsizedRWByteAddressBuffer`      | `RWByteAddressBuffer`      |
+
+For structured buffers, `L` is optional and defaults to `DefaultDataLayout`, as it does for the sized types.
+Unsized buffers support loads, and their read-write variants support stores and atomics.
+Structured buffers also support indexing.
+Unsized buffers have no `GetDimensions` or `getCount` methods on any target and do not implement `IArray` or `IRWArray`.
+Pass a length separately when the algorithm needs one; the caller must ensure that accesses stay within the allocated storage.
+
+In generated C++ and CUDA code, an unsized buffer uses a prelude struct containing only a data pointer, with the same size and alignment as that pointer.
+The prelude types are `UnsizedStructuredBuffer<T>`, `UnsizedRWStructuredBuffer<T>`, `UnsizedByteAddressBuffer`, and `UnsizedRWByteAddressBuffer`.
+These structs have no count field. The direct LLVM backend also represents an unsized buffer with one pointer.
+On HLSL, SPIR-V, GLSL, and WGSL targets, it uses the same native resource representation as the matching sized buffer.
+On Metal, it uses the existing device-pointer representation.
+Sized and unsized buffers remain distinct types on every target, including in generic `T is U` comparisons.
+The absence of length-query methods is the same on every target, even where the underlying native resource can report a length.
+
+A sized buffer converts implicitly to its matching unsized type. Explicit construction is also supported:
+
+```slang
+void copyValues(
+    __UnsizedStructuredBuffer<float> source,
+    __UnsizedRWStructuredBuffer<float> destination,
+    uint count)
+{
+    for (uint i = 0; i < count; ++i)
+        destination[i] = source[i];
+}
+
+void copySizedValues(
+    StructuredBuffer<float> source,
+    RWStructuredBuffer<float> destination,
+    uint count)
+{
+    // Explicit construction discards the destination's length.
+    let unsizedDestination = __UnsizedRWStructuredBuffer<float>(destination);
+    // The source converts implicitly at the call boundary.
+    copyValues(source, unsizedDestination, count);
+}
+```
+
+Conversion refers to the same storage and discards length information where it is stored separately.
+For structured buffers, the element type `T` and layout `L` must match.
+There is no reverse conversion from unsized to sized, and conversion does not change access rights: a read-only buffer cannot become read-write.
+The existing public names remain the canonical sized types, preserving their existing behavior and names in diagnostics.
+The provisional `__SizedStructuredBuffer`, `__SizedRWStructuredBuffer`, `__SizedByteAddressBuffer`, and `__SizedRWByteAddressBuffer` names are aliases for those public types, respectively.
+
+The bundled Slang RHI CPU and CUDA resource binders currently assume that structured and byte-addressed buffers include a count.
+Do not bind these unsized types through that resource-binding path: it writes an extra count and can overwrite the following parameter.
+Bind a sized resource and convert it inside the shader, or supply the single data pointer as ordinary parameter data at the reflected offset.
+When supplying a pointer directly, keep the allocation alive and use an address accessible to the target device.
+
 ##### Constant Buffers
 
 Constant buffers (sometimes also called "uniform buffers") are typically used to pass immutable parameter data from a host application to GPU code.
@@ -527,9 +587,57 @@ Function parameters may be marked with a _direction_ qualifier:
 * `out` indicates an output parameter
 * `inout` or `in out` indicates an input/output parameter
 
+An `out` or `inout` parameter has exclusive access to its argument for the duration of the call.
+An `inout` parameter is an _exclusive mutable borrow_ of its argument.
+An `out` parameter receives uninitialized storage, to which the function writes a value; when the function returns, ownership of that value moves out of the function to the caller.
+While the call is in progress, nothing else should read or write the argument's memory, whether through another parameter, a global variable, or another invocation.
+
 > #### Note ####
 > The `out` and `inout` directions are superficially similar to non-`const` reference parameters in C++.
 > In cases that do not involve aliasing of mutable memory, the semantics should be equivalent.
+> Slang does not check that a program gives an `out` or `inout` parameter exclusive access to its argument; if other code accesses the argument's memory during the call, the program has undefined behavior.
+
+#### Borrow and Reference Parameters ####
+
+Slang has additional parameter modifiers for borrows and references:
+
+* `__borrow` (also spelled `__constref`) indicates an _immutable borrow_: the function may read the argument but not modify it, and nothing should modify the argument while the call is in progress
+* `__ref` indicates a _reference_: the parameter does not have exclusive access to its argument, so other code may read or write the argument's memory while the call is in progress, and the function reads and writes that memory directly
+
+> #### Note ####
+> These modifiers exist mainly to support the Slang core module. Their spelling and their implementation are subject to change, so we recommend that user code avoid them, with the exception of `groupshared` described below.
+> As with `out` and `inout`, Slang does not check that a program respects the access rules of a borrow (there is no borrow checker); a program that violates them has undefined behavior.
+
+A parameter marked `groupshared` is a reference to thread-group-shared memory, and is the one kind of reference parameter we expect user code to use.
+Its argument must be a `groupshared` variable, a part of one, or another `groupshared` parameter, and the function accesses that memory while other invocations in the thread group can access it too.
+A `const groupshared` parameter is a read-only reference.
+A `groupshared` parameter cannot also be marked `in`, `out`, `inout`, or `__borrow`.
+
+```hlsl
+groupshared float tile[64];
+
+void fill(groupshared float values[64], uint i)
+{
+    values[i] = float(i);
+}
+
+float neighbor(const groupshared float values[64], uint i)
+{
+    return values[(i + 1) % 64];
+}
+
+[numthreads(64, 1, 1)]
+void computeMain(uint i : SV_GroupIndex)
+{
+    fill(tile, i);
+    GroupMemoryBarrierWithGroupSync();
+    float n = neighbor(tile, i);
+    // ...
+}
+```
+
+HLSL does not allow a function with a `groupshared` parameter to be `export` (see [HLSL proposal 0043](https://github.com/microsoft/hlsl-specs/blob/main/proposals/0043-groupshared-arguments.md)), and neither does Slang when targeting HLSL.
+If such a function must be `export`, have it access a global `groupshared` variable directly instead of taking the memory as a parameter.
 
 Preprocessor
 ------------
@@ -997,7 +1105,9 @@ is not generated if the base struct has a user-defined constructor. See GitHub i
 [#13064](https://github.com/shader-slang/slang/issues/13064) for details.
 
 > ⚠️ **Warning:** Struct-from-struct inheritance is unstable in Slang 2025 and earlier language versions, and
-> has been removed in Slang 2026. Use composition (a struct as a member) instead.
+> has been removed in Slang 2026. Use composition (a struct as a member) instead. In those earlier versions, a
+> struct that inherits from another struct also cannot be used as an entry-point varying input or output when
+> targeting SPIR-V or GLSL, or as a varying input when targeting Metal or WGSL.
 
 Initializer Lists
 ----------

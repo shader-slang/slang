@@ -107,7 +107,8 @@ docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.
 # accepted silently by the frontend, but the C++ emitted with debug info
 # (`-g2`, which the `-cpu` COMPARE_COMPUTE path uses) references an
 # undeclared `shared_0`, so clang rejects the generated file. (Will become
-# a tracking issue after human triage.)
+# a tracking issue after human triage.) The LLVM CPU backend reports the same
+# shape of failure: _meta/findings/llvm-cpu-switch-case-decl-undeclared-local.yaml
 docs/generated/tests/design/ast-reference/statements/switchstmt-case-decl-used-in-later-case.slang (cpu)
 
 # Pending: docs/generated/tests/_meta/findings/metal-append-buffer-params-missing-binding-slot.yaml
@@ -137,39 +138,69 @@ docs/generated/tests/design/target-pipelines/metal/append-buffer-params-carry-bu
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2
 
-# https://github.com/shader-slang/slang/issues/12443 — `Size(N)` enum
-# construction is rejected inside a generic function's array bound with
-# E33070 "expected a function, got 'typeof(Size)'", while the same spelling
-# compiles in an ordinary expression. Recorded in
-# _meta/findings/enum-cast-in-generic-array-bound-rejected.yaml.
-docs/generated/tests/design/ast-reference/values/builtinoperationintval-enum-operands-fold.slang
+# Pending: docs/generated/tests/_meta/findings/torch-ordinary-entry-param-sigsegv.yaml
+# `-target torch` on an ordinary compute entry point that has a parameter
+# (e.g. `uint3 tid : SV_DispatchThreadID`) and no Torch attribute dies with
+# SIGSEGV (exit 139) instead of emitting an empty pybind module. The same
+# entry point without a parameter compiles. Remove once the crash is fixed.
+docs/generated/tests/design/pipeline/overview/torch-ordinary-entry-with-param-has-nothing-to-bind.slang
 
-# Surfaced on nightly run 34310111817 (first failed on the 2026-09-02
-# nightly and every nightly since):
-# https://github.com/shader-slang/slang/actions/runs/34310111817
-# Compiler bug, bisected to
-# https://github.com/shader-slang/slang/pull/12574. `prelinkIR` now clones
-# an imported interface's definition into the user module instead of
-# re-deriving it. `builtinRequirementKey` is hoistable, so the linker's
-# cloner (`cloneInst` in slang-ir-link.cpp) dedups the cloned key onto the
-# one lowering already created — and then runs `cloneDecorationsAndChildren`
-# on that pre-existing inst anyway, so it ends up with
-# `BuiltinRequirementDecoration` twice. slang-ir-clone.cpp guards against
-# exactly this case (see PR #12569); the linker's cloner has no equivalent
-# guard. All three tests pin "the role decoration is immediately followed by
-# the key built from the same ordinal", which the duplicated line breaks.
-# Remove once the linker stops grafting decorations onto a dedup hit.
-docs/generated/tests/design/cross-cutting/ir-instructions/decoration-builtin-requirement-key-ir.slang
-docs/generated/tests/design/ir-reference/decorations/builtin-requirement-key-decoration.slang
-docs/generated/tests/design/ir-reference/differentiation/builtin-requirement-decoration.slang
-
-# Surfaced on nightly run 34310111817:
-# https://github.com/shader-slang/slang/actions/runs/34310111817
-# Diagnostic text drift rather than a compiler bug.
-# https://github.com/shader-slang/slang/pull/12616 merges type-flow sets
-# directly instead of through an intermediate hash set, so `E50102` now
-# reports "2 possible types: 'Square, Rect'" where the pinned text says
-# "'Rect, Square'". Remove once the expected text is regenerated — or once
-# the diagnostic sorts the list, which would make the text order-stable by
-# construction rather than a reflection of the merge order.
-docs/generated/tests/design/pipeline/05-ir-passes/typeflow-report-dynamic-dispatch-sites.slang
+# https://github.com/shader-slang/slang/issues/14259 — the HLSL emitter writes a
+# nonzero `int` constant as `NL` rather than `int(N)` and the `int` minimum as
+# `(-2147483647L - 1L)`. These bundles check the old HLSL spellings and need
+# regenerating; remove each entry once its regenerated bundle passes.
+docs/generated/tests/conformance/expressions-member-access/vector-rgba-mapping.slang.1
+docs/generated/tests/conformance/types-struct/struct-static-const-initializer.slang
+docs/generated/tests/conformance/types-struct/struct-static-member-functional.slang
+docs/generated/tests/conformance/types-vector-and-matrix/matrix-elem-access.slang.1
+docs/generated/tests/conformance/types-vector-and-matrix/vector-binary-scalar-broadcast.slang.1
+docs/generated/tests/coverage/check-expr/matrix-swizzle-vector-result.slang
+docs/generated/tests/coverage/cli-options/disable-short-circuit-eager-operands.slang
+docs/generated/tests/coverage/cli-options/disable-short-circuit-eager-operands.slang.1
+docs/generated/tests/coverage/emit/matrix-reshape-row-truncation.slang
+docs/generated/tests/coverage/emit/switch-fallthrough-shared-case.slang
+docs/generated/tests/coverage/lower-to-ir/defer-scope-end-hlsl-emit.slang
+docs/generated/tests/coverage/lower-to-ir/generic-value-param-bitwise-array-size.slang.1
+docs/generated/tests/coverage/lower-to-ir/switch-fallthrough-and-shared-case.slang
+docs/generated/tests/coverage/parser/gpu-foreach-statement.slang
+docs/generated/tests/coverage/parser/target-switch-multi-statement-case.slang
+docs/generated/tests/coverage/type-layout/array-of-struct-of-resources-register-striding.slang
+docs/generated/tests/design/ast-reference/expressions/new-expr-class-instance.slang
+docs/generated/tests/design/ast-reference/expressions/tuple-expr-empty.slang
+docs/generated/tests/design/ast-reference/expressions/tuple-expr-pair-construction.slang
+docs/generated/tests/design/ast-reference/statements/targetcase-stacked-labels-share-body.slang
+docs/generated/tests/design/ast-reference/values/linktimeintval-cast-and-builtin-op-propagate.slang
+docs/generated/tests/design/ast-reference/values/linktimeintval-extern-const-polynomial-bound.slang
+docs/generated/tests/design/cross-cutting/targets/target-switch-missing-arm-falls-to-default.slang
+docs/generated/tests/design/ir-reference/misc/node-output-record-get-element-ptr.slang.1
+docs/generated/tests/design/ir-reference/resources-and-atomics/natural-stride-alignment-folded-values.slang.1
+docs/generated/tests/design/name-resolution/lookup/lookup-mask-attribute-vs-value-name.slang
+docs/generated/tests/design/name-resolution/lookup/semantic-name-not-hidden-by-value-decl.slang
+docs/generated/tests/design/name-resolution/visibility/aggregate-member-takes-module-default-2025-accepted.slang
+docs/generated/tests/design/pipeline/03-semantic-check/dyn-interface-restrictions-inactive-under-default-std.slang
+docs/generated/tests/design/pipeline/05-ir-passes/bit-field-accessors-emit-shift-and-mask.slang
+docs/generated/tests/design/pipeline/05-ir-passes/defer-buffer-load-narrows-read-to-leaf.slang
+docs/generated/tests/design/pipeline/05-ir-passes/explicit-global-init-hlsl-keeps-declaration-initializer.slang
+docs/generated/tests/design/pipeline/05-ir-passes/lower-defer-emits-cleanup-on-scope-exit.slang
+docs/generated/tests/design/pipeline/05-ir-passes/lower-enum-type-emits-integer-on-hlsl.slang
+docs/generated/tests/design/pipeline/05-ir-passes/specialize-stage-switch-resolves-stage-conditional.slang
+docs/generated/tests/design/pipeline/06-emit/int32-min-literal-emit-per-target.slang
+docs/generated/tests/design/pipeline/06-emit/wgsl-switch-keeps-early-case-break.slang.1
+docs/generated/tests/design/pipeline/06-emit/wgsl-switch-merges-shared-case-labels.slang.1
+docs/generated/tests/design/pipeline/overview/ast-to-ir-lowers-control-flow.slang
+docs/generated/tests/design/pipeline/overview/ast-to-ir-lowers-global-var.slang
+docs/generated/tests/design/pipeline/overview/ast-to-ir-lowers-nested-control-flow.slang
+docs/generated/tests/design/pipeline/overview/end-to-end-flow-all-targets.slang
+docs/generated/tests/design/pipeline/overview/preprocess-completes-before-parse.slang
+docs/generated/tests/design/syntax-reference/grammar/expr-new-class-instance.slang
+docs/generated/tests/design/syntax-reference/grammar/stmt-require-capability-multiple-atoms.slang
+docs/generated/tests/design/syntax-reference/keywords-and-builtins/boundary-rwstructuredbuffer-index-zero-emission.slang
+docs/generated/tests/design/target-pipelines/hlsl/eliminate-phis-default-options.slang
+docs/generated/tests/design/target-pipelines/hlsl/enum-lowering-to-integer.slang
+docs/generated/tests/design/target-pipelines/hlsl/int-literal-min-emits-decimal.slang
+docs/generated/tests/design/target-pipelines/hlsl/matrix-storage-colmajor-infix-under-row-major-layout.slang
+docs/generated/tests/design/target-pipelines/hlsl/matrix-storage-natural-float3x4-field-shape.slang
+docs/generated/tests/design/target-pipelines/hlsl/matrix-swizzle-store-lowered-to-elements.slang
+docs/generated/tests/design/target-pipelines/hlsl/move-global-var-init-to-entry.slang
+docs/generated/tests/design/target-pipelines/hlsl/stress-deeply-nested-if-else.slang
+docs/generated/tests/design/target-pipelines/hlsl/stress-many-case-switch.slang

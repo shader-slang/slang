@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 Tuple<bool, float> createTuple() {
     return {};

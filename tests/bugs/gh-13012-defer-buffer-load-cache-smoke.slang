@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Smoke test that the cache-threaded `doesCalleeHaveSideEffect` signature added in PR #13012
 // (fixes #13010) still detects impurity correctly on a real, non-inlined call: `mutate` is

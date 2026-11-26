@@ -5,7 +5,7 @@
 // namespace does. Both `earlier` and `later` find the imported `Foo::importedValue`, not the
 // global.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 import reopen_lib;
 

@@ -10,7 +10,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(genericEntryPointLayout)
+SLANG_UNIT_TEST(genericEntryPointLayout, NoRenderApi)
 {
     const char* userSourceBody = R"(
         struct MyData<int N>

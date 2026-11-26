@@ -1,7 +1,7 @@
 // direct-spirv-control-flow-2.slang
 
 //TESTD:SIMPLE:-target spirv -entry computeMain -stage compute
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 // Test direct SPIR-V emit on control flows.
 

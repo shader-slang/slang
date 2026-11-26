@@ -140,7 +140,7 @@ Used to specify the IR opcode associated with a type. The IR opcode is listed as
 As an example from the core module
 
 ```slang
-__magic_type(HLSLByteAddressBufferType)
+__magic_type(HLSLSizedByteAddressBufferType)
 __intrinsic_type($(kIROp_HLSLByteAddressBufferType))
 struct ByteAddressBuffer
 {

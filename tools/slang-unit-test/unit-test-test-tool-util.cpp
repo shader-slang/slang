@@ -8,7 +8,7 @@ using namespace Slang;
 
 // Verify that getExeDirectoryPath falls back to Path::getExecutablePath() for
 // bare names (no separators), matching the fix in PR #11212.
-SLANG_UNIT_TEST(testToolUtilBareArgv0)
+SLANG_UNIT_TEST(testToolUtilBareArgv0, NoRenderApi)
 {
     // A bare name with no path separator should use the OS-provided exe path.
     String bareResult;
@@ -55,8 +55,9 @@ SLANG_UNIT_TEST(testToolUtilBareArgv0)
 }
 
 // Verify the mapping from a tool's `SlangResult` to its process return code. In particular, an
-// ordinary compilation failure (-1) must stay distinguishable from an internal compiler error (-2).
-SLANG_UNIT_TEST(testToolUtilReturnCode)
+// ordinary compilation failure (2) must stay distinguishable from an internal compiler error (3).
+// Every value must be non-negative, because a negative value is not a valid exit status on Linux.
+SLANG_UNIT_TEST(testToolUtilReturnCode, NoRenderApi)
 {
     SLANG_CHECK(TestToolUtil::getReturnCode(SLANG_OK) == ToolReturnCode::Success);
     SLANG_CHECK(TestToolUtil::getReturnCode(SLANG_FAIL) == ToolReturnCode::Failed);
@@ -66,11 +67,11 @@ SLANG_UNIT_TEST(testToolUtilReturnCode)
     SLANG_CHECK(
         TestToolUtil::getReturnCode(SLANG_E_ABORT) == ToolReturnCode::InternalCompilerError);
 
-    SLANG_CHECK(int(ToolReturnCode::CompilationFailed) == -1);
-    SLANG_CHECK(int(ToolReturnCode::InternalCompilerError) == -2);
+    SLANG_CHECK(int(ToolReturnCode::CompilationFailed) == 2);
+    SLANG_CHECK(int(ToolReturnCode::InternalCompilerError) == 3);
 
     // The new code is a valid value when a tool's exit code is read back.
-    SLANG_CHECK(TestToolUtil::getReturnCodeFromInt(-2) == ToolReturnCode::InternalCompilerError);
-    SLANG_CHECK(TestToolUtil::getReturnCodeFromInt(-1) == ToolReturnCode::CompilationFailed);
+    SLANG_CHECK(TestToolUtil::getReturnCodeFromInt(3) == ToolReturnCode::InternalCompilerError);
+    SLANG_CHECK(TestToolUtil::getReturnCodeFromInt(2) == ToolReturnCode::CompilationFailed);
     SLANG_CHECK(!TestToolUtil::isDone(ToolReturnCode::InternalCompilerError));
 }

@@ -1,5 +1,5 @@
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUFFER):-output-using-type
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -emit-spirv-directly
 
 //TEST_INPUT:set output = out ubuffer(data=[0 0 0 0], stride=4)

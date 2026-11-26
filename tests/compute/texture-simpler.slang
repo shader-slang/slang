@@ -1,13 +1,8 @@
-//TEST(smoke,compute):COMPARE_COMPUTE_EX:-cpu -compute  -shaderobj -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE_EX:-slang -compute -dx12  -shaderobj -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj -output-using-type
-//TEST(smoke,compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -render-feature hardware-device
-//TEST(smoke,compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE:-slang -shaderobj -mtl -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE:-wgpu -slang -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-llvm):-output-using-type
+//TEST(smoke):COMPARE_COMPUTE(targets=dx12):-profile cs_6_0 -output-using-type
+//TEST(smoke):COMPARE_COMPUTE(targets=vk):-output-using-type -render-feature hardware-device
+//TEST:COMPARE_COMPUTE(targets=metal+wgpu):-output-using-type
 // Not supported in LLVM: textures are not currently available
-//DISABLE_TEST(smoke,compute):COMPARE_COMPUTE: -slang -shaderobj -llvm
 
 //TEST_INPUT: Texture2D(size=4, content = one):name t2D
 Texture2D<float> t2D;

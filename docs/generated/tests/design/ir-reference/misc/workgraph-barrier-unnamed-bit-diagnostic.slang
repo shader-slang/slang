@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#getenumbarriermemorytypeflags-and-getenumbarriersemanticflags
-//META: doc_section_digest=317deed31ccd4d62bda7fa4d68a0f890c2fba63b524551d7d97a028f181885d1
+//META: doc_section_digest=8cf0682827ec9cdfec0745e8a2aeeffcc7f3dfedf183640205f6d2fb03cef85f
 //META: purpose=A barrier flag value outside the known mask has no name to emit, so the memory-type mapping rejects it instead of writing an unnamed bit.
 //META: intent=negative
 //META: pipeline_stage=emit

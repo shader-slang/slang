@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#concepts
-//META: doc_section_digest=d82114f6d4f3a1709d4ec40612e4a5271110c0dabacf3223cc6947cdceaf8ef6
+//META: doc_section_digest=9beb7ce113203f7b6a97267dc5716f8e7cf59ebe42628adaf018784110a2aac5
 //META: purpose=The declaration being checked is excluded from its own lookup, so a typedef that reuses the name it is defined from resolves that name to the outer declaration.
 //META: intent=functional
 //META: pipeline_stage=check

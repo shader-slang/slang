@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#generic-application
-//META: doc_section_digest=d49a080ef9b53be4d6c526a9c06cdc10eebed42c56ce72157faeb10bfc04648b
+//META: doc_section_digest=1b35acbd21812d559bc561b706440cf4fe3c630c3cac3ebd9b614ae7f2aa48b6
 //META: purpose=A reference to a generic struct at a concrete type produces a specialize(type, T) type-level value.
 //META: intent=functional
 //META: pipeline_stage=lower

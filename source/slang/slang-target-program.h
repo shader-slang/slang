@@ -9,9 +9,9 @@
 
 #include "core/slang-smart-pointer.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
-#include "slang-ir.h"
 #include "slang-linkable.h"
 #include "slang-target.h"
+#include "slang/ir/slang-ir.h"
 
 #include <mutex>
 

@@ -1,12 +1,8 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-cpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck=CHK):
 // No support for int64_t on D3D11 (no sm 6.0)
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-slang -compute -shaderobj
 // No support with Dx12 with dxbc. Needs SM6.0 + dxil
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-slang -compute -dx12 -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-slang -compute -profile cs_6_0 -dx12 -shaderobj -render-feature hardware-device
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck=CHK):-vk -compute -shaderobj -render-feature int64
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-cuda -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-llvm -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck=CHK):-profile cs_6_0 -render-feature hardware-device
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck=CHK):-render-feature int64
 
 // The expected behavior is that the literal type is the first from the following list
 // in which the value can fit:
@@ -26,9 +22,9 @@ RWStructuredBuffer<uint64_t> outputBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = int(int64_t(dispatchThreadID.x));
-    
+
     uint64_t v = 0;
-    
+
     if (idx == 0)
     {
         // Should be 0xffffffffffffffff
@@ -58,12 +54,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     else if (idx == 5)
     {
         // Should be 0xffffffffffffffff
-        v = ~0; 
+        v = ~0;
     }
     else if (idx == 6)
     {
         // Should be 0xffffffffffffffff
-        v = ~0LL; 
+        v = ~0LL;
     }
     else if (idx == 7)
     {

@@ -1,10 +1,5 @@
-//TEST(smoke,compute):COMPARE_COMPUTE:-shaderobj
-//TEST(smoke,compute):COMPARE_COMPUTE:-dx12 -shaderobj
-//TEST(smoke,compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(smoke,compute):COMPARE_COMPUTE:-vk -shaderobj
-//TEST(smoke,compute):COMPARE_COMPUTE:-mtl -shaderobj
-//TEST(smoke,compute):COMPARE_COMPUTE:-cuda -shaderobj
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
+//TEST(smoke):COMPARE_COMPUTE(targets=cpu, filecheck-buffer=CHECK):
 
 // CHECK:      0
 // CHECK-NEXT: 3F800000

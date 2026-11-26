@@ -28,7 +28,7 @@ renderer_test::CoreToRHIDebugBridge* getRetainedBridgeAfterStackCallbackScope()
 }
 } // namespace
 
-SLANG_UNIT_TEST(scopedCoreDebugCallbackClearsBridgeOnExit)
+SLANG_UNIT_TEST(scopedCoreDebugCallbackClearsBridgeOnExit, NoRenderApi)
 {
     renderer_test::CoreToRHIDebugBridge bridge;
 
@@ -54,7 +54,7 @@ SLANG_UNIT_TEST(scopedCoreDebugCallbackClearsBridgeOnExit)
     SLANG_CHECK(nextCallback.getString() == "next scope\n");
 }
 
-SLANG_UNIT_TEST(scopedCoreDebugCallbackDoesNotLeakAcrossScopes)
+SLANG_UNIT_TEST(scopedCoreDebugCallbackDoesNotLeakAcrossScopes, NoRenderApi)
 {
     renderer_test::CoreToRHIDebugBridge bridge;
     renderer_test::CoreDebugCallback firstCallback;
@@ -74,7 +74,7 @@ SLANG_UNIT_TEST(scopedCoreDebugCallbackDoesNotLeakAcrossScopes)
     SLANG_CHECK(secondCallback.getString() == "second\n");
 }
 
-SLANG_UNIT_TEST(scopedCoreDebugCallbackClearsBridgeOnException)
+SLANG_UNIT_TEST(scopedCoreDebugCallbackClearsBridgeOnException, NoRenderApi)
 {
     renderer_test::CoreToRHIDebugBridge bridge;
     renderer_test::CoreDebugCallback firstCallback;
@@ -101,7 +101,7 @@ SLANG_UNIT_TEST(scopedCoreDebugCallbackClearsBridgeOnException)
     SLANG_CHECK(secondCallback.getString() == "next iteration\n");
 }
 
-SLANG_UNIT_TEST(scopedCoreDebugCallbackSeparatesRetainedBridgeScopes)
+SLANG_UNIT_TEST(scopedCoreDebugCallbackSeparatesRetainedBridgeScopes, NoRenderApi)
 {
     renderer_test::CoreToRHIDebugBridge* oldBridge = getRetainedBridgeAfterStackCallbackScope();
     auto nextBridge = renderer_test::createRetainedCoreToRHIDebugBridge();
@@ -125,7 +125,7 @@ SLANG_UNIT_TEST(scopedCoreDebugCallbackSeparatesRetainedBridgeScopes)
 // every ordinary unit-test run. Here, two back-to-back snapshots taken with no
 // intervening append must each own a distinct StringRepresentation; under the
 // aliasing bug both would share the bridge's representation and compare equal.
-SLANG_UNIT_TEST(coreDebugCallbackGetStringReturnsIndependentStorage)
+SLANG_UNIT_TEST(coreDebugCallbackGetStringReturnsIndependentStorage, NoRenderApi)
 {
     renderer_test::CoreToRHIDebugBridge bridge;
     renderer_test::CoreDebugCallback callback;
@@ -149,7 +149,7 @@ SLANG_UNIT_TEST(coreDebugCallbackGetStringReturnsIndependentStorage)
 // post-cleanCache re-acquire a fresh bridge. Before the fix a reused device kept a stale (cleared)
 // bridge and dropped its validation messages. The emitError(*bridge, ...) calls below model a
 // device-forwarded message (real device->debugCallback forwarding needs a GPU).
-SLANG_UNIT_TEST(deviceCacheReusesDebugBridgeAcrossInvocations)
+SLANG_UNIT_TEST(deviceCacheReusesDebugBridgeAcrossInvocations, CPU)
 {
     using namespace renderer_test;
 
@@ -241,7 +241,7 @@ SLANG_UNIT_TEST(deviceCacheReusesDebugBridgeAcrossInvocations)
     DeviceCache::cleanCache();
 }
 
-SLANG_UNIT_TEST(coreDebugBridgeHandlesConcurrentMessages)
+SLANG_UNIT_TEST(coreDebugBridgeHandlesConcurrentMessages, NoRenderApi)
 {
     static constexpr int kThreadCount = 4;
     static constexpr int kMessageCount = 1024;

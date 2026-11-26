@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE:-dx12 -output-using-type -Xslang -matrix-layout-row-major
-//TEST(compute):COMPARE_COMPUTE:-dx12 -output-using-type -Xslang -matrix-layout-column-major
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type -Xslang -matrix-layout-row-major
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type -Xslang -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=ASM-ROW):-target dxil-asm -entry computeMain -stage compute -matrix-layout-row-major -O3
 //TEST:SIMPLE(filecheck=ASM-COLUMN):-target dxil-asm -entry computeMain -stage compute -matrix-layout-column-major -O3
 

@@ -1,9 +1,9 @@
-//TEST(compute):COMPARE_COMPUTE: 
+//TEST:COMPARE_COMPUTE(targets=all):
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -profile cs_5_0
 
 int check<let b : bool>(int x)
 {
-    // CHECK: int v{{.*}}[int(2)]
+    // CHECK: int v{{.*}}[2L]
     int v[((int)b) + 1];
     for (int i = 0; i < ((int)b) + 1; i++)
         v[i] = i;

@@ -13,7 +13,7 @@ using namespace Slang;
 
 // Test that the compilation API can be used to produce CUDA source.
 
-SLANG_UNIT_TEST(CudaCompile)
+SLANG_UNIT_TEST(CudaCompile, NoRenderApi)
 {
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(

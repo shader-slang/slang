@@ -170,7 +170,7 @@ void checkParseFails(slang::IGlobalSession* globalSession, int argc, const char*
 
 } // namespace
 
-SLANG_UNIT_TEST(parseCommandLineArgs)
+SLANG_UNIT_TEST(parseCommandLineArgs, NoRenderApi)
 {
     ParseCommandLineArgsTestContext context(unitTestContext);
 
@@ -179,7 +179,7 @@ SLANG_UNIT_TEST(parseCommandLineArgs)
     SLANG_CHECK(SLANG_SUCCEEDED(result));
 }
 
-SLANG_UNIT_TEST(parseCommandLineArgsReportsParseErrors)
+SLANG_UNIT_TEST(parseCommandLineArgsReportsParseErrors, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -396,7 +396,7 @@ static String compileSpirvAsmWithSession(
 // carries it as a session option, and a target that the caller adds to the session inherits it.
 // The precise mode is observed in the generated code, where SPIR-V arithmetic carries
 // `NoContraction` only in that mode.
-SLANG_UNIT_TEST(parseCommandLineArgsFloatingPointModeReachesSessionTargets)
+SLANG_UNIT_TEST(parseCommandLineArgsFloatingPointModeReachesSessionTargets, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -445,7 +445,7 @@ static void checkParseTargets(
 
 // A profile that implies a stage is session configuration. The caller selects entry points
 // later, so the stage needs no `-entry` here. The target keeps only the profile's version.
-SLANG_UNIT_TEST(parseCommandLineArgsAcceptsStageProfileWithoutEntryPoint)
+SLANG_UNIT_TEST(parseCommandLineArgsAcceptsStageProfileWithoutEntryPoint, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -468,7 +468,7 @@ SLANG_UNIT_TEST(parseCommandLineArgsAcceptsStageProfileWithoutEntryPoint)
 // A stage profile does not restrict the session's target to that stage: with a pixel-stage
 // profile, a module with vertex and compute entry points loads, and its compute entry point
 // compiles for the compute stage.
-SLANG_UNIT_TEST(parseCommandLineArgsStageProfileKeepsOtherStagesUsable)
+SLANG_UNIT_TEST(parseCommandLineArgsStageProfileKeepsOtherStagesUsable, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -496,7 +496,7 @@ SLANG_UNIT_TEST(parseCommandLineArgsStageProfileKeepsOtherStagesUsable)
 // A session target's version-only profile keeps the explicit capabilities, from `-capability` or
 // from the `+` atoms of a `-profile`, as a `TargetDesc` that sets them directly does. The
 // `spirv_1_6` capability is observable in the SPIR-V version that the generated code declares.
-SLANG_UNIT_TEST(parseCommandLineArgsCapabilitiesMatchDirectConfiguration)
+SLANG_UNIT_TEST(parseCommandLineArgsCapabilitiesMatchDirectConfiguration, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -554,7 +554,7 @@ SLANG_UNIT_TEST(parseCommandLineArgsCapabilitiesMatchDirectConfiguration)
 // Source and module files, entry-point options and output paths configure a compilation rather
 // than a session, so they are accepted and ignored. An `-o` path still infers a target when no
 // `-target` is given.
-SLANG_UNIT_TEST(parseCommandLineArgsIgnoresCompileOptions)
+SLANG_UNIT_TEST(parseCommandLineArgsIgnoresCompileOptions, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -613,7 +613,7 @@ SLANG_UNIT_TEST(parseCommandLineArgsIgnoresCompileOptions)
 
 // Output paths only infer a target when no `-target` is given, and are not retained. An explicit
 // `-target hlsl` with a `.spv` output gives a session whose only target generates HLSL.
-SLANG_UNIT_TEST(parseCommandLineArgsOutputPathOnlyInfersTarget)
+SLANG_UNIT_TEST(parseCommandLineArgsOutputPathOnlyInfersTarget, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -632,7 +632,7 @@ SLANG_UNIT_TEST(parseCommandLineArgsOutputPathOnlyInfersTarget)
 
 // `-o x.spv` and `-target spirv` give the same target configuration, and neither selects
 // whole-program code generation; only an explicit `-whole-program` does.
-SLANG_UNIT_TEST(parseCommandLineArgsOutputPathDoesNotSelectWholeProgram)
+SLANG_UNIT_TEST(parseCommandLineArgsOutputPathDoesNotSelectWholeProgram, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -696,7 +696,7 @@ SLANG_UNIT_TEST(parseCommandLineArgsOutputPathDoesNotSelectWholeProgram)
 
 // An explicit `-whole-program` reaches code generation: an HLSL library target emits an exported
 // function with `export` only in whole-program mode.
-SLANG_UNIT_TEST(parseCommandLineArgsWholeProgramReachesCodeGeneration)
+SLANG_UNIT_TEST(parseCommandLineArgsWholeProgramReachesCodeGeneration, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -774,7 +774,7 @@ static String compileSpirvAsmWithCompileRequest(
 // A compile request configured through the deprecated API still resolves entry points when its
 // command line is parsed, so a stage with no entry point fails there. It keeps a floating-point
 // mode given with no `-target` for the targets added to it later, as the generated SPIR-V shows.
-SLANG_UNIT_TEST(parseCommandLineArgsCompileRequestKeepsCompileChecks)
+SLANG_UNIT_TEST(parseCommandLineArgsCompileRequestKeepsCompileChecks, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 

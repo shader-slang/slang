@@ -1,12 +1,8 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+metal+cpu+llvm):-output-using-type
 // Does not run on DX11 as SM 6.4 is required.
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_4 -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-wgsl -compute -shaderobj -render-feature half -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -g0 -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12):-profile cs_6_4 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=wgpu):-render-feature half -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda):-g0 -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -23,7 +19,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     //
     uint unsignedX = 0x01020304U;
     uint unsignedY = 0x02040201U;
-    uint unsignedAcc = 5U; 
+    uint unsignedAcc = 5U;
     uint unsignedResult = dot4add_u8packed(unsignedX, unsignedY, unsignedAcc);
     outputBuffer[outputIndex++] = unsignedResult;
 
@@ -40,7 +36,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     //
     // dot2add()
-    // [10.8 -3.3] dot [1.4 -20.3] - 2.11 
+    // [10.8 -3.3] dot [1.4 -20.3] - 2.11
     // (10.8 * 1.4) + (-3.3 * -20.3) - 2.0 = 80.11
     //
     half2 half2X = half2(half(10.8), half(-3.3));

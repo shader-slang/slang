@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -11,7 +10,7 @@ struct DisneyBRDFPattern
     float specular, metallic, roughness;
     float opacity;
     float3 emmissive;
-    float ambientOcclusion;  
+    float ambientOcclusion;
 };
 
 struct VertexPosition
@@ -39,9 +38,9 @@ interface IDisneyBRDFPattern
 {
     __generic<TVertexInterpolant:IVertexInterpolant>
     DisneyBRDFPattern evalPattern(
-        CameraView cam, 
-        VertexPosition vWorld,  
-        VertexPosition vObject, 
+        CameraView cam,
+        VertexPosition vWorld,
+        VertexPosition vObject,
         TVertexInterpolant interpolants);
 }
 
@@ -57,9 +56,9 @@ struct MaterialPattern1 : IDisneyBRDFPattern
 {
     __generic<TVertexInterpolant:IVertexInterpolant>
     DisneyBRDFPattern evalPattern(
-        CameraView cam, 
-        VertexPosition vWorld,  
-        VertexPosition vObject, 
+        CameraView cam,
+        VertexPosition vWorld,
+        VertexPosition vObject,
         TVertexInterpolant interpolants)
     {
         DisneyBRDFPattern rs;
@@ -74,7 +73,7 @@ float test(TVertexInterpolant vertInterps, TPattern pattern)
 {
     CameraView cam = {};
     VertexPosition vW = {}, vO = {};
-    DisneyBRDFPattern rs = pattern.evalPattern(cam, vW, vO, vertInterps);    
+    DisneyBRDFPattern rs = pattern.evalPattern(cam, vW, vO, vertInterps);
     return rs.baseColor.x;
 }
 [numthreads(4, 1, 1)]

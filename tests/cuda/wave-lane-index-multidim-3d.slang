@@ -3,8 +3,7 @@
 // The linearized index is threadIdx.z * (4*4) + threadIdx.y * 4 + threadIdx.x,
 // so the lane index should equal the SV_GroupIndex directly.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 

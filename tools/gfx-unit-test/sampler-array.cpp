@@ -124,7 +124,7 @@ void samplerArrayTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, buffer, std::array{4.0f});
 }
 
-SLANG_UNIT_TEST(samplerArrayVulkan)
+SLANG_UNIT_TEST(samplerArrayVulkan, Vulkan)
 {
     runTestImpl(samplerArrayTestImpl, unitTestContext, DeviceType::Vulkan);
 }

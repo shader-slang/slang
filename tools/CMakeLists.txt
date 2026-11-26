@@ -280,7 +280,7 @@ if(SLANG_ENABLE_GFX)
 endif()
 if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     # ---- spvdb integration for SPVDB_DEBUGGER tests -------------------------
-    # spvdb (vendored at tests/spvdb) is a SPIR-V interpreter and source-level
+    # spvdb (vendored at tools/spvdb) is a SPIR-V interpreter and source-level
     # debugger. Build libspvdb here and link it into slang-test so that
     # .slang test files under tests/debuginfo can drive the debugger
     # in-process and validate its output with FileCheck.
@@ -297,7 +297,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         set(SPVDB_PARENT_PROVIDES_STB_IMAGE TRUE)
     endif()
     add_subdirectory(
-        "${slang_SOURCE_DIR}/tests/spvdb"
+        "${slang_SOURCE_DIR}/tools/spvdb"
         "${CMAKE_CURRENT_BINARY_DIR}/spvdb"
         EXCLUDE_FROM_ALL
     )
@@ -509,9 +509,11 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         slang-unit-test
         PRIVATE
             ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+            ${slang_SOURCE_DIR}/tools/slang-test/options.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-context.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-output-path-util.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-reporter.cpp
+            ${slang_SOURCE_DIR}/tools/slang-test/test-target-util.cpp
     )
     # The unit tests include internal slang headers (e.g. slang-repro.h) that
     # transitively pull in FIDDLE / capability generated headers. The `slang`

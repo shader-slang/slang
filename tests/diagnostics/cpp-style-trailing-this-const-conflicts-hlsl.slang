@@ -1,4 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang hlsl tests/diagnostics/cpp-style-trailing-this-const-conflicts-hlsl.slang -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang hlsl tests/diagnostics/cpp-style-trailing-this-const-conflicts-hlsl.slang -fhlsl-methods-mutating-by-default -no-codegen
 
 // A declaration can have at most one receiver-mode spelling. Error recovery uses the first
 // specifier, so both method bodies keep their explicitly nonmutating receiver after diagnosis.

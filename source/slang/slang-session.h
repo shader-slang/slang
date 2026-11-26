@@ -18,11 +18,11 @@
 #include "compiler-core/slang-name.h"
 #include "core/slang-riff.h"
 #include "core/slang-smart-pointer.h"
-#include "slang-ast-base.h"
 #include "slang-compiler-fwd.h"
 #include "slang-compiler-options.h"
-#include "slang-content-assist-info.h"
 #include "slang-global-session.h"
+#include "slang/ast/slang-ast-base.h"
+#include "slang/language-server/slang-content-assist-info.h"
 
 #include <mutex>
 #include <slang.h>

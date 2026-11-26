@@ -100,7 +100,7 @@ static void checkJsonIntField(
 // `ICoverageTracingMetadata`, this test will catch it at CI time
 // rather than at customer-runtime time.
 
-SLANG_UNIT_TEST(coverageTracingMetadata)
+SLANG_UNIT_TEST(coverageTracingMetadata, NoRenderApi)
 {
     const char* shaderSource = R"(
         RWStructuredBuffer<uint> outputBuffer;
@@ -1209,7 +1209,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     }
 }
 
-SLANG_UNIT_TEST(coverageTracingSpecializedEntryPointMetadata)
+SLANG_UNIT_TEST(coverageTracingSpecializedEntryPointMetadata, NoRenderApi)
 {
     const char* shaderSource = R"(
         RWStructuredBuffer<uint> outputBuffer;
@@ -1358,7 +1358,7 @@ SLANG_UNIT_TEST(coverageTracingSpecializedEntryPointMetadata)
     SLANG_CHECK(seenFalseArm);
 }
 
-SLANG_UNIT_TEST(coverageTracingBranchSiteIDsAreMetadataLocal)
+SLANG_UNIT_TEST(coverageTracingBranchSiteIDsAreMetadataLocal, NoRenderApi)
 {
     const char* moduleASource = R"(
         [noinline]
@@ -1523,7 +1523,7 @@ SLANG_UNIT_TEST(coverageTracingBranchSiteIDsAreMetadataLocal)
     SLANG_CHECK(seenModuleBFalseArm);
 }
 
-SLANG_UNIT_TEST(coverageTracingBranchSiteIDsManyFunctions)
+SLANG_UNIT_TEST(coverageTracingBranchSiteIDsManyFunctions, NoRenderApi)
 {
     const char* shaderSource = R"(
         RWStructuredBuffer<uint> outputBuffer;
@@ -1715,7 +1715,7 @@ SLANG_UNIT_TEST(coverageTracingBranchSiteIDsManyFunctions)
     }
 }
 
-SLANG_UNIT_TEST(coverageTracingFunctionEntryMetadataForMultipleReturns)
+SLANG_UNIT_TEST(coverageTracingFunctionEntryMetadataForMultipleReturns, NoRenderApi)
 {
     const char* shaderSource = R"(
         RWStructuredBuffer<uint> outputBuffer;
@@ -1855,7 +1855,7 @@ SLANG_UNIT_TEST(coverageTracingFunctionEntryMetadataForMultipleReturns)
     SLANG_CHECK(computeMainCount == 1);
 }
 
-SLANG_UNIT_TEST(coverageTracingFunctionEntryCallableKindsMetadata)
+SLANG_UNIT_TEST(coverageTracingFunctionEntryCallableKindsMetadata, NoRenderApi)
 {
     const char* shaderSource = R"(
         RWStructuredBuffer<uint> outputBuffer;
@@ -2043,7 +2043,7 @@ SLANG_UNIT_TEST(coverageTracingFunctionEntryCallableKindsMetadata)
     SLANG_CHECK(computeMainCount == 1);
 }
 
-SLANG_UNIT_TEST(coverageTracingSpecializedMultiEntryPointMetadata)
+SLANG_UNIT_TEST(coverageTracingSpecializedMultiEntryPointMetadata, NoRenderApi)
 {
     const char* shaderSource = R"(
         RWStructuredBuffer<uint> outputBufferA;
@@ -2220,7 +2220,7 @@ SLANG_UNIT_TEST(coverageTracingSpecializedMultiEntryPointMetadata)
     checkEntryPointCoverage(1, "computeB");
 }
 
-SLANG_UNIT_TEST(coverageTracingReservedNameFailsCodegen)
+SLANG_UNIT_TEST(coverageTracingReservedNameFailsCodegen, NoRenderApi)
 {
     const char* shaderSource = R"(
         RWStructuredBuffer<uint> __slang_coverage;
@@ -2324,7 +2324,7 @@ SLANG_UNIT_TEST(coverageTracingReservedNameFailsCodegen)
     }
 }
 
-SLANG_UNIT_TEST(coverageTracingNestedBranchSiteIDs)
+SLANG_UNIT_TEST(coverageTracingNestedBranchSiteIDs, NoRenderApi)
 {
     const char* shaderSource = R"(
         RWStructuredBuffer<uint> outputBuffer;
@@ -2503,7 +2503,7 @@ SLANG_UNIT_TEST(coverageTracingNestedBranchSiteIDs)
     SLANG_CHECK(switchSiteCount == 1);
 }
 
-SLANG_UNIT_TEST(coverageTracingDoWhileBranchArmKinds)
+SLANG_UNIT_TEST(coverageTracingDoWhileBranchArmKinds, NoRenderApi)
 {
     const char* shaderSource = R"(
         RWStructuredBuffer<uint> outputBuffer;
@@ -2646,7 +2646,7 @@ SLANG_UNIT_TEST(coverageTracingDoWhileBranchArmKinds)
 // fail loudly rather than silently producing uint32 counters. This test
 // pins that contract: invalid byte widths fail codegen with E45114, and
 // the two legal widths (4 and 8) compile.
-SLANG_UNIT_TEST(coverageTracingInvalidCounterWidthFailsCodegen)
+SLANG_UNIT_TEST(coverageTracingInvalidCounterWidthFailsCodegen, NoRenderApi)
 {
     const char* shaderSource = R"(
         RWStructuredBuffer<uint> outputBuffer;
@@ -2819,7 +2819,7 @@ SLANG_UNIT_TEST(coverageTracingInvalidCounterWidthFailsCodegen)
 // that the manifest serializes it as "boolean" rather than "unknown".
 // This is a regression test for the case where _getCoverageCounterModeName
 // lacked a case for Boolean and silently returned "unknown".
-SLANG_UNIT_TEST(coverageTracingBooleanCounterMode)
+SLANG_UNIT_TEST(coverageTracingBooleanCounterMode, NoRenderApi)
 {
     const char* shaderSource = R"(
         RWStructuredBuffer<uint> outputBuffer;

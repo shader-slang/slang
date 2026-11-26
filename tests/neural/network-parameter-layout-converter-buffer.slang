@@ -1,25 +1,25 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -entry computeMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -entry computeMain -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -entry computeMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=ROUNDTRIP):-vk -compute -entry roundTripMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=ROUNDTRIP):-mtl -compute -entry roundTripMain -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=ROUNDTRIP):-cuda -compute -entry roundTripMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=LONGMASK):-vk -compute -entry longMaskMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=LONGMASK):-mtl -compute -entry longMaskMain -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=LONGMASK):-cuda -compute -entry longMaskMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=MULTITILE):-vk -compute -entry multiTileMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=MULTITILE):-mtl -compute -entry multiTileMain -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=MULTITILE):-cuda -compute -entry multiTileMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=HALFROUNDTRIP):-vk -compute -entry halfRoundTripMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=HALFROUNDTRIP):-cuda -compute -entry halfRoundTripMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=TOPBIT):-vk -compute -entry topBitMaskMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=TOPBIT):-mtl -compute -entry topBitMaskMain -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=TOPBIT):-cuda -compute -entry topBitMaskMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=MIXEDROUNDTRIP):-vk -compute -entry mixedBiasRoundTripMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=MIXEDROUNDTRIP):-cuda -compute -entry mixedBiasRoundTripMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=THREADCOUNTS):-vk -compute -entry threadCountBoundaryMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=THREADCOUNTS):-mtl -compute -entry threadCountBoundaryMain -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=THREADCOUNTS):-cuda -compute -entry threadCountBoundaryMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUFFER):-entry computeMain -xslang -experimental-feature -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUFFER):-entry computeMain -xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-entry computeMain -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=ROUNDTRIP):-entry roundTripMain -xslang -experimental-feature -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=ROUNDTRIP):-entry roundTripMain -xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=ROUNDTRIP):-entry roundTripMain -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=LONGMASK):-entry longMaskMain -xslang -experimental-feature -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=LONGMASK):-entry longMaskMain -xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=LONGMASK):-entry longMaskMain -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=MULTITILE):-entry multiTileMain -xslang -experimental-feature -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=MULTITILE):-entry multiTileMain -xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=MULTITILE):-entry multiTileMain -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=HALFROUNDTRIP):-entry halfRoundTripMain -xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=HALFROUNDTRIP):-entry halfRoundTripMain -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=TOPBIT):-entry topBitMaskMain -xslang -experimental-feature -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=TOPBIT):-entry topBitMaskMain -xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=TOPBIT):-entry topBitMaskMain -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=MIXEDROUNDTRIP):-entry mixedBiasRoundTripMain -xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=MIXEDROUNDTRIP):-entry mixedBiasRoundTripMain -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=THREADCOUNTS):-entry threadCountBoundaryMain -xslang -experimental-feature -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=THREADCOUNTS):-entry threadCountBoundaryMain -xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=THREADCOUNTS):-entry threadCountBoundaryMain -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
 
 import slang.neural;
 

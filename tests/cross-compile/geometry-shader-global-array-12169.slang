@@ -36,8 +36,11 @@ in triangle float4 coarseVecArray[3];
 // ARR_SPIRV: OpExecutionMode %mainArrayStruct Triangles
 // ARR_SPIRV-DAG: %coarseArray_position = OpVariable %{{.*}} Input
 // ARR_SPIRV-DAG: %coarseArray_color = OpVariable %{{.*}} Input
-// ARR_SPIRV: %[[PP:[0-9]+]] = OpAccessChain %_ptr_Input_v4float %coarseArray_position %{{[0-9]+}}
-// ARR_SPIRV: %[[CP:[0-9]+]] = OpAccessChain %_ptr_Input_v3float %coarseArray_color %{{[0-9]+}}
+// The index operand is the loop induction value, which direct SPIR-V emission
+// now keeps in SSA form, so it disassembles under its name hint rather than as a
+// numeric register id.
+// ARR_SPIRV: %[[PP:[0-9]+]] = OpAccessChain %_ptr_Input_v4float %coarseArray_position %{{[A-Za-z0-9_]+}}
+// ARR_SPIRV: %[[CP:[0-9]+]] = OpAccessChain %_ptr_Input_v3float %coarseArray_color %{{[A-Za-z0-9_]+}}
 // ARR_SPIRV: OpLoad %v4float %[[PP]]
 // ARR_SPIRV: OpLoad %v3float %[[CP]]
 // ARR_SPIRV: OpStore %outputStream_position %{{[0-9]+}}
@@ -76,7 +79,7 @@ void mainArrayStruct(inout TriangleStream<RasterVertex> outputStream)
 
 // VEC_SPIRV: OpExecutionMode %mainVecArray Triangles
 // VEC_SPIRV-DAG: OpTypeArray %v4float %int_3
-// VEC_SPIRV: %[[VP:[0-9]+]] = OpAccessChain %_ptr_Input_v4float %coarseVecArray %{{[0-9]+}}
+// VEC_SPIRV: %[[VP:[0-9]+]] = OpAccessChain %_ptr_Input_v4float %coarseVecArray %{{[A-Za-z0-9_]+}}
 // VEC_SPIRV: OpLoad %v4float %[[VP]]
 // VEC_SPIRV: OpStore %outputStream_position %{{[0-9]+}}
 

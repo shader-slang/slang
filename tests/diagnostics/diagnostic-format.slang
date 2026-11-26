@@ -2,25 +2,25 @@
 // enable machine-readable output, so they would not exercise Visual Studio formatting.
 
 // Select Visual Studio headers and indented source details.
-//TEST:SIMPLE(filecheck=VS,exit-code=-1): -target hlsl -diagnostic-format vs
+//TEST:SIMPLE(filecheck=VS,exit-code=2): -target hlsl -diagnostic-format vs
 
 // VS output stays uncolored even when color is requested afterward.
-//TEST:SIMPLE(filecheck=VS,exit-code=-1): -target hlsl -diagnostic-format vs -diagnostic-color always
+//TEST:SIMPLE(filecheck=VS,exit-code=2): -target hlsl -diagnostic-format vs -diagnostic-color always
 
 // VS output also stays uncolored when color is requested first.
-//TEST:SIMPLE(filecheck=VS,exit-code=-1): -target hlsl -diagnostic-color always -diagnostic-format vs
+//TEST:SIMPLE(filecheck=VS,exit-code=2): -target hlsl -diagnostic-color always -diagnostic-format vs
 
 // Without a format option, preserve the normal rich diagnostic output.
-//TEST:SIMPLE(filecheck=DEFAULT,exit-code=-1): -target hlsl
+//TEST:SIMPLE(filecheck=DEFAULT,exit-code=2): -target hlsl
 
 // The last format option wins: 'default' restores normal output after 'vs'.
-//TEST:SIMPLE(filecheck=DEFAULT,exit-code=-1): -target hlsl -diagnostic-format vs -diagnostic-format default
+//TEST:SIMPLE(filecheck=DEFAULT,exit-code=2): -target hlsl -diagnostic-format vs -diagnostic-format default
 
 // Machine-readable output takes precedence over the requested VS format.
-//TEST:SIMPLE(filecheck=TSV,exit-code=-1): -target hlsl -diagnostic-format vs -enable-machine-readable-diagnostics
+//TEST:SIMPLE(filecheck=TSV,exit-code=2): -target hlsl -diagnostic-format vs -enable-machine-readable-diagnostics
 
 // Machine-readable output still takes precedence when the arguments are reversed.
-//TEST:SIMPLE(filecheck=TSV,exit-code=-1): -target hlsl -enable-machine-readable-diagnostics -diagnostic-format vs
+//TEST:SIMPLE(filecheck=TSV,exit-code=2): -target hlsl -enable-machine-readable-diagnostics -diagnostic-format vs
 
 // Use VS formatting for errors while parsing subsequent command-line options.
 //TEST:SIMPLE(filecheck=OPTION,exit-code=1): -diagnostic-format vs -unknown-format-test-option

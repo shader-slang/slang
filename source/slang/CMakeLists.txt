@@ -6,7 +6,7 @@ set(SLANG_FIDDLE_INPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(SLANG_FIDDLE_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/fiddle")
 
 file(
-    GLOB SLANG_FIDDLE_INPUT_FILE_NAMES
+    GLOB_RECURSE SLANG_FIDDLE_INPUT_FILE_NAMES
     CONFIGURE_DEPENDS
     RELATIVE "${SLANG_FIDDLE_INPUT_DIR}"
     "*.h"
@@ -18,7 +18,7 @@ list(
     PREPEND "${SLANG_FIDDLE_INPUT_DIR}/"
     OUTPUT_VARIABLE SLANG_FIDDLE_INPUTS
 )
-glob_append(SLANG_FIDDLE_LUA_INPUTS "*.lua")
+file(GLOB_RECURSE SLANG_FIDDLE_LUA_INPUTS CONFIGURE_DEPENDS "*.lua")
 
 list(
     TRANSFORM SLANG_FIDDLE_INPUT_FILE_NAMES
@@ -26,6 +26,20 @@ list(
     OUTPUT_VARIABLE SLANG_FIDDLE_OUTPUTS
 )
 list(TRANSFORM SLANG_FIDDLE_OUTPUTS PREPEND "${SLANG_FIDDLE_OUTPUT_DIR}/")
+
+# Fiddle mirrors each input's relative path below the output directory. We create
+# the corresponding directories because `slang-fiddle` does not create parents
+# when writing its generated files.
+set(SLANG_FIDDLE_OUTPUT_DIRS "${SLANG_FIDDLE_OUTPUT_DIR}")
+foreach(slang_fiddle_output IN LISTS SLANG_FIDDLE_OUTPUTS)
+    get_filename_component(
+        slang_fiddle_output_dir
+        "${slang_fiddle_output}"
+        DIRECTORY
+    )
+    list(APPEND SLANG_FIDDLE_OUTPUT_DIRS "${slang_fiddle_output_dir}")
+endforeach()
+list(REMOVE_DUPLICATES SLANG_FIDDLE_OUTPUT_DIRS)
 
 #
 # slang-fiddle is a many-input / many-output generator that uses
@@ -44,7 +58,7 @@ set(SLANG_FIDDLE_STAMP "${SLANG_FIDDLE_OUTPUT_DIR}/.fiddle.stamp")
 add_custom_command(
     OUTPUT ${SLANG_FIDDLE_STAMP}
     BYPRODUCTS ${SLANG_FIDDLE_OUTPUTS}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_FIDDLE_OUTPUT_DIR}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_FIDDLE_OUTPUT_DIRS}
     COMMAND
         slang-fiddle -i "${SLANG_FIDDLE_INPUT_DIR}/" -o
         "${SLANG_FIDDLE_OUTPUT_DIR}/" ${SLANG_FIDDLE_INPUT_FILE_NAMES}
@@ -92,7 +106,7 @@ set_source_files_properties(
 # MSVC can exceed the COFF section limit for this translation unit in optimized
 # ARM64 builds. Use the extended object format to accommodate its generated code.
 set_property(
-    SOURCE slang-check-decl.cpp
+    SOURCE semantic-checking/slang-check-decl.cpp
     APPEND
     PROPERTY COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:MSVC>:/bigobj>"
 )

@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-shaderobj -vk -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 
 struct Foo {float v;};

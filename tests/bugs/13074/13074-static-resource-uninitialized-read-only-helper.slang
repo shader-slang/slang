@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -O0 -target hlsl -entry main -stage fragment -validate-ir -verify-debug-serial-ir
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -O0 -target hlsl -entry main -stage fragment -validate-ir -verify-debug-serial-ir
 
 // The `initializeMain` entry point can write `cachedTexture`, so the module-wide
 // uninitialized-global analysis cannot conclude that every read is uninitialized. The `main`
