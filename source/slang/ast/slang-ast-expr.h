@@ -92,7 +92,8 @@ class LiteralExpr : public Expr
     // used to get the raw text of the literal, including any suffix.
     Token token;
 
-    // The suffix type is used to mark the literal type until a proper AST
+    // The literal's type as determined by its suffix and value, and for GLSL
+    // by the bit-pattern rule; used to mark the literal until a proper AST
     // expression type is attached.
     FIDDLE() BaseType suffixType = BaseType::Void;
 };

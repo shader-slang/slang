@@ -9170,17 +9170,50 @@ enum class IntegerLiteralUnsignedSuffix
 };
 
 // See docs/language-reference/expressions-literal.md for the rules.
+// Return the type of an integer literal, given its raw value, base,
+// suffixes, and the source language. For Slang-family sources the
+// suffixes and value determine the type through the ladder below; for
+// GLSL the bit-pattern rule takes precedence instead. The caller must
+// narrow the stored value into the returned type, which is load-bearing
+// when they differ (a GLSL sign-bit pattern typed `int`). Overflow
+// diagnoses through `sink`; `*outSignedMinimumIntException` is set only
+// by the Slang ladder, for the `-2147483648`-style idiom whose folded
+// value needs the unary-minus demotion in `parsePrefixExpr` — the GLSL
+// early return below bypasses that mechanism entirely.
 static BaseType _determineIntegerLiteralType(
     IntegerLiteralValue value,
     bool isDecimalBase,
     IntegerLiteralWidthSuffix widthSuffix,
     IntegerLiteralUnsignedSuffix unsignedSuffix,
+    SourceLanguage sourceLanguage,
     Token* token,
     DiagnosticSink* sink,
     bool* outSignedMinimumIntException)
 {
     const uint64_t rawValue = static_cast<uint64_t>(value);
     *outSignedMinimumIntException = false;
+
+    // GLSL 4.60 section 4.1.3: an unsuffixed literal that fits in 32
+    // bits is an `int` carrying the raw bit pattern, so a pattern with
+    // the sign bit set denotes a negative value (`0xf1bbcdcb` is
+    // -239350325), in every spelling — the condition below is
+    // base-independent, matching the vendored glslang reference
+    // compiler, which wraps both hex and decimal literals to `int`.
+    // Only a `u`/`U` suffix selects an unsigned literal, which the
+    // branch below returns for that case. GLSL defines no width
+    // suffixes, so a width-suffixed literal is a Slang extension that
+    // keeps the Slang ladder below. The same ladder also takes
+    // literals that do not fit in 32 bits: GLSL makes those a
+    // compile-time error, but we keep accepting them with the Slang
+    // type rather than rejecting code that used to compile.
+    // `parseIntegerLiteralExpr` narrows the stored value to the chosen
+    // type, which turns the bit pattern into that negative value.
+    if (sourceLanguage == SourceLanguage::GLSL && widthSuffix == IntegerLiteralWidthSuffix::None &&
+        (rawValue <= UINT32_MAX))
+    {
+        return (unsignedSuffix == IntegerLiteralUnsignedSuffix::None) ? BaseType::Int
+                                                                      : BaseType::UInt;
+    }
 
     if (isDecimalBase)
     {
@@ -9383,6 +9416,7 @@ static Expr* parseIntegerLiteralExpr(Parser* parser)
             isDecimalBase,
             widthSuffix,
             unsignedSuffix,
+            parser->getSourceLanguage(),
             &token,
             parser->sink,
             &signedMinimumIntException);
@@ -9392,7 +9426,19 @@ static Expr* parseIntegerLiteralExpr(Parser* parser)
         suffixBaseType = BaseType::UInt64;
     }
 
-    constExpr->value = value;
+    // The stored value must fit the chosen literal type. The GLSL branch in
+    // `_determineIntegerLiteralType` types some literals `int` whose raw
+    // bit pattern has the sign bit set, and this narrowing is what turns
+    // the pattern into the negative value. Every path of the Slang ladder
+    // returns a type at least as wide as the value (the signed-minimum
+    // exception paths return 64-bit types, and the `z` suffix returns
+    // pointer-sized types, eight bytes on supported hosts), so for Slang
+    // sources this call is a no-op. For GLSL it is load-bearing twice over:
+    // the signed-minimum exception can never be set for an unsuffixed
+    // 32-bit literal, so the `-2147483648` idiom reaches INT_MIN only
+    // through this narrowing, the unary-minus fold in `parsePrefixExpr`,
+    // and the fold-site narrowing there — removing either site breaks it.
+    constExpr->value = _fixIntegerLiteral(suffixBaseType, value, &token, parser->sink);
     constExpr->suffixType = suffixBaseType;
     constExpr->signedMinimumIntException = signedMinimumIntException;
 
@@ -10572,9 +10618,12 @@ static Expr* parsePrefixExpr(Parser* parser)
 
                     newLiteral->signedMinimumIntException = false;
 
-                    // Fit the folded value to the literal's type, which the suffix determines.
-                    // The parser does not assign `type` to a literal, so the suffix is the only
-                    // source of the type here. For example, `~0xffffffffu` folds to 0 in `uint`.
+                    // Fit the folded value to the literal's type. The parser
+                    // does not assign `type` to a literal, so the type
+                    // recorded in `IntegerLiteralExpr::suffixType` — chosen
+                    // from the suffix and value, and for GLSL from the
+                    // bit-pattern rule — is the only source of the type here.
+                    // For example, `~0xffffffffu` folds to 0 in `uint`.
                     newLiteral->value =
                         _fixIntegerLiteral(newLiteral->suffixType, value, nullptr, nullptr);
                 }
