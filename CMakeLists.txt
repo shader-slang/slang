@@ -238,6 +238,11 @@ option(
 )
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
 option(
+    SLANG_CRASH_REPORT_SYMBOLS
+    "Print the function name of each stack frame in the crash report of an internal error. Off by default: the report then holds addresses only, which the offline symbolizer resolves. On Windows the names need a PDB beside each binary."
+    OFF
+)
+option(
     SLANG_ENABLE_RECORD_REPLAY
     "Build the API record-replay layer and its slang_*RecordLayer/*Replay C API. When OFF, the record-replay sources are excluded and that C API is compiled as exported disabled stubs (ABI preserved)."
     ON

@@ -13,6 +13,15 @@ slang_add_target(
         ${CMAKE_CURRENT_SOURCE_DIR}/slang-basic.h
 )
 
+# The crash report of an internal error names the function of each stack frame. Windows reads
+# the names through DbgHelp, which is part of the operating system.
+if(SLANG_CRASH_REPORT_SYMBOLS)
+    target_compile_definitions(core PUBLIC SLANG_CRASH_REPORT_SYMBOLS=1)
+    if(WIN32)
+        target_link_libraries(core PUBLIC dbghelp)
+    endif()
+endif()
+
 if(SLANG_ENABLE_MIMALLOC)
     if(NOT TARGET mimalloc-static)
         message(

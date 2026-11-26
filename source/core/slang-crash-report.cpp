@@ -3,12 +3,15 @@
 
 #include "slang-crash-report-file.h"
 #include "slang-signal.h"
+#include "slang-stack-symbols.h"
 
 #include <atomic>
 #include <string.h>
 
-// This file uses only C library calls and fixed storage. Slang's own containers allocate and
-// assert, and both are off limits on the paths that produce a crash report.
+// This file uses only C library calls and fixed storage, because the same code runs after a
+// crash, where Slang's own containers, which allocate and assert, are off limits. The one
+// exception is the optional lookup of function names, which an internal-error report alone
+// uses.
 
 namespace Slang
 {
@@ -216,6 +219,7 @@ static void _appendCommonFieldsAndStack(
     const char* frontEnd,
     const char* signature,
     const StackTrace* stackTrace,
+    bool withFunctionNames,
     CrashReportText& ioText)
 {
     const CrashBreadcrumbs empty;
@@ -235,6 +239,13 @@ static void _appendCommonFieldsAndStack(
         ioText.append("(not available)\n");
         return;
     }
+    // Function names are read from the binaries, which allocates, so a report asks for them only
+    // where that is safe: after an internal error, not inside a crash handler.
+    StackSymbolResolver* resolver = nullptr;
+    StackSymbolResolver resolverStorage;
+    if (withFunctionNames && StackSymbolResolver::isEnabled())
+        resolver = &resolverStorage;
+
     for (int i = 0; i < stackTrace->frameCount; ++i)
     {
         ioText.append("#");
@@ -249,6 +260,13 @@ static void _appendCommonFieldsAndStack(
             ioText.append(module.moduleName[0] ? module.moduleName : "?");
             ioText.append("+0x");
             ioText.appendHex(uint64_t(module.offset));
+
+            String name;
+            if (resolver && resolver->findFunctionName(stackTrace->returnAddresses[i], name))
+            {
+                ioText.append("  ");
+                ioText.appendSingleLine(name.getBuffer(), 200);
+            }
         }
         else
         {
@@ -298,6 +316,7 @@ static void _appendDetailsAndHowToReport(
         desc.frontEnd,
         signature.getBuffer(),
         desc.stackTrace,
+        true,
         ioText);
     _appendDetailsAndHowToReport(desc.message, signature.getBuffer(), ioText);
 }
@@ -371,6 +390,7 @@ static bool _isSystemModule(const char* moduleName)
         desc.frontEnd,
         signature.getBuffer(),
         desc.stackTrace,
+        false,
         ioText);
     _appendDetailsAndHowToReport(nullptr, signature.getBuffer(), ioText);
 }
