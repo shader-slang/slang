@@ -336,6 +336,15 @@ jobs:
         if: matrix.install_test == 'true' && (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64')
         run: |
           cmake --install build --config "$cmake_config" --prefix install
+          # The legacy backward-compatibility artifacts (the Unix libslang.so /
+          # libslang.dylib symlinks and the Windows slang.dll proxy) were removed
+          # at the end of 2026; no install configuration may ship them again.
+          compat=$(find install \( -name 'libslang.so' -o -name 'libslang.dylib' -o -name 'slang.dll' \))
+          if [ -n "$compat" ]; then
+            echo "ERROR: legacy compatibility artifacts were installed (removed per #9203):"
+            echo "$compat"
+            exit 1
+          fi
           # The monolithic standard-module library must be installed *in place of*
           # the loose module tree: the single library is present and no loose
           # *.slang-module files are installed. Exclusivity is checked on the
