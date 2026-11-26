@@ -4216,6 +4216,11 @@ Type* Linkage::specializeType(
     DiagnosticSink* sink)
 {
     SLANG_ASSERT(unspecializedType);
+    // Reflection callers (e.g. `spReflection_specializeType`) reach this overload with no
+    // AST-builder scope active, while `isSubtype` and the specialized-type creation below
+    // allocate through the thread-local "current" builder. Without this scope, a builder
+    // left current by an earlier compilation on the same thread would silently take over.
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     // TODO: We should cache and re-use specialized types
     // when the exact same arguments are provided again later.
