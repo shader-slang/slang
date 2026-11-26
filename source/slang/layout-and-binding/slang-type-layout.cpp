@@ -6624,10 +6624,16 @@ Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
     Type* resultType = declRefType;
     if (isExtern)
     {
-        if (!externTypeMap)
-            buildExternTypeMap();
-        const auto mangledName = getMangledName(targetReq->getLinkage()->getASTBuilder(), decl);
-        externTypeMap->tryGetValue(mangledName, resultType);
+        // Without a program layout (e.g. `TargetRequest::getTypeLayout`) there is no
+        // linked program to resolve against, so leave the type as declared.
+        if (programLayout)
+        {
+            if (!programLayout->externTypeMapBuilt)
+                buildExternTypeMap();
+            auto& externTypeMap = programLayout->externTypeMap;
+            const auto mangledName = getMangledName(targetReq->getLinkage()->getASTBuilder(), decl);
+            externTypeMap.tryGetValue(mangledName, resultType);
+        }
         if (auto resolvedDeclRef = isDeclRefTypeOf<Decl>(resultType))
         {
             if (resolvedDeclRef != declRef)
@@ -6662,7 +6668,13 @@ Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
 
 void TypeLayoutContext::buildExternTypeMap()
 {
-    externTypeMap.emplace();
+    // The map is a pure function of the program's module dependencies, so we build
+    // it once on the owning ProgramLayout and read it back from every
+    // TypeLayoutContext copy. Only `extern` declarations and type declarations can
+    // take part in a match, so we skip mangling every other declaration: the map
+    // is only consulted when laying out a type, and only a type declaration can
+    // serve as a linked-in type definition.
+    auto& externTypeMap = programLayout->externTypeMap;
 
     HashSet<String> externNames;
     Dictionary<String, DeclRefType*> allTypes;
@@ -6675,18 +6687,22 @@ void TypeLayoutContext::buildExternTypeMap()
             decl = genericDecl->inner;
         const auto isExtern =
             decl->hasModifier<ExternAttribute>() || decl->hasModifier<ExternModifier>();
+        const auto isTypeDecl = as<AggTypeDecl>(decl) || as<SimpleTypeDecl>(decl);
 
-        if (auto declRefType = as<DeclRefType>(DeclRefType::create(astBuilder, decl)))
+        if (isExtern || isTypeDecl)
         {
-            String mangledName = getMangledName(astBuilder, decl);
+            if (auto declRefType = as<DeclRefType>(DeclRefType::create(astBuilder, decl)))
+            {
+                String mangledName = getMangledName(astBuilder, decl);
 
-            if (isExtern)
-            {
-                externNames.add(mangledName);
-            }
-            else
-            {
-                allTypes[mangledName] = declRefType;
+                if (isExtern)
+                {
+                    externNames.add(mangledName);
+                }
+                else
+                {
+                    allTypes[mangledName] = declRefType;
+                }
             }
         }
 
@@ -6713,9 +6729,10 @@ void TypeLayoutContext::buildExternTypeMap()
     {
         if (allTypes.containsKey(externName))
         {
-            externTypeMap.value()[externName] = allTypes[externName];
+            externTypeMap[externName] = allTypes[externName];
         }
     }
+    programLayout->externTypeMapBuilt = true;
 }
 
 } // namespace Slang

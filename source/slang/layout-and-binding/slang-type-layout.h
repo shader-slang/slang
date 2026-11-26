@@ -1271,6 +1271,20 @@ public:
     /// Holds all of the string literals that have been hashed
     StringSlicePool hashedStringLiteralPool;
 
+    /// Mangled names to `Type`, used to match up `extern` types to their linked-in
+    /// definitions during layout generation.
+    ///
+    /// This map is a pure function of the program's module dependencies, so it is
+    /// shared by every `TypeLayoutContext` copy that lays out this program: the
+    /// context is copied by value on the way to each lookup (`with()`,
+    /// `withSpecializationArgs()`, ...), so a cache stored on the context itself
+    /// would be built on a temporary copy and thrown away, once per lookup.
+    ///
+    Dictionary<String, Type*> externTypeMap;
+
+    /// Whether `externTypeMap` has been built for this program layout yet.
+    bool externTypeMapBuilt = false;
+
     /// The descriptor set/space index reserved for descriptor-handle-capable targets.
     ///
     /// -1 means no bindless space was reserved for this program and target.
@@ -1561,10 +1575,6 @@ struct TypeLayoutContext
 
     // Options passed to object layout
     ObjectLayoutRulesImpl::Options objectLayoutOptions;
-
-    // Mangled names to Type, this is used to match up 'extern' types to
-    // their linked in definitions during layout generation
-    std::optional<Dictionary<String, Type*>> externTypeMap;
 
     Type* lookupExternDeclRefType(DeclRefType* declRefType);
     void buildExternTypeMap();
