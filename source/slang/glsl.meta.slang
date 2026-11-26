@@ -459,11 +459,7 @@ public vector<T, N> sign(vector<T, N> x)
     __target_switch
     {
     case hlsl: __intrinsic_asm "$TR(sign($0))";
-    case glsl: 
-        if (__isFloat<T>())
-            __intrinsic_asm "vec$N0(sign($0))";
-        else 
-            __intrinsic_asm "sign($0)";
+    case glsl: __intrinsic_asm "sign($0)";
     case metal: __intrinsic_asm "sign($0)";
     case spirv:
         return spirv_asm
