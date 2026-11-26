@@ -735,6 +735,16 @@ struct UntaggedUnionLoweringContext : public InstPassBase
                 return containsUnmarshalableType((IRType*)matrixType->getElementType());
             }
 
+        case kIROp_TupleType:
+            {
+                for (UInt i = 0; i < type->getOperandCount(); i++)
+                {
+                    if (containsUnmarshalableType((IRType*)type->getOperand(i)))
+                        return true;
+                }
+                return false;
+            }
+
         default:
             return false;
         }
@@ -852,15 +862,65 @@ struct UntaggedUnionLoweringContext : public InstPassBase
         noneTypeElement->removeAndDeallocate();
     }
 
+    // Return whether `untaggedUnionType` can be lowered now. A union with only one payload type is
+    // replaced by that type, so it always can. Any other union is replaced by an `AnyValueType`
+    // sized from its payload types, and a payload type that holds another union cannot be sized
+    // until that union is lowered.
+    bool isReadyToLower(IRUntaggedUnionType* untaggedUnionType)
+    {
+        auto typeSet = cast<IRTypeSet>(untaggedUnionType->getSet());
+        if (tryGetSinglePayloadType(typeSet))
+            return true;
+
+        for (UInt i = 0; i < typeSet->getCount(); i++)
+        {
+            auto payloadType = as<IRType>(typeSet->getElement(i));
+            if (payloadType && getAnyValueSize(payloadType, targetProgram->getTargetReq()) < 0)
+                return false;
+        }
+        return true;
+    }
+
     void processModule()
     {
+        List<IRUntaggedUnionType*> pendingUnions;
         processInstsOfType<IRUntaggedUnionType>(
             kIROp_UntaggedUnionType,
-            [&](IRUntaggedUnionType* inst)
+            [&](IRUntaggedUnionType* inst) { pendingUnions.add(inst); });
+
+        // We lower the unions that are ready and repeat until no more become ready, because the
+        // module does not always place a union after the unions that its payload types hold.
+        bool madeProgress = true;
+        while (madeProgress)
+        {
+            madeProgress = false;
+
+            List<IRUntaggedUnionType*> blockedUnions;
+            for (auto untaggedUnionType : pendingUnions)
             {
-                if (inst->hasUses())
-                    return lowerUntaggedUnionType(inst);
-            });
+                // A union loses its uses when lowering another union makes the two identical.
+                if (!untaggedUnionType->hasUses())
+                    continue;
+
+                if (isReadyToLower(untaggedUnionType))
+                {
+                    lowerUntaggedUnionType(untaggedUnionType);
+                    madeProgress = true;
+                }
+                else
+                {
+                    blockedUnions.add(untaggedUnionType);
+                }
+            }
+            pendingUnions = _Move(blockedUnions);
+        }
+
+        // Each remaining union has a payload type that cannot be sized, which lowering diagnoses.
+        for (auto untaggedUnionType : pendingUnions)
+        {
+            if (untaggedUnionType->hasUses())
+                lowerUntaggedUnionType(untaggedUnionType);
+        }
 
         replaceNoneTypeElementWithVoidType();
     }
