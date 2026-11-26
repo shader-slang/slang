@@ -63,7 +63,7 @@ void computeMain()
     //
     // SPIR: FSign
     // SPIR-NOT: OpSDiv
-    outputBuffer.data[4] = sign(nz) / 2.0;   // expected: -0.5
+    outputBuffer.data[4] = sign(nz) / 2;   // expected: -0.5
 
     // GLSL output must not emit the int(sign(...)) wrapper that the old
     // code produced for float sign().

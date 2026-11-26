@@ -434,20 +434,14 @@ public T sign(T x)
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "sign";
+    case hlsl: __intrinsic_asm "$TR(sign($0))";
     case metal: __intrinsic_asm "sign($0)";
     case glsl: __intrinsic_asm "sign($0)";
     case spirv:
-        if(__isFloat<T>()) 
-            return spirv_asm
-            {
-                OpExtInst $$T result glsl450 FSign $x;
-            };
-        else 
-            return spirv_asm
-            {
-                OpExtInst $$T result glsl450 SSign $x;
-            };
+        return spirv_asm
+        {
+            OpExtInst $$T result glsl450 FSign $x;
+        };
     default:
         return x == T(0) ? T(0) : (x < T(0) ? T(-1) : T(1));
     }
@@ -464,22 +458,18 @@ public vector<T, N> sign(vector<T, N> x)
         return vector<T, N>(sign(x[0]));
     __target_switch
     {
+    case hlsl: __intrinsic_asm "$TR(sign($0))";
     case glsl: 
-            if (__isFloat<T>())
-                __intrinsic_asm "vec$N0(sign($0))";
-            else 
-                __intrinsic_asm "ivec$N0(sign($0))";
+        if (__isFloat<T>())
+            __intrinsic_asm "vec$N0(sign($0))";
+        else 
+            __intrinsic_asm "sign($0)";
+    case metal: __intrinsic_asm "sign($0)";
     case spirv:
-        if(__isFloat<T>())
-            return spirv_asm
-            {
-                OpExtInst $$vector<T, N> result glsl450 FSign $x;
-            };
-        else
-            return spirv_asm
-            {
-                    OpExtInst $$vector<T, N> result glsl450 SSign $x;
-            };
+        return spirv_asm
+        {
+            OpExtInst $$vector<T, N> result glsl450 FSign $x;
+        };
     default:
         VECTOR_MAP_UNARY(T, N, sign, x);
     }

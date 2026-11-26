@@ -38,7 +38,7 @@ void computeMain()
     // GLSL: int({{.*}}sign(
     // METAL: int({{.*}}sign(
     // WGSL: i32({{.*}}sign(
-    int sf = sign(f);
+    let sf = sign(f);
     outInt[1] = sf;
 
     // -----------------------------------------------------------------------
@@ -50,7 +50,7 @@ void computeMain()
     // GLSL: sign(
     // METAL: sign(
     // WGSL: sign(
-    int si = sign(i);
+    let si = sign(i);
     outInt[2] = si;
 
     // -----------------------------------------------------------------------
@@ -68,7 +68,7 @@ void computeMain()
     // METAL: vec<int,3>({{.*}}sign(
     // WGSL: vec3<i32>({{.*}}sign(
     float3 vf  = float3(f, f, f);
-    int3   svf = sign(vf);
+    let    svf = sign(vf);
     outInt[3] = svf.x;
 
     // -----------------------------------------------------------------------
@@ -81,6 +81,6 @@ void computeMain()
     // METAL: vec<int,3>({{.*}}sign(
     // WGSL: vec3<i32>({{.*}}sign(
     int3 vi  = int3(i, i, i);
-    int3 svi = sign(vi);
+    let  svi = sign(vi);
     outInt[4] = svi.x;
 }
