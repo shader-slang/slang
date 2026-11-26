@@ -15,6 +15,7 @@
 //TEST:SIMPLE_EX(filecheck=SPIR_NO_INT_CAST): -lang glsl tests/glsl-intrinsic/glsl-sign-float-type.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 //TEST:SIMPLE_EX(filecheck=GLSL): -lang glsl tests/glsl-intrinsic/glsl-sign-float-type.slang -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE_EX(filecheck=WGSL): -lang glsl tests/glsl-intrinsic/glsl-sign-float-type.slang -stage compute -entry computeMain -target wgsl
+//TEST:SIMPLE_EX(filecheck=WGSL_NO_INT_CAST): -lang glsl tests/glsl-intrinsic/glsl-sign-float-type.slang -stage compute -entry computeMain -target wgsl
 
 // --- Runtime check (Vulkan) ---
 
@@ -71,9 +72,7 @@ void computeMain()
     // GLSL-NOT: int(sign(
     // GLSL: sign(
 
-    // WGSL output must emit native sign() without i32() cast wrapper
-    // WGSL-NOT: i32(sign(
-    // WGSL-NOT: vec2<i32>(sign(
+    // WGSL output must emit native sign()
     // WGSL: sign(
 
     // BUF: BF000000
@@ -87,3 +86,7 @@ void computeMain()
 // anywhere in the SPIR-V produced for a pure-float sign() shader.
 // SPIR_NO_INT_CAST-NOT: OpConvertFToS
 // SPIR_NO_INT_CAST-NOT: OpSDiv
+
+// Global absence check (WGSL): ensure no integer wrapper surrounds sign() calls anywhere in WGSL output.
+// WGSL_NO_INT_CAST-NOT: i32(sign(
+// WGSL_NO_INT_CAST-NOT: vec2<i32>(sign(
