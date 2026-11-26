@@ -34,7 +34,8 @@ struct EmbeddedStandardModule
 extern "C"
 {
     // Same version-stamp export as the other embedded-module libraries, so the
-    // compiler can reject a standard-modules DLL that does not match slang.dll.
+    // compiler can reject a standard-modules DLL that does not match
+    // slang-compiler.dll.
     SLANG_DLL_EXPORT const char* slang_getEmbeddedModuleBuildTagString()
     {
         return SLANG_TAG_VERSION;
@@ -42,8 +43,8 @@ extern "C"
 
     // Look up a serialized standard module by its import path. On a match,
     // writes the LZ4-compressed bytes, their size, and the uncompressed size,
-    // and returns 1; returns 0 otherwise. The caller (slang.dll) decompresses
-    // with LZ4CompressionSystem.
+    // and returns 1; returns 0 otherwise. The caller (slang-compiler.dll)
+    // decompresses with LZ4CompressionSystem.
     //
     // Return pointers and sizes to avoid a cross-library virtual interface.
     // The data remains valid while the monolithic library is loaded.

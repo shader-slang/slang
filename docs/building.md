@@ -314,7 +314,6 @@ works for any given binary.
 | `SLANG_ENABLE_SLANGI`                 | `TRUE`                        | Enable Slang interpreter target                                                                                                                                                                                                    |
 | `SLANG_ENABLE_SLANGRT`                | `TRUE`                        | Enable runtime target                                                                                                                                                                                                              |
 | `SLANG_ENABLE_SLANG_GLSLANG`          | `TRUE`                        | Enable glslang dependency and slang-glslang wrapper target                                                                                                                                                                         |
-| `SLANG_ENABLE_SLANG_PROXY`            | `TRUE`                        | Build the legacy `slang.dll` proxy and `libslang` symlink backward-compatibility outputs for `slang-compiler`                                                                                                                      |
 | `SLANG_ENABLE_TESTS`                  | `TRUE`                        | Enable test targets, requires `SLANG_ENABLE_SLANG_RHI`; some tests require other CMake options                                                                                                                                     |
 | `SLANG_ENABLE_EXAMPLES`               | `TRUE`                        | Enable example targets, requires SLANG_ENABLE_SLANG_RHI                                                                                                                                                                            |
 | `SLANG_ENABLE_REPLAYER`               | `TRUE`                        | Enable slang-replay tool                                                                                                                                                                                                           |
@@ -584,7 +583,7 @@ ${SLANG_DIR}/build/external/miniz/libminiz.a
 ${SLANG_DIR}/build/external/lz4/build/cmake/liblz4.a
 ```
 
-## Deprecation of libslang and slang.dll filenames
+## Removal of libslang and slang.dll filenames
 
 In Slang v2025.21, the primary library for Slang was renamed, from
 `libslang.so` and `slang.dll` to `libslang-compiler.so` and
@@ -596,24 +595,13 @@ be installed via `brew`. To make the Slang library name predictable and
 simplify downstream build logic, the Slang library name was changed on all
 platforms.
 
-A change like this requires a period of transition, so on a **temporary**
-basis: Linux and macOS packages now include symlinks from the old filename to
-the new one. For Windows, a proxy library is provided with the old name, that
-redirects all functions to the new `slang-compiler.dll`. The rationale here is
-that applications with a complex dependency graph may have some components
-still temporarily using `slang.dll`, while others have been updated to use
-`slang-compiler.dll`. Using a proxy library for `slang.dll` ensures that all
-components are using the same library, and avoids any potential state or
-heap-related issues from an executable sharing data structures between the two
-libraries.
-
-These backwards compatability affordances, namely the proxy `slang.dll` and
-`slang.lib` (for Windows) and the `libslang.so` and `libslang.dylib` symlinks
-(for Linux and macOS), **will be removed at the end of 2026**. Until that time,
-they will be present in the github release packages for downstream use.
-Downstream packaging may or may not choose to distribute them, at their
-discretion. **We strongly encourage downstream users of Slang to move to the
-new library names as soon as they are able.**
+To ease the transition, Linux and macOS packages temporarily included
+symlinks from the old filename to the new one, and Windows packages included
+a `slang.dll` proxy library that redirected all functions to
+`slang-compiler.dll`. These backwards compatibility affordances were removed
+at the end of 2026, as planned: builds and packages no longer produce
+`libslang.so`, `libslang.dylib`, or `slang.dll`. Downstream users of Slang
+must link against the `slang-compiler` library by its new name.
 
 ## Notes
 

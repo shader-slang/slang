@@ -26,13 +26,14 @@ namespace Slang
 // Helper function to find the standard module root path.
 static String getStandardModuleDirPath()
 {
-    // Get the path of the currently loaded libslang.so/slang.dll by using a known exported symbol
+    // Get the path of the currently loaded libslang-compiler.so/slang-compiler.dll
+    // by using a known exported symbol
     String libslangPath =
         SharedLibraryUtils::getSharedLibraryFileName((void*)slang_createGlobalSession);
     if (libslangPath.getLength() == 0)
         return String();
 
-    // Get the directory containing libslang.so/slang.dll
+    // Get the directory containing libslang-compiler.so/slang-compiler.dll
     String libslangDir = Path::getParentDirectory(libslangPath);
     if (libslangDir.getLength() == 0)
         return String();
@@ -43,7 +44,7 @@ static String getStandardModuleDirPath()
 
 static String findStandardModulePath(String const& stdModuleDirPath, String const& moduleName)
 {
-    // Standard modules are co-located with libslang.so/slang.dll under
+    // Standard modules are co-located with libslang-compiler.so/slang-compiler.dll under
     // SLANG_STANDARD_MODULE_DIR_NAME.
     // Hierarchical imports map to subdirectories, e.g. "slang/neural" or "experimental/workgraph".
     String stdModulePath = Path::combine(stdModuleDirPath, moduleName + ".slang-module");
@@ -56,12 +57,12 @@ static String findStandardModulePath(String const& stdModuleDirPath, String cons
 
 // Optional alternative to the loose standard-module files: if the monolithic
 // slang-standard-modules shared library (built with SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY)
-// is deployed beside slang.dll, obtain a serialized module from it by import
+// is deployed beside slang-compiler.dll, obtain a serialized module from it by import
 // path. Returns the module's IR bytes, or null if the library is absent or does
 // not contain the requested module.
 //
 // The library filename is versioned on Mac/Linux and unversioned on Windows, and
-// its build tag is matched against slang.dll before use. The standard modules
+// its build tag is matched against slang-compiler.dll before use. The standard modules
 // stay ordinary on-demand imports -- only their *storage* moves from a directory
 // of files into one library. The experimental-feature gate is unaffected, since
 // it is enforced during import resolution regardless of where the bytes come
@@ -2063,7 +2064,7 @@ RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
     // from our standard module search path.
     //
     // First, if the optional slang-standard-modules library is deployed beside
-    // slang.dll, load the module from it. When that library is not deployed this
+    // slang-compiler.dll, load the module from it. When that library is not deployed this
     // is a cheap miss and we fall through to the loose-file search below.
     if (ComPtr<ISlangBlob> embeddedModule =
             tryLoadStandardModuleFromMonolithicLibrary(moduleName->text))

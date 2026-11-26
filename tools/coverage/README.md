@@ -64,7 +64,7 @@ powershell -File tools\coverage\run-coverage-local.ps1 -SkipBuild -SkipTest
 
 Notes for Windows:
 
-- Coverage targets `slang-compiler.dll` (the real compiler lib; `slang.dll` is a thin proxy on Windows).
+- Coverage targets `slang-compiler.dll` (the compiler library; the `slang.dll` compatibility proxy was removed at the end of 2026).
 - OpenCppCoverage emits Cobertura XML, which the script converts to LCOV internally. ReportGenerator renders the Cobertura to HTML; the slangc-only HTML is produced by applying `-filefilters` at render time rather than running a second test pass.
 - Cobertura (and therefore Windows LCOV/HTML) carries only line-level data — no region/function/branch counts like `llvm-cov` emits on Linux/macOS.
 - Add `-WithSynthesis` to run the `-only-synthesized` pass. On runners without GPU drivers this provides a large backend-emit coverage boost; on machines with drivers it's a near no-op because Pass 1 already exercises the same paths.
@@ -107,7 +107,7 @@ The record-replay smoke tests (`RecordReplaySmokeCreateSession`, `RecordReplaySm
 ### View coverage for specific file:
 
 ```bash
-llvm-cov show ./build/RelWithDebInfo/lib/libslang.so \
+llvm-cov show ./build/RelWithDebInfo/lib/libslang-compiler.so \
     -instr-profile=slang-test.profdata \
     source/slang/parser/slang-parser.cpp
 ```
@@ -115,7 +115,7 @@ llvm-cov show ./build/RelWithDebInfo/lib/libslang.so \
 ### Get function-level coverage:
 
 ```bash
-llvm-cov report ./build/RelWithDebInfo/lib/libslang.so \
+llvm-cov report ./build/RelWithDebInfo/lib/libslang-compiler.so \
     -instr-profile=slang-test.profdata \
     -show-functions
 ```
@@ -128,7 +128,7 @@ On macOS, use `xcrun llvm-cov` instead of plain `llvm-cov`.
 
 - Ensure binaries were built with coverage enabled
 - Check that `*.profraw` files are being generated
-- Verify the binary has coverage symbols: `nm build/RelWithDebInfo/lib/libslang.* | grep __llvm_profile`
+- Verify the binary has coverage symbols: `nm build/RelWithDebInfo/lib/libslang-compiler.* | grep __llvm_profile`
 
 ### Mismatched data warnings
 

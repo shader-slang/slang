@@ -237,7 +237,8 @@ jobs:
           Write-Host "`nVerifying replacement..."
 
           # Check that key files exist
-          # Note: slang.dll is deprecated, slang-compiler.dll is the new primary library
+          # Note: slang-compiler.dll is the primary library (the slang.dll
+          # compatibility proxy was removed at the end of 2026)
           $requiredFiles = @("slangc.exe", "slang-compiler.dll", "slang-glslang.dll")
           foreach ($file in $requiredFiles) {
             $filePath = Join-Path $remixSlangDir $file

@@ -21,11 +21,12 @@ tree before.
    `slang-compiler` shared library, runtime bindings including the
    WebAssembly bindings). Do not call the library `libslang`: the build
    sets `OUTPUT_NAME slang-compiler`
-   ([../../../../source/slang/CMakeLists.txt](../../../../source/slang/CMakeLists.txt)
-   lines 310 and 351), and `libslang` / `slang.dll` exist only as
-   backward-compatibility aliases gated on `SLANG_ENABLE_SLANG_PROXY`
-   (lines 425 and 515). Naming `libslang` as the primary artefact was a
-   critical review finding in a past round.
+   ([../../../../source/slang/CMakeLists.txt](../../../../source/slang/CMakeLists.txt),
+   search for `OUTPUT_NAME slang-compiler`). The legacy `libslang` /
+   `slang.dll` compatibility aliases were removed at the end of 2026
+   (#9203), so only the `slang-compiler` names exist. Naming `libslang`
+   as the primary artefact was a critical review finding in a past
+   round.
 3. `## Top-level decomposition` — describe the major subsystem layers in
    the source tree:
    - `source/core/` — platform-agnostic C++ utilities.
