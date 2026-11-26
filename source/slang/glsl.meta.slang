@@ -429,7 +429,7 @@ __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 public T sign(T x)
 {
     __target_switch
@@ -437,6 +437,7 @@ public T sign(T x)
     case hlsl: __intrinsic_asm "$TR(sign($0))";
     case metal: __intrinsic_asm "sign($0)";
     case glsl: __intrinsic_asm "sign($0)";
+    case wgsl: __intrinsic_asm "sign($0)";
     case spirv:
         return spirv_asm
         {
@@ -451,7 +452,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 public vector<T, N> sign(vector<T, N> x)
 {
     if (N == 1)
@@ -461,6 +462,7 @@ public vector<T, N> sign(vector<T, N> x)
     case hlsl: __intrinsic_asm "$TR(sign($0))";
     case glsl: __intrinsic_asm "sign($0)";
     case metal: __intrinsic_asm "sign($0)";
+    case wgsl: __intrinsic_asm "sign($0)";
     case spirv:
         return spirv_asm
         {

@@ -14,6 +14,7 @@
 //TEST:SIMPLE_EX(filecheck=SPIR): -lang glsl tests/glsl-intrinsic/glsl-sign-float-type.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 //TEST:SIMPLE_EX(filecheck=SPIR_NO_INT_CAST): -lang glsl tests/glsl-intrinsic/glsl-sign-float-type.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 //TEST:SIMPLE_EX(filecheck=GLSL): -lang glsl tests/glsl-intrinsic/glsl-sign-float-type.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=WGSL): -lang glsl tests/glsl-intrinsic/glsl-sign-float-type.slang -stage compute -entry computeMain -target wgsl
 
 // --- Runtime check (Vulkan) ---
 
@@ -24,10 +25,10 @@ layout(local_size_x = 1) in;
 
 // Input: -3.0, 3.0, -1.0 stored as float bit patterns.
 //TEST_INPUT:ubuffer(data=[-3.0 3.0 -1.0], stride=4):name=inputBuffer
-layout(std430, binding = 0) buffer InputBlock { float data[]; } inputBuffer;
+layout(binding = 0) buffer InputBlock { float data[]; } inputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0], stride=4):out,name=outputBuffer
-layout(std430, binding = 1) buffer OutputBlock { float data[]; } outputBuffer;
+layout(binding = 1) buffer OutputBlock { float data[]; } outputBuffer;
 
 void computeMain()
 {
@@ -63,12 +64,17 @@ void computeMain()
     //
     // SPIR: FSign
     // SPIR-NOT: OpSDiv
-    outputBuffer.data[4] = sign(nz) / 2;   // expected: -0.5
+    outputBuffer.data[4] = sign(nx) / 2;   // expected: -0.5 (nx = -3.0)
 
     // GLSL output must not emit the int(sign(...)) wrapper that the old
     // code produced for float sign().
     // GLSL-NOT: int(sign(
     // GLSL: sign(
+
+    // WGSL output must emit native sign() without i32() cast wrapper
+    // WGSL-NOT: i32(sign(
+    // WGSL-NOT: vec2<i32>(sign(
+    // WGSL: sign(
 
     // BUF: BF000000
     // BUF-NEXT: 3F000000
