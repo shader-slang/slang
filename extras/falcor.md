@@ -87,7 +87,7 @@ Falcor consumes Slang as a CMake-imported library, so the Slang **defaults work*
 | Slang CMake option                                                      | Needed value       | Why                                                                                                                                        |
 | ----------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `SLANG_ENABLE_GFX`                                                      | `ON` (default)     | Falcor imports both `slang` and `slang-gfx`; with `-DSLANG_ENABLE_GFX=0` there is no `gfx` library to import, so Falcor's configure fails. |
-| `SLANG_LIB_TYPE`                                                        | `SHARED` (default) | Falcor imports the shared `slang`/`slang-gfx` libraries (`libslang.so` / `slang.dll`).                                                     |
+| `SLANG_LIB_TYPE`                                                        | `SHARED` (default) | Falcor imports the shared `slang`/`slang-gfx` libraries (`libslang-compiler.so` / `slang-compiler.dll`).                                        |
 | `SLANG_ENABLE_TESTS`, `SLANG_ENABLE_EXAMPLES`, `SLANG_ENABLE_SLANG_RHI` | any                | Not consumed by Falcor; leave at defaults or disable to speed the Slang build.                                                             |
 
 `cmake --preset default` already sets the needed values. The CI Falcor job (`.github/workflows/falcor-test.yml`) uses a trimmed, known-good Slang configuration, but that set is for CI's copy-into-prebuilt-Falcor flow; for this script the defaults are sufficient. **Do not disable `SLANG_ENABLE_GFX`.**
@@ -98,14 +98,14 @@ Falcor builds on Windows and Linux. The script picks a build target by host, ove
 
 | Host                           | Default target | Notes                                                                |
 | ------------------------------ | -------------- | -------------------------------------------------------------------- |
-| native Windows (git-bash/MSYS) | `windows`      | Uses `windows-vs2022` preset, `setup.bat`, `slang.dll`.              |
+| native Windows (git-bash/MSYS) | `windows`      | Uses `windows-vs2022` preset, `setup.bat`, `slang-compiler.dll`.      |
 | WSL                            | `windows`      | WSL runs on a Windows host; many Slang devs build Slang for Windows. |
-| native Linux                   | `linux`        | Uses `linux-clang` preset, `setup.sh`, `libslang.so`.                |
+| native Linux                   | `linux`        | Uses `linux-clang` preset, `setup.sh`, `libslang-compiler.so`.       |
 
-**WSL.** WSL reports as Linux (`uname -s` = `Linux`) but runs on a Windows machine, so the script detects it (`/proc/version` / `$WSL_DISTRO_NAME`) and defaults to a **Windows** target — matching a Slang build done on the Windows side (`build/<config>/bin/slang.dll`). Under WSL with a Windows target the script drives the Windows toolchain (`cmake.exe`, `cmd.exe`) and translates paths with `wslpath`. If you instead built Slang for Linux inside WSL and want an in-WSL Linux build, pass `--target-os linux`:
+**WSL.** WSL reports as Linux (`uname -s` = `Linux`) but runs on a Windows machine, so the script detects it (`/proc/version` / `$WSL_DISTRO_NAME`) and defaults to a **Windows** target — matching a Slang build done on the Windows side (`build/<config>/bin/slang-compiler.dll`). Under WSL with a Windows target the script drives the Windows toolchain (`cmake.exe`, `cmd.exe`) and translates paths with `wslpath`. If you instead built Slang for Linux inside WSL and want an in-WSL Linux build, pass `--target-os linux`:
 
 ```bash
-# In-WSL Linux build/test (needs a Linux Slang build: libslang.so)
+# In-WSL Linux build/test (needs a Linux Slang build: libslang-compiler.so)
 ./extras/falcor.sh build --target-os linux
 ```
 

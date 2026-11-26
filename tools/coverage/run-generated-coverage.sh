@@ -66,7 +66,7 @@ fi
 
 SLANG_TEST="$BUILD_DIR/$CONFIG/bin/slang-test"
 BINDIR="$BUILD_DIR/$CONFIG/bin"
-LIBSLANG="$BUILD_DIR/$CONFIG/lib/libslang.$LIB_EXT"
+LIBSLANG="$BUILD_DIR/$CONFIG/lib/libslang-compiler.$LIB_EXT"
 TEST_ROOT="docs/generated/tests"
 
 COVERAGE_DIR="${COVERAGE_DIR:-$BUILD_DIR/coverage-generated-$LABEL}"
