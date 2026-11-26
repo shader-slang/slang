@@ -9199,18 +9199,20 @@ static BaseType _determineIntegerLiteralType(
     // -239350325), in every spelling — the condition below is
     // base-independent, matching the vendored glslang reference
     // compiler, which wraps both hex and decimal literals to `int`.
-    // Only a `u`/`U` suffix selects an unsigned literal; GLSL defines
-    // no width suffixes, so a width-suffixed literal is a Slang
-    // extension that keeps the Slang ladder below. The same ladder
-    // also takes literals that do not fit in 32 bits: GLSL makes
-    // those a compile-time error, but we keep accepting them with the
-    // Slang type rather than rejecting code that used to compile.
+    // Only a `u`/`U` suffix selects an unsigned literal, which the
+    // branch below returns for that case. GLSL defines no width
+    // suffixes, so a width-suffixed literal is a Slang extension that
+    // keeps the Slang ladder below. The same ladder also takes
+    // literals that do not fit in 32 bits: GLSL makes those a
+    // compile-time error, but we keep accepting them with the Slang
+    // type rather than rejecting code that used to compile.
     // `parseIntegerLiteralExpr` narrows the stored value to the chosen
     // type, which turns the bit pattern into that negative value.
     if (sourceLanguage == SourceLanguage::GLSL && widthSuffix == IntegerLiteralWidthSuffix::None &&
-        unsignedSuffix == IntegerLiteralUnsignedSuffix::None && (rawValue <= UINT32_MAX))
+        (rawValue <= UINT32_MAX))
     {
-        return BaseType::Int;
+        return (unsignedSuffix == IntegerLiteralUnsignedSuffix::None) ? BaseType::Int
+                                                                      : BaseType::UInt;
     }
 
     if (isDecimalBase)
