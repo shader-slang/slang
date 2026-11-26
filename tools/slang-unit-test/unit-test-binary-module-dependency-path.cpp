@@ -285,6 +285,17 @@ SLANG_UNIT_TEST(binaryModuleDependencyResolvesRelativeToModuleSource)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(createSession(globalSession, root.path, session)));
         SLANG_CHECK(session->isBinaryModuleUpToDate(cachedBaseModule.getBuffer(), baseModuleBlob));
     }
+
+    // A shadow copy whose contents differ from the recorded helper must not make the unchanged
+    // module stale: the dependency resolves against the module source directory, so the check
+    // hashes the real helper and never consults the copy.
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(writeFile(shadowHelper, "static const int HelperConstant = 9;\n")));
+    {
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(createSession(globalSession, root.path, session)));
+        SLANG_CHECK(session->isBinaryModuleUpToDate(cachedBaseModule.getBuffer(), baseModuleBlob));
+    }
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::remove(prodHelper)));
     {
         ComPtr<slang::ISession> session;
