@@ -185,7 +185,7 @@ bool areBlobsEqual(slang::IBlob* a, slang::IBlob* b)
 // sees the helper under two identities and its entry-point hash changes, and an edit to the real
 // helper goes unnoticed by the up-to-date check because the copy still matches the recorded
 // digest.
-SLANG_UNIT_TEST(binaryModuleDependencyResolvesRelativeToModuleSource)
+SLANG_UNIT_TEST(binaryModuleDependencyResolvesRelativeToModuleSource, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
@@ -308,7 +308,7 @@ SLANG_UNIT_TEST(binaryModuleDependencyResolvesRelativeToModuleSource)
 // working directory, and the up-to-date check finds it there, so an edit to one of its includes
 // makes the cached binary stale rather than letting it pass as a standalone module. Loading the
 // binary finds that source file the same way, so the module depends on its source and include.
-SLANG_UNIT_TEST(binaryModuleSourceOutsideSearchPathsIsChecked)
+SLANG_UNIT_TEST(binaryModuleSourceOutsideSearchPathsIsChecked, NoRenderApi)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
