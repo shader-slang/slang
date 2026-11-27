@@ -4,6 +4,7 @@
 // (https://github.com/shader-slang/slang/issues/14087).
 
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -emit-spirv-directly -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRVI):-target spirv -emit-spirv-directly -entry computeIntPtr -stage compute
 //TEST:COMPARE_COMPUTE(targets=all-glsl-dx11-dx12-wgpu, filecheck-buffer=BUF):-output-using-type
 
 //TEST_INPUT: set q = ubuffer(data=[3 7 11 13], stride=4);
@@ -39,3 +40,20 @@ void computeMain()
     outputBuffer[3] = int((int64_t)(q + 3) - s);
     outputBuffer[4] = Ptr<int>(u)[3];
 }
+
+// A pointer-sized signed cast routes the same way as the fixed-width one: the unsigned
+// intermediate must come from the pointer-sized unsigned type, so a classifier desync
+// that let the signed type reach `OpConvertPtrToU` unchanged would emit the invalid
+// `OpConvertPtrToU %long` shape and fail these checks.
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeIntPtr()
+{
+    intptr_t ptrAsInt = (intptr_t)q;
+    outputBuffer[0] = int(ptrAsInt);
+}
+
+// SPIRVI-NOT: OpConvertPtrToU %long
+// SPIRVI: [[U2:%[0-9a-zA-Z_]+]] = OpConvertPtrToU %ulong
+// SPIRVI-NEXT: %ptrAsInt = OpBitcast %long [[U2]]
+// SPIRVI-NOT: OpConvertPtrToU %long
