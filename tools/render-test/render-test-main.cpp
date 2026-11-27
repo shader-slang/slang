@@ -2112,6 +2112,30 @@ static SlangResult _innerMain(
                 return SLANG_E_NOT_AVAILABLE;
             }
         }
+
+        // Which cooperative-matrix shapes a device accepts is a runtime property: the Vulkan
+        // device lists each supported shape as a cooperative-matrix property entry (or a
+        // granularity under cooperativeMatrixFlexibleDimensions), and a shader that declares
+        // a shape the device does not list fails pipeline creation. We gate such tests on the
+        // device listing every required shape, in the same way as required features:
+        // returning SLANG_E_NOT_AVAILABLE makes the test harness skip the test rather than
+        // fail it on a device that cannot run it.
+        //
+        // Only the Vulkan rhi device answers this query today; the base Device
+        // implementation reports every shape as unsupported, so a test tagged with
+        // -require-coopmat-shape skips on all other backends. A failed query is also treated
+        // as unsupported — the rhi contract reports an unsupported shape as SLANG_OK with
+        // *outSupported = false, so a failure means the query itself is broken, and the skip
+        // keeps that the conservative outcome for a capability gate.
+        for (const auto& desc : options.requiredCooperativeMatrixShapes)
+        {
+            bool supported = false;
+            if (SLANG_FAILED(deviceWrapper->isCooperativeMatrixSupported(desc, &supported)) ||
+                !supported)
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
+        }
     }
 
     // Bind this invocation's callback to the device's bridge for the adapter query and rendering;

@@ -80,6 +80,14 @@ struct Options
 
     Slang::List<Slang::String> renderFeatures; /// Required render features for this test to run
 
+    /// Cooperative-matrix shapes (in matmul terms: m, n, k, component types, scope) the
+    /// device must list for this test to run, one -require-coopmat-shape flag per shape —
+    /// the device must list every given shape. The flag's single type token fills all four
+    /// component-type slots, so a mixed-type matmul shape cannot be spelled. A device that
+    /// does not list a required shape makes the test skip instead of fail, in the same way
+    /// as an unlisted -render-feature.
+    Slang::List<CooperativeMatrixDesc> requiredCooperativeMatrixShapes;
+
     uint32_t computeDispatchSize[3] = {1, 1, 1};
 
     Slang::String nvapiExtnSlot; ///< The nvapiRegister to use.
