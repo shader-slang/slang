@@ -2917,10 +2917,32 @@ static void UnwrapDeclarator(
 
                 auto arrayTypeExpr = astBuilder->create<IndexExpr>();
                 arrayTypeExpr->loc = arrayDeclarator->openBracketLoc;
-                arrayTypeExpr->baseExpression = ioInfo->typeSpec;
                 if (arrayDeclarator->elementCountExpr)
                     arrayTypeExpr->indexExprs.add(arrayDeclarator->elementCountExpr);
-                ioInfo->typeSpec = arrayTypeExpr;
+
+                // GLSL reads a declaration's brackets left to right, first bracket
+                // outermost, and the checker's GLSL re-nest expects the chain to
+                // carry them that way (first source bracket innermost, like every
+                // other chain producer). Slang and HLSL declarations instead keep
+                // the plain wrap, which their checker turns into the
+                // last-bracket-outermost type reading the spec defines.
+                if (parser->getSourceLanguage() == SourceLanguage::GLSL &&
+                    as<IndexExpr>(ioInfo->typeSpec))
+                {
+                    // Splice below the bottom bracket; the chain top is unchanged.
+                    // The walk descends to the bottom before the new node takes over
+                    // the atom link, since the assignment order preserves it.
+                    auto bottomBracketExpr = as<IndexExpr>(ioInfo->typeSpec);
+                    while (as<IndexExpr>(bottomBracketExpr->baseExpression))
+                        bottomBracketExpr = as<IndexExpr>(bottomBracketExpr->baseExpression);
+                    arrayTypeExpr->baseExpression = bottomBracketExpr->baseExpression;
+                    bottomBracketExpr->baseExpression = arrayTypeExpr;
+                }
+                else
+                {
+                    arrayTypeExpr->baseExpression = ioInfo->typeSpec;
+                    ioInfo->typeSpec = arrayTypeExpr;
+                }
 
                 declarator = arrayDeclarator->inner;
             }
