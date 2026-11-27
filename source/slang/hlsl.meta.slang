@@ -18102,10 +18102,12 @@ __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 T WaveActive$(opName.hlslName)(T expr)
 {
     __target_switch
     {
+    case cpp: return expr;
     case glsl:
     case wgsl:
         __intrinsic_asm "subgroup$(opName.glslName)";
@@ -18125,10 +18127,12 @@ __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
 {
     __target_switch
     {
+    case cpp: return expr;
     case glsl:
     case wgsl:
         __intrinsic_asm "subgroup$(opName.glslName)";
@@ -18145,6 +18149,7 @@ vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
 
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
 {
     __target_switch
@@ -18177,10 +18182,12 @@ __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 T WaveActive$(opName.name)(T expr)
 {
     __target_switch
     {
+    case cpp: return expr;
     case glsl:
     case wgsl:
         __intrinsic_asm "subgroup$(opName.name)";
@@ -18205,10 +18212,12 @@ __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 vector<T, N> WaveActive$(opName.name)(vector<T, N> expr)
 {
     __target_switch
     {
+    case cpp: return expr;
     case glsl:
     case wgsl:
         __intrinsic_asm "subgroup$(opName.name)";
@@ -18230,6 +18239,7 @@ vector<T, N> WaveActive$(opName.name)(vector<T, N> expr)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 matrix<T, N, M> WaveActive$(opName.name)(matrix<T, N, M> expr)
 {
     __target_switch
@@ -18263,10 +18273,12 @@ __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 T WaveActive$(opName.hlslName)(T expr)
 {
     __target_switch
     {
+    case cpp: return expr;
     case glsl:
         if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroup$(opName.glslName)($0)";
@@ -18298,10 +18310,12 @@ __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
 {
     __target_switch
     {
+    case cpp: return expr;
     case glsl:
         if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroup$(opName.glslName)($0)";
@@ -18330,6 +18344,7 @@ vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
 {
     __target_switch
@@ -18355,10 +18370,12 @@ __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+[require(cpp)]
 bool WaveActiveAllEqual(T value)
 {
     __target_switch
     {
+    case cpp: return true;
     case glsl:
         __intrinsic_asm "subgroupAllEqual($0)";
     case hlsl:
@@ -18378,10 +18395,12 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+[require(cpp)]
 bool WaveActiveAllEqual(vector<T,N> value)
 {
     __target_switch
     {
+    case cpp: return true;
     case glsl:
         __intrinsic_asm "subgroupAllEqual($0)";
     case hlsl:
@@ -18399,10 +18418,12 @@ bool WaveActiveAllEqual(vector<T,N> value)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_hlsl, subgroup_vote)]
+[require(cpp)]
 bool WaveActiveAllEqual(matrix<T, N, M> value)
 {
     __target_switch
     {
+    case cpp: return true;
     case hlsl: __intrinsic_asm "WaveActiveAllEqual";
     default:
         return WaveMaskAllEqual(WaveGetActiveMask(), value);
@@ -18414,10 +18435,12 @@ __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_vote)]
+[require(cpp)]
 bool WaveActiveAllTrue(bool condition)
 {
     __target_switch
     {
+    case cpp: return condition;
     case glsl:
     case wgsl:
         __intrinsic_asm "subgroupAll";
@@ -18441,10 +18464,12 @@ __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_vote)]
+[require(cpp)]
 bool WaveActiveAnyTrue(bool condition)
 {
     __target_switch
     {
+    case cpp: return condition;
     case glsl:
     case wgsl:
         __intrinsic_asm "subgroupAny";
@@ -18485,10 +18510,12 @@ __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+[require(cpp)]
 uint4 WaveActiveBallot(bool condition)
 {
     __target_switch
     {
+    case cpp: return uint4(condition ? 1u : 0u, 0u, 0u, 0u);
     case glsl:
     case wgsl:
         __intrinsic_asm "subgroupBallot";
@@ -18508,10 +18535,12 @@ uint4 WaveActiveBallot(bool condition)
 
 /// @category wave
 [require(cuda_glsl_hlsl_metal_spirv, subgroup_basic_ballot)]
+[require(cpp)]
 uint WaveActiveCountBits(bool value)
 {
     __target_switch
     {
+    case cpp: return value ? 1u : 0u;
     case hlsl: __intrinsic_asm "WaveActiveCountBits";
     case glsl:
     case spirv:
@@ -18522,16 +18551,24 @@ uint WaveActiveCountBits(bool value)
     }
 }
 
+// On the C++ CPU targets, the threads of a group run one after another, so each thread is a wave
+// of one lane: WaveGetLaneCount() is 1, WaveGetLaneIndex() is 0, WaveIsFirstLane() is true, the
+// WaveActive* reductions and WaveReadLane* return the thread's own value, and the exclusive
+// WavePrefix* scans return their identity (0 for sums and counts, 1 for products). The intrinsics
+// that need more than one lane to mean anything (quad operations, shuffles, WaveMatch, the
+// WaveMask* and WaveMulti* forms) stay unavailable there.
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
 [ForceInline]
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+[require(cpp)]
 uint WaveGetLaneCount()
 {
     __target_switch
     {
+    case cpp: return 1u;
     case glsl: __intrinsic_asm  "(gl_SubgroupSize)";
     case cuda: __intrinsic_asm  "(warpSize)";
     case hlsl: __intrinsic_asm  "WaveGetLaneCount()";
@@ -18555,10 +18592,12 @@ __spirv_version(1.3)
 [NonUniformReturn]
 [ForceInline]
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+[require(cpp)]
 uint WaveGetLaneIndex()
 {
     __target_switch
     {
+    case cpp: return 0u;
     case glsl: __intrinsic_asm  "(gl_SubgroupInvocationID)";
     case cuda: __intrinsic_asm  "_getLaneId()";
     case hlsl: __intrinsic_asm  "WaveGetLaneIndex()";
@@ -18892,11 +18931,13 @@ __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+[require(cpp)]
 [KnownBuiltin($((int)KnownBuiltinDeclName::WaveIsFirstLane))]
 bool WaveIsFirstLane()
 {
     __target_switch
     {
+    case cpp: return true;
     case glsl: __intrinsic_asm "subgroupElect()";
     case hlsl: __intrinsic_asm "WaveIsFirstLane()";
     case metal: __intrinsic_asm "simd_is_first";
@@ -18948,10 +18989,12 @@ __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 T WavePrefixProduct(T expr)
 {
     __target_switch
     {
+    case cpp: return T(1);
     case glsl:
         if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveMul($0)";
@@ -18984,10 +19027,12 @@ __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 vector<T,N> WavePrefixProduct(vector<T,N> expr)
 {
     __target_switch
     {
+    case cpp: return vector<T,N>(T(1));
     case glsl:
         if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveMul($0)";
@@ -19013,6 +19058,7 @@ vector<T,N> WavePrefixProduct(vector<T,N> expr)
 /// @category wave
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
 {
     __target_switch
@@ -19032,10 +19078,12 @@ __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 T WavePrefixSum(T expr)
 {
     __target_switch
     {
+    case cpp: return T(0);
     case glsl:
         if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveAdd($0)";
@@ -19064,10 +19112,12 @@ __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 vector<T,N> WavePrefixSum(vector<T,N> expr)
 {
     __target_switch
     {
+    case cpp: return vector<T,N>(T(0));
     case glsl:
         if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveAdd($0)";
@@ -19093,6 +19143,7 @@ vector<T,N> WavePrefixSum(vector<T,N> expr)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
+[require(cpp)]
 matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
 {
     __target_switch
@@ -19437,11 +19488,13 @@ __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+[require(cpp)]
 [KnownBuiltin($((int)KnownBuiltinDeclName::WaveReadLaneFirst))]
 T WaveReadLaneFirst(T expr)
 {
     __target_switch
     {
+    case cpp: return expr;
     case glsl:
         if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupBroadcastFirst($0)";
@@ -19460,11 +19513,13 @@ __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+[require(cpp)]
 [KnownBuiltin($((int)KnownBuiltinDeclName::WaveReadLaneFirst))]
 vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 {
     __target_switch
     {
+    case cpp: return expr;
     case glsl:
         if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupBroadcastFirst($0)";
@@ -19480,11 +19535,13 @@ vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+[require(cpp)]
 [KnownBuiltin($((int)KnownBuiltinDeclName::WaveReadLaneFirst))]
 matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
 {
     __target_switch
     {
+    case cpp: return expr;
     case cuda:
         return WaveMaskReadLaneFirst(WaveGetActiveMask(), expr);
     case hlsl: __intrinsic_asm "WaveReadLaneFirst";
@@ -19574,10 +19631,12 @@ __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_shuffle)]
+[require(cpp)]
 T WaveReadLaneAt(T value, int lane)
 {
     __target_switch
     {
+    case cpp: return value;
     case glsl:
         if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupShuffle($0, $1)";
@@ -19597,10 +19656,12 @@ __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_shuffle)]
+[require(cpp)]
 vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
 {
     __target_switch
     {
+    case cpp: return value;
     case glsl:
         if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupShuffle($0, $1)";
@@ -19617,10 +19678,12 @@ vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_shuffle)]
+[require(cpp)]
 matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
 {
     __target_switch
     {
+    case cpp: return value;
     case cuda: __intrinsic_asm "_waveShuffleMultiple(_getActiveMask(), $0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     default:
@@ -19698,10 +19761,12 @@ matrix<T, N, M> WaveShuffle(matrix<T, N, M> value, int lane)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+[require(cpp)]
 uint WavePrefixCountBits(bool value)
 {
     __target_switch
     {
+    case cpp: return 0u;
     case glsl:
         __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($0))";
     case hlsl: __intrinsic_asm "WavePrefixCountBits($0)";
@@ -28084,9 +28149,11 @@ uint3 cudaBlockDim()
 
 //
 // `saturated_cooperation(c, f, s, u)` will call `f(s, u)` if not all lanes in the
-// workgroup are currently executing. however if all lanes are saturated, then
+// wave are currently executing. however if all lanes are saturated, then
 // for each unique `s` across all the active lanes `c(s, u)` is called. The
 // return value is the one corresponding to the input `s` from this lane.
+// It uses `WaveMatch`, which the C++ targets do not provide (a thread there is a wave of
+// one lane, and `WaveMatch` stays unavailable), so it is not available on them either.
 //
 // Adjacent calls to saturated_cooperation are subject to fusion, i.e.
 //      saturated_cooperation(c1, f1, s, u1);
