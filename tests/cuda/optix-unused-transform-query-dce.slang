@@ -1,0 +1,93 @@
+// SPDX-FileCopyrightText: The Khronos Group, Inc.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+// Regression test for https://github.com/shader-slang/slang/issues/13262.
+// Slang itself must remove an unused transform query: on CUDA the query expands to an OptiX
+// transform-list walk whose loads are `asm volatile`, so NVRTC keeps it once it is emitted.
+// The unsuffixed ObjectToWorld()/WorldToObject() aliases forward to the annotated 3x4 queries,
+// so their dead calls are eliminated via the propagated NoSideEffect property.
+// The SPIR-V lanes compile at -O0 so spirv-opt stays out of the pipeline and only Slang's own
+// DCE can remove the dead query.
+
+//TEST:SIMPLE(filecheck=CUDA_DEAD): -target cuda -entry closestHitDead -stage closesthit
+//TEST:SIMPLE(filecheck=CUDA_LIVE): -target cuda -entry closestHitLive -stage closesthit
+//TEST:SIMPLE(filecheck=PTX_DEAD): -target ptx -entry closestHitDead -stage closesthit
+//TEST:SIMPLE(filecheck=PTX_LIVE): -target ptx -entry closestHitLive -stage closesthit
+//TEST:SIMPLE(filecheck=SPIRV_DEAD): -target spirv-asm -O0 -entry closestHitDead -stage closesthit
+//TEST:SIMPLE(filecheck=SPIRV_LIVE): -target spirv-asm -O0 -entry closestHitLive -stage closesthit
+//TEST:SIMPLE(filecheck=HLSL_DEAD): -target hlsl -entry closestHitDead -stage closesthit
+//TEST:SIMPLE(filecheck=HLSL_LIVE): -target hlsl -entry closestHitLive -stage closesthit
+//TEST:SIMPLE(filecheck=GLSL_DEAD): -target glsl -entry closestHitDead -stage closesthit
+//TEST:SIMPLE(filecheck=GLSL_LIVE): -target glsl -entry closestHitLive -stage closesthit
+
+struct Payload
+{
+    float value;
+};
+
+// Guards match the emitted symbol names: slangOptixGet*TransformMatrix* helpers and the
+// ObjectToWorld_/WorldToObject_ wrapper specializations on CUDA, the _optix_get_transform_list
+// walk on PTX, the *KHR builtins on SPIR-V, and the raw getter names on HLSL.
+// CUDA_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
+// CUDA_DEAD: __closesthit__closestHitDead
+// CUDA_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
+// CUDA_DEAD: optixSetPayload_0
+// CUDA_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
+
+// PTX_DEAD: .version
+// PTX_DEAD-NOT: _optix_get_transform_list
+
+// SPIRV_DEAD: OpEntryPoint
+// SPIRV_DEAD-NOT: {{ObjectToWorldKHR|WorldToObjectKHR}}
+
+// HLSL_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
+// HLSL_DEAD: closestHitDead
+// HLSL_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
+// HLSL_DEAD: barycentrics
+// HLSL_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
+
+// GLSL_DEAD-NOT: {{gl_ObjectToWorld|gl_WorldToObject}}
+// GLSL_DEAD: void main()
+// GLSL_DEAD-NOT: {{gl_ObjectToWorld|gl_WorldToObject}}
+[shader("closesthit")]
+void closestHitDead(inout Payload payload, BuiltInTriangleIntersectionAttributes attributes)
+{
+    float3x4 objectToWorld3x4 = ObjectToWorld3x4();
+    float3x4 worldToObject3x4 = WorldToObject3x4();
+    float4x3 objectToWorld4x3 = ObjectToWorld4x3();
+    float4x3 worldToObject4x3 = WorldToObject4x3();
+    float3x4 objectToWorld = ObjectToWorld();
+    float3x4 worldToObject = WorldToObject();
+    payload.value = attributes.barycentrics.x;
+}
+
+// CUDA_LIVE: __closesthit__closestHitLive
+// CUDA_LIVE-DAG: slangOptixGetObjectToWorldTransformMatrix()
+// CUDA_LIVE-DAG: slangOptixGetWorldToObjectTransformMatrix()
+// CUDA_LIVE-DAG: slangOptixGetObjectToWorldTransformMatrix4x3()
+// CUDA_LIVE-DAG: slangOptixGetWorldToObjectTransformMatrix4x3()
+// CUDA_LIVE-DAG: {{ObjectToWorld_[0-9]+}}()
+// CUDA_LIVE-DAG: {{WorldToObject_[0-9]+}}()
+
+// PTX_LIVE: _optix_get_transform_list
+
+// SPIRV_LIVE-DAG: BuiltIn ObjectToWorldKHR
+// SPIRV_LIVE-DAG: BuiltIn WorldToObjectKHR
+
+// HLSL_LIVE: closestHitLive
+// HLSL_LIVE-DAG: ObjectToWorld3x4()
+// HLSL_LIVE-DAG: WorldToObject3x4()
+// HLSL_LIVE-DAG: ObjectToWorld4x3()
+// HLSL_LIVE-DAG: WorldToObject4x3()
+// HLSL_LIVE-DAG: {{ObjectToWorld_[0-9]+}}()
+// HLSL_LIVE-DAG: {{WorldToObject_[0-9]+}}()
+
+// GLSL_LIVE-DAG: gl_ObjectToWorldEXT
+// GLSL_LIVE-DAG: gl_WorldToObjectEXT
+[shader("closesthit")]
+void closestHitLive(inout Payload payload, BuiltInTriangleIntersectionAttributes attributes)
+{
+    payload.value = attributes.barycentrics.x + ObjectToWorld3x4()[0][0] + WorldToObject3x4()[0][1]
+                    + ObjectToWorld4x3()[0][2] + WorldToObject4x3()[1][0] + ObjectToWorld()[1][1]
+                    + WorldToObject()[1][2];
+}
