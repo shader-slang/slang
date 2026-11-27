@@ -53,6 +53,11 @@ void main()
     // Note: 0111'1011'1111'1110
     //CHECK-NEXT: 0x7bff
 
+    // digit separators are ignored
+    h = 0x1p1_0hf;
+    printf("0x%04x\n", (uint32_t)bit_cast<uint16_t>(h));
+    //CHECK-NEXT: 0x6400
+
 
     ////// floats //////
     f = 0x0p0f;
@@ -106,6 +111,27 @@ void main()
     // Note: 0111'1111'0111'1111'1111'1111'1111'1111
     //CHECK-NEXT: 0x7f7fffff
 
+    // digit separators are ignored in the integer part, fraction and exponent
+    f = 0x1_0p3f;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x43000000
+
+    f = 0x1.8_0p1_0f;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x44c00000
+
+    f = 0x_1p0f;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x3f800000
+
+    f = 0xFF_FF.8p0f;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x477fff80
+
+    f = 0x1p_4f;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x41800000
+
 
     ////// doubles //////
     d = 0x0p0LF;
@@ -158,4 +184,9 @@ void main()
     printf("0x%016llx\n", bit_cast<uint64_t>(d));
     // Note: 0111'1111'1110'1111'1111'1111'1111'1111
     //CHECK-NEXT: 0x7fefffffffffffff
+
+    // digit separators are ignored
+    d = 0x1.0000_0000_0000_1p0LF;
+    printf("0x%016llx\n", bit_cast<uint64_t>(d));
+    //CHECK-NEXT: 0x3ff0000000000001
 }
