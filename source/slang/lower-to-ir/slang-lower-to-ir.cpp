@@ -5001,6 +5001,25 @@ struct ExprLoweringContext
         LoweredValInfo destination,
         const TryClauseEnvironment& tryEnv)
     {
+        if (auto operand = getIdentityCastOperand(expr))
+        {
+            // A checked identity cast preserves the operand's destination and value category.
+            // Normal dispatch also preserves conditional and short-circuit evaluation. An active
+            // `try` instead belongs to the underlying call validated by `visitTryExpr`.
+            if (tryEnv.clauseType != TryClauseType::None)
+            {
+                auto invokeOperand = as<InvokeExpr>(operand);
+                SLANG_RELEASE_ASSERT(invokeOperand);
+                return visitInvokeExprImpl(invokeOperand, destination, tryEnv);
+            }
+            if (destination.flavor != LoweredValInfo::Flavor::None)
+            {
+                lowerRValueExprWithDestination(context, destination, operand);
+                return LoweredValInfo();
+            }
+            return lowerSubExpr(operand);
+        }
+
         // Guard recursive invoke lowering so an infinitely nesting type that keeps
         // synthesizing constructor calls diagnoses cleanly instead of overflowing
         // the native stack while lowering the ctor call tree.

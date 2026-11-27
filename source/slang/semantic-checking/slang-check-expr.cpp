@@ -2926,10 +2926,15 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     ConstantFoldingCircularityInfo* circularityInfo)
 {
 
-    // Unwrap any "identity" expressions
-    while (auto parenExpr = expr.as<ParenExpr>())
+    // Parentheses and checked identity casts preserve source syntax without changing the value.
+    for (;;)
     {
-        expr = getBaseExpr(parenExpr);
+        if (auto parenExpr = expr.as<ParenExpr>())
+            expr = getBaseExpr(parenExpr);
+        else if (auto operand = getIdentityCastOperand(expr.getExpr()))
+            expr = substituteExpr(expr.getSubsts(), operand);
+        else
+            break;
     }
 
     if (auto intLitExpr = expr.as<IntegerLiteralExpr>())
@@ -3247,6 +3252,8 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
     if (typeCastOperand)
     {
+        while (auto operand = getIdentityCastOperand(typeCastOperand.getExpr()))
+            typeCastOperand = substituteExpr(typeCastOperand.getSubsts(), operand);
         auto substType = getType(m_astBuilder, expr);
         if (!substType)
             return nullptr;
@@ -3958,6 +3965,8 @@ static bool _canLValueCoerce(Type* a, Type* b)
 
 void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn)
 {
+    while (auto operand = getIdentityCastOperand(argIn))
+        argIn = operand;
     auto arg = as<VarExpr>(argIn);
     if (!paramIn || !arg)
         return;
@@ -4351,6 +4360,9 @@ void SemanticsVisitor::settlePendingTryCoverage(
     Expr* checkedExpr,
     List<InvokeExpr*> const& pendingCalls)
 {
+    while (auto operand = getIdentityCastOperand(checkedExpr))
+        checkedExpr = operand;
+
     // A call that the conversion resolved to takes the conversion's place, as `f()` does in
     // `int(f())`, so the same `try` covers it. A call nested deeper, as in `int(f().x)`, is not
     // covered.
@@ -4374,10 +4386,10 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
         // if this is still an invoke expression, test arguments passed to inout/out parameter
         // are LValues.
         //
-        // A special case that allows us to skip this validation is when `expr` is an identical type
-        // cast, e.g. `(T)(funcThatReturnsT())`. In this case `ResolveInvoke(expr)` will simply
-        // return the argument expr `funcThatReturnsT()`. And we can skip rerunning any `out` param
-        // validation logic on the inner expr.
+        // An identity cast retains an already-checked operand, so its `out` parameters do not
+        // need to be checked again. Some conversions still return that operand directly.
+        if (getIdentityCastOperand(invoke))
+            return rs;
         if (expr->arguments.getCount() == 1 && invoke == expr->arguments[0])
             return rs;
 
@@ -7448,6 +7460,8 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
     // Visit the value expression
     auto valueExpr = dispatch(expr->value);
     expr->value = valueExpr;
+    while (auto operand = getIdentityCastOperand(valueExpr))
+        valueExpr = operand;
 
     // Determine the floating-point type from the expression
     auto valueType = valueExpr->type.type;
@@ -7510,11 +7524,14 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
 
         if (isConversion && invokeExpr->arguments.getCount() == 1)
         {
-            floatLitExpr = as<FloatingPointLiteralExpr>(invokeExpr->arguments[0]);
+            auto argument = invokeExpr->arguments[0];
+            while (auto operand = getIdentityCastOperand(argument))
+                argument = operand;
+            floatLitExpr = as<FloatingPointLiteralExpr>(argument);
             if (!floatLitExpr)
             {
                 // Also check for integer literal being cast to float
-                if (auto intLitExpr = as<IntegerLiteralExpr>(invokeExpr->arguments[0]))
+                if (auto intLitExpr = as<IntegerLiteralExpr>(argument))
                 {
                     double floatVal = (double)intLitExpr->value;
                     IntegerLiteralValue resultValue = 0;
@@ -7588,6 +7605,8 @@ static PtrType* getValidTypeForAddressOf(
     Expr* baseExpr,
     Type* targetType)
 {
+    while (auto operand = getIdentityCastOperand(baseExpr))
+        baseExpr = operand;
 
     // If our base is a variable like expression, we should check if this expr is a
     // block of memory we allow getting the address of.
@@ -7837,6 +7856,8 @@ static Expr* getSubExpressionDeterminingAddressSpace(Expr* expr)
     {
         if (auto parenExpr = as<ParenExpr>(expr))
             expr = parenExpr->base;
+        else if (auto operand = getIdentityCastOperand(expr))
+            expr = operand;
         else if (auto indexExpr = as<IndexExpr>(expr))
             expr = indexExpr->baseExpression;
         else if (auto swizzleExpr = as<SwizzleExpr>(expr))
@@ -8347,11 +8368,18 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                                 Diagnostics::DeprecatedStructCastFromZero{.expr = expr});
 
                         settlePendingTryCoverage(nullptr, pendingTryCoverage);
-                        return coerce(
+                        auto checkedValue = coerce(
                             CoercionSite::General,
                             typeExp.type,
                             checkedInitListExpr,
                             getSink());
+                        if (IsErrorExpr(checkedValue))
+                            return checkedValue;
+                        expr->arguments.clear();
+                        expr->arguments.add(checkedValue);
+                        expr->type = checkedValue->type;
+                        expr->checked = true;
+                        return expr;
                     }
                 }
             }
@@ -8396,7 +8424,10 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
         return expr;
 
     auto parentFunc = this->m_parentFunc;
-    auto base = as<InvokeExpr>(expr->base);
+    auto checkedBase = expr->base;
+    while (auto operand = getIdentityCastOperand(checkedBase))
+        checkedBase = operand;
+    auto base = as<InvokeExpr>(checkedBase);
     if (!base)
     {
         getSink()->diagnose(Diagnostics::TryClauseMustApplyToInvokeExpr{.expr = expr});

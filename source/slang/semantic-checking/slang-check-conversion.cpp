@@ -1680,6 +1680,8 @@ ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
     // Fix up the cost if the operand is a const lit.
     if (isScalarIntegerType(toType))
     {
+        while (auto operand = getIdentityCastOperand(arg))
+            arg = operand;
         auto knownVal = as<IntegerLiteralExpr>(arg);
         if (!knownVal)
             return candidateCost;
@@ -1910,8 +1912,12 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
-    // Assume string literals are convertible to any string type.
-    if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))
+    // Assume string literals are convertible to any string type. A retained explicit cast
+    // still denotes the literal; keep its source expression in the converted result.
+    auto literalExpr = fromExpr;
+    while (auto operand = getIdentityCastOperand(literalExpr))
+        literalExpr = operand;
+    if (as<StringLiteralExpr>(literalExpr) && as<StringTypeBase>(toType))
     {
         if (outToExpr)
             *outToExpr = fromExpr;
@@ -3009,7 +3015,7 @@ bool SemanticsVisitor::_coerce(
                     overloadContext.bestCandidate->item.declRef.getDecl());
                 if (builtinConversionKind == kBuiltinConversion_FloatToDouble)
                 {
-                    if (!as<FloatingPointLiteralExpr>(fromExpr))
+                    if (!as<FloatingPointLiteralExpr>(literalExpr))
                         sink->diagnose(Diagnostics::ImplicitConversionToDouble{.expr = fromExpr});
                 }
             }

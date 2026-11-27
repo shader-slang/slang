@@ -237,6 +237,16 @@ class ExplicitlyDeclaredCapabilityModifier : public Modifier
     FIDDLE() CapabilitySetVal* declaredCapabilityRequirements = nullptr;
 };
 
+// Stores a default argument's requirements separately from its parameter's contract.
+// Checked source expressions can lose references when serialized, so selected defaults
+// use this summary after import instead of depending on the original expression tree.
+FIDDLE()
+class DefaultArgumentCapabilityModifier : public Modifier
+{
+    FIDDLE(...)
+    FIDDLE() CapabilitySetVal* capabilityRequirements = nullptr;
+};
+
 // Marks a synthesized variable as local temporary variable.
 FIDDLE()
 class LocalTempVarModifier : public Modifier

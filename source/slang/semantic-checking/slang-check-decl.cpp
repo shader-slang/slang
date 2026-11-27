@@ -33,6 +33,8 @@ static Val* _getNonEmptyConstraintPackVal(
     ASTBuilder* astBuilder,
     DeclRef<NonEmptyPackConstraintDecl> const& constraintDeclRef);
 
+static void cacheDefaultArgumentCapabilities(SemanticsVisitor* visitor, Decl* rootDecl);
+
 /// Return the outermost declaration in a synthesized declaration's generic wrapper chain.
 ///
 /// Witness synthesis can wrap an inner callable or type in one or more cloned `GenericDecl`s. The
@@ -1118,6 +1120,65 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         return DeclVisitor<VisitorType>::dispatch(val);
     }
 
+    // Keep ordinary type requirements on the existing semantic type traversal. The checked
+    // expression supplements it with references that canonicalization erased. For example,
+    // `Box<int(Mode.hlslMode) * 0>` has canonical type Box<0>, but its source argument
+    // still references Mode.hlslMode. The supplementary walk visits arguments and aliases,
+    // without also visiting a generic type's selected inner declaration: that would broaden
+    // the existing type requirement checks.
+    void visitTypeExp(TypeExp const& typeExp)
+    {
+        dispatchIfNotNull(typeExp.type);
+        visitTypeExpressionSource(typeExp.exp);
+    }
+
+    // Type annotations and constructor callees can both lose aliases and source arguments
+    // during resolution. Recover those references without changing semantic type traversal.
+    void visitTypeExpressionSource(Expr* expr)
+    {
+        auto oldVisitingTypeSource = visitingTypeSource;
+        visitingTypeSource = true;
+        dispatchIfNotNull(expr);
+        visitingTypeSource = oldVisitingTypeSource;
+    }
+
+    bool visitingTypeSource = false;
+
+    // Visit source arguments retained by generic application checking. Consider this example:
+    //
+    //     readValue<int(Mode.hlslMode) * 0>();
+    //
+    // Overload resolution stores only zero in the selected declaration reference. Its
+    // original expression retains the checked arguments, so declaration analysis must
+    // visit those arguments as well. The original callee can still be an unresolved
+    // overload set; only the selected declaration reference supplies the callee.
+    void visitGenericArgumentExpressions(Expr* expr)
+    {
+        if (auto overloadedExpr = as<OverloadedExpr2>(expr))
+        {
+            // Each candidate retains the same checked source arguments. Only visit those
+            // arguments; the invocation's selected callee supplies its own requirements.
+            for (auto candidate : overloadedExpr->candidateExprs)
+                visitGenericArgumentExpressions(candidate);
+            return;
+        }
+        if (auto declRefExpr = as<DeclRefExpr>(expr))
+            expr = declRefExpr->originalExpr;
+        else if (auto partialAppExpr = as<PartiallyAppliedGenericExpr>(expr))
+            expr = partialAppExpr->originalExpr;
+
+        if (auto genericAppExpr = as<GenericAppExpr>(expr))
+        {
+            // The generic arguments are ordinary checked expressions even when the
+            // application appeared inside a type annotation.
+            auto oldVisitingTypeSource = visitingTypeSource;
+            visitingTypeSource = false;
+            for (auto arg : genericAppExpr->arguments)
+                dispatchIfNotNull(arg);
+            visitingTypeSource = oldVisitingTypeSource;
+        }
+    }
+
     // Expr Visitor
     void visitExpr(Expr*) {}
 
@@ -1153,14 +1214,64 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             dispatchIfNotNull(arg);
     }
 
-    void visitSharedTypeExpr(SharedTypeExpr* expr) { dispatchIfNotNull(expr->base.exp); }
+    void visitSharedTypeExpr(SharedTypeExpr* expr) { visitTypeExp(expr->base); }
 
     void visitInvokeExpr(InvokeExpr* expr)
     {
+        if (expr->originalFunctionExpr && as<TypeType>(expr->originalFunctionExpr->type))
+            visitTypeExpressionSource(expr->originalFunctionExpr);
+        else
+            visitGenericArgumentExpressions(expr->originalFunctionExpr);
         dispatchIfNotNull(expr->functionExpr);
         for (auto arg : expr->arguments)
             dispatchIfNotNull(arg);
+        visitDefaultArgumentExpressions(expr);
     }
+
+    // Visit the ordinary defaults that this call actually uses. Consider
+    // `int use(Mode m = Mode.A)`: use() references Mode.A, while use(Mode(1)) does not.
+    // A checked invocation retains only supplied arguments; addDirectCallArgs in IR
+    // lowering obtains the omitted arguments from the selected callable's parameters.
+    // Follow that same signature here, before lowering, so the caller's requirements
+    // include the checked default expressions without restricting every use of `use`.
+    void visitDefaultArgumentExpressions(InvokeExpr* expr)
+    {
+        // Failed overload resolution keeps the original invocation with ErrorType.
+        // Its missing arguments can be required parameters, so no defaults were selected.
+        if (IsErrorExpr(expr))
+            return;
+        auto callee = as<DeclRefExpr>(expr->functionExpr);
+        if (!callee)
+            return;
+        auto callable = callee->declRef.template as<CallableDecl>();
+        if (!callable)
+            return;
+        auto parameters = getParametersForCallableSignature(getASTBuilder(), callable);
+        for (Index i = expr->arguments.getCount(); i < parameters.getCount(); ++i)
+            static_cast<VisitorType*>(this)->visitDefaultArgument(parameters[i].getDecl());
+    }
+
+    // Visit a selected default's checked source. Defaults can refer back to themselves
+    // through calls, as in `int f(int x = f()) { return x; }`. This is a graph walk,
+    // not recursive expansion of the default. Stop back edges while collecting references;
+    // lowering retains responsibility for diagnosing unbounded expansion. Remove each
+    // parameter on return so another use can be analyzed in its own target context.
+    void visitDefaultArgument(Decl* param)
+    {
+        if (!activeDefaultArguments.add(param))
+            return;
+        if (auto typeParam = as<GenericTypeParamDecl>(param))
+            visitTypeExp(typeParam->initType);
+        else
+        {
+            auto valueParam = as<VarDeclBase>(param);
+            SLANG_RELEASE_ASSERT(valueParam && valueParam->initExpr);
+            dispatchIfNotNull(valueParam->initExpr);
+        }
+        activeDefaultArguments.remove(param);
+    }
+
+    HashSet<Decl*> activeDefaultArguments;
 
     // A fast-path builtin operator (e.g. `getClock() + 1`) is a `BuiltinOperatorExpr`, not an
     // `InvokeExpr`, so it needs its own recursion into the operands -- otherwise decl references
@@ -1173,9 +1284,25 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitTypeCastExpr(TypeCastExpr* expr)
     {
-        dispatchIfNotNull(expr->functionExpr);
-        for (auto arg : expr->arguments)
-            dispatchIfNotNull(arg);
+        if (auto operand = getIdentityCastOperand(expr))
+        {
+            visitTypeExpressionSource(expr->functionExpr);
+            dispatchIfNotNull(operand);
+        }
+        else
+            visitInvokeExpr(expr);
+    }
+
+    void visitBuiltinCastExpr(BuiltinCastExpr* expr)
+    {
+        dispatchIfNotNull(expr->base);
+        dispatchIfNotNull(expr->type.type);
+    }
+
+    void visitSizeOfLikeExpr(SizeOfLikeExpr* expr)
+    {
+        dispatchIfNotNull(expr->value);
+        dispatchIfNotNull(expr->dataLayout);
     }
 
     void visitDerefExpr(DerefExpr* expr) { dispatchIfNotNull(expr->base); }
@@ -1194,6 +1321,23 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitDeclRefExpr(DeclRefExpr* expr)
     {
+        visitGenericArgumentExpressions(expr);
+        // The solver records default selection before folding erases case references.
+        // Only the selected reference carries this list, so unused overloads and
+        // explicitly supplied or inferred arguments do not contribute their defaults.
+        for (auto param : expr->defaultedGenericParams)
+            static_cast<VisitorType*>(this)->visitDefaultArgument(param);
+        if (visitingTypeSource && as<TypeType>(expr->type))
+        {
+            // Canonicalization also erases aliases. Their own requirements belong to
+            // references to the alias, even when its underlying type is unrestricted.
+            if (expr->declRef.is<TypeDefDecl>())
+            {
+                dispatchIfNotNull(expr->declRef.declRefBase);
+                processDeclModifiers(expr->declRef.getDecl(), expr->loc);
+            }
+            return;
+        }
         dispatchIfNotNull(expr->type.type);
         dispatchIfNotNull(expr->declRef.declRefBase);
 
@@ -1238,10 +1382,10 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitThisInterfaceExpr(ThisInterfaceExpr*) { return; }
     void visitAndTypeExpr(AndTypeExpr* expr)
     {
-        dispatchIfNotNull(expr->left.type);
-        dispatchIfNotNull(expr->right.type);
+        visitTypeExp(expr->left);
+        visitTypeExp(expr->right);
     }
-    void visitPointerTypeExpr(PointerTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
+    void visitPointerTypeExpr(PointerTypeExpr* expr) { visitTypeExp(expr->base); }
     void visitAsTypeExpr(AsTypeExpr* expr)
     {
         dispatchIfNotNull(expr->value);
@@ -1263,22 +1407,25 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         // innerVarDecl is synthetic; innerCoercedExpr references it
         dispatchIfNotNull(expr->innerCoercedExpr);
     }
-    void visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr*) { return; }
+    void visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr* expr)
+    {
+        visitGenericArgumentExpressions(expr);
+    }
     void visitSPIRVAsmExpr(SPIRVAsmExpr*) { return; }
-    void visitModifiedTypeExpr(ModifiedTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
+    void visitModifiedTypeExpr(ModifiedTypeExpr* expr) { visitTypeExp(expr->base); }
     void visitFuncTypeExpr(FuncTypeExpr* expr)
     {
         for (const auto& t : expr->parameters)
         {
-            dispatchIfNotNull(t.type);
+            visitTypeExp(t);
         }
-        dispatchIfNotNull(expr->result.type);
+        visitTypeExp(expr->result);
     }
     void visitTupleTypeExpr(TupleTypeExpr* expr)
     {
         for (auto t : expr->members)
         {
-            dispatchIfNotNull(t.type);
+            visitTypeExp(t);
         }
     }
     void visitShapePackTransformExpr(ShapePackTransformExpr* expr)
@@ -1288,9 +1435,9 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     }
     void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
     {
-        dispatchIfNotNull(expr->packOperand.type);
-        dispatchIfNotNull(expr->emptyType.type);
-        dispatchIfNotNull(expr->nonEmptyType.type);
+        visitTypeExp(expr->packOperand);
+        visitTypeExp(expr->emptyType);
+        visitTypeExp(expr->nonEmptyType);
     }
     void visitTryExpr(TryExpr* expr) { dispatchIfNotNull(expr->base); }
     void visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
@@ -1464,12 +1611,16 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitFunctionDeclBase(FunctionDeclBase* decl)
     {
         visitContainerDecl(decl);
+        visitTypeExp(decl->returnType);
+        visitTypeExp(decl->errorType);
         dispatchIfNotNull(decl->body);
     }
 
+    void visitTypeDefDecl(TypeDefDecl* decl) { visitTypeExp(decl->type); }
+
     void visitVarDeclBase(VarDeclBase* varDecl)
     {
-        dispatchIfNotNull(varDecl->type.type);
+        visitTypeExp(varDecl->type);
         dispatchIfNotNull(varDecl->initExpr);
     }
 };
@@ -1495,10 +1646,16 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
 
     CapabilitySet getDeclaredCapabilitySet(Decl* decl);
 
+    // Validate an explicit public contract against inferred dependencies. Declarations
+    // without an explicit contract keep their inferred requirements.
+    void checkDeclaredCapabilityRequirements(Decl* decl);
+
     void visitDecl(Decl*) {}
     void visitDeclGroup(DeclGroup*) {}
     void checkVarDeclCommon(VarDeclBase* varDecl);
     void visitContainerDecl(ContainerDecl* decl);
+    void visitEnumCaseDecl(EnumCaseDecl* decl);
+    void visitTypeDefDecl(TypeDefDecl* decl);
 
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
@@ -3802,6 +3959,8 @@ static bool _initExprIsRuntimeValue(ASTBuilder* astBuilder, Expr* expr)
         return false;
     if (as<ErrorType>(expr->type.type))
         return false;
+    if (auto operand = getIdentityCastOperand(expr))
+        return _initExprIsRuntimeValue(astBuilder, operand);
     HashSet<Type*> activeTypes;
     if (_isResourceHandleOnlyType(astBuilder, expr->type.type, activeTypes))
     {
@@ -5815,6 +5974,18 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
         //
         ensureAllDeclsRec(moduleDecl, s);
         ensureRegisteredSynthesizedDecls(s);
+    }
+
+    // Default expressions can refer back to their own callable. Cache their requirements
+    // after declaration contracts are complete so `int f(int value = f())` does not
+    // re-enter capability checking for its parameter while checking f's contract.
+    // Failed modules are not serialized and may still contain unchecked error recovery syntax.
+    if (getSink()->getErrorCount() == 0 &&
+        !getOptionSet().getBoolOption(CompilerOptionName::IgnoreCapabilities))
+    {
+        cacheDefaultArgumentCapabilities(this, moduleDecl);
+        for (Index i = 0; i < getShared()->getSynthesizedDeclRootCount(); ++i)
+            cacheDefaultArgumentCapabilities(this, getShared()->getSynthesizedDeclRoot(i));
     }
 
     // Once we have completed the above loop, all declarations not
@@ -22649,6 +22820,22 @@ struct CapabilityDeclReferenceVisitor
         if (decl)
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
     }
+    // Module serialization keeps canonical types rather than their source expressions.
+    // A selected default such as `T = Box<int(Mode.A) * 0>` therefore uses its saved
+    // requirement summary after import. While the defining module is being checked,
+    // summaries are not ready yet and we visit the checked source instead.
+    void visitDefaultArgument(Decl* param)
+    {
+        if (auto modifier = param->findModifier<DefaultArgumentCapabilityModifier>())
+        {
+            auto loc =
+                Base::sourceLocStack.getCount() ? Base::sourceLocStack.getLast() : param->loc;
+            handleProcessFunc(param, modifier->capabilityRequirements, loc);
+        }
+        else
+            Base::visitDefaultArgument(param);
+    }
+
     // Collect the capabilities of the individual conformances in a type-pack proof.
     // Consider this example:
     //
@@ -23039,6 +23226,57 @@ void visitReferencedDecls(
         visitor.dispatchIfNotNull(decl);
 }
 
+// Save default requirements while checked source is still available. Consider this example:
+//
+//     enum Mode { [require(hlsl)] A = 0 }
+//     struct Box<let N : int> {}
+//     int read<T = Box<int(Mode.A) * 0>>() { return 7; }
+//
+// The type default serializes as Box<0>, so an imported read() cannot recover Mode.A from
+// its semantic type. Preserve the requirements on the parameter, separately from its
+// declaration contract, so read<int>() remains unrestricted. This runs after the module's
+// capability phase; nested default expressions can use either an already-published summary
+// or their checked source, without starting a new declaration-checking phase.
+static void cacheDefaultArgumentCapabilities(SemanticsVisitor* semantics, Decl* rootDecl)
+{
+    bool hasDefault = false;
+    if (auto typeParam = as<GenericTypeParamDecl>(rootDecl))
+        hasDefault = typeParam->initType.type != nullptr;
+    else if (as<ParamDecl>(rootDecl) || as<GenericValueParamDecl>(rootDecl))
+        hasDefault = as<VarDeclBase>(rootDecl)->initExpr != nullptr;
+
+    if (hasDefault && !rootDecl->findModifier<DefaultArgumentCapabilityModifier>())
+    {
+        CapabilitySet capabilities;
+        CapabilityDeclReferenceVisitor visitor(
+            [&](SyntaxNode*, const CapabilitySetVal* nodeCaps, SourceLoc)
+            { capabilities.join(nodeCaps); },
+            [](DiagnosticCategory) {},
+            nullptr,
+            *semantics);
+        visitor.sourceLocStack.add(rootDecl->loc);
+        visitor.visitDefaultArgument(rootDecl);
+
+        // Collecting an unused default must not propagate requirements onto the parameter
+        // or diagnose target conflicts at its declaration. Consumers apply this summary
+        // only when a call actually selects the default.
+        auto modifier = semantics->getASTBuilder()->create<DefaultArgumentCapabilityModifier>();
+        modifier->capabilityRequirements = capabilities.freeze(semantics->getASTBuilder());
+        addModifier(rootDecl, modifier);
+    }
+
+    if (auto containerDecl = as<ContainerDecl>(rootDecl))
+    {
+        for (auto member : containerDecl->getDirectMemberDecls())
+        {
+            if (!as<ScopeDecl>(member))
+                cacheDefaultArgumentCapabilities(semantics, member);
+        }
+    }
+    if (auto genericDecl = as<GenericDecl>(rootDecl))
+        cacheDefaultArgumentCapabilities(semantics, genericDecl->inner);
+}
+
 CapabilitySet getDeclRefCapabilityRequirements(
     SemanticsVisitor* visitor,
     DeclRef<Decl> declRef,
@@ -23087,19 +23325,27 @@ CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)
 
 void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
-    CapabilitySet mutableCapSet{varDecl->inferredCapabilityRequirements};
-    visitReferencedDecls(
-        *this,
-        varDecl->type.type,
-        varDecl->loc,
-        varDecl->findModifier<RequireCapabilityAttribute>(),
+    CapabilitySet capabilities{varDecl->inferredCapabilityRequirements};
+    for (auto attribute : varDecl->getModifiersOfType<RequireCapabilityAttribute>())
+        capabilities.unionWith(attribute->capabilitySet);
+    CapabilityDeclReferenceVisitor visitor(
         [this,
          varDecl,
-         &mutableCapSet](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
-        { _propagateRequirement(this, mutableCapSet, varDecl, node, nodeCaps, refLoc); },
+         &capabilities](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
+        { _propagateRequirement(this, capabilities, varDecl, node, nodeCaps, refLoc); },
         [this, varDecl](DiagnosticCategory category)
-        { _propagateSeeDefinitionOf(this, varDecl, category); });
-    varDecl->inferredCapabilityRequirements = mutableCapSet.freeze(getASTBuilder());
+        { _propagateSeeDefinitionOf(this, varDecl, category); },
+        varDecl->findModifier<RequireCapabilityAttribute>(),
+        *this);
+    visitor.sourceLocStack.add(varDecl->loc);
+    visitor.visitTypeExp(varDecl->type);
+    // Global and static initializers belong to their declaration. Parameter defaults
+    // are visited only at calls that omit the argument; locals are analyzed in their
+    // enclosing statement's target-switch context.
+    if (as<VarDecl>(varDecl) && !isLocalVar(varDecl) &&
+        (isGlobalDecl(varDecl) || varDecl->hasModifier<HLSLStaticModifier>()))
+        visitor.dispatchIfNotNull(varDecl->initExpr);
+    varDecl->inferredCapabilityRequirements = capabilities.freeze(getASTBuilder());
 }
 
 CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* decl)
@@ -23120,6 +23366,15 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
     CapabilityAtom stageToJoin = CapabilityAtom::Invalid;
     for (Decl* parent = decl; parent; parent = getParentDecl(parent))
     {
+        // A lexical statement scope does not give its declarations the enclosing function's
+        // contract. Consider a function requiring spvShaderClockKHR with `typealias X = int`:
+        // returning X(1) in its `case spirv` arm does not require a clock operation. Giving X
+        // that ambient requirement could make this arm incompatible with another arm that
+        // requires an unrelated SPIR-V feature. Aggregate members still inherit their
+        // aggregate's requirements before this boundary.
+        if (as<ScopeDecl>(parent))
+            break;
+
         CapabilitySet localDeclaredCaps;
         bool shouldBreak = false;
         if (!as<AggTypeDeclBase>(parent) || !parent->inferredCapabilityRequirements ||
@@ -23162,6 +23417,47 @@ void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
 {
     // Any potential child must get it's capabilities from `getDeclaredCapabilitySet`.
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl).freeze(getASTBuilder());
+}
+
+void SemanticsDeclCapabilityVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
+{
+    // A case owns its requirements. For example, `[require(hlsl)] A = 0, B = A`
+    // gives both A and B an HLSL requirement, without restricting uses of the enum type.
+    auto capabilities = getDeclaredCapabilitySet(decl);
+    visitReferencedDecls(
+        *this,
+        decl->tagExpr,
+        decl->loc,
+        decl->findModifier<RequireCapabilityAttribute>(),
+        [this,
+         decl,
+         &capabilities](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc loc)
+        { _propagateRequirement(this, capabilities, decl, node, nodeCaps, loc); },
+        [this, decl](DiagnosticCategory category)
+        { _propagateSeeDefinitionOf(this, decl, category); });
+    decl->inferredCapabilityRequirements = capabilities.freeze(getASTBuilder());
+    checkDeclaredCapabilityRequirements(decl);
+}
+
+void SemanticsDeclCapabilityVisitor::visitTypeDefDecl(TypeDefDecl* decl)
+{
+    // `typealias Selected = Box<int(Mode.hlslMode) * 0>` references Mode.hlslMode
+    // even though the alias resolves to Box<0>. Infer from the checked source expression;
+    // callers then inherit these requirements by referencing the alias declaration.
+    auto capabilities = getDeclaredCapabilitySet(decl);
+    CapabilityDeclReferenceVisitor visitor(
+        [this,
+         decl,
+         &capabilities](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc loc)
+        { _propagateRequirement(this, capabilities, decl, node, nodeCaps, loc); },
+        [this, decl](DiagnosticCategory category)
+        { _propagateSeeDefinitionOf(this, decl, category); },
+        decl->findModifier<RequireCapabilityAttribute>(),
+        *this);
+    visitor.sourceLocStack.add(decl->loc);
+    visitor.visitTypeExp(decl->type);
+    decl->inferredCapabilityRequirements = capabilities.freeze(getASTBuilder());
+    checkDeclaredCapabilityRequirements(decl);
 }
 
 void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extensionDecl)
@@ -23224,6 +23520,47 @@ void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extension
         extensionDecl->loc);
 }
 
+void SemanticsDeclCapabilityVisitor::checkDeclaredCapabilityRequirements(Decl* decl)
+{
+    auto declaredCaps = getDeclaredCapabilitySet(decl);
+    if (declaredCaps.isEmpty())
+        return;
+
+    const auto frozenDeclaredCaps = declaredCaps.freeze(getASTBuilder());
+    auto declaredCapModifier = m_astBuilder->create<ExplicitlyDeclaredCapabilityModifier>();
+    declaredCapModifier->declaredCapabilityRequirements = frozenDeclaredCaps;
+    addModifier(decl, declaredCapModifier);
+    if (getDeclVisibility(decl) == DeclVisibility::Public)
+    {
+        // A public declaration must cover every referenced declaration's requirements.
+        // For example, a [require(sm_6_0)] alias cannot reference a case requiring sm_6_6.
+        // As for functions, the implementation can support additional targets or stages
+        // beyond those exposed by the public contract.
+        CapabilityAtomSet failedAvailableCapabilityConjunction;
+        CheckCapabilityRequirementResult checkCapabilityResult;
+        CapabilitySet::checkCapabilityRequirement(
+            CheckCapabilityRequirementOptions::AvailableCanHaveSubsetOfAbstractAtoms,
+            declaredCaps,
+            CapabilitySet{decl->inferredCapabilityRequirements},
+            failedAvailableCapabilityConjunction,
+            checkCapabilityResult);
+        diagnoseUndeclaredCapability(
+            decl,
+            UndeclaredCapabilityDiagnosticKind::UseOfUndeclaredCapability,
+            failedAvailableCapabilityConjunction,
+            true);
+        decl->inferredCapabilityRequirements = frozenDeclaredCaps;
+    }
+    else
+    {
+        // Preserve the existing internal-declaration policy: join declared and inferred
+        // requirements rather than checking a public API contract.
+        decl->inferredCapabilityRequirements = CapabilitySet{decl->inferredCapabilityRequirements}
+                                                   .join(declaredCaps)
+                                                   .freeze(getASTBuilder());
+    }
+}
+
 void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
 {
     setParentFuncOfVisitor(funcDecl);
@@ -23242,19 +23579,22 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
             member->loc);
     }
 
-    // visit the body of our funcDecl, propagate capabilities.
-    visitReferencedDecls(
-        *this,
-        funcDecl->body,
-        funcDecl->loc,
-        funcDecl->findModifier<RequireCapabilityAttribute>(),
+    // Visit the checked signature and body so references erased from canonical types
+    // still contribute to this declaration's requirements.
+    CapabilityDeclReferenceVisitor visitor(
         [this, funcDecl, &mutableFuncDeclCapSet](
             SyntaxNode* node,
             const CapabilitySetVal* nodeCaps,
             SourceLoc refLoc)
         { _propagateRequirement(this, mutableFuncDeclCapSet, funcDecl, node, nodeCaps, refLoc); },
         [this, funcDecl](DiagnosticCategory category)
-        { _propagateSeeDefinitionOf(this, funcDecl, category); });
+        { _propagateSeeDefinitionOf(this, funcDecl, category); },
+        funcDecl->findModifier<RequireCapabilityAttribute>(),
+        *this);
+    visitor.sourceLocStack.add(funcDecl->loc);
+    visitor.visitTypeExp(funcDecl->returnType);
+    visitor.visitTypeExp(funcDecl->errorType);
+    visitor.dispatchIfNotNull(funcDecl->body);
 
     // A user-defined forward/backward derivative is invoked only when the primal is
     // *differentiated* (`fwd_diff` / `bwd_diff`), not on every call to the primal.
@@ -23285,61 +23625,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
 
     funcDecl->inferredCapabilityRequirements = mutableFuncDeclCapSet.freeze(getASTBuilder());
 
-    // Get require of decl + add parents
-    auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
-
-    // If 0 capabilities were annotated on this function,
-    // keep the capabilities inferred from the children.
-    if (declaredCaps.isEmpty())
-    {
-        funcDecl->inferredCapabilityRequirements = mutableFuncDeclCapSet.freeze(getASTBuilder());
-    }
-    else
-    {
-        auto vis = getDeclVisibility(funcDecl);
-        const auto frozenDeclaredCaps = declaredCaps.freeze(getASTBuilder());
-        auto declaredCapModifier = m_astBuilder->create<ExplicitlyDeclaredCapabilityModifier>();
-        declaredCapModifier->declaredCapabilityRequirements = frozenDeclaredCaps;
-        addModifier(funcDecl, declaredCapModifier);
-        if (vis == DeclVisibility::Public)
-        {
-            // We need to enforce that the function-body
-            // only uses capabilities that the function-decl declares.
-            //
-            // A small exception to this rule is that the body must
-            // implement all shader stages/targets of the functionDecl
-            // requirements. The body can support *more* stages/targets,
-            // these will just be not accessible (which is fine since a user
-            // may only need hlsl support for a function, using an STD-LIB function
-            // implemented for all targets/stages).
-            CapabilityAtomSet failedAvailableCapabilityConjunction;
-            CheckCapabilityRequirementResult checkCapabilityResult;
-            CapabilitySet::checkCapabilityRequirement(
-                CheckCapabilityRequirementOptions::AvailableCanHaveSubsetOfAbstractAtoms,
-                declaredCaps,
-                CapabilitySet{funcDecl->inferredCapabilityRequirements},
-                failedAvailableCapabilityConjunction,
-                checkCapabilityResult);
-            diagnoseUndeclaredCapability(
-                funcDecl,
-                UndeclaredCapabilityDiagnosticKind::UseOfUndeclaredCapability,
-                failedAvailableCapabilityConjunction,
-                true);
-
-            // declared capabilities must be a superset.
-            funcDecl->inferredCapabilityRequirements = frozenDeclaredCaps;
-        }
-        else
-        {
-            // For internal decls, their inferred capability should be joined
-            // with the declared capabilities since we are assuming the stdlib
-            // is not wrong.
-            funcDecl->inferredCapabilityRequirements =
-                CapabilitySet{funcDecl->inferredCapabilityRequirements}
-                    .join(declaredCaps)
-                    .freeze(getASTBuilder());
-        }
-    }
+    checkDeclaredCapabilityRequirements(funcDecl);
 
     // See _checkExtensionMemberCapConflict for the rationale behind checking
     // only own [require(...)] attributes here.

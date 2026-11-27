@@ -469,6 +469,11 @@ struct OverloadCandidate
     // -- rather than a separate linear pass. -1 until computed.
     Index explicitGenericArgCount = -1;
 
+    // Parameters whose defaults were selected by this candidate's generic application.
+    // Keep these candidate-local until overload selection: another candidate can use
+    // different defaults, and inference can override a default.
+    List<Decl*> defaultedGenericParams;
+
     // When a generic candidate fails before producing a specialized decl-ref,
     // the solver can record a focused failure reason here. The selected failed
     // candidate reports this reason instead of falling back to only the generic
@@ -3826,7 +3831,8 @@ public:
         GenericInferenceContext&& inferenceContext,
         DeclRef<GenericDecl> genericDeclRef,
         ArrayView<Val*> providedOrdinaryArgs,
-        ConversionCost& outBaseCost);
+        ConversionCost& outBaseCost,
+        List<Decl*>* outDefaultedGenericParams = nullptr);
 
 
     // State related to overload resolution for a call
@@ -4045,7 +4051,8 @@ public:
         LookupResultItem item,
         DeclRef<CallableDecl> funcDeclRef,
         OverloadResolveContext& context,
-        ConversionCost baseCost);
+        ConversionCost baseCost,
+        ArrayView<Decl*> defaultedGenericParams = ArrayView<Decl*>());
 
     void AddFuncOverloadCandidate(
         FuncType* /*funcType*/,
@@ -4212,14 +4219,16 @@ public:
         ArrayView<Val*> providedOrdinaryArgs,
         ConversionCost& outBaseCost,
         List<QualType>* innerParameterTypes = nullptr,
-        GenericArgumentInferenceFailure* outFailure = nullptr);
+        GenericArgumentInferenceFailure* outFailure = nullptr,
+        List<Decl*>* outDefaultedGenericParams = nullptr);
 
     void AddTypeOverloadCandidates(Type* type, OverloadResolveContext& context);
 
     void AddDeclRefOverloadCandidates(
         LookupResultItem item,
         OverloadResolveContext& context,
-        ConversionCost baseCost);
+        ConversionCost baseCost,
+        ArrayView<Decl*> defaultedGenericParams = ArrayView<Decl*>());
 
     void AddOverloadCandidates(LookupResult const& result, OverloadResolveContext& context);
 
