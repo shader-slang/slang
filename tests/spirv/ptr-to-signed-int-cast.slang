@@ -42,8 +42,8 @@ void computeMain()
 }
 
 // A pointer-sized signed cast routes the same way as the fixed-width one: the unsigned
-// intermediate must come from the pointer-sized unsigned type, so a classifier regression
-// that handed `getUnsignedTypeFromSignedType` the signed type would emit the invalid
+// intermediate must come from the pointer-sized unsigned type, so a classifier desync
+// that let the signed type reach `OpConvertPtrToU` unchanged would emit the invalid
 // `OpConvertPtrToU %long` shape and fail these checks.
 [shader("compute")]
 [numthreads(1, 1, 1)]
