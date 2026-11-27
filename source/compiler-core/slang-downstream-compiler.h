@@ -173,6 +173,8 @@ struct DownstreamCompileOptions
             EnableFloat8 = 0x10,         ///< If set compiles with support for float8
             EnableBfloat16 = 0x20,       ///< If set compiles with support for bfloat16
             EnableLogging = 0x40,        ///< If set compiles with support for shader logging
+            RequiresOptix = 0x80,        ///< If set the code needs the OptiX headers (for example a
+                                         ///< ray-tracing stage or OptiX cooperative vectors)
         };
     };
 

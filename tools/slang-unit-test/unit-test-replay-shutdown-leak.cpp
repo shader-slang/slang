@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-shutdown-leak.cpp
 //
 // Regression test for https://github.com/shader-slang/slang/issues/10624
@@ -11,7 +12,7 @@
 
 // Verify that resetHandlers() clears the dictionary, so _CrtDumpMemoryLeaks()
 // won't report the handler strings as leaks when called from slang_shutdown().
-SLANG_UNIT_TEST(replayResetHandlersClearsDictionary)
+SLANG_UNIT_TEST(replayResetHandlersClearsDictionary, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -43,7 +44,7 @@ SLANG_UNIT_TEST(replayResetHandlersClearsDictionary)
 // body runs.
 //
 // Regression test for https://github.com/shader-slang/slang/issues/10791
-SLANG_UNIT_TEST(replayTryGetSkipsConstruction)
+SLANG_UNIT_TEST(replayTryGetSkipsConstruction, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -55,7 +56,7 @@ SLANG_UNIT_TEST(replayTryGetSkipsConstruction)
 }
 
 // Make sure the singleton is released after destroySingleton().
-SLANG_UNIT_TEST(replayContextDestroyedByShutdown)
+SLANG_UNIT_TEST(replayContextDestroyedByShutdown, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -67,3 +68,4 @@ SLANG_UNIT_TEST(replayContextDestroyedByShutdown)
     ReplayContext::destroySingleton();
     SLANG_CHECK(ReplayContext::tryGet() == nullptr);
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

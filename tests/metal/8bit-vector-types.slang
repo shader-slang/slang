@@ -1,6 +1,5 @@
 //TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=BUF):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0], stride=4, counter=1):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -22,7 +21,7 @@ void computeMain()
     // MTL: char2
     uint8_t2 u8v2 = createUChar2();
     int8_t2 i8v2 = createChar2();
-    
+
     // BUF: {{^}}4{{$}}
     outputBuffer[0] = u8v2.x + i8v2.x;
 }

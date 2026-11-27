@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // CHECK: 1
 // CHECK-NEXT: 0

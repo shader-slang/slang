@@ -9,7 +9,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(findTypeByName)
+SLANG_UNIT_TEST(findTypeByName, NoRenderApi)
 {
     const char* testSource = "struct TestStruct {"
                              "   int member0;"
@@ -53,7 +53,7 @@ SLANG_UNIT_TEST(findTypeByName)
     spDestroySession(session);
 }
 
-SLANG_UNIT_TEST(findTypeByNameExtensionTypeAlias)
+SLANG_UNIT_TEST(findTypeByNameExtensionTypeAlias, NoRenderApi)
 {
     const char* vectorizeSource = R"(
         module slangpy;

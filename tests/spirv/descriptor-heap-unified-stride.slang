@@ -17,7 +17,7 @@
 // Conflict: a non-zero explicit literal stride and the unified maximum stride are mutually
 // exclusive, so combining them is a hard error rather than silently letting one win. (An explicit
 // stride of 0 selects the same default path the unified option modifies and is accepted.)
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CONFLICT): -target spirv-asm -entry computeMain -stage compute -capability spvDescriptorHeapEXT -spirv-resource-heap-stride 64 -spirv-unified-descriptor-heap-stride
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CONFLICT,exit-code=1): -target spirv-asm -entry computeMain -stage compute -capability spvDescriptorHeapEXT -spirv-resource-heap-stride 64 -spirv-unified-descriptor-heap-stride
 
 // Single resource category: a shader that uses ONLY a constant buffer must STILL advertise the
 // fixed image-vs-buffer max (the host's heap layout is independent of shader contents), so the

@@ -5,8 +5,31 @@
 #include "slang-io.h"
 #include "slang-string-util.h"
 
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+#include <crtdbg.h>
+#include <stdlib.h>
+#endif
+
 namespace Slang
 {
+
+/* static */ void TestToolUtil::suppressDebugDialogs()
+{
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Suppress the modal abort() dialog.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+
+    // The debug CRT reports errors and failed assertions (for example heap corruption) with a
+    // separate mechanism, _CrtDbgReport, that opens its own message box. We write these reports
+    // to the standard error instead. _CrtXXX functions are functional only for a debug build. The
+    // spec says, "When _DEBUG isn't defined, calls to _CrtSetReportMode are removed during
+    // preprocessing."
+    _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
+    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+#endif
+}
 
 /* static */ ToolReturnCode TestToolUtil::getReturnCode(SlangResult res)
 {
@@ -14,6 +37,8 @@ namespace Slang
     {
     case SLANG_OK:
         return ToolReturnCode::Success;
+    case SLANG_E_ABORT:
+        return ToolReturnCode::InternalCompilerError;
     case SLANG_E_INTERNAL_FAIL:
         return ToolReturnCode::CompilationFailed;
     case SLANG_FAIL:

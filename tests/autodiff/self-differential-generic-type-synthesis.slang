@@ -1,13 +1,11 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-// Test that struct types made up of differentiable members who are self-differential (i.e. their Differential type is the same as their type) 
+// Test that struct types made up of differentiable members who are self-differential (i.e. their Differential type is the same as their type)
 // are considered self-differential as well. We should be able to assign T.Differential = T and T = T.Differential without errors.
-// 
+//
 
 
 struct Ray<let N: int> : IDifferentiable {

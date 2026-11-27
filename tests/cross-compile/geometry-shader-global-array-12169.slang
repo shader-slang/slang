@@ -36,8 +36,11 @@ in triangle float4 coarseVecArray[3];
 // ARR_SPIRV: OpExecutionMode %mainArrayStruct Triangles
 // ARR_SPIRV-DAG: %coarseArray_position = OpVariable %{{.*}} Input
 // ARR_SPIRV-DAG: %coarseArray_color = OpVariable %{{.*}} Input
-// ARR_SPIRV: %[[PP:[0-9]+]] = OpAccessChain %_ptr_Input_v4float %coarseArray_position %{{[0-9]+}}
-// ARR_SPIRV: %[[CP:[0-9]+]] = OpAccessChain %_ptr_Input_v3float %coarseArray_color %{{[0-9]+}}
+// The index operand is the loop induction value, which direct SPIR-V emission
+// now keeps in SSA form, so it disassembles under its name hint rather than as a
+// numeric register id.
+// ARR_SPIRV: %[[PP:[0-9]+]] = OpAccessChain %_ptr_Input_v4float %coarseArray_position %{{[A-Za-z0-9_]+}}
+// ARR_SPIRV: %[[CP:[0-9]+]] = OpAccessChain %_ptr_Input_v3float %coarseArray_color %{{[A-Za-z0-9_]+}}
 // ARR_SPIRV: OpLoad %v4float %[[PP]]
 // ARR_SPIRV: OpLoad %v3float %[[CP]]
 // ARR_SPIRV: OpStore %outputStream_position %{{[0-9]+}}
@@ -47,9 +50,12 @@ in triangle float4 coarseVecArray[3];
 // ARR_GLSL-DAG: in vec3 {{.*}}coarseArray_color{{[0-9_]*}}[3];
 // `v` receives both fields from the indexed input; the output reads position
 // from `v` and color from the whole-struct copy `[[S]] = v`, so both fields are
-// bound from input element to their matching output.
+// bound from input element to their matching output. The color element address is folded
+// into the color load, after the store to `v.position`. The fold check does not fold the
+// load of `ii` past any store, even one that cannot change `ii`, so it gets a temporary.
+// ARR_GLSL: [[II:_S[0-9]+]] = ii{{[0-9_]*}};
 // ARR_GLSL: [[V:v[0-9_]+]].position{{[0-9_]*}} = {{.*}}coarseArray_position{{[0-9_]*}}[ii{{[0-9_]*}}];
-// ARR_GLSL: [[V]].color{{[0-9_]*}} = {{.*}}coarseArray_color{{[0-9_]*}}[ii{{[0-9_]*}}];
+// ARR_GLSL: [[V]].color{{[0-9_]*}} = {{.*}}coarseArray_color{{[0-9_]*}}{{\[}}[[II]]{{\]}};
 // ARR_GLSL: [[S:[A-Za-z_0-9]+]] = [[V]];
 // ARR_GLSL: outputStream_position{{[0-9_]*}} = [[V]].position{{[0-9_]*}};
 // ARR_GLSL: outputStream_color{{[0-9_]*}} = [[S]].color{{[0-9_]*}};
@@ -73,7 +79,7 @@ void mainArrayStruct(inout TriangleStream<RasterVertex> outputStream)
 
 // VEC_SPIRV: OpExecutionMode %mainVecArray Triangles
 // VEC_SPIRV-DAG: OpTypeArray %v4float %int_3
-// VEC_SPIRV: %[[VP:[0-9]+]] = OpAccessChain %_ptr_Input_v4float %coarseVecArray %{{[0-9]+}}
+// VEC_SPIRV: %[[VP:[0-9]+]] = OpAccessChain %_ptr_Input_v4float %coarseVecArray %{{[A-Za-z0-9_]+}}
 // VEC_SPIRV: OpLoad %v4float %[[VP]]
 // VEC_SPIRV: OpStore %outputStream_position %{{[0-9]+}}
 

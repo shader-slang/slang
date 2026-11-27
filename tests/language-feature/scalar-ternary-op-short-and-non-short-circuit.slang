@@ -4,13 +4,9 @@
 // - The ternary conditional operator with a vector condition
 //   evaluates both branches
 //
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type -xslang -Wno-30056
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type -xslang -Wno-30056
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute  -shaderobj -output-using-type -xslang -Wno-30056
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -compute  -shaderobj -output-using-type -xslang -Wno-30056
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -xslang -Wno-30056
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -xslang -Wno-30056
+//TEST:COMPARE_COMPUTE(targets=all-wgpu, filecheck-buffer=CHECK):-output-using-type -xslang -Wno-30056
 //
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-wgpu -compute  -shaderobj -output-using-type -xslang -Wno-30056
 // See https://github.com/shader-slang/slang/issues/12173
 
 

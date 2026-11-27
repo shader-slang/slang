@@ -90,12 +90,12 @@ void sharedBufferTestAPI(UnitTestContext* context, DeviceType srcApi, DeviceType
     sharedBufferTestImpl(srcDevice, dstDevice, context);
 }
 #if SLANG_WIN64
-SLANG_UNIT_TEST(sharedBufferD3D12ToCUDA)
+SLANG_UNIT_TEST(sharedBufferD3D12ToCUDA, D3D12 | CUDA)
 {
     sharedBufferTestAPI(unitTestContext, DeviceType::D3D12, DeviceType::CUDA);
 }
 
-SLANG_UNIT_TEST(sharedBufferVulkanToCUDA)
+SLANG_UNIT_TEST(sharedBufferVulkanToCUDA, Vulkan | CUDA)
 {
     sharedBufferTestAPI(unitTestContext, DeviceType::Vulkan, DeviceType::CUDA);
 }

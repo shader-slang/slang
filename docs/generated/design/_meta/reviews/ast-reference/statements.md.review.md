@@ -1,50 +1,45 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T08:17:46+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T06:58:24Z
 target_doc: ast-reference/statements.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 070b3ccec0f278478300fb9f59f4c0f312a12c4abadffcc0764197842e97ad2b
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: f39f7b2520b2e5061ebb8ffd7d9d6c3ee67d8463ef419fefebeebc4ad95a45
+source_commit: 56b1b0b83fb96f88f36da7e37cd9c2c7f27af70c
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: partial
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 5
+finding_count: 2
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 4
-  nit: 0
+  major: 0
+  minor: 1
+  nit: 1
 ---
 
 # Review report for ast-reference/statements.md
 
 ## Summary
-The page is structurally complete, covers every concrete class in the watched statement header, and has valid links and front matter. Five findings remain. The most important is that it equates `ScopeStmt` inheritance with opening a lexical scope, although the parser creates no statement-owned scope for `WhileStmt`, `DoWhileStmt`, or `SwitchStmt`.
+
+The document covers all concrete statement-header classes, and its line citations and links resolve correctly. The principal factual issue is a prose statement identifying the `IfStmt` predicate as `Stmt*`, although the header and the document’s own table correctly identify it as `Expr*`. Several notable-node callouts also exceed the contract’s prescribed length.
 
 ## Items checked
-- Verified the document against all three resolved watched files at `53b76e6d3009b8e6434d41573524c7ce5c499d23`, which is also the review-time `HEAD`.
-- Checked all 30 concrete classes and their table fields against `slang-ast-stmt.h`, plus every abstract intermediate shown in the hierarchy.
-- Re-derived all 24 line-number citation occurrences (22 distinct ranges or lines) in `slang-parser.cpp`; each cited line identifies the stated enum, call site, or function definition.
-- Verified more than 30 factual claims, including parser dispatch, deferred body parsing, block sequencing, loop construction, target-switch cases, catch chaining, labels, and capability-name validation.
-- Resolved all 41 relative links, including anchors, and checked both dependency documents: `ast-reference/base.md` and `syntax-reference/grammar.md`.
-- Checked the mandatory sections, front-matter keys, warning text, 64-character hexadecimal digest shape, and the 49,152-byte size cap.
+
+- Reviewed against the **current working tree**; `git diff` against the document’s source commit reported no differences under `source/`. Confirmed HEAD matches the supplied review commit.
+- Read `_review.md`, `_common.md`, and the document-specific prompt identified by `regenerate.py show ast-reference/statements.md`.
+- Checked all 30 concrete classes against `slang-ast-stmt.h`, including table coverage, field types, and hierarchy relationships.
+- Verified all 33 line-citation expressions, including paired locations and ranges, against `slang-parser.cpp`, `slang-options.cpp`, and `slang-check-stmt.cpp`.
+- Spot-checked more than 10 behavioral claims: block sequencing, empty blocks, deferred body parsing, scope restoration, `if let` desugaring, case-label siblings, HLSL loop scoping, loop-initializer validation, compile-time range parsing, deprecation diagnostics, shared target-case bodies, catch nesting, labeled breaks, defer restrictions, and capability-token filtering.
+- Resolved all 45 Markdown link occurrences (15 distinct destinations), checked both explicit anchors, and confirmed referenced generated pages appear in the manifest. Read dependency excerpts only for cross-reference checks.
+- Checked required section order, table columns, required notable-node coverage, front-matter keys and formats, Mermaid syntax, and Liquid safety. The document is 25,891 bytes, below its 49,152-byte cap.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Family hierarchy`, lines 42-46; `### BlockStmt and SeqStmt`, lines 134-139; `### Loop family`, lines 203-205 | The page presents `ScopeStmt` inheritance as the lexical-scope axis and concludes that every loop is “scope-introducing.” That is not how the watched parser constructs these nodes: only `ForStmt` receives and conditionally pushes its own `ScopeDecl`; `WhileStmt` and `DoWhileStmt` receive none, and `SwitchStmt` relies on its parsed `BlockStmt` for a scope rather than owning one itself. | `source/slang/slang-parser.cpp:6572-6581` creates `SwitchStmt` without assigning `scopeDecl`; `source/slang/slang-parser.cpp:7394-7420` creates and pushes the `ForStmt` scope; `source/slang/slang-parser.cpp:7457-7479` creates `WhileStmt` and `DoWhileStmt` without any scope operation. | Describe `ScopeStmt` as a structural base used by several control-flow groupings, then state precisely which parser routines create a statement-owned `ScopeDecl`: block, scoped `for`, GPU foreach, and compile-time `for`. Explain that a switch's block supplies its lexical scope and that while/do-while do not add a separate one. |
-| F-002 | minor | `### Loop family`, lines 206-209 | The page says `ParseForStatement` “rejects” an initializer that is not a `DeclStmt` or `ExpressionStmt`, but the function emits a diagnostic and continues constructing and returning the `ForStmt`. | `source/slang/slang-parser.cpp:7424-7437` diagnoses the unexpected statement without returning or clearing it; the function returns `stmt` at `source/slang/slang-parser.cpp:7454`. | Replace “rejects” with “diagnoses” and, if useful, note that parser recovery retains the constructed loop node. |
-| F-003 | minor | `## Nodes`, `DeferStmt` row, line 123 | The summary spells the form as `defer S;`, implying that `defer` itself requires a trailing semicolon. The parser consumes `defer` followed by an arbitrary `Stmt`, so a deferred block has no extra semicolon. | `source/slang/slang-parser.cpp:7571-7577` calls `ParseStatement()` immediately after `ReadToken("defer")`; `docs/generated/design/syntax-reference/grammar.md:439` specifies `DeferStmt ::= 'defer' Stmt`. | Change the generic spelling to `defer S`; optionally use `defer f();` and `defer { ... }` as examples if both forms need illustration. |
-| F-004 | minor | `## Nodes`, `DeferStmt` row, line 123; `### DeferStmt`, lines 264-268 | The page describes IR lowering in detail (“scope-exit handlers”), even though the per-document prompt explicitly forbids IR-level statement lowering and asks this page to stop at the AST node and link to the lowering page. | `docs/generated/design/_meta/prompts/ast-reference-statements.md:39-42` asks for the AST shape and a pipeline citation; lines 50-55 forbid IR-level lowering. | Retain that `DeferStmt::statement` stores the deferred statement and link to `pipeline/04-ast-to-ir.md`; remove the claims about enqueueing and scope-exit-handler materialization. |
-| F-005 | minor | Intro, lines 12-16 | The first body paragraph says what the page covers but not who it is for; the audience appears in a separate paragraph. The universal contract requires both in the first paragraph. | `docs/generated/design/_meta/prompts/_common.md:65-66` requires the first paragraph to state the coverage and intended reader. | Merge the audience sentence into the opening paragraph. |
-
-## No-issues notes
-- Every concrete `FIDDLE()` class in `slang-ast-stmt.h`, including `UniqueStmtIDNode`, appears exactly once in the Nodes table; abstract intermediates remain in the hierarchy.
-- The two-stage `UnparsedStmt` account and all associated parser citations match `parseOptBody` and `parseUnparsedStmt`.
-- The target-switch explanation correctly captures shared parsing, immediate capability-name validation, default-label encoding, and shared bodies for stacked labels.
+| F-001 | minor | `### IfStmt`, line 197 | `Holds the predicate and both branches as raw Stmt*` incorrectly assigns the statement-pointer type to the predicate. The table already gives the correct type. | `source/slang/slang-ast-stmt.h:86` declares `Expr* predicate`; lines 87–88 declare the two branches as `Stmt*`. | Change the sentence to specify an `Expr*` predicate and two `Stmt*` branches. |
+| F-002 | nit | `## Notable nodes`, particularly lines 138–173, 228–258, and 291–319 | Multiple callouts are substantially longer than the required 2–5 sentences each. For example, the block/sequence callout spans two lengthy paragraphs containing approximately 13 sentences. | `docs/generated/design/_meta/prompts/_common.md`, “AST reference family contract,” item 5 requires “short prose callouts (2-5 sentences each).” | Condense each callout to 2–5 sentences, retaining the required AST distinctions and parser references. Remove repetition of table fields and extended diagnostic examples. |

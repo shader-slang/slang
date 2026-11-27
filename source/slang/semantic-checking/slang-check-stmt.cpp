@@ -1,0 +1,1419 @@
+// slang-check-stmt.cpp
+#include "slang-check-impl.h"
+#include "slang/ir/slang-ir-util.h"
+#include "slang/slang-rich-diagnostics.h"
+
+// This file implements semantic checking logic related to statements.
+
+namespace Slang
+{
+namespace
+{
+/// RAII-like type for establishing an "outer" statement during nested checks.
+///
+/// The `SemanticsStmtVisitor` maintains a linked list of outer statements
+/// using `OuterStmtInfo` records stored on the recursive call stack during
+/// checking. This type creates a sub-`SemanticsStmtVisitor` that has one
+/// additional outer statement added to the stack of outer statements.
+///
+/// The outer statements are used to validate and resolve things like
+/// the target of `break` or `continue` statements.
+///
+struct WithOuterStmt : public SemanticsStmtVisitor
+{
+public:
+    WithOuterStmt(SemanticsStmtVisitor* visitor, Stmt* outerStmt)
+        : SemanticsStmtVisitor(visitor->withOuterStmts(&m_outerStmt))
+    {
+        m_outerStmt.next = visitor->getOuterStmts();
+        m_outerStmt.stmt = outerStmt;
+    }
+
+private:
+    OuterStmtInfo m_outerStmt;
+};
+} // namespace
+
+void SemanticsVisitor::checkStmt(Stmt* stmt, SemanticsContext const& context)
+{
+    if (!stmt)
+        return;
+    dispatchStmt(stmt, context);
+    checkModifiers(stmt);
+}
+
+CatchStmt* SemanticsVisitor::findMatchingCatchStmt(Type* errorType)
+{
+    for (auto outerStmtInfo = m_outerStmts; outerStmtInfo; outerStmtInfo = outerStmtInfo->next)
+    {
+        if (auto catchStmt = as<CatchStmt>(outerStmtInfo->stmt))
+        {
+            if (!catchStmt->errorVar || catchStmt->errorVar->getType()->equals(errorType))
+                return catchStmt;
+        }
+    }
+    return nullptr;
+}
+
+void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
+{
+    if (auto declGroup = as<DeclGroup>(stmt->decl))
+    {
+        // The members of a group reach their declaration points in order, so
+        // that a later initializer can refer to an earlier member, as in
+        // `int a = 1, b = a;`.
+        for (auto decl : declGroup->decls)
+            checkDeclAtDeclarationPoint(decl);
+        return;
+    }
+
+    auto decl = as<Decl>(stmt->decl);
+    SLANG_RELEASE_ASSERT(decl);
+    checkDeclAtDeclarationPoint(decl);
+}
+
+void SemanticsStmtVisitor::checkDeclAtDeclarationPoint(Decl* decl)
+{
+    // When we encounter a declaration during statement checking,
+    // it may already be partly checked, for example by a parser-time
+    // lookup that decides what `a <` means, so we bottleneck through
+    // the `ensureDecl()` path to unify with the rest of semantic checking.
+    //
+    // TODO: This logic might not suffice for something like a
+    // local `struct` declaration, where it would have members
+    // that need to be recursively checked.
+    //
+    ensureDecl(decl, DeclCheckState::DefinitionChecked, this);
+    decl->hiddenFromLookup = false;
+    if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        if (varDecl->initExpr)
+            varDecl->initExpr = maybeRegisterLambdaCapture(varDecl->initExpr);
+    }
+}
+
+void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
+{
+    // Make sure to fully check all nested agg type decls first.
+    if (stmt->scopeDecl)
+    {
+        for (auto aggDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<AggTypeDeclBase>())
+        {
+            ensureAllDeclsRec(aggDecl, DeclCheckState::DefinitionChecked);
+        }
+
+        // A local generic type is wrapped in a `GenericDecl`, which is not an
+        // `AggTypeDeclBase`, so the loop above does not reach it. Its inner type still
+        // needs the same conformance checking.
+        for (auto genericDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<GenericDecl>())
+        {
+            if (as<AggTypeDeclBase>(genericDecl->inner))
+                ensureAllDeclsRec(genericDecl, DeclCheckState::DefinitionChecked);
+        }
+
+        // We hide every local owned by this scope until its declaration is checked.
+        // In HLSL, that includes `for` initializers nested under other statements, such as
+        // `int x = i; for (int i = 0; i < 2; ++i) {}`. Looking only at the block's immediate
+        // declaration statements would let the earlier read bind to the later loop variable.
+        // `checkDeclAtDeclarationPoint` reveals each variable after checking its initializer;
+        // `_lookUpDirectAndTransparentMembers` skips variables still hidden from lookup.
+        for (auto decl : stmt->scopeDecl->getDirectMemberDecls())
+        {
+            if (isLocalVar(decl))
+                decl->hiddenFromLookup = true;
+        }
+    }
+    checkStmt(stmt->body);
+
+    // A `cbuffer` in a block adds a transparent variable to the block's scope, which does not go
+    // through `_dispatchDeclCheckingVisitor`, so we compare the members that lookup finds through
+    // it here, once the block's declarations are checked.
+    if (stmt->scopeDecl)
+        checkForRedeclarationOfTransparentMembers(stmt->scopeDecl);
+}
+
+void SemanticsStmtVisitor::visitSeqStmt(SeqStmt* stmt)
+{
+    for (auto& ss : stmt->stmts)
+    {
+        ss = maybeParseStmt(ss, *this);
+        checkStmt(ss);
+    }
+}
+
+void SemanticsStmtVisitor::visitLabelStmt(LabelStmt* stmt)
+{
+    WithOuterStmt subContext(this, stmt);
+    subContext.checkStmt(stmt->innerStmt);
+}
+
+void SemanticsStmtVisitor::checkStmt(Stmt* stmt)
+{
+    SemanticsVisitor::checkStmt(stmt, *this);
+}
+
+Stmt* SemanticsStmtVisitor::findOuterStmtWithLabel(Name* label)
+{
+    for (auto outerStmtInfo = m_outerStmts; outerStmtInfo; outerStmtInfo = outerStmtInfo->next)
+    {
+        auto outerStmt = outerStmtInfo->stmt;
+        auto found = as<LabelStmt>(outerStmt);
+        if (found)
+        {
+            if (found->label.getName() == label)
+            {
+                return found->innerStmt;
+            }
+        }
+    }
+    return nullptr;
+}
+
+void SemanticsStmtVisitor::generateUniqueIDForStmt(BreakableStmt* stmt)
+{
+    stmt->uniqueID = getASTBuilder()->generateUniqueIDForStmt();
+}
+
+void SemanticsStmtVisitor::visitBreakStmt(BreakStmt* stmt)
+{
+    // We need to identify the enclosing statement that
+    // this `break` is meant to break out of.
+    //
+    BreakableStmt* targetOuterStmt = nullptr;
+    if (stmt->targetLabel.type == TokenType::Identifier)
+    {
+        // If this is a `break` statement that specifies
+        // an explicit label, then we will search for
+        // an outer statement matching that label.
+        //
+        auto foundOuterStmt = findOuterStmtWithLabel(stmt->targetLabel.getName());
+        if (!foundOuterStmt)
+        {
+            getSink()->diagnose(Diagnostics::BreakLabelNotFound{
+                .label = stmt->targetLabel.getName(),
+                .stmt = stmt});
+        }
+        else
+        {
+            // It is possible that the labelled statement
+            // is not a valid one for a `break` to target,
+            // so we check for that next.
+            //
+            targetOuterStmt = as<BreakableStmt>(foundOuterStmt);
+            if (!targetOuterStmt)
+            {
+                getSink()->diagnose(Diagnostics::TargetLabelDoesNotMarkBreakableStmt{
+                    .label = stmt->targetLabel.getName(),
+                    .stmt = stmt});
+            }
+        }
+    }
+    else
+    {
+        // If there is no explicit label on the `break` statement,
+        // then we are simply searching for the inner-most
+        // enclosing statement that is a valid `break` target.
+        //
+        targetOuterStmt = FindOuterStmt<BreakableStmt>();
+        if (!targetOuterStmt)
+        {
+            getSink()->diagnose(Diagnostics::BreakOutsideLoop{.stmt = stmt});
+        }
+    }
+
+    // We do not (currently) allow a `break` to proceed "through"
+    // an enclosing `defer` statement. Thus, we search for
+    // a possible enclosing `defer` statement, between the
+    // `stmt` being checked and the `targetOuterStmt` that
+    // `stmt` is trying to branch to.
+    //
+    // TODO: This is a reasonable feature to add down the line;
+    // it simply involves more implementation complexity than
+    // the simpler cases of `defer`.
+    //
+    if (targetOuterStmt)
+    {
+        if (FindOuterStmt<DeferStmt>(targetOuterStmt))
+        {
+            getSink()->diagnose(Diagnostics::BreakInsideDefer{.stmt = stmt});
+        }
+
+        // We stash the ID of the target statement in the `break`
+        // statement so that they can be correlated later, during
+        // code generation.
+        //
+        stmt->targetOuterStmtID = targetOuterStmt->uniqueID;
+    }
+}
+
+void SemanticsStmtVisitor::visitContinueStmt(ContinueStmt* stmt)
+{
+    auto targetOuterStmt = FindOuterStmt<LoopStmt>();
+    if (!targetOuterStmt)
+    {
+        getSink()->diagnose(Diagnostics::ContinueOutsideLoop{.stmt = stmt});
+    }
+    else
+    {
+        if (FindOuterStmt<DeferStmt>(targetOuterStmt))
+        {
+            getSink()->diagnose(Diagnostics::ContinueInsideDefer{.stmt = stmt});
+        }
+
+        // We stash the ID of the target statement in the `continue`
+        // statement so that they can be correlated later, during
+        // code generation.
+        //
+        stmt->targetOuterStmtID = targetOuterStmt->uniqueID;
+    }
+}
+
+Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
+{
+    if (as<AssignExpr>(expr))
+    {
+        getSink()->diagnose(Diagnostics::AssignmentInPredicateExpr{.expr = expr});
+    }
+    Expr* e = expr;
+    e = CheckTerm(e);
+    e = maybeRegisterLambdaCapture(e);
+    e = coerce(CoercionSite::General, m_astBuilder->getBoolType(), e, getSink());
+    return e;
+}
+
+void SemanticsStmtVisitor::checkConditionClause(ConditionClause* conditionClause)
+{
+    ConditionClauseVisitor<SemanticsStmtVisitor>::dispatch(conditionClause);
+}
+
+void SemanticsStmtVisitor::visitExprConditionClause(ExprConditionClause* conditionClause)
+{
+    conditionClause->expr = checkPredicateExpr(conditionClause->expr);
+}
+
+void SemanticsStmtVisitor::visitDeclConditionClause(DeclConditionClause* conditionClause)
+{
+    auto varDecl = conditionClause->decl;
+
+    // The variable comes into scope after its initializer. In `if (int n = n - 1)`,
+    // the initializer still refers to the enclosing `n`. As with locals in a block,
+    // `checkDeclAtDeclarationPoint` makes the new declaration visible after checking it.
+    varDecl->hiddenFromLookup = true;
+    checkDeclAtDeclarationPoint(varDecl);
+
+    // In `if (int count = getCount())`, the predicate tests the value stored in
+    // `count` after its initializer has been converted to `int`. We already have
+    // the declaration, so the implicit read needs no name lookup.
+    auto varExpr = m_astBuilder->create<VarExpr>();
+    varExpr->loc = varDecl->getNameLoc();
+    varExpr->declRef = makeDeclRef<Decl>(varDecl);
+    conditionClause->predicateExpr = checkPredicateExpr(varExpr);
+}
+
+void SemanticsStmtVisitor::visitDoWhileStmt(DoWhileStmt* stmt)
+{
+    generateUniqueIDForStmt(stmt);
+    checkModifiers(stmt);
+    WithOuterStmt subContext(this, stmt);
+
+    checkConditionClause(stmt->condition);
+    subContext.checkStmt(stmt->statement);
+    checkLoopInDifferentiableFunc(stmt);
+}
+
+void SemanticsStmtVisitor::visitForStmt(ForStmt* stmt)
+{
+    generateUniqueIDForStmt(stmt);
+    WithOuterStmt subContext(this, stmt);
+    checkModifiers(stmt);
+    checkStmt(stmt->initialStatement);
+
+    if (stmt->predicateExpression)
+    {
+        stmt->predicateExpression = checkPredicateExpr(stmt->predicateExpression);
+    }
+    if (stmt->sideEffectExpression)
+    {
+        // Use special context for for-loop side effect to allow comma operators without warning
+        SemanticsContext sideEffectContext = withInForLoopSideEffect();
+        SemanticsExprVisitor subExprVisitor(sideEffectContext);
+        stmt->sideEffectExpression = subExprVisitor.CheckExpr(stmt->sideEffectExpression);
+
+        // A `for` loop's side-effect expression also discards its result.
+        maybeDiagnoseDiscardedNoDiscardResult(stmt->sideEffectExpression);
+    }
+    subContext.checkStmt(stmt->statement);
+
+    tryInferLoopMaxIterations(stmt);
+
+    checkLoopInDifferentiableFunc(stmt);
+}
+
+Expr* SemanticsVisitor::checkExpressionAndExpectIntegerConstant(
+    Expr* expr,
+    IntVal** outIntVal,
+    ConstantFoldingKind kind)
+{
+    expr = CheckExpr(expr);
+    auto intVal = CheckIntegerConstantExpression(
+        expr,
+        IntegerConstantExpressionCoercionType::AnyInteger,
+        nullptr,
+        kind);
+    if (outIntVal)
+        *outIntVal = intVal;
+    return expr;
+}
+
+void SemanticsStmtVisitor::visitCompileTimeForStmt(CompileTimeForStmt* stmt)
+{
+    WithOuterStmt subContext(this, stmt);
+
+    stmt->varDecl->type.type = m_astBuilder->getIntType();
+    addModifier(stmt->varDecl, m_astBuilder->create<ConstModifier>());
+    stmt->varDecl->setCheckState(DeclCheckState::DefinitionChecked);
+
+    IntVal* rangeBeginVal = nullptr;
+    IntVal* rangeEndVal = nullptr;
+
+    if (stmt->rangeBeginExpr)
+    {
+        stmt->rangeBeginExpr = checkExpressionAndExpectIntegerConstant(
+            stmt->rangeBeginExpr,
+            &rangeBeginVal,
+            ConstantFoldingKind::LinkTime);
+    }
+    else
+    {
+        ConstantIntVal* rangeBeginConst = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 0);
+        rangeBeginVal = rangeBeginConst;
+    }
+
+    stmt->rangeEndExpr = checkExpressionAndExpectIntegerConstant(
+        stmt->rangeEndExpr,
+        &rangeEndVal,
+        ConstantFoldingKind::LinkTime);
+
+    stmt->rangeBeginVal = rangeBeginVal;
+    stmt->rangeEndVal = rangeEndVal;
+
+    subContext.checkStmt(stmt->body);
+}
+
+void SemanticsStmtVisitor::validateCaseStmts(SwitchStmt* stmt, DiagnosticSink* sink)
+{
+    auto blockStmt = as<BlockStmt>(stmt->body);
+    if (!blockStmt)
+        return;
+
+    auto seqStmt = as<SeqStmt>(blockStmt->body);
+    if (!seqStmt)
+        return;
+
+    bool hasDefaultStmt = false;
+    HashSet<Val*> caseStmtVals;
+    for (auto& sStmt : seqStmt->stmts)
+    {
+        if (auto caseStmt = as<CaseStmt>(sStmt))
+        {
+            // check that all case tags are unique
+            if (caseStmt->exprVal)
+            {
+                // exprVal contains the constant folded expr, that is checked for
+                // uniqueness within the scope of the switch statement.
+                if (!caseStmtVals.add(caseStmt->exprVal))
+                {
+                    sink->diagnose(Diagnostics::SwitchDuplicateCases{.stmt = sStmt});
+                    return;
+                }
+            }
+        }
+        else if (as<DefaultStmt>(sStmt))
+        {
+            // check that there is at most one `default` clause
+            if (hasDefaultStmt)
+            {
+                sink->diagnose(Diagnostics::SwitchMultipleDefault{.stmt = sStmt});
+                return;
+            }
+            hasDefaultStmt = true;
+        }
+    }
+}
+
+void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
+{
+    generateUniqueIDForStmt(stmt);
+    WithOuterStmt subContext(this, stmt);
+
+    stmt->condition = CheckExpr(stmt->condition);
+
+    // Reject a non-integer/enum selector here so no inconsistent `switch` reaches IR
+    // lowering; skip when the condition already failed to check to avoid a cascade.
+    auto conditionType = stmt->condition->type.type;
+    if (conditionType && !as<ErrorType>(conditionType) &&
+        !isValidCompileTimeConstantType(conditionType))
+    {
+        getSink()->diagnose(
+            Diagnostics::SwitchConditionNotInteger{.type = conditionType, .expr = stmt->condition});
+        return;
+    }
+
+    subContext.checkStmt(stmt->body);
+
+    // check the case value exits within the switch
+    validateCaseStmts(stmt, getSink());
+}
+
+void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
+{
+    // A 'case' statement must be directly enclosed by a 'switch' statement. If
+    // this is not the case, the parser has already diagnosed an error.
+    SwitchStmt* switchStmt = m_outerStmts ? as<SwitchStmt>(m_outerStmts->stmt) : nullptr;
+    if (!switchStmt)
+        return;
+
+    // Check that the type for the `case` is consistent with the type for the `switch`.
+    auto expr = CheckExpr(stmt->expr);
+    expr = coerce(CoercionSite::Argument, switchStmt->condition->type, expr, getSink());
+
+    // coerce to type being switch on, and ensure that value is a compile-time constant
+    // The Vals in the AST are pointer-unique, making them easy to check for duplicates
+    // by addeing them to a HashSet.
+    auto exprVal = checkConstantIntVal(expr);
+
+    stmt->expr = expr;
+    stmt->exprVal = exprVal;
+
+    // We stash the ID of the target statement in the `case`
+    // statement so that they can be correlated later, during
+    // code generation.
+    //
+    stmt->targetOuterStmtID = switchStmt->uniqueID;
+}
+
+void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
+{
+    generateUniqueIDForStmt(stmt);
+    WithOuterStmt subContext(this, stmt);
+    HashSet<Stmt*> checkedStmt;
+    for (auto caseStmt : stmt->targetCases)
+    {
+        CapabilitySet set((CapabilityName)caseStmt->capability);
+
+        CapabilityName canonicalStage = CapabilityName::Invalid;
+        bool isStage = isStageAtom((CapabilityName)caseStmt->capability, canonicalStage);
+        if (as<StageSwitchStmt>(stmt))
+        {
+            if (!isStage && caseStmt->capability != (int32_t)CapabilityName::Invalid)
+            {
+                getSink()->diagnose(Diagnostics::UnknownStageName{
+                    .stageName = String(caseStmt->capabilityToken.getContent()),
+                    .location = caseStmt->capabilityToken.loc});
+            }
+            caseStmt->capability = (int32_t)canonicalStage;
+        }
+        else
+        {
+            if (isStage)
+            {
+                getSink()->diagnose(Diagnostics::TargetSwitchCaseCannotBeAStage{
+                    .location = caseStmt->capabilityToken.loc});
+            }
+            else if (
+                caseStmt->capabilityToken.getContentLength() != 0 &&
+                (set.getCapabilityTargetSets().getCount() != 1 || set.isInvalid() || set.isEmpty()))
+            {
+                getSink()->diagnose(Diagnostics::InvalidTargetSwitchCase{
+                    .capability = capabilityNameToString((CapabilityName)caseStmt->capability),
+                    .location = caseStmt->capabilityToken.loc});
+            }
+        }
+
+        if (checkedStmt.contains(caseStmt->body))
+            continue;
+        subContext.checkStmt(caseStmt);
+        checkedStmt.add(caseStmt->body);
+    }
+}
+
+void SemanticsStmtVisitor::visitTargetCaseStmt(TargetCaseStmt* stmt)
+{
+    auto switchStmt = FindOuterStmt<TargetSwitchStmt>();
+    if (getShared()->isInLanguageServer() &&
+        getShared()->getSession()->getCompletionRequestTokenName() ==
+            stmt->capabilityToken.getName())
+    {
+        getShared()->getLinkage()->contentAssistInfo.completionSuggestions.scopeKind =
+            CompletionSuggestions::ScopeKind::Capabilities;
+    }
+    if (!switchStmt)
+    {
+        getSink()->diagnose(Diagnostics::CaseOutsideSwitch{.stmt = stmt});
+    }
+    else
+    {
+        stmt->targetOuterStmtID = switchStmt->uniqueID;
+    }
+    WithOuterStmt subContext(this, stmt);
+    subContext.checkStmt(stmt->body);
+}
+
+void SemanticsStmtVisitor::visitIntrinsicAsmStmt(IntrinsicAsmStmt* stmt)
+{
+    WithOuterStmt subContext(this, stmt);
+    for (auto& arg : stmt->args)
+        arg = subContext.CheckExpr(arg);
+}
+
+void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
+{
+    // A 'default' statement must be directly enclosed by a 'switch'
+    // statement. If this is not the case, the parser has already diagnosed an
+    // error.
+    SwitchStmt* switchStmt = m_outerStmts ? as<SwitchStmt>(m_outerStmts->stmt) : nullptr;
+    if (!switchStmt)
+        return;
+
+    // We stash the ID of the target statement in the `default`
+    // statement so that they can be correlated later, during
+    // code generation.
+    //
+    stmt->targetOuterStmtID = switchStmt->uniqueID;
+}
+
+void SemanticsStmtVisitor::visitIfStmt(IfStmt* stmt)
+{
+    WithOuterStmt subContext(this, stmt);
+    checkConditionClause(stmt->condition);
+    subContext.checkStmt(stmt->positiveStatement);
+    subContext.checkStmt(stmt->negativeStatement);
+}
+
+void SemanticsStmtVisitor::visitUnparsedStmt(UnparsedStmt*)
+{
+    // Nothing to do
+}
+
+void SemanticsStmtVisitor::visitEmptyStmt(EmptyStmt*)
+{
+    // Nothing to do
+}
+
+void SemanticsStmtVisitor::visitDiscardStmt(DiscardStmt*)
+{
+    // Nothing to do
+}
+
+void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
+{
+    auto function = getParentFunc();
+    Type* returnType = nullptr;
+    Type* expectedReturnType = nullptr;
+    if (m_parentLambdaDecl)
+    {
+        expectedReturnType = m_parentLambdaDecl->funcDecl->returnType.type;
+    }
+    else if (function)
+    {
+        expectedReturnType = function->returnType.type;
+    }
+    if (!stmt->expression)
+    {
+        if (expectedReturnType && !expectedReturnType->equals(m_astBuilder->getVoidType()) &&
+            !as<ConstructorDecl>(function))
+        {
+            getSink()->diagnose(Diagnostics::ReturnNeedsExpression{.stmt = stmt});
+        }
+    }
+    else
+    {
+        stmt->expression = CheckExpr(stmt->expression);
+        returnType = stmt->expression->type.type;
+        if (!stmt->expression->type->equals(m_astBuilder->getErrorType()))
+        {
+            if (!m_parentLambdaExpr && expectedReturnType)
+            {
+                stmt->expression =
+                    coerce(CoercionSite::Return, expectedReturnType, stmt->expression, getSink());
+            }
+        }
+    }
+    if (m_parentLambdaDecl)
+    {
+        if (!returnType)
+            returnType = m_astBuilder->getVoidType();
+        if (!m_parentLambdaDecl->funcDecl->returnType.type)
+            m_parentLambdaDecl->funcDecl->returnType.type = returnType;
+        if (!m_parentLambdaDecl->funcDecl->returnType.type->equals(returnType))
+        {
+            getSink()->diagnose(Diagnostics::ReturnTypeMismatchInsideLambda{
+                .returnedType = returnType,
+                .previousType = m_parentLambdaDecl->funcDecl->returnType.type,
+                .stmt = stmt});
+        }
+    }
+
+    if (FindOuterStmt<DeferStmt>())
+    {
+        getSink()->diagnose(Diagnostics::ReturnInsideDefer{.stmt = stmt});
+    }
+}
+
+void SemanticsStmtVisitor::visitWhileStmt(WhileStmt* stmt)
+{
+    generateUniqueIDForStmt(stmt);
+    checkModifiers(stmt);
+    WithOuterStmt subContext(this, stmt);
+    checkConditionClause(stmt->condition);
+    subContext.checkStmt(stmt->statement);
+    checkLoopInDifferentiableFunc(stmt);
+}
+
+void SemanticsStmtVisitor::visitDeferStmt(DeferStmt* stmt)
+{
+    WithOuterStmt subContext(this, stmt);
+    subContext.checkStmt(stmt->statement);
+}
+
+void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
+{
+    stmt->expression = CheckExpr(stmt->expression);
+    Stmt* catchStmt = findMatchingCatchStmt(stmt->expression->type);
+
+    auto parentFunc = getParentFunc();
+    if (!catchStmt && (!parentFunc || parentFunc->errorType->equals(m_astBuilder->getBottomType())))
+    {
+        getSink()->diagnose(Diagnostics::UncaughtThrowInNonThrowFunc{.stmt = stmt});
+        return;
+    }
+
+    if (!catchStmt && !stmt->expression->type->equals(m_astBuilder->getErrorType()))
+    {
+        if (!parentFunc->errorType->equals(stmt->expression->type))
+        {
+            getSink()->diagnose(Diagnostics::ThrowTypeIncompatibleWithErrorType{
+                .throwType = stmt->expression->type.type,
+                .errorType = parentFunc->errorType,
+                .expr = stmt->expression});
+        }
+    }
+
+    if (FindOuterStmt<DeferStmt>(catchStmt))
+    {
+        // Allowing 'throw' to escape a defer statement gets quite complex, for
+        // similar reasons as 'return' - if you have two (or more) defers,
+        // both of which exit the outer scope, it's unclear which one gets
+        // called and when. Both can't fully run. That kind of goes against the
+        // point of 'defer', which is to _always_ run some code when exiting
+        // scopes.
+        getSink()->diagnose(Diagnostics::UncaughtThrowInsideDefer{.stmt = stmt});
+    }
+}
+
+void SemanticsStmtVisitor::visitCatchStmt(CatchStmt* stmt)
+{
+    if (stmt->errorVar)
+    {
+        ensureDeclBase(stmt->errorVar, DeclCheckState::DefinitionChecked, this);
+        stmt->errorVar->hiddenFromLookup = false;
+    }
+
+    WithOuterStmt subContext(this, stmt);
+    subContext.checkStmt(stmt->tryBody);
+    subContext.checkStmt(stmt->handleBody);
+}
+
+void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
+{
+    stmt->expression = CheckExpr(stmt->expression);
+    // Warn on a dangling `==` whose result is discarded (likely a mistyped `=`). The
+    // comparison may be either a resolved `operator==` call or a builtin fast-path
+    // `BuiltinOperatorExpr` (the common scalar case).
+    bool isDanglingEquality = false;
+    if (auto operatorExpr = as<OperatorExpr>(stmt->expression))
+    {
+        if (auto func = as<VarExpr>(operatorExpr->functionExpr))
+            isDanglingEquality = func->name && func->name->text == "==";
+    }
+    else if (auto builtinOp = as<BuiltinOperatorExpr>(stmt->expression))
+    {
+        isDanglingEquality = (builtinOp->op == BuiltinOperationKind::Eql);
+    }
+    if (isDanglingEquality)
+        getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = stmt->expression});
+
+    maybeDiagnoseDiscardedNoDiscardResult(stmt->expression);
+}
+
+void SemanticsStmtVisitor::maybeDiagnoseDiscardedNoDiscardResult(Expr* expr)
+{
+    // Peel transparent wrappers that don't change whether the result is discarded: a call
+    // wrapped in parentheses (`(t.load());`) still discards the call's result.
+    while (auto paren = as<ParenExpr>(expr))
+    {
+        expr = paren->base;
+    }
+
+    // A comma operator in a discarded context discards each of its operands, so recurse
+    // into them (e.g. `for (int i = 0; i < n; t.load(), i++)` discards `t.load()`).
+    if (auto operatorExpr = as<OperatorExpr>(expr))
+    {
+        if (auto func = as<VarExpr>(operatorExpr->functionExpr))
+        {
+            if (getText(func->name) == ",")
+            {
+                for (auto arg : operatorExpr->arguments)
+                    maybeDiagnoseDiscardedNoDiscardResult(arg);
+                return;
+            }
+        }
+    }
+
+    // A ternary `?:` and a short-circuiting `&&`/`||` both yield a chosen operand's result
+    // verbatim, so discarding the whole expression discards that operand's result. Recurse into
+    // the operands that can become the result:
+    //   - both arms of a ternary (`arguments[1]`/`arguments[2]`; the condition `arguments[0]` is
+    //     consumed to choose an arm, not passed through), and
+    //   - the right-hand operand of `&&`/`||` (`arguments[1]`; the left operand is consumed to
+    //     decide whether the right is evaluated, not passed through).
+    if (auto select = as<SelectExpr>(expr))
+    {
+        if (select->arguments.getCount() == 3)
+        {
+            maybeDiagnoseDiscardedNoDiscardResult(select->arguments[1]);
+            maybeDiagnoseDiscardedNoDiscardResult(select->arguments[2]);
+        }
+        return;
+    }
+    if (auto shortCircuit = as<LogicOperatorShortCircuitExpr>(expr))
+    {
+        if (shortCircuit->arguments.getCount() == 2)
+            maybeDiagnoseDiscardedNoDiscardResult(shortCircuit->arguments[1]);
+        return;
+    }
+
+    // If the discarded expression is a call to a function marked `[NoDiscard]`, report that
+    // the result is being ignored.
+    auto invokeExpr = as<InvokeExpr>(expr);
+    if (!invokeExpr)
+        return;
+
+    // `[NoDiscard]` on a `void`-returning function is already rejected at the declaration
+    // (see `NoDiscardOnVoidFunction` in `checkCallableDeclCommon`). That diagnostic is an
+    // error but not fatal, so checking continues and calls to such a function still reach
+    // here; this guard suppresses an additional, nonsensical "result is discarded" error
+    // at every call site on top of the declaration error.
+    if (invokeExpr->type.type && invokeExpr->type.type->equals(m_astBuilder->getVoidType()))
+        return;
+
+    auto funcDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
+    if (!funcDeclRefExpr)
+        return;
+
+    auto calleeDecl = funcDeclRefExpr->declRef.getDecl();
+    if (!calleeDecl)
+        return;
+
+    // Bare discarded construction is intentionally outside this diagnostic.
+    if (as<ConstructorDecl>(calleeDecl))
+        return;
+
+    if (calleeDecl->findModifier<NoDiscardAttribute>())
+    {
+        getSink()->diagnose(Diagnostics::DiscardedNoDiscardResult{
+            .name = calleeDecl->getName(),
+            .expr = invokeExpr});
+    }
+}
+
+void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)
+{
+    // Nothing to do
+}
+
+// The operator that steps a for-loop variable: `Add` for `++` and `+=`, `Sub` for `--` and `-=`.
+// The operator alone does not give the direction the variable moves: the sign of the step value
+// does too. For example, `i -= -2` increases `i`.
+enum class LoopStepOperator
+{
+    Add,
+    Sub,
+};
+
+static BuiltinOperationKind getSwapSideComparisonOp(BuiltinOperationKind op)
+{
+    switch (op)
+    {
+    case BuiltinOperationKind::Less:
+        return BuiltinOperationKind::Greater;
+
+    case BuiltinOperationKind::Leq:
+        return BuiltinOperationKind::Geq;
+
+    case BuiltinOperationKind::Greater:
+        return BuiltinOperationKind::Less;
+
+    case BuiltinOperationKind::Geq:
+        return BuiltinOperationKind::Leq;
+
+    default:
+        SLANG_UNEXPECTED("Unexpected BuiltinOperationKind value");
+    }
+}
+
+// Return how many times the body of this loop runs:
+//
+//     for (i = initialValue; i OP comparisonValue; i STEP stepValue)
+//
+// Return -1 when the count cannot be inferred or does not fit in `int`. The loop variable `i` has
+// type `iteratorType`, `OP` is `comparisonKind`, and `STEP` is `+=` or `-=` as given by `stepOp`.
+// The comparison happens in the type of `comparisonValue`, which is the common type of the loop
+// variable and the bound. For example, in `for (int i = 0; i < 10u; i++)` it is `uint`.
+//
+// If the condition is false for the initial value, the count is 0 whatever the step is. Otherwise a
+// zero step or a step that moves the variable away from the bound gives -1, and the caller reports
+// the step.
+//
+// Nothing is inferred when the loop variable would leave the range of `iteratorType` or of the
+// comparison type before the condition fails, because the loop then wraps around and may never
+// end. For example, `for (int i = 5; i >= 0u; i--)` never ends, because `uint(-1)` is still
+// `>= 0u`.
+static int calculateNumLoopIterations(
+    const MathIntType& iteratorType,
+    const MathIntValue& initialValue,
+    const MathIntValue& comparisonValue,
+    BuiltinOperationKind comparisonKind,
+    const MathIntValue& stepValue,
+    LoopStepOperator stepOp)
+{
+    const MathIntType comparisonType{comparisonValue.getType()};
+
+    // We compute the count in these steps. A loop that counts down with `>` or `>=` mirrors one
+    // that counts up with `<` or `<=`, so we measure distances in the direction the variable moves.
+    //
+    // 1. If the condition is false for `initialValue` converted to the comparison type, the body
+    //    never runs, and the count is 0.
+    // 2. If that conversion changes `initialValue`, as when `int` -10 becomes `uint` 0xFFFFFFF6,
+    //    the values the loop compares differ from the values it steps, and we infer nothing.
+    // 3. `step` is the size of the step in the direction of travel. If it is zero or negative, the
+    //    variable does not move toward the bound, and we infer nothing.
+    // 4. `delta` is the distance from `initialValue` to `comparisonValue`. After steps 1 to 3,
+    //    `step` is positive, `delta` is non-negative, and both fit in `uint64_t`.
+    // 5. The count is `ceil(delta / step)` for `<` and `>`, and `floor(delta / step) + 1` for `<=`
+    //    and `>=`, because an inclusive bound runs the body once more when the variable lands on
+    //    it.
+    // 6. The value after the last iteration, `initialValue +/- count * step`, must be in the range
+    //    of both `iteratorType` and the comparison type. Otherwise the variable wraps around
+    //    before the condition fails, and we infer nothing.
+    // 7. The count must fit in `int`, the type of the inferred `[MaxIters]` value.
+
+    const bool reverseDirection{
+        comparisonKind == BuiltinOperationKind::Greater ||
+        comparisonKind == BuiltinOperationKind::Geq};
+    const MathIntValue initialCastToCompType{MathIntOps::cast(comparisonType, initialValue).value};
+
+    // check whether the loop predicate is false for the initial value
+    switch (comparisonKind)
+    {
+    case BuiltinOperationKind::Less:
+        if (MathIntOps::compLess(initialCastToCompType, comparisonValue).value.isZero())
+            return 0;
+        break;
+
+    case BuiltinOperationKind::Leq:
+        if (MathIntOps::compLeq(initialCastToCompType, comparisonValue).value.isZero())
+            return 0;
+        break;
+
+    case BuiltinOperationKind::Geq:
+        if (MathIntOps::compGeq(initialCastToCompType, comparisonValue).value.isZero())
+            return 0;
+        break;
+
+    case BuiltinOperationKind::Greater:
+        if (MathIntOps::compGreater(initialCastToCompType, comparisonValue).value.isZero())
+            return 0;
+        break;
+
+    default:
+        SLANG_UNEXPECTED("Bad comparisonKind");
+    }
+
+    // check whether the initial value is changed when cast to comparison type
+    if (MathIntOps::cast(comparisonValue.getType(), initialValue).flags & MathIntResult::Overflow)
+        return -1;
+
+    MathIntResult adjStepRes;
+
+    if ((!reverseDirection && stepOp == LoopStepOperator::Add) ||
+        (reverseDirection && stepOp == LoopStepOperator::Sub))
+        adjStepRes = MathIntOps::cast(MathIntType::UInt64Type, stepValue);
+    else
+        adjStepRes = MathIntOps::sub(
+            MathIntType::UInt64Type,
+            MathIntValue::constructFromValue(MathIntType::UInt8Type, 0U),
+            stepValue);
+
+    // If we have an overflow here, the iterator is incremented in the wrong
+    // direction. It is also possible that it's not incremented at all, which
+    // we'll check separately. Examples:
+    //
+    //     for (int i = 0; i < 5; --i)
+    //     for (int i = 5; i >= 0; ++i)
+    //     for (int i = 0; i < 5; i += 0)
+    //
+    if ((adjStepRes.flags & MathIntResult::Overflow) || adjStepRes.value.isZero())
+        return -1;
+
+    MathIntResult deltaRes =
+        reverseDirection ? MathIntOps::sub(MathIntType::UInt64Type, initialValue, comparisonValue)
+                         : MathIntOps::sub(MathIntType::UInt64Type, comparisonValue, initialValue);
+
+    // assert: deltaRes is within Uint64Type range. We've already established that initialValue
+    // didn't change when cast to comparisonType, so we can't have deltas such as [-1, UINT64_MAX].
+    SLANG_RELEASE_ASSERT(deltaRes.flags == 0U);
+
+    MathIntResult divRes =
+        MathIntOps::div(MathIntType::UInt64Type, deltaRes.value, adjStepRes.value);
+    MathIntResult remRes =
+        MathIntOps::rem(MathIntType::UInt64Type, deltaRes.value, adjStepRes.value);
+
+    // We have returned above for a zero step, so the division and remainder are always defined.
+    SLANG_RELEASE_ASSERT(divRes.flags == 0U && remRes.flags == 0U);
+
+    // The count is `ceil(delta / step)` for an exclusive bound and `floor(delta / step) + 1` for
+    // an inclusive one.
+    MathIntResult stepsRes = MathIntOps::add(
+        MathIntType::UInt64Type,
+        divRes.value,
+        MathIntValue::constructFromValue(
+            MathIntType::UInt8Type,
+            (remRes.value.getUnsignedValue() != 0U || comparisonKind == BuiltinOperationKind::Leq ||
+             comparisonKind == BuiltinOperationKind::Geq)
+                ? 1U
+                : 0U));
+
+    // this may overflow in something such as 'for (uint64_t i = 0; i <= UINT64_MAX; ++i)'
+    if (stepsRes.flags & MathIntResult::Overflow)
+        return -1;
+
+    MathIntResult deltaFromSteps =
+        MathIntOps::mul(MathIntType::UInt64Type, stepsRes.value, adjStepRes.value);
+
+    // this may overflow in something such as 'for (uint64_t i = 0; i < UINT64_MAX; i +=
+    // UINT64_MAX/2)'
+    if (deltaFromSteps.flags & MathIntResult::Overflow)
+        return -1;
+
+    // compute the final value and check that it's within iteratorType range
+    const MathIntResult finalValueRes{
+        reverseDirection ? MathIntOps::sub(iteratorType, initialValue, deltaFromSteps.value)
+                         : MathIntOps::add(iteratorType, initialValue, deltaFromSteps.value)};
+
+    if (finalValueRes.flags & MathIntResult::Overflow)
+        return -1;
+
+    // check that the final value is also within comparisonType range
+    if (MathIntOps::cast(comparisonType, finalValueRes.value).flags & MathIntResult::Overflow)
+        return -1;
+
+    // finally, check that numIters fits in the return type
+    uint64_t numIters = stepsRes.value.getUnsignedValue();
+    if (numIters <= std::numeric_limits<int>::max())
+        return static_cast<int>(numIters);
+    else
+        return -1;
+}
+
+// Return the variable reference that `expr` reads, looking through an implicit conversion of
+// it. Consider `for (int i = 0; i < 5u; i++)`: checking promotes both operands of `<` to their
+// common type `uint`, so the predicate's left operand is `ImplicitCastExpr(uint, VarExpr(i))`.
+// An explicit cast is not looked through, because it is user code and may narrow.
+static VarExpr* getVarExprLookingThroughImplicitCast(Expr* expr)
+{
+    if (auto castExpr = as<ImplicitCastExpr>(expr))
+    {
+        SLANG_ASSERT(castExpr->arguments.getCount() == 1);
+        expr = castExpr->arguments[0];
+    }
+    return as<VarExpr>(expr);
+}
+
+void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
+{
+    // If a for loop is in the form of `for (var = initialVal; var $compareOp otherVal; var
+    // sideEffectOp operand)` we will try to constant fold the operands and see if we can statically
+    // determine the maximum number of iterations this loop will run, and insert the inferred result
+    // as a `[MaxIters]` attribute on the stmt.
+    //
+    // ++, --, +=, -= are supported in side effect expressions.
+    // >, <, >=, <= are supported in predicate expressions.
+    // induction variable can appear in either side of the expressions.
+    //
+    // Other forms like for (var1 = .., var2 = ..; ) will not be recognized here.
+    // If we see suspicious code like `for (int i = 0; i < 5; j++)`, we will produce a warning along
+    // the way.
+    //
+
+    MathIntType iteratorType{};
+    MathIntValue initialValue{};
+    MathIntValue comparisonValue{};
+    BuiltinOperationKind compareOp{BuiltinOperationKind::Unknown};
+    MathIntValue stepValue{};
+    LoopStepOperator stepOp{};
+
+    DeclRef<Decl> iteratorVar = {};
+    Type* iteratorVarType = {};
+    DeclRef<Decl> predicateVar = {};
+    BuiltinOperatorExpr* cmpExpr = nullptr;
+    Type* comparisonValueType = nullptr;
+
+    // determine iterator type and initial value
+    {
+        Expr* initialVal = nullptr;
+        if (auto varStmt = as<DeclStmt>(stmt->initialStatement))
+        {
+            auto varDecl = as<VarDecl>(varStmt->decl);
+            if (!varDecl)
+                return;
+            iteratorVar = makeDeclRef<Decl>(varDecl);
+            initialVal = varDecl->initExpr;
+            iteratorVarType = varDecl->getType();
+            iteratorType = getIntegerFoldingMathIntType(m_astBuilder, iteratorVarType);
+        }
+        else if (auto exprStmt = as<ExpressionStmt>(stmt->initialStatement))
+        {
+            auto assignExpr = as<AssignExpr>(exprStmt->expression);
+            if (!assignExpr)
+                return;
+            auto varExpr = as<VarExpr>(assignExpr->left);
+            if (!varExpr)
+                return;
+            iteratorVar = varExpr->declRef;
+            initialVal = assignExpr->right;
+
+            // The variable can be any variable declaration, such as a function parameter, so we
+            // take its type from the expression that names it.
+            iteratorVarType = varExpr->type.type;
+            iteratorType = getIntegerFoldingMathIntType(m_astBuilder, iteratorVarType);
+        }
+        else
+            return;
+
+        if (auto initialLitVal = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
+                initialVal,
+                ConstantFoldingKind::CompileTime,
+                nullptr)))
+            initialValue = MathIntValue::constructFromValue(
+                getIntegerFoldingMathIntType(m_astBuilder, initialLitVal->getType()),
+                initialLitVal->getValue());
+    }
+
+    // Determine comparison. The comparison is normalized as:
+    //
+    //     predicateVar compareOp comparisonValue
+    //
+    // Note: predicateVar is looked through an implicit cast if necessary, e.g., in
+    //
+    //   for (int8_t i = 0; i < 100; ++i)  // note: i < 100 is promoted to int(i) < 100
+    //
+    // We'll check here whether the iterator values survive the implicit cast.
+    {
+        // A comparison loop predicate `i < N` on builtin scalar operands is always rewritten by the
+        // fast path to a `BuiltinOperatorExpr`, so that is the only form we need to recognize here.
+        cmpExpr = as<BuiltinOperatorExpr>(stmt->predicateExpression);
+        if (!cmpExpr)
+            return;
+        switch (cmpExpr->op)
+        {
+        case BuiltinOperationKind::Less:
+        case BuiltinOperationKind::Leq:
+        case BuiltinOperationKind::Greater:
+        case BuiltinOperationKind::Geq:
+            compareOp = cmpExpr->op;
+            break;
+        default:
+            // Only ordering comparisons drive trip-count inference.
+            return;
+        }
+
+        if (cmpExpr->arguments.getCount() != 2)
+            return;
+        auto leftCompareOperand = cmpExpr->arguments[0];
+        auto rightCompareOperand = cmpExpr->arguments[1];
+        if (!leftCompareOperand)
+            return;
+        if (!rightCompareOperand)
+            return;
+        // Note: we'll try integer constant folding before VarExpr casting,
+        // since VarExpr may be foldable to a constant.
+        if (auto rightVal = tryFoldIntegerConstantExpression(
+                cmpExpr->arguments[1],
+                ConstantFoldingKind::CompileTime,
+                nullptr))
+        {
+
+            auto leftVar = getVarExprLookingThroughImplicitCast(leftCompareOperand);
+            if (!leftVar)
+                return;
+            predicateVar = leftVar->declRef;
+            if (auto finalVal = as<ConstantIntVal>(rightVal))
+            {
+                comparisonValueType = finalVal->getType();
+                comparisonValue = MathIntValue::constructFromValue(
+                    getIntegerFoldingMathIntType(m_astBuilder, comparisonValueType),
+                    finalVal->getValue());
+            }
+        }
+        else if (
+            auto leftVal = tryFoldIntegerConstantExpression(
+                cmpExpr->arguments[0],
+                ConstantFoldingKind::CompileTime,
+                nullptr))
+        {
+            auto rightVar = getVarExprLookingThroughImplicitCast(rightCompareOperand);
+            if (!rightVar)
+                return;
+            predicateVar = rightVar->declRef;
+            if (auto finalVal = as<ConstantIntVal>(leftVal))
+            {
+                comparisonValueType = finalVal->getType();
+                comparisonValue = MathIntValue::constructFromValue(
+                    getIntegerFoldingMathIntType(m_astBuilder, comparisonValueType),
+                    finalVal->getValue());
+            }
+            compareOp = getSwapSideComparisonOp(compareOp);
+        }
+        else
+        {
+            // If neither left or right is constant, we'll check if either is
+            // the iterator variable. If not and both are variables, we'll
+            // assume that leftVar is the predicate variable for diagnostics.
+            VarExpr* leftVar = getVarExprLookingThroughImplicitCast(leftCompareOperand);
+            VarExpr* rightVar = getVarExprLookingThroughImplicitCast(rightCompareOperand);
+
+            if (leftVar && leftVar->declRef == iteratorVar)
+            {
+                predicateVar = leftVar->declRef;
+            }
+            else if (rightVar && rightVar->declRef == iteratorVar)
+            {
+                predicateVar = rightVar->declRef;
+                compareOp = getSwapSideComparisonOp(compareOp);
+            }
+            else if (leftVar && rightVar)
+            {
+                predicateVar = leftVar->declRef;
+            }
+        }
+    }
+
+    // determine step and step direction
+    {
+        auto opSideEffectExpr = as<InvokeExpr>(stmt->sideEffectExpression);
+        if (!opSideEffectExpr)
+            return;
+        auto sideEffectFuncExpr = as<DeclRefExpr>(opSideEffectExpr->functionExpr);
+        if (!sideEffectFuncExpr)
+            return;
+        auto sideEffectFuncDecl = sideEffectFuncExpr->declRef.getDecl();
+        if (!sideEffectFuncDecl)
+            return;
+        if (auto opName = sideEffectFuncDecl->getName())
+        {
+            if (opName->text == "++" || opName->text == "+=")
+                stepOp = LoopStepOperator::Add;
+            else if (opName->text == "--" || opName->text == "-=")
+                stepOp = LoopStepOperator::Sub;
+            else
+                return;
+        }
+
+        if (opSideEffectExpr->arguments.getCount())
+        {
+            auto varExpr = as<VarExpr>(opSideEffectExpr->arguments[0]);
+            if (!varExpr)
+                return;
+            if (varExpr->declRef.getDecl() != iteratorVar.getDecl())
+            {
+                // If the user writes something like `for (int i = 0; i < 5; j++)`,
+                // it is most likely a bug, so we issue a warning.
+                if (predicateVar == iteratorVar)
+                    getSink()->diagnose(Diagnostics::ForLoopSideEffectChangingDifferentVar{
+                        .initVar = iteratorVar.getDecl(),
+                        .modifiedVar = varExpr->declRef.getDecl(),
+                        .sideEffect = varExpr});
+                return;
+            }
+        }
+        else
+            return;
+
+        if (opSideEffectExpr->arguments.getCount() == 2)
+        {
+            auto stepVal = tryFoldIntegerConstantExpression(
+                opSideEffectExpr->arguments[1],
+                ConstantFoldingKind::CompileTime,
+                nullptr);
+            if (!stepVal)
+                return;
+            if (auto constantIntVal = as<ConstantIntVal>(stepVal))
+            {
+                stepValue = MathIntValue::constructFromValue(
+                    getIntegerFoldingMathIntType(m_astBuilder, constantIntVal->getType()),
+                    constantIntVal->getValue());
+            }
+        }
+        else
+        {
+            stepValue = MathIntValue::constructFromValue(MathIntType::UInt8Type, 1);
+        }
+
+        if (predicateVar.getDecl() != iteratorVar.getDecl())
+        {
+            if (predicateVar)
+                getSink()->diagnose(Diagnostics::ForLoopPredicateCheckingDifferentVar{
+                    .initVar = iteratorVar.getDecl(),
+                    .predicateVar = predicateVar.getDecl(),
+                    .predicate = stmt->predicateExpression});
+            return;
+        }
+
+        // The condition and the step both use the loop variable, so we can check how the comparison
+        // treats its values. Consider `for (int i = -5; i < 10u; i++)`: the comparison is in
+        // `uint`, where the initial value -5 becomes 0xFFFFFFFB, which is most likely not what the
+        // user meant.
+        if (iteratorType.width > 0U && initialValue.hasValue() && comparisonValue.hasValue())
+        {
+            // check that initial value survives the cast to comparison type
+            MathIntResult initValueCastRes =
+                MathIntOps::cast(comparisonValue.getType(), initialValue);
+            if (initValueCastRes.flags & MathIntResult::Overflow)
+            {
+                getSink()->diagnose(Diagnostics::ForLoopInitialValueChangesInComparison{
+                    .toType = comparisonValueType,
+                    .fromValue = initialValue.toString(),
+                    .toValue = initValueCastRes.value.toString(),
+                    .comparison = cmpExpr});
+            }
+
+            // check that the comparison value is representable by the iterator
+            MathIntResult comparisonValueCastRes = MathIntOps::cast(iteratorType, comparisonValue);
+            if (comparisonValueCastRes.flags & MathIntResult::Overflow)
+            {
+                getSink()->diagnose(Diagnostics::ForLoopIteratorValueCannotReachComparison{
+                    .toValue = comparisonValue.toString(),
+                    .iteratorType = iteratorVarType,
+                    .comparison = cmpExpr});
+            }
+        }
+
+        if (!stepValue.hasValue())
+            return;
+    }
+
+    int loopIterations{-1};
+
+    // do we have everything we need to determine loop iterations?
+    if (iteratorType.width > 0U && initialValue.hasValue() && comparisonValue.hasValue() &&
+        stepValue.hasValue())
+    {
+        loopIterations = calculateNumLoopIterations(
+            iteratorType,
+            initialValue,
+            comparisonValue,
+            compareOp,
+            stepValue,
+            stepOp);
+
+        if (loopIterations >= 0)
+        {
+            if (loopIterations == 0)
+            {
+                getSink()->diagnose(Diagnostics::LoopRunsForZeroIterations{.stmt = stmt});
+            }
+
+            auto maxItersAttr = m_astBuilder->create<InferredMaxItersAttribute>();
+            auto litExpr = m_astBuilder->create<IntegerLiteralExpr>();
+            litExpr->type.type = m_astBuilder->getIntType();
+            litExpr->token.setName(getNamePool()->getName(String(loopIterations)));
+            maxItersAttr->args.add(litExpr);
+            maxItersAttr->intArgVals.add(
+                m_astBuilder->getIntVal(m_astBuilder->getIntType(), loopIterations));
+            maxItersAttr->value = (int32_t)loopIterations;
+            maxItersAttr->inductionVar = iteratorVar;
+            addModifier(stmt, maxItersAttr);
+        }
+    }
+
+    if (loopIterations != 0)
+    {
+        if (stepValue.isPositive())
+        {
+
+            if ((stepOp == LoopStepOperator::Add && (compareOp == BuiltinOperationKind::Greater ||
+                                                     compareOp == BuiltinOperationKind::Geq)) ||
+                (stepOp == LoopStepOperator::Sub && (compareOp == BuiltinOperationKind::Less ||
+                                                     compareOp == BuiltinOperationKind::Leq)))
+            {
+                getSink()->diagnose(
+                    Diagnostics::ForLoopChangingIterationVariableInOppositeDirection{
+                        .var = iteratorVar.getDecl(),
+                        .sideEffect = stmt->sideEffectExpression});
+            }
+        }
+        else if (stepValue.isNegative())
+        {
+            if ((stepOp == LoopStepOperator::Add && (compareOp == BuiltinOperationKind::Less ||
+                                                     compareOp == BuiltinOperationKind::Leq)) ||
+                (stepOp == LoopStepOperator::Sub && (compareOp == BuiltinOperationKind::Greater ||
+                                                     compareOp == BuiltinOperationKind::Geq)))
+            {
+                getSink()->diagnose(
+                    Diagnostics::ForLoopChangingIterationVariableInOppositeDirection{
+                        .var = iteratorVar.getDecl(),
+                        .sideEffect = stmt->sideEffectExpression});
+            }
+        }
+        else
+        {
+            getSink()->diagnose(Diagnostics::ForLoopNotModifyingIterationVariable{
+                .var = iteratorVar.getDecl(),
+                .sideEffect = stmt->sideEffectExpression});
+        }
+    }
+}
+
+void SemanticsStmtVisitor::checkLoopInDifferentiableFunc(Stmt* stmt)
+{
+    SLANG_UNUSED(stmt);
+    if (getParentDifferentiableAttribute())
+    {
+        if (!getParentFunc())
+            return;
+
+        // If the function is itself a derivative, or has a user defined derivative,
+        // then we don't require anything.
+
+        if (getParentFunc()->findModifier<ForwardDerivativeOfAttribute>())
+            return;
+        if (getParentFunc()->findModifier<ForwardDerivativeAttribute>())
+            return;
+        if (getParentFunc()->findModifier<BackwardDerivativeOfAttribute>())
+            return;
+        if (getParentFunc()->findModifier<BackwardDerivativeAttribute>())
+            return;
+    }
+}
+
+void SemanticsStmtVisitor::visitGpuForeachStmt(GpuForeachStmt* stmt)
+{
+    stmt->device = CheckExpr(stmt->device);
+    stmt->gridDims = CheckExpr(stmt->gridDims);
+    ensureDeclBase(stmt->dispatchThreadID, DeclCheckState::DefinitionChecked, this);
+    WithOuterStmt subContext(this, stmt);
+    stmt->kernelCall = subContext.CheckExpr(stmt->kernelCall);
+    return;
+}
+} // namespace Slang

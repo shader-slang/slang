@@ -111,12 +111,12 @@ void pointerInBufferDoublePtrRoundtripTestImpl(IDevice* device, UnitTestContext*
     compareComputeResult(device, outputBuffer, std::array{42});
 }
 
-SLANG_UNIT_TEST(pointerInBufferDoublePtrRoundtripVulkan)
+SLANG_UNIT_TEST(pointerInBufferDoublePtrRoundtripVulkan, Vulkan)
 {
     runTestImpl(pointerInBufferDoublePtrRoundtripTestImpl, unitTestContext, DeviceType::Vulkan);
 }
 
-SLANG_UNIT_TEST(pointerInBufferDoublePtrRoundtripMetal)
+SLANG_UNIT_TEST(pointerInBufferDoublePtrRoundtripMetal, Metal)
 {
     runTestImpl(pointerInBufferDoublePtrRoundtripTestImpl, unitTestContext, DeviceType::Metal);
 }

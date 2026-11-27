@@ -10,7 +10,7 @@
 
 static int4 myVec1 = { int2(1, 2), 3 };
 //CHECK:             ^ use of removed declaration
-//CHECK:             ^ $init has been removed since language version '2026': Three-component initializer (vector<T, 2>, T) for vector<T, 4> has been removed since Slang 2026.
+//CHECK:             ^ vector.init has been removed since language version '2026': Three-component initializer (vector<T, 2>, T) for vector<T, 4> has been removed since Slang 2026.
 
 RWStructuredBuffer<int4> output;
 
@@ -18,7 +18,7 @@ void computeMain()
 {
     int4 myVec2 = { 1, int2(2, 3) };
 //CHECK:          ^ use of removed declaration
-//CHECK:          ^ $init has been removed since language version '2026': Three-component initializer (T, vector<T, 2>) for vector<T, 4> has been removed since Slang 2026.
+//CHECK:          ^ vector.init has been removed since language version '2026': Three-component initializer (T, vector<T, 2>) for vector<T, 4> has been removed since Slang 2026.
 
     output[0] = myVec1;
     output[1] = myVec2;

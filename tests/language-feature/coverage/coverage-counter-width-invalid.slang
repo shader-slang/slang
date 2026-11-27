@@ -11,10 +11,10 @@
 //   - `33` exercises a near-valid off-by-one.
 //   - `128` exercises a larger power of two beyond the supported range.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-coverage-counter-width 0
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-coverage-counter-width 16
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-coverage-counter-width 33
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-coverage-counter-width 128
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=1):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-coverage-counter-width 0
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=1):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-coverage-counter-width 16
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=1):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-coverage-counter-width 33
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=1):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-coverage-counter-width 128
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;

@@ -5,10 +5,10 @@
 #include "slang-com-ptr.h"
 #include "slang-deprecated.h"
 #include "slang.h"
-#include "slang/slang-fossil.h"
-#include "slang/slang-ir.h"
-#include "slang/slang-serialize-container.h"
-#include "slang/slang-serialize-ir.h"
+#include "slang/ir/slang-ir.h"
+#include "slang/serialization/slang-fossil.h"
+#include "slang/serialization/slang-serialize-container.h"
+#include "slang/serialization/slang-serialize-ir.h"
 #include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -242,7 +242,7 @@ bool moduleHasDirectDeclaration(slang::IModule* module, UnownedStringSlice name)
 
 } // namespace
 
-SLANG_UNIT_TEST(serializedModuleVersionValidation)
+SLANG_UNIT_TEST(serializedModuleVersionValidation, NoRenderApi)
 {
     const char* source = R"(
         module version_test;
@@ -451,7 +451,7 @@ SLANG_UNIT_TEST(serializedModuleVersionValidation)
     }
 }
 
-SLANG_UNIT_TEST(serializedModuleVersionLibraryReference)
+SLANG_UNIT_TEST(serializedModuleVersionLibraryReference, NoRenderApi)
 {
     const char* source = R"(
         module version_test_library;
@@ -503,7 +503,7 @@ SLANG_UNIT_TEST(serializedModuleVersionLibraryReference)
     }
 }
 
-SLANG_UNIT_TEST(serializedModuleVersionImportFallback)
+SLANG_UNIT_TEST(serializedModuleVersionImportFallback, NoRenderApi)
 {
     const char* binarySource = R"(
         module future;

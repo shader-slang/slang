@@ -55,6 +55,8 @@ struct TypeTextUtil
     static ConstArrayView<NamesDescriptionValue> getFloatingPointModeInfos();
     /// Get the floating point denormal handling modes
     static ConstArrayView<NamesDescriptionValue> getFpDenormalModeInfos();
+    /// Get the bitfield packing rules with their command-line names and descriptions.
+    static ConstArrayView<NamesDescriptionValue> getBitfieldPackingRulesInfos();
     // Get the line directive infos
     static ConstArrayView<NamesDescriptionValue> getLineDirectiveInfos();
     /// Get the optimization level info

@@ -7,7 +7,7 @@
 // RTTI, witness table, and AnyValue data. The compiler must generate
 // dispatch code for each element's method call independently.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-vk-glsl-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 [anyValueSize(8)]
 interface IFoo

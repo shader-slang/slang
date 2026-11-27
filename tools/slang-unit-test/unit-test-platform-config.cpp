@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 
-SLANG_UNIT_TEST(platformPointerSize)
+SLANG_UNIT_TEST(platformPointerSize, NoRenderApi)
 {
     SLANG_CHECK((SLANG_PTR_IS_64 ? 8u : 4u) == sizeof(void*));
     SLANG_CHECK(SLANG_PTR_IS_32 == (SLANG_PTR_IS_64 ? 0 : 1));
@@ -18,7 +18,7 @@ SLANG_UNIT_TEST(platformPointerSize)
     SLANG_CHECK(sizeof(SlangSizeT) == sizeof(void*));
 }
 
-SLANG_UNIT_TEST(platformEndianness)
+SLANG_UNIT_TEST(platformEndianness, NoRenderApi)
 {
     SLANG_CHECK((SLANG_LITTLE_ENDIAN ^ SLANG_BIG_ENDIAN) == 1);
 

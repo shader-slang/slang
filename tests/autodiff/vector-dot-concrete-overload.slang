@@ -1,7 +1,7 @@
 // Verify that a concrete floating-point vector dot call still binds to the core overload carrying
 // the custom forward and backward derivative registrations.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 1

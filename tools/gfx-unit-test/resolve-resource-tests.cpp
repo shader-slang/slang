@@ -320,7 +320,7 @@ void resolveResourceTestImpl(IDevice* device, UnitTestContext* context)
 
 namespace gfx_test
 {
-SLANG_UNIT_TEST(resolveResourceSimpleD3D12)
+SLANG_UNIT_TEST(resolveResourceSimpleD3D12, D3D12)
 {
     runTestImpl(
         resolveResourceTestImpl<ResolveResourceSimple>,
@@ -328,7 +328,7 @@ SLANG_UNIT_TEST(resolveResourceSimpleD3D12)
         DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(resolveResourceSimpleVulkan)
+SLANG_UNIT_TEST(resolveResourceSimpleVulkan, Vulkan)
 {
     runTestImpl(
         resolveResourceTestImpl<ResolveResourceSimple>,

@@ -5,12 +5,7 @@
 
 // DX11 and WGSL don't support fall-through natively, but the restructure
 // pass legalizes fall-through by inlining code, so tests should still pass.
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // Verify HLSL output preserves fallthrough structure for SM 6.0
 //TEST:SIMPLE(filecheck=CHECK-HLSL): -target hlsl -profile cs_6_0 -entry computeMain -stage compute
@@ -18,13 +13,13 @@
 // First fallthrough chain: case 0 -> case 1
 // CHECK-HLSL: case int(0):
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case int(1):
+// CHECK-HLSL: case 1L:
 // Second fallthrough chain: case 3 -> case 4 -> case 5
-// CHECK-HLSL: case int(3):
+// CHECK-HLSL: case 3L:
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case int(4):
+// CHECK-HLSL: case 4L:
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case int(5):
+// CHECK-HLSL: case 5L:
 
 // CHECK:      6
 // CHECK-NEXT: 3

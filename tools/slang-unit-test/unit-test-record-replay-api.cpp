@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // API tests for record-replay functionality
 // These tests verify that the record layer wrapper classes correctly wrap Slang API calls.
 // They exercise methods on SessionRecorder, ModuleRecorder, EntryPointRecorder, and
@@ -13,7 +14,7 @@ using namespace Slang;
 
 // Test 1: Basic session creation
 // When run with SLANG_RECORD_LAYER=1, this exercises the GlobalSessionRecorder wrapper
-SLANG_UNIT_TEST(RecordReplayApiCreateSession)
+SLANG_UNIT_TEST(RecordReplayApiCreateSession, NoRenderApi)
 {
     // Create global session
     ComPtr<slang::IGlobalSession> globalSession;
@@ -29,7 +30,7 @@ SLANG_UNIT_TEST(RecordReplayApiCreateSession)
 
 // Test 2: Module loading and reflection
 // Exercises ModuleRecorder wrapper by calling reflection methods on the loaded module.
-SLANG_UNIT_TEST(RecordReplayApiCompileModule)
+SLANG_UNIT_TEST(RecordReplayApiCompileModule, NoRenderApi)
 {
     // Create session with a target
     ComPtr<slang::IGlobalSession> globalSession;
@@ -79,7 +80,7 @@ SLANG_UNIT_TEST(RecordReplayApiCompileModule)
 
 // Test 3: Entry point, composite components, and linking
 // Exercises EntryPointRecorder and CompositeComponentTypeRecorder by calling their methods.
-SLANG_UNIT_TEST(RecordReplayApiEntryPoint)
+SLANG_UNIT_TEST(RecordReplayApiEntryPoint, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
@@ -147,7 +148,7 @@ SLANG_UNIT_TEST(RecordReplayApiEntryPoint)
 
 // Test 4: Session-level type operations
 // Exercises SessionRecorder by calling type specialization and layout methods.
-SLANG_UNIT_TEST(RecordReplayApiTypeOperations)
+SLANG_UNIT_TEST(RecordReplayApiTypeOperations, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
@@ -202,7 +203,7 @@ SLANG_UNIT_TEST(RecordReplayApiTypeOperations)
 
 // Test 5: Parameter serialization and target code generation
 // Exercises parameter-recorder.cpp by compiling code with multiple targets.
-SLANG_UNIT_TEST(RecordReplayApiParameterSerialization)
+SLANG_UNIT_TEST(RecordReplayApiParameterSerialization, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
@@ -267,3 +268,4 @@ SLANG_UNIT_TEST(RecordReplayApiParameterSerialization)
     SLANG_CHECK(targetCode != nullptr);
     SLANG_CHECK(targetCode->getBufferSize() > 0);
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

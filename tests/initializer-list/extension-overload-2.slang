@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj -vk
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUFFER):
 
 struct Foo
 {

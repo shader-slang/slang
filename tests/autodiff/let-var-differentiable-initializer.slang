@@ -3,8 +3,7 @@
 // initializers (like dot) get properly marked as differentiable and can propagate
 // derivatives correctly
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -45,7 +44,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     // Use dispatchThreadID.x to make q a runtime value and prevent constant folding
     float3 q = float3(float(dispatchThreadID.x) + 1.0, 2.0, 3.0);
-    
+
     // Test that all variants compile and can be differentiated
     // Expected: q·q = 1² + 2² + 3² = 1 + 4 + 9 = 14
     // CHECK: 14.000000

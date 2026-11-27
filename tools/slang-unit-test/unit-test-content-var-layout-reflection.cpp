@@ -4,7 +4,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(contentVarLayoutReflection)
+SLANG_UNIT_TEST(contentVarLayoutReflection, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);

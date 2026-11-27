@@ -14,7 +14,7 @@ using namespace Slang;
 // Test that the IModule::findAndCheckEntryPoint API works with modules that
 // defines two entrypoints, where one entrypoint calls the other.
 
-SLANG_UNIT_TEST(findEntryPointNested)
+SLANG_UNIT_TEST(findEntryPointNested, NoRenderApi)
 {
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(

@@ -4,6 +4,7 @@
 #include "slang-free-list.h"
 #include "slang.h"
 
+#include <limits>
 #include <stdlib.h>
 #include <string.h>
 #include <type_traits>
@@ -419,8 +420,13 @@ SLANG_FORCE_INLINE T* MemoryArena::allocate()
 template<typename T>
 SLANG_FORCE_INLINE T* MemoryArena::allocateArray(size_t numElems)
 {
-    return (numElems > 0) ? reinterpret_cast<T*>(allocateAligned(sizeof(T) * numElems, alignof(T)))
-                          : nullptr;
+    if (numElems == 0)
+        return nullptr;
+    // Guard against sizeof(T) * numElems overflowing size_t, which would otherwise turn an
+    // attacker-controlled element count (e.g. from deserialized data) into an undersized
+    // allocation that callers then write numElems elements into.
+    SLANG_RELEASE_ASSERT(numElems <= std::numeric_limits<size_t>::max() / sizeof(T));
+    return reinterpret_cast<T*>(allocateAligned(sizeof(T) * numElems, alignof(T)));
 }
 
 // --------------------------------------------------------------------------
@@ -428,14 +434,13 @@ template<typename T>
 SLANG_FORCE_INLINE T* MemoryArena::allocateAndCopyArray(const T* arr, size_t numElems)
 {
     static_assert(std::is_trivially_copyable_v<T>);
-    if (numElems > 0)
-    {
-        const size_t totalSize = sizeof(T) * numElems;
-        void* ptr = allocateAligned(totalSize, alignof(T));
-        ::memcpy(ptr, arr, totalSize);
-        return reinterpret_cast<T*>(ptr);
-    }
-    return nullptr;
+    if (numElems == 0)
+        return nullptr;
+    SLANG_RELEASE_ASSERT(numElems <= std::numeric_limits<size_t>::max() / sizeof(T));
+    const size_t totalSize = sizeof(T) * numElems;
+    void* ptr = allocateAligned(totalSize, alignof(T));
+    ::memcpy(ptr, arr, totalSize);
+    return reinterpret_cast<T*>(ptr);
 }
 
 // ---------------------------------------------------------------------------

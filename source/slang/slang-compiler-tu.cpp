@@ -3,10 +3,10 @@
 
 #include "core/slang-basic.h"
 #include "slang-capability.h"
-#include "slang-check-impl.h"
 #include "slang-compiler.h"
-#include "slang-ir-insts.h"
-#include "slang-ir-util.h"
+#include "slang/ir/slang-ir-insts.h"
+#include "slang/ir/slang-ir-util.h"
+#include "slang/semantic-checking/slang-check-impl.h"
 
 namespace Slang
 {
@@ -112,7 +112,7 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
     applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         RefPtr<TargetRequest> targetReq = new TargetRequest(linkage, targetEnum);
 
@@ -233,6 +233,7 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
         module->_invalidateLinkingInfo();
         return SLANG_OK;
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         outputExceptionDiagnostic(e, sink, outDiagnostics);
@@ -248,6 +249,7 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
         outputExceptionDiagnostic(sink, outDiagnostics);
         return SLANG_FAIL;
     }
+#endif
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Module::getPrecompiledTargetCode(

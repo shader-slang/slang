@@ -18,8 +18,8 @@
 // HLSL66-DAG: struct PartialRayPayload
 // HLSL66-DAG: float3 readOnly_0;
 // HLSL66-DAG: float3 writeOnly_0;
-// HLSL66-DAG: struct EmptyRayPayload
-// HLSL66-DAG: int _slang_dummy_0;
+// HLSL66-DAG: struct DummyRayPayload
+// HLSL66-DAG: uint _slang_dummy_0;
 // HLSL66-NOT: : read(
 // HLSL66-NOT: : write(
 // HLSL67-DAG: struct [raypayload] RayPayload
@@ -29,8 +29,8 @@
 // HLSL67-DAG: struct [raypayload] PartialRayPayload
 // HLSL67-DAG: float3 readOnly_0 : read(caller) : write(caller, anyhit, closesthit, miss);
 // HLSL67-DAG: float3 writeOnly_0 : read(caller, anyhit, closesthit, miss) : write(caller);
-// HLSL67-DAG: struct [raypayload] EmptyRayPayload
-// HLSL67-DAG: int _slang_dummy_0 : read(caller, anyhit, closesthit, miss) : write(caller, anyhit, closesthit, miss);
+// HLSL67-DAG: struct [raypayload] DummyRayPayload
+// HLSL67-DAG: uint _slang_dummy_0 : read(caller, anyhit, closesthit, miss) : write(caller, anyhit, closesthit, miss);
 // DXIL66: define void @
 // DXIL66-NOT: !dx.dxrPayloadAnnotations
 // DXIL67: define void @

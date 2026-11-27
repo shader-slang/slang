@@ -21,6 +21,20 @@ implementing differentiable;
 // spellings such as `sin(value)` instead of `value.sin()` without making differentiability part of
 // the base contracts.
 
+/// Returns each component from `ifTrue` where `condition` is true, and from `ifFalse` otherwise.
+///
+/// Each mask component controls the corresponding result component.
+/// Derivatives propagate through the selected value components; the mask is nondifferentiable.
+[__readNone]
+[Differentiable]
+[ForceInline]
+[OverloadRank(-10)]
+public T select<T : IDifferentiableNumericShapedType>(
+    no_diff T.Mask condition, T ifTrue, T ifFalse)
+{
+    return T.selectComponents(condition, ifTrue, ifFalse);
+}
+
 [__readNone]
 [ForceInline]
 [OverloadRank(-9)]

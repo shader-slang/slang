@@ -11,9 +11,9 @@ public extension bool : IBooleanMask
     [__unsafeForceInlineEarly] bool all() { return this; }
 }
 
-// The nominal joins below let each conformance publish one unambiguous set of Scalar, Mask, and
-// fromScalar witnesses for interface branches that share INumericShapedType. Equivalent
-// conjunction aliases currently fail during conformance checking; see #12874.
+// The nominal joins below let each conformance publish one unambiguous set of shape witnesses
+// for interface branches that share `INumericShapedType`. Equivalent conjunction aliases currently
+// fail during conformance checking; see #12874.
 interface __IScalarNumericDotProduct : IDotProduct, IScalarNumeric {}
 
 #define SLANG_NUMERICS_SCALAR_CONFORMANCE(TYPE)                                       \
@@ -25,6 +25,11 @@ interface __IScalarNumericDotProduct : IDotProduct, IScalarNumeric {}
                                                                                  \
         [__unsafeForceInlineEarly]                                               \
         static This fromScalar(Scalar value) { return value; }                   \
+        [__unsafeForceInlineEarly]                                               \
+        static This selectComponents(Mask condition, This ifTrue, This ifFalse) \
+        {                                                                        \
+            return __numericsBuiltinSelect(condition, ifTrue, ifFalse);          \
+        }                                                                        \
         [__unsafeForceInlineEarly]                                               \
         __init<TSource : __BuiltinIntegerType>(TSource value)                    \
         {                                                                        \
@@ -93,8 +98,19 @@ SLANG_NUMERICS_SIGNED_INTEGER_CONFORMANCE(intptr_t)
 #undef SLANG_NUMERICS_SIGNED_INTEGER_CONFORMANCE
 
 #define SLANG_NUMERICS_INTEGER_CONFORMANCE(TYPE)                                      \
-    public extension TYPE : ITotallyOrdered                                     \
-    {}                                                                           \
+    public extension TYPE : ITotallyOrdered, INumericExtrema                     \
+    {                                                                            \
+        [__unsafeForceInlineEarly]                                               \
+        This minimum(This other)                                                 \
+        {                                                                        \
+            return __numericsBuiltinMinimum(this, other);                       \
+        }                                                                        \
+        [__unsafeForceInlineEarly]                                               \
+        This maximum(This other)                                                 \
+        {                                                                        \
+            return __numericsBuiltinMaximum(this, other);                       \
+        }                                                                        \
+    }                                                                            \
                                                                                  \
     public extension TYPE : IScalarIntegerType                                  \
     {                                                                            \
@@ -308,8 +324,8 @@ public extension<let R : int, let C : int, let L : MatrixLayoutMode>
 // Unlike the scalar conformances above, vectors publish `IDotProduct` separately instead of joining
 // it with each narrower numeric refinement. All extensions on the same `vector<T, N>` contribute to
 // one member set, so the integer and floating-point refinements below can satisfy their inherited
-// Scalar, Mask, and fromScalar requirements with the witnesses published here. Giving each
-// refinement a parallel joined conformance and another copy of those witnesses would instead
+// `INumericShapedType` requirements with the witnesses published here. Giving each refinement a
+// parallel joined conformance and another copy of those witnesses would instead
 // recreate the ambiguity tracked by #12874.
 public extension<T : __BuiltinArithmeticType & IScalarNumeric, let N : int>
     vector<T, N> : IDotProduct
@@ -319,11 +335,16 @@ public extension<T : __BuiltinArithmeticType & IScalarNumeric, let N : int>
 
     [__unsafeForceInlineEarly] static This fromScalar(Scalar value) { return This(value); }
     [__unsafeForceInlineEarly]
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse)
+    {
+        return __numericsBuiltinSelect(condition, ifTrue, ifFalse);
+    }
+    [__unsafeForceInlineEarly]
     Scalar dotProductWith(This other) { return __numericsBuiltinDot(this, other); }
 }
 
 public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
-    vector<T, N> : IIntegerType
+    vector<T, N> : IIntegerType, INumericExtrema
 {
     typealias ShiftAmount = vector<int, N>;
 
@@ -349,6 +370,10 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     This minus(This other) { return this.sub(other); }
     [__unsafeForceInlineEarly]
     This multipliedBy(This other) { return this.mul(other); }
+    [__unsafeForceInlineEarly]
+    This minimum(This other) { return __numericsBuiltinMinimum(this, other); }
+    [__unsafeForceInlineEarly]
+    This maximum(This other) { return __numericsBuiltinMaximum(this, other); }
     [__unsafeForceInlineEarly]
     This quotientWhenDividedBy(This divisor)
     {
@@ -377,6 +402,36 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     {
         return __numericsBuiltinShiftRight(this, amount);
     }
+}
+
+// Integer matrices used by `IFloatingPointWithIntegerPart` expose their logical shape without
+// requiring the arithmetic and bitwise operations of `IIntegerType`.
+public extension<let R : int, let C : int, let L : MatrixLayoutMode>
+    matrix<int, R, C, L> : INumericShapedType
+{
+    typealias Scalar = int;
+    typealias Mask = matrix<bool, R, C, L>;
+
+    [__unsafeForceInlineEarly]
+    static This fromScalar(Scalar value) { return This(value); }
+
+    [__unsafeForceInlineEarly]
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse)
+    {
+        return __numericsBuiltinSelect(condition, ifTrue, ifFalse);
+    }
+}
+
+public extension<
+    T : __BuiltinIntegerType & IScalarIntegerType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode> matrix<T, R, C, L> : INumericExtrema
+{
+    [__unsafeForceInlineEarly]
+    This minimum(This other) { return __numericsBuiltinMinimum(this, other); }
+    [__unsafeForceInlineEarly]
+    This maximum(This other) { return __numericsBuiltinMaximum(this, other); }
 }
 
 public extension<
@@ -450,6 +505,12 @@ public extension<
     typealias Mask = matrix<bool, R, C, L>;
 
     [__unsafeForceInlineEarly] static This fromScalar(Scalar value) { return This(value); }
+
+    [__unsafeForceInlineEarly]
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse)
+    {
+        return __numericsBuiltinSelect(condition, ifTrue, ifFalse);
+    }
 
     [__unsafeForceInlineEarly]
     Mask isEqualTo(This other)

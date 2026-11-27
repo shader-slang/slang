@@ -91,7 +91,7 @@ static ComPtr<ISlangBlob> _serializeModule(
 // ISession::loadModule loads a module as an import would, so source-file discovery through this
 // API must enforce the gate too. This differs from loadModuleFromSourceString, which defines the
 // module supplied by the caller.
-SLANG_UNIT_TEST(loadModuleByNameRequiresExperimentalFeature)
+SLANG_UNIT_TEST(loadModuleByNameRequiresExperimentalFeature, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -112,7 +112,7 @@ SLANG_UNIT_TEST(loadModuleByNameRequiresExperimentalFeature)
 // Importing a module must enforce its experimental gate even when another API call has already
 // inserted that module into the session cache. The explicit loadModuleFromSourceString API may
 // define an experimental library; each consumer still needs to opt in before importing it.
-SLANG_UNIT_TEST(cachedExperimentalModuleStillRequiresFeature)
+SLANG_UNIT_TEST(cachedExperimentalModuleStillRequiresFeature, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -151,7 +151,7 @@ SLANG_UNIT_TEST(cachedExperimentalModuleStillRequiresFeature)
 // dictionary before IR generation begins. When the second unit imports the first, the dependency
 // therefore has a checked AST but no IR. Its import must enforce the same gate as a session-cache
 // or file-system lookup without relying on IRExperimentalModuleDecoration.
-SLANG_UNIT_TEST(multiTranslationUnitExperimentalModuleStillRequiresFeature)
+SLANG_UNIT_TEST(multiTranslationUnitExperimentalModuleStillRequiresFeature, NoRenderApi)
 {
     ComPtr<slang::ICompileRequest> request;
     SLANG_ALLOW_DEPRECATED_BEGIN
@@ -183,7 +183,7 @@ SLANG_UNIT_TEST(multiTranslationUnitExperimentalModuleStillRequiresFeature)
 
 // A dependency discovered through the file system is not in either module cache when its import
 // begins. The source-load return path must apply the same gate as cached and serialized modules.
-SLANG_UNIT_TEST(sourceExperimentalModuleStillRequiresFeature)
+SLANG_UNIT_TEST(sourceExperimentalModuleStillRequiresFeature, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -208,7 +208,7 @@ SLANG_UNIT_TEST(sourceExperimentalModuleStillRequiresFeature)
 
 // Enabling the feature must preserve the common import path's success case. Use file-system
 // discovery here as well so the positive and negative tests exercise the same source-module shape.
-SLANG_UNIT_TEST(sourceExperimentalModuleImportsWithFeature)
+SLANG_UNIT_TEST(sourceExperimentalModuleImportsWithFeature, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -240,7 +240,7 @@ SLANG_UNIT_TEST(sourceExperimentalModuleImportsWithFeature)
 
 // An ordinary serialized module must restore a checked ModuleDecl and pass through the common
 // validation boundary without being over-rejected.
-SLANG_UNIT_TEST(precompiledOrdinaryModuleImportsWithoutFeature)
+SLANG_UNIT_TEST(precompiledOrdinaryModuleImportsWithoutFeature, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -270,7 +270,7 @@ SLANG_UNIT_TEST(precompiledOrdinaryModuleImportsWithoutFeature)
 
 // Serialized modules restore their checked AST before they become importable. Importing only the
 // serialized blob verifies that its restored ExperimentalModule attribute still enforces the gate.
-SLANG_UNIT_TEST(precompiledExperimentalModuleStillRequiresFeature)
+SLANG_UNIT_TEST(precompiledExperimentalModuleStillRequiresFeature, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -301,7 +301,7 @@ SLANG_UNIT_TEST(precompiledExperimentalModuleStillRequiresFeature)
 // An ordinary precompiled module must not hide an experimental dependency from its consumer. The
 // dependency is re-resolved while the ordinary module's AST is deserialized, and that transitive
 // import must pass through the same policy boundary as a direct source import.
-SLANG_UNIT_TEST(precompiledOrdinaryModuleCannotHideExperimentalDependency)
+SLANG_UNIT_TEST(precompiledOrdinaryModuleCannotHideExperimentalDependency, NoRenderApi)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(

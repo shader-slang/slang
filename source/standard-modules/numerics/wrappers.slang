@@ -4,16 +4,19 @@ implementing numerics;
 // one generic overload above another from their interface refinements. Keep the ranks aligned with
 // the existing core tiers:
 //
-// - Rank -10 is the ordinary interface-generic fallback. Unranked core math overloads and rank-10
-//   builtin operators therefore continue to handle builtin types.
-//   The dot-product wrapper now explicitly uses this fallback rank. Slang 202c removes the
-//   deprecated generic-parameter-count tie-breaker, so the rank keeps concrete core overloads
-//   preferred independently of that compatibility rule.
+// - Rank -10 is the ordinary interface-generic fallback. Wrappers that shadow same-named core
+//   overloads carry an explicit rank; the ordinary ones (dot, any, all, abs, rcp, and the
+//   floating-point wrappers below) use -10, so unranked core overloads and rank-10 builtin
+//   operators continue to handle builtin types. Slang 202c removes the deprecated
+//   generic-parameter-count tie-breaker, so these ranks keep concrete core overloads preferred
+//   independently of that compatibility rule.
 // - Rank -4 is immediately below the legacy IArithmetic operator tier at -3 (with IFloat at -2
 //   and IDifferentiableArithmetic at -1), so existing generic constraints retain their operators.
-// - Ranks -9 and -11 bracket the legacy IComparable adapters at -10. Scalar bool-valued relations
-//   and min/max win at -9, while component-wise Mask-valued relations remain fallback behavior at
+// - Ranks -9 and -11 bracket the legacy IComparable relation adapters at -10. Scalar bool-valued
+//   relations win at -9, while component-wise Mask-valued relations remain fallback behavior at
 //   -11 for types that also conform to IComparable.
+// - For min/max the order is -9 here, -10 in differentiable-wrappers.slang, then the core
+//   adapters for `IFloat` (-11), `IInteger` (-12) and `IComparable` (-13).
 
 /// Converts between non-void builtin scalar representations using compiler numeric-cast semantics.
 /// Conversion to `bool` tests whether the source is nonzero; this is not bit reinterpretation.
@@ -59,6 +62,7 @@ public matrix<TDestination, R, C, L> convertBuiltinMatrix(matrix<TSource, R, C, 
 __generic<M : IBooleanMask>
 [__readNone]
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 public bool all(M value)
 {
     return value.all();
@@ -68,9 +72,21 @@ public bool all(M value)
 __generic<M : IBooleanMask>
 [__readNone]
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 public bool any(M value)
 {
     return value.any();
+}
+
+/// Returns each logical component from `ifTrue` where `condition` is true, and from `ifFalse`
+/// otherwise.
+__generic<T : INumericShapedType>
+[__readNone]
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+public T select(T.Mask condition, T ifTrue, T ifFalse)
+{
+    return T.selectComponents(condition, ifTrue, ifFalse);
 }
 
 /// Returns the dot product of `left` and `right`.
@@ -558,6 +574,18 @@ public T modf<T : IFloatingPoint>(T value, out T integralPart)
     return value.fractionalPart(integralPart);
 }
 
+/// Splits `value` into same-shape integer and floating-point fractional parts.
+///
+/// Each whole part must be representable as `T.IntegerPart.Scalar`. The whole parts are truncated
+/// toward zero and written to `integralPart`; the fractional parts are returned in `T`.
+[__readNone]
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+public T modf<T : IFloatingPointWithIntegerPart>(T value, out T.IntegerPart integralPart)
+{
+    return value.fractionalPart(integralPart);
+}
+
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
@@ -769,7 +797,7 @@ public T rsqrt<T : IRootFunctions>(T value)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-9)]
-public T min<T : IRealOrderingFunctions>(T left, T right)
+public T min<T : INumericExtrema>(T left, T right)
 {
     return left.minimum(right);
 }
@@ -777,7 +805,7 @@ public T min<T : IRealOrderingFunctions>(T left, T right)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-9)]
-public T max<T : IRealOrderingFunctions>(T left, T right)
+public T max<T : INumericExtrema>(T left, T right)
 {
     return left.maximum(right);
 }
@@ -785,7 +813,7 @@ public T max<T : IRealOrderingFunctions>(T left, T right)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T clamp<T : IRealOrderingFunctions>(T value, T minimumValue, T maximumValue)
+public T clamp<T : INumericExtrema>(T value, T minimumValue, T maximumValue)
 {
     return value.maximum(minimumValue).minimum(maximumValue);
 }
@@ -793,7 +821,7 @@ public T clamp<T : IRealOrderingFunctions>(T value, T minimumValue, T maximumVal
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T saturate<T : IFractional & IRealOrderingFunctions>(T value)
+public T saturate<T : IFractional & INumericExtrema>(T value)
 {
     return clamp<T>(
         value,
@@ -805,7 +833,7 @@ public T saturate<T : IFractional & IRealOrderingFunctions>(T value)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T fdim<T : IFractional & IRealOrderingFunctions>(T x, T y)
+public T fdim<T : IFractional & INumericExtrema>(T x, T y)
 {
     T zero = T.zero();
     return x.minus(y).maximum(zero);
@@ -832,7 +860,7 @@ public T lerp<T : IFractional>(T x, T y, T factor)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T max3<T : IRealOrderingFunctions>(T x, T y, T z)
+public T max3<T : INumericExtrema>(T x, T y, T z)
 {
     return x.maximum(y.maximum(z));
 }
@@ -840,7 +868,7 @@ public T max3<T : IRealOrderingFunctions>(T x, T y, T z)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T min3<T : IRealOrderingFunctions>(T x, T y, T z)
+public T min3<T : INumericExtrema>(T x, T y, T z)
 {
     return x.minimum(y.minimum(z));
 }
@@ -848,7 +876,7 @@ public T min3<T : IRealOrderingFunctions>(T x, T y, T z)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T median3<T : IRealOrderingFunctions>(T x, T y, T z)
+public T median3<T : INumericExtrema>(T x, T y, T z)
 {
     T lower = y.minimum(z);
     T upper = y.maximum(z);
@@ -858,7 +886,7 @@ public T median3<T : IRealOrderingFunctions>(T x, T y, T z)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T fmax<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y)
+public T fmax<T : IFloatingPoint & INumericExtrema>(T x, T y)
 {
     return x.maximum(y);
 }
@@ -866,7 +894,7 @@ public T fmax<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T fmax3<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y, T z)
+public T fmax3<T : IFloatingPoint & INumericExtrema>(T x, T y, T z)
 {
     return x.maximum(y.maximum(z));
 }
@@ -874,7 +902,7 @@ public T fmax3<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y, T z)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T fmin<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y)
+public T fmin<T : IFloatingPoint & INumericExtrema>(T x, T y)
 {
     return x.minimum(y);
 }
@@ -882,7 +910,7 @@ public T fmin<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T fmin3<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y, T z)
+public T fmin3<T : IFloatingPoint & INumericExtrema>(T x, T y, T z)
 {
     return x.minimum(y.minimum(z));
 }
@@ -890,7 +918,7 @@ public T fmin3<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y, T z)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T fmedian3<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y, T z)
+public T fmedian3<T : IFloatingPoint & INumericExtrema>(T x, T y, T z)
 {
     return median3(x, y, z);
 }

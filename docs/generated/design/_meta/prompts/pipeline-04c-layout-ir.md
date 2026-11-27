@@ -7,7 +7,7 @@ See [_common.md](_common.md) for the universal rules.
 Produce `docs/generated/design/pipeline/04c-layout-ir.md` — a
 construction reference for the **layout IR module** built by
 `TargetProgram::createIRModuleForLayout`
-([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+([slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
 line 16353). This module is **not** a copy of the executable
 IR module; it is a sibling IR module whose only job is to carry
 `IRLayoutDecoration`s on stub globals and entry points for the
@@ -35,7 +35,7 @@ script with a single Mermaid flowchart and two reference tables.
    stub globals, stub entry-point functions, and
    `IRLayoutDecoration`s.
 3. `## Source` — direct link to
-   [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+   [slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
    line 16353 and to
    [slang-target-program.h](../../../../source/slang/slang-target-program.h)
    for the `m_irModuleForLayout` cache and `getOrCreateIRModuleForLayout`

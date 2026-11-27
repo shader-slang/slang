@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#the-general-path
-//META: doc_section_digest=436f56a9b4722c5976d165afb6d558aed7529f2fc5194e02488c5753bf733c25
+//META: doc_section_digest=2c5cf19780ff5e32c3610b10c3f170b49191675976d3294898fdf305168a3009
 //META: purpose=An operator whose operands are user-defined types is declined by the fast path and resolved by the general pipeline, so a user-declared operator+ on a struct fires.
 //META: intent=functional
 //META: pipeline_stage=check

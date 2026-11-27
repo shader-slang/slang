@@ -122,9 +122,9 @@ spelling of a modifier as it appears in the parser's syntax table).
 You may **not** mine them for behavioral claims that the doc does not
 make.
 
-- `source/slang/slang-parser.cpp`
-- `source/slang/slang-syntax.h`
-- `source/slang/slang-syntax.cpp`
+- `source/slang/parser/slang-parser.cpp`
+- `source/slang/ast/slang-syntax.h`
+- `source/slang/ast/slang-syntax.cpp`
 
 ## Test directives
 

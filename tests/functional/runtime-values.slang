@@ -1,7 +1,7 @@
 // Verify generation and mapping for arrays, vectors, and matrices with function values and
 // capturing lambdas.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 1

@@ -6,7 +6,7 @@
 // This test is CUDA-only because Vulkan requires SPV_EXT_shader_atomic_float16_add
 // which is not widely supported by drivers.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUF):-output-using-type
 
 // half add reduction target
 //TEST_INPUT:ubuffer(data=[0], stride=4):name=halfAddTarget

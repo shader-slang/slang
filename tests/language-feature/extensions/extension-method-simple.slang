@@ -2,7 +2,7 @@
 
 // Test that an `extension` applied to an interface type works as users expect
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 struct MyType
 {

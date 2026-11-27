@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 module main;
 
@@ -16,5 +15,5 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     outputBuffer[tid] = f_c();
-    // CHECK: 4 
+    // CHECK: 4
 }

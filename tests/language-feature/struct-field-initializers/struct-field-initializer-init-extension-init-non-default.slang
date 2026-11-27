@@ -1,8 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -emit-spirv-directly
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -compute -entry computeMain
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-llvm -compute -entry computeMain
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-entry computeMain
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -14,7 +10,6 @@ struct DefaultStructWithInit
 };
 extension DefaultStructWithInit
 {
-    [mutating]
     __init(int inData)
     {
         data1 = 3;

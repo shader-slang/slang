@@ -7,7 +7,7 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(byteEncode)
+SLANG_UNIT_TEST(byteEncode, NoRenderApi)
 {
     {
         SLANG_CHECK(ByteEncodeUtil::calcMsb8(0) == -1);

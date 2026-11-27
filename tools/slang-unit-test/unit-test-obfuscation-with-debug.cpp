@@ -397,7 +397,7 @@ static SlangResult verifySeparateDebugOutput(
 //    b) stripped.spv has no accidental debug info (no OpSource, OpLine, etc.)
 //    c) DBI in stripped.spv matches DBI in dbg.spv
 //
-SLANG_UNIT_TEST(obfuscationWithSeparateDebug)
+SLANG_UNIT_TEST(obfuscationWithSeparateDebug, NoRenderApi)
 {
     LOG("========================================\n");
     LOG("Testing Obfuscation with Separate Debug\n");

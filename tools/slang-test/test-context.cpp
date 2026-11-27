@@ -70,6 +70,10 @@ void TestContext::setMaxTestRunnerThreadCount(int count)
         ordinal = 0;
     }
     m_testRequirements.setCount(count);
+    for (auto& requirements : m_testRequirements)
+    {
+        requirements = nullptr;
+    }
     m_reporters.setCount(count);
     for (auto& reporter : m_reporters)
     {
@@ -337,15 +341,26 @@ Slang::IDownstreamCompiler* TestContext::getDefaultCompiler(SlangSourceLanguage 
     return set ? set->getDefaultCompiler(sourceLanguage) : nullptr;
 }
 
-bool TestContext::canRunTestWithRenderApiFlags(Slang::RenderApiFlags requiredFlags)
+bool TestContext::canRunTestWithRenderApiFlags(
+    Slang::RenderApiFlags requiredFlags,
+    bool isNeededByGpuTests)
 {
-    // If only allow tests that use API - then the requiredFlags must be 0
-    if (options.apiOnly && requiredFlags == 0)
+    // A compile test does not run with `-compile-test false`, unless GPU tests need it.
+    if (requiredFlags == 0 && !options.compileTest && !isNeededByGpuTests)
     {
         return false;
     }
     // Are the required rendering APIs enabled from the -api command line switch
     return (requiredFlags & options.enabledApis) == requiredFlags;
+}
+
+bool TestContext::canRunUnitTestUsingRenderApis(Slang::RenderApiFlags usedApis)
+{
+    if (usedApis == 0)
+    {
+        return options.compileTest;
+    }
+    return (usedApis & options.enabledApis) != 0;
 }
 
 SpawnType TestContext::getFinalSpawnType(SpawnType spawnType)

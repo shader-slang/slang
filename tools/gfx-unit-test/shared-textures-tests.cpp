@@ -251,12 +251,12 @@ void sharedTextureTestAPI(
     sharedTextureTestImpl(srcDevice, dstDevice, context);
 }
 #if SLANG_WIN64
-SLANG_UNIT_TEST(sharedTextureD3D12ToCUDA)
+SLANG_UNIT_TEST(sharedTextureD3D12ToCUDA, D3D12 | CUDA)
 {
     sharedTextureTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12, Slang::RenderApiFlag::CUDA);
 }
 
-SLANG_UNIT_TEST(sharedTextureVulkanToCUDA)
+SLANG_UNIT_TEST(sharedTextureVulkanToCUDA, Vulkan | CUDA)
 {
     sharedTextureTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan, Slang::RenderApiFlag::CUDA);
 }

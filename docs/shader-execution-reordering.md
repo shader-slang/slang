@@ -175,6 +175,10 @@ BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attribut
 
 **Note**: This function is **NV-only** and not available with the cross-vendor EXT extension.
 
+**Note**: On CUDA, `GeometryIndex` is the OptiX SBT GAS index, which equals the geometry index under the
+host-side conditions described in [Geometry index](cuda-target.md#geometry-index). With OptiX 9.0 and later, this
+function does not use its hit-identifying arguments; see the limitation in that section.
+
 ## Signature
 
 ```
@@ -210,6 +214,10 @@ static HitObject HitObject.MakeHit<attr_t>(
 See MakeHit but handles Motion.
 
 **Note**: This function is **NV-only** and not available with the cross-vendor EXT extension.
+
+**Note**: On CUDA, `GeometryIndex` is the OptiX SBT GAS index, which equals the geometry index under the
+host-side conditions described in [Geometry index](cuda-target.md#geometry-index). With OptiX 9.0 and later, this
+function does not use its hit-identifying arguments; see the limitation in that section.
 
 ## Signature
 
@@ -558,6 +566,9 @@ uint HitObject.GetInstanceID();
 
 Returns the geometry index of a hit. Valid if the hit object represents a hit.
 
+**Note**: On CUDA, this returns the OptiX SBT GAS index, which equals the geometry index under the
+host-side conditions described in [Geometry index](cuda-target.md#geometry-index).
+
 ## Signature
 
 ```
@@ -627,7 +638,7 @@ Returns the world-space vertex positions of the triangle that was hit. Valid if 
 ## Signature
 
 ```
-void HitObject.GetTriangleVertexPositions(out float3 positions[3]);
+float3[3] HitObject.GetTriangleVertexPositions();
 ```
 
 ---

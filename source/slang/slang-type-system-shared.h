@@ -167,6 +167,9 @@ enum class AddressSpace : uint64_t
     SpecializationConstant,
     // Corresponds to SPIR-V's SpvStorageClassNodePayloadAMDX,
     NodePayloadAMDX,
+    // The storage of an entry point's by-value uniform parameters, which the host supplies when it
+    // launches the entry point.
+    LaunchParameter,
 
     // Default address space for a user-defined pointer
     UserPointer = 0x100000001ULL,
@@ -205,6 +208,12 @@ enum class AccessQualifier : uint64_t
     // qualifier than `Read`, and may allow the backend to perform more aggresive
     // optimizations.
     Immutable = 2,
+
+    // The data being referred to can only be written through the reference.
+    // `IRRefParamType` records this access for a `__ref_writeonly` parameter;
+    // the core module's `Access` enum does not expose it, so a `Ptr` or `Ref`
+    // cannot name it.
+    WriteOnly = 3,
 };
 
 // NOTE: The IR linker assumes every `AnnotationKind` is differentiability-

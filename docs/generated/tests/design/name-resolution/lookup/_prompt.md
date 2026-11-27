@@ -155,11 +155,11 @@ realizable through the surface language, or to confirm the exact
 text/code of a diagnostic. You may **not** mine them for behaviors
 the doc does not claim.
 
-- `source/slang/slang-lookup.h`
-- `source/slang/slang-lookup.cpp`
-- `source/slang/slang-check-decl.cpp`
-- `source/slang/slang-check-inheritance.cpp`
-- `source/slang/slang-check-stmt.cpp`
+- `source/slang/semantic-checking/slang-lookup.h`
+- `source/slang/semantic-checking/slang-lookup.cpp`
+- `source/slang/semantic-checking/slang-check-decl.cpp`
+- `source/slang/semantic-checking/slang-check-inheritance.cpp`
+- `source/slang/semantic-checking/slang-check-stmt.cpp`
 - `source/slang/slang-diagnostics.lua` (verification-only; pick the
   real diagnostic code for the ambiguity / member-not-found tests)
 

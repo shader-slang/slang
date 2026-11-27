@@ -1,11 +1,8 @@
 //TEST:SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute -DMETAL
 //TEST:SIMPLE(filecheck=LIB):-target metallib -entry computeMain -stage compute -DMETAL
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -dx12 -profile cs_6_0 -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type
-//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=BUF):-profile cs_6_0 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUF):-output-using-type
 
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name=uintBuffer
@@ -31,17 +28,21 @@ void computeMain(uint groupIndex : SV_GroupIndex)
         }
     }
     AllMemoryBarrierWithGroupSync();
-    
+
     int idx = groupIndex;
     float val = 0.0f;
 
     // InterlockedAdd
-    //MTL: atomic_uint threadgroup*{{.*}}shareMemUI
+    // Each pointer is held in a temporary because it is used again after the atomic, and the
+    // fold check does not move a value past an instruction with side effects.
+    //MTL: array<uint, int(4)> threadgroup* [[UI:_S[0-9]+]] = {{.*}}shareMemUI
+    //MTL: atomic_uint threadgroup*{{.*}}[[UI]]
     //LIB: call {{.*}}.atomic.local.add.u.i32
     InterlockedAdd(shareMemUI[idx], uint(1));
     val += shareMemUI[idx];
 
-    //MTL: atomic_int threadgroup*{{.*}}shareMemI
+    //MTL: array<int, int(4)> threadgroup* [[SI:_S[0-9]+]] = {{.*}}shareMemI
+    //MTL: atomic_int threadgroup*{{.*}}[[SI]]
     //LIB: call {{.*}}.atomic.local.add.s.i32
     InterlockedAdd(shareMemI[idx],  2);
     val += shareMemI[idx];

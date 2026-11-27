@@ -223,14 +223,6 @@ static SlangResult _compileProgramImpl(
         sessionOptionEntries.add(entry);
     }
 
-    {
-        slang::CompilerOptionEntry entry;
-        entry.name = slang::CompilerOptionName::LineDirectiveMode;
-        entry.value.kind = slang::CompilerOptionValueKind::Int;
-        entry.value.intValue0 = int(SlangLineDirectiveMode::SLANG_LINE_DIRECTIVE_MODE_NONE);
-        sessionOptionEntries.add(entry);
-    }
-
     if (options.useLLVMDirectly)
     {
         slang::CompilerOptionEntry entry;

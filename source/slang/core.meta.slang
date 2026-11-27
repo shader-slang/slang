@@ -111,6 +111,42 @@ interface IComparable
     bool lessThanOrEquals(This other);
 }
 
+//@hidden:
+// A generic `min(x, y)` binds once, against the abstract `T`, and specialization does not revisit
+// that choice, so on its own it cannot reach the concrete overload written for a scalar, vector or
+// matrix shape. The core `min`/`max` overloads for `IFloat` and `IInteger` therefore call
+// `x.__min(y)` / `x.__max(y)`, and the builtin scalar, vector and float matrix conformances
+// implement these by calling `min`/`max` on their own operands. That call is resolved when each
+// builtin conformance is checked, where the operand shape is known, so it binds the concrete
+// overload for that shape, which ranks above the generic ones that would call back into
+// `__min`/`__max` without end. Each target then gets its native vector operation where it has one,
+// and the same per-element code as a direct call on cpp/cuda.
+//
+// `x.__min(y)` and `x.__max(y)` return what `min(x, y)` and `max(x, y)` mean for the type. The
+// defaults order whole values with `lessThan`, as the `IComparable` overloads do, which suits a
+// type ordered as a whole. The builtin types override them: vectors and matrices are
+// component-wise, and scalars keep each target's own `min`/`max`, including its NaN handling, which
+// a `lessThan` comparison does not match. A user `IFloat`/`IInteger` type therefore needs no new
+// members. The requirements live here rather than in `IComparable` so that a type conforming only
+// to `IComparable` gains no new requirements and `IComparable` stays a pure ordering interface.
+interface __IMinMax : IComparable
+{
+    This __min(This other)
+    {
+        if (this.lessThan(other))
+            return this;
+        return other;
+    }
+
+    This __max(This other)
+    {
+        if (this.lessThan(other))
+            return other;
+        return this;
+    }
+}
+//@public:
+
 /// Represents types that has a defined range of values.
 /// Implemented by all builtin integer and floating point types.
 interface IRangedValue
@@ -248,7 +284,7 @@ interface ILogical : IComparable
 /// }
 /// ```
 ///
-interface IInteger : IArithmetic, ILogical
+interface IInteger : IArithmetic, ILogical, __IMinMax
 {
     /// Converts the value of the current instance to an `int`.
     /// @return The converted `int` value.
@@ -301,7 +337,7 @@ interface IInteger : IArithmetic, ILogical
 /// }
 /// ```
 ///
-interface IFloat : IArithmetic, IDifferentiable
+interface IFloat : IArithmetic, IDifferentiable, __IMinMax
 {
     /// Initializes a value of the conforming type form a `float`.
     [Differentiable]
@@ -958,10 +994,13 @@ interface __EnumType : ILogical
 
 //@public:
 
-/// Represents types that provide a subscript operator so that they can be used like an immutable array.
+/// Represents types that provide a subscript operator so that they can be used like an immutable
+/// array.
 /// @param T The element type returned by the subscript operator.
-/// @remarks This interface is implemented by `Array`, `vector`, `matrix`, `StructuredBuffer` and `RWStructuredBuffer` types.
-/// @example The follow example shows how to define a generic function that computes the sum of all elements in an array-like type.
+/// @remarks This interface is implemented by `Array`, `vector`, `matrix`, `Buffer`,
+/// `StructuredBuffer`, and `RWStructuredBuffer` types.
+/// @example The following example shows how to define a generic function that computes the sum of
+/// all elements in an array-like type.
 /// ```csharp
 /// T sum<T:IFloat, U:IArray<T>>(U array)
 /// {
@@ -1150,6 +1189,12 @@ struct $(kBaseTypes[tt].name)
     : __BuiltinType
 
 ${
+    // Each base type declares every builtin marker interface it implements, including those
+    // that its other markers already refine. A declared conformance gives a constraint such as
+    // `T : __BuiltinScalarType` a direct witness, which adds no upcast cost in overload ranking.
+    // The scalar-to-vector splat on `vector<ToType,N>` depends on this: with a transitive witness
+    // it would rank below the exact-match, explicit-only `__init(int)` of `vector<float,N>`, and
+    // `float4 v = i;` (as well as `msad4` in the core module) would fail to type-check.
     switch (kBaseTypes[tt].tag)
     {
     case BaseType::Half:
@@ -1160,6 +1205,7 @@ $}
     ,  __BuiltinRealType
     ,  __BuiltinSignedArithmeticType
     ,  __BuiltinArithmeticType
+    ,  __BuiltinScalarType
 ${
         break;
     case BaseType::Int8:
@@ -1192,6 +1238,7 @@ ${
     case BaseType::Bool:
 $}
     ,  __BuiltinLogicalType
+    ,  __BuiltinScalarType
 ${
         break;
 
@@ -1244,8 +1291,14 @@ ${
     case BaseType::Bool:
 $}
         [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Eql)) bool equals(This other);
-        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
-        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Leq)) bool lessThanOrEquals(This other);
+        // SPIR-V has no ordering comparison for Boolean operands, and GLSL and
+        // WGSL do not allow relational operators on Booleans, so the ordering
+        // `false < true` is defined with the logical operators that every
+        // target supports: `a < b` is `!a && b`, `a <= b` is `!a || b`. The
+        // non-short-circuit `and`/`or` keep both operands evaluated and the
+        // comparison branchless, as ordering comparisons are on other types.
+        [__unsafeForceInlineEarly] bool lessThan(This other) { return and(!this, other); }
+        [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return or(!this, other); }
         [__unsafeForceInlineEarly] This shl(int other) { return __intCast<This>(__shl(__intCast<int>(this), other)); }
         [__unsafeForceInlineEarly] This shr(int other) { return __intCast<This>(__shr(__intCast<int>(this), other)); }
         [__unsafeForceInlineEarly] This bitAnd(This other) { return __intCast<This>(__and(__intCast<int>(this), __intCast<int>(other))); }
@@ -1303,6 +1356,8 @@ $}
         __intrinsic_op($(kIROp_IntCast)) int64_t toInt64();
         __intrinsic_op($(kIROp_IntCast)) uint toUInt();
         __intrinsic_op($(kIROp_IntCast)) uint64_t toUInt64();
+        [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+        [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
 ${
         break;
 
@@ -1338,6 +1393,8 @@ $}
          __intrinsic_op($(kIROp_Neg))  [Differentiable] This neg();
          __intrinsic_op($(kIROp_FloatCast)) [Differentiable] float toFloat();
          [__unsafeForceInlineEarly] [Differentiable] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
+         [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+         [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
         typedef $(kBaseTypes[tt].name) Differential;
 
         [__unsafeForceInlineEarly]
@@ -1805,6 +1862,16 @@ struct BorrowInOutParam<T>
 __magic_type(RefParamType)
 __intrinsic_type($(kIROp_RefParamType))
 struct RefParam<T>
+{};
+
+__magic_type(RefReadOnlyParamType)
+__intrinsic_type($(kIROp_RefParamType))
+struct RefReadOnlyParam<T>
+{};
+
+__magic_type(RefWriteOnlyParamType)
+__intrinsic_type($(kIROp_RefParamType))
+struct RefWriteOnlyParam<T>
 {};
 
 __magic_type(BorrowInParamType)
@@ -2382,6 +2449,8 @@ extension vector<T,N> : IInteger
     [__unsafeForceInlineEarly] int64_t toInt64() { return __intCast<int64_t>(this[0]); }
     [__unsafeForceInlineEarly] uint toUInt() { return __intCast<uint>(this[0]); }
     [__unsafeForceInlineEarly] uint64_t toUInt64() { return __intCast<uint64_t>(this[0]); }
+    [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+    [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
     [OverloadRank(-1)]
     [__unsafeForceInlineEarly] __init(int v) { this = vector<T,N>(T(v)); }
     [OverloadRank(-1)]
@@ -2422,6 +2491,8 @@ extension vector<T,N> : IFloat
     __intrinsic_op($(kIROp_Neg)) [Differentiable] This neg();
     [Differentiable] [__unsafeForceInlineEarly]  This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable] [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
+    [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+    [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
 
     [Differentiable]
     __intrinsic_op(0)
@@ -2490,6 +2561,21 @@ extension matrix<T,N,M,L> : IFloat
     [Differentiable] __intrinsic_op($(kIROp_Neg)) This neg();
     [Differentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
+
+    // The concrete floating-point matrix overloads accept layout `L` directly. Overload resolution
+    // therefore selects the shaped overload without a layout conversion or a recursive call to
+    // the whole-type `IFloat` forwarder.
+    [__unsafeForceInlineEarly]
+    override This __min(This other)
+    {
+        return min(this, other);
+    }
+
+    [__unsafeForceInlineEarly]
+    override This __max(This other)
+    {
+        return max(this, other);
+    }
 
     [Differentiable]
     __intrinsic_op(0)
@@ -2913,13 +2999,41 @@ __generic<ToType, let N : int> extension vector<ToType,N>
     __intrinsic_op(BuiltinCast)
     __init<FromType>(vector<FromType,N> value) where ToType(FromType) implicit;
 
+    // The scalar-to-vector splats build `vector<FromType,N>` and convert it with `__builtin_cast`
+    // instead of calling the coercion witness, so a source must be a valid vector element whose
+    // conversion `BuiltinCast` performs: a builtin scalar or an enum. The `where` clause still
+    // decides which element types a source can splat into, and supplies the `constraint+` cost.
+    // A user-defined conversion such as `float.__init(float3)` therefore does not make `float3`
+    // implicitly convertible to `float4`, and an enum source always splats its tag value. The enum
+    // splat is a separate overload because `__EnumType` does not refine `__BuiltinScalarType`.
     __implicit_conversion(constraint+)
     [__unsafeForceInlineEarly]
     [__readNone]
     [TreatAsDifferentiable]
-    __init<FromType>(FromType value) where ToType(FromType) implicit
+    __init<FromType : __BuiltinScalarType>(FromType value) where ToType(FromType) implicit
     {
         this = __builtin_cast<vector<ToType,N>>(vector<FromType,N>(value));
+    }
+
+    __implicit_conversion(constraint+)
+    [__unsafeForceInlineEarly]
+    [__readNone]
+    [TreatAsDifferentiable]
+    __init<FromType : __EnumType>(FromType value) where ToType(FromType) implicit
+    {
+        this = __builtin_cast<vector<ToType,N>>(vector<FromType,N>(value));
+    }
+
+    // A one-element vector of the element type splats through its own overload, because the
+    // splats above accept only scalar and enum sources. Its cost equals that of the
+    // `vector<T,1>` -> `T` -> `vector<T,N>` path, so overload ranking does not change.
+    __implicit_conversion($(kConversionCost_OneVectorToScalar + kConversionCost_ScalarToVector))
+    [__unsafeForceInlineEarly]
+    [__readNone]
+    [TreatAsDifferentiable]
+    __init(vector<ToType,1> value)
+    {
+        this = vector<ToType,N>(value[0]);
     }
 }
 
@@ -4643,6 +4757,14 @@ __attributeTarget(FuncDecl)
 attribute_syntax [NumThreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
 
 /// Indicate a compute shader entry point is only compatible with the specified wave size.
+/// On HLSL this is emitted as `[WaveSize(N)]`, and on WGSL as `@subgroup_size(N)` (with the
+/// `subgroups` and `subgroup_size_control` extensions). SPIR-V and GLSL have no in-shader form,
+/// and Slang does not enforce the size in the generated shader: the application must request it
+/// when it creates the pipeline (`VK_EXT_subgroup_size_control`), using the value that
+/// reflection reports through `EntryPointReflection::getComputeWaveSize`. Without that request
+/// the shader can run at a different wave size. Metal cannot request
+/// a SIMD-group width, so the attribute is ignored there with a warning. CUDA warps are always 32
+/// lanes wide: `[WaveSize(32)]` needs nothing emitted, and any other size is ignored with a warning.
 /// @param numLanes The wave size this shader entrypoint is compatible with. Must be one of 4, 8, 16, 32, 64, 128.
 __attributeTarget(FuncDecl)
 attribute_syntax [WaveSize(numLanes: int)]   : WaveSizeAttribute;
@@ -4721,7 +4843,7 @@ attribute_syntax [mutating] : MutatingAttribute;
 /// it to be called with a non-mutating value of `S`.
 /// @see `[mutating]`.
 ///
-__attributeTarget(AccessorDecl)
+__attributeTarget(FunctionDeclBase)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
 
 /// Marks a function whose return value should not be discarded. When a call to a
@@ -4779,6 +4901,25 @@ enum _AttributeTargets
 /// @param target The type of declarations to which the attribute can be applied.
 __attributeTarget(StructDecl)
 attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsageAttribute;
+
+/// Associate a root signature with a function declaration.
+///
+/// @param value A string that defines the root signature.
+///
+/// This attribute is allowed on any function declaration, but is intended
+/// for use with function declarations used as entry points.
+///
+/// This attribute is currently only intended for use when compiling for D3D12,
+/// in which case the string argument is expected to define a root signature
+/// using the root-signature DSL syntax introduced by HLSL.
+///
+/// An application can query for a root signature attribute and inspect
+/// its argument using the reflection API for user-defined attributes.
+[__AttributeUsage(_AttributeTargets.Function)]
+struct RootSignatureAttribute
+{
+    String value;
+};
 
 /// Specify the storage format of a read-write texture. Can only be used on a texture typed struct field or global parameter.
 /// @param format The storage format of the texture.
@@ -4989,7 +5130,7 @@ attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
 
 // @hidden:
 __attributeTarget(DeclBase)
-attribute_syntax [KnownBuiltin(name : int)] : KnownBuiltinAttribute;
+attribute_syntax [KnownBuiltin(name)] : KnownBuiltinAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__GLSLRequireShaderInputParameter(parameterNumber:int)] : GLSLRequireShaderInputParameterAttribute;
@@ -5004,14 +5145,16 @@ __attributeTarget(FunctionDeclBase)
 attribute_syntax [NonUniformReturn] : NonDynamicUniformAttribute;
 
 /// Mark a compute shader entry point to allow it to use implicit derivatives.
-/// @remarks This attributes causes Slang to emit `DerivativeGroupQuadsNV` execution mode when producing SPIR-V. The attribute has no
-/// effect on other targets.
+/// @remarks This attribute emits the `DerivativeGroupQuadsKHR` execution mode for SPIR-V
+/// and the `derivative_group_quadsNV` layout qualifier for GLSL.
+/// It has no effect on other targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [DerivativeGroupQuad] : DerivativeGroupQuadAttribute;
 
 /// Mark a compute shader entry point to allow it to use implicit derivatives.
-/// @remarks This attributes causes Slang to emit `DerivativeGroupLinearNV` execution mode when producing SPIR-V. The attribute has no
-/// effect on other targets.
+/// @remarks This attribute emits the `DerivativeGroupLinearKHR` execution mode for SPIR-V
+/// and the `derivative_group_linearNV` layout qualifier for GLSL.
+/// It has no effect on other targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [DerivativeGroupLinear] : DerivativeGroupLinearAttribute;
 

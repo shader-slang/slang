@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-integration.cpp
 // Integration tests: API calls, directory management
 
@@ -66,7 +67,7 @@ static void checkNextReplayBlobRejected()
     SLANG_CHECK(replayedBlob == nullptr);
 }
 
-SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
+SLANG_UNIT_TEST(replayContextRecordFindProfileCall, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -136,7 +137,7 @@ SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
     ctx().disable();
 }
 
-SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
+SLANG_UNIT_TEST(replayContextRecordCreateSessionCall, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -226,7 +227,7 @@ SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
 // Replay Directory Tests
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextReplayDirectory)
+SLANG_UNIT_TEST(replayContextReplayDirectory, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -245,7 +246,7 @@ SLANG_UNIT_TEST(replayContextReplayDirectory)
     ctx().setReplayDirectory(".slang-replays");
 }
 
-SLANG_UNIT_TEST(replayContextMirrorFileCreation)
+SLANG_UNIT_TEST(replayContextMirrorFileCreation, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -277,7 +278,7 @@ SLANG_UNIT_TEST(replayContextMirrorFileCreation)
     ctx().setReplayDirectory(".slang-replays");
 }
 
-SLANG_UNIT_TEST(replayContextLoadLatestReplay)
+SLANG_UNIT_TEST(replayContextLoadLatestReplay, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -321,7 +322,7 @@ SLANG_UNIT_TEST(replayContextLoadLatestReplay)
     ctx().setReplayDirectory(".slang-replays");
 }
 
-SLANG_UNIT_TEST(replayContextFindLatestFolder)
+SLANG_UNIT_TEST(replayContextFindLatestFolder, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -363,7 +364,7 @@ SLANG_UNIT_TEST(replayContextFindLatestFolder)
     ctx().setReplayDirectory(".slang-replays");
 }
 
-SLANG_UNIT_TEST(replayContextRejectsInvalidBlobHash)
+SLANG_UNIT_TEST(replayContextRejectsInvalidBlobHash, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -502,7 +503,7 @@ SLANG_UNIT_TEST(replayContextRejectsInvalidBlobHash)
 // Verify the recorded stream contains the expected signature and SessionDesc.
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextRecordGetSessionDescDigestCall)
+SLANG_UNIT_TEST(replayContextRecordGetSessionDescDigestCall, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -579,7 +580,7 @@ SLANG_UNIT_TEST(replayContextRecordGetSessionDescDigestCall)
 // because callWithDefaults passes nullptr for the SessionDesc* parameter.
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextGetSessionDescDigestPlayback)
+SLANG_UNIT_TEST(replayContextGetSessionDescDigestPlayback, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -637,7 +638,7 @@ SLANG_UNIT_TEST(replayContextGetSessionDescDigestPlayback)
 //     on a given compiler being present.
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextGetDownstreamCompilerPathPlayback)
+SLANG_UNIT_TEST(replayContextGetDownstreamCompilerPathPlayback, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -706,3 +707,4 @@ SLANG_UNIT_TEST(replayContextGetDownstreamCompilerPathPlayback)
 
     ctx().disable();
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

@@ -1,5 +1,5 @@
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target spirv
 
 void doSomethingInSpirv()
 {

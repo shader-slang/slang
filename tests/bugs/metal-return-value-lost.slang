@@ -8,12 +8,8 @@
 //TEST:SIMPLE(filecheck=CPP):   -target cpp -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):  -target wgsl -entry computeMain -stage compute
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-d3d12 -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -Xslang -O3
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cpu -compute -shaderobj -output-using-type
-//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-metal -compute -shaderobj -output-using-type -Xslang -O3
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-wgsl -compute -shaderobj -output-using-type -Xslang -O3
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+cpu, filecheck-buffer=BUFFER):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx11+metal+cuda+wgpu+llvm, filecheck-buffer=BUFFER):-output-using-type -Xslang -O3
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -67,7 +63,7 @@ void computeMain(uint tid : SV_GroupIndex)
 // HLSL: for(;;)
 // HLSL: [[RET]].data_0 = output_0.data_0;
 // HLSL: if(([[RET]].data_0[int(0)]) == 30.0f)
-// HLSL: passed_0 = ([[RET]].data_0[int(1)]) == 70.0f;
+// HLSL: passed_0 = ([[RET]].data_0[1L]) == 70.0f;
 
 // CUDA: Vec_0 [[RET:_S[0-9]+]];
 // CUDA: for(;;)
@@ -82,7 +78,7 @@ void computeMain(uint tid : SV_GroupIndex)
 // CPP: passed_0 = ((&[[RET]])->data_0[int(1)]) == 70.0f;
 
 // WGSL: var [[RET:_S[0-9]+]] : Vec_0;
-// WGSL: for(;;)
+// WGSL: loop
 // WGSL: [[RET]].data_0 = output_0.data_0;
 // WGSL: if(([[RET]].data_0[i32(0)]) == 30.0f)
 // WGSL: passed_0 = ([[RET]].data_0[i32(1)]) == 70.0f;

@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): 
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 int check<int v>()
 {

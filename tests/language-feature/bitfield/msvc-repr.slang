@@ -1,10 +1,11 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compile-arg -msvc-style-bitfield-packing
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck-buffer=CHECK):-compile-arg -msvc-style-bitfield-packing
 
-// MSVC style packs from MSB to LSB
+// The deprecated -msvc-style-bitfield-packing option packs from MSB to LSB.
+// Actual MSVC packing on little-endian platforms runs from LSB to MSB.
 // struct S { uint a:4; uint b:8; uint c:4; uint d:16; }
 // Memory layout (32-bit):
 // bits 28-31: a (0x5)
-// bits 20-27: b (0xAB) 
+// bits 20-27: b (0xAB)
 // bits 16-19: c (0xC)
 // bits 0-15:  d (0xDEF0)
 // Expected: 0x5ABCDEF0

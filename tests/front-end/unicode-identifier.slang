@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Test that we can use unicode characters in identifier names.
 
@@ -10,7 +9,7 @@ static const float π = float.getPi();
 
 float /*комментарий*/ 圆周率_円周率_원주율()
 {
-    return π;   
+    return π;
 }
 
 [numthreads(1, 1, 1)]

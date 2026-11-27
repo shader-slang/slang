@@ -315,6 +315,19 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                 sb << " " << name << " " << (v.intValue * 8);
             }
             break;
+        case CompilerOptionName::BitfieldPackingRules:
+            {
+                for (auto v : option.value)
+                {
+                    SLANG_RELEASE_ASSERT(v.kind == CompilerOptionValueKind::Int);
+                    const auto ruleName = NameValueUtil::findName(
+                        TypeTextUtil::getBitfieldPackingRulesInfos(),
+                        v.intValue);
+                    SLANG_RELEASE_ASSERT(ruleName.getLength() != 0);
+                    sb << " " << name << " " << ruleName;
+                }
+                break;
+            }
         case CompilerOptionName::GLSLForceScalarLayout:
         case CompilerOptionName::ForceDXLayout:
         case CompilerOptionName::ForceCLayout:
@@ -332,6 +345,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::DumpIntermediates:
         case CompilerOptionName::MinimumSlangOptimization:
         case CompilerOptionName::SkipSPIRVValidation:
+        case CompilerOptionName::ValidateWithDownstreamCompiler:
         case CompilerOptionName::ZeroInitialize:
         case CompilerOptionName::IgnoreCapabilities:
         case CompilerOptionName::RestrictiveCapabilityCheck:
@@ -344,7 +358,6 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::IncompleteLibrary:
         case CompilerOptionName::EnableExperimentalDynamicDispatch:
         case CompilerOptionName::GenerateWholeProgram:
-        case CompilerOptionName::UseMSVCStyleBitfieldPacking:
         case CompilerOptionName::ExperimentalFeature:
         case CompilerOptionName::EmitSeparateDebug:
         case CompilerOptionName::TraceCoverage:
@@ -358,10 +371,20 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::NoHLSLBinding:
         case CompilerOptionName::NoHLSLPackConstantBufferElements:
         case CompilerOptionName::EnableExperimentalPasses:
+        case CompilerOptionName::EnableExtendedHLSLBackwardsCompatibility:
+        case CompilerOptionName::HLSLMethodsMutatingByDefault:
         case CompilerOptionName::TrackLiveness:
         case CompilerOptionName::LoopInversion:
         case CompilerOptionName::AllowGLSL:
             if (option.value.getCount() && option.value[0].intValue != 0)
+                sb << " " << name;
+            break;
+        case CompilerOptionName::UseMSVCStyleBitfieldPacking:
+            // API clients can set both bitfield options, and the explicit rule takes precedence.
+            // The CLI rejects both flags on one command line, so we omit this boolean when an
+            // explicit rule is also present in the option set.
+            if (!hasOption(CompilerOptionName::BitfieldPackingRules) && option.value.getCount() &&
+                option.value[0].intValue != 0)
                 sb << " " << name;
             break;
         default:
@@ -438,10 +461,10 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::WarningsAsErrors:
     case CompilerOptionName::DisableWarning:
     case CompilerOptionName::DisableWarnings:
+    case CompilerOptionName::DisableNotes:
     case CompilerOptionName::EnableWarning:
     case CompilerOptionName::WarningLevel:
     case CompilerOptionName::Capability:
-    case CompilerOptionName::DownstreamArgs:
     case CompilerOptionName::VulkanBindShift:
     case CompilerOptionName::VulkanBindShiftAll:
     case CompilerOptionName::TypeConformance:
@@ -452,6 +475,43 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     }
     return false;
 }
+bool CompilerOptionSet::isLevelLocal(CompilerOptionName name)
+{
+    return name == CompilerOptionName::DownstreamArgs;
+}
+
+CompilerOptionSet CompilerOptionSet::copyWithoutLevelLocalOptions() const
+{
+    CompilerOptionSet result = *this;
+    for (auto& kv : options)
+    {
+        if (isLevelLocal(kv.key))
+            result.options.remove(kv.key);
+    }
+    return result;
+}
+
+void CompilerOptionSet::appendLevelLocal(
+    CompilerOptionName name,
+    const List<CompilerOptionValue>& values)
+{
+    SLANG_ASSERT(isLevelLocal(name));
+    auto existing = options.tryGetValue(name);
+    if (!existing)
+    {
+        options[name] = values;
+        return;
+    }
+    if (existing == &values)
+    {
+        // Growing the list would free the buffer we are copying from.
+        List<CompilerOptionValue> copy = values;
+        existing->addRange(copy);
+        return;
+    }
+    existing->addRange(values);
+}
+
 CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name)
 {
     switch (name)
@@ -635,6 +695,16 @@ void applySettingsToDiagnosticSink(
             Severity::Warning,
             Severity::Disable);
     }
+    disableArray = options.getArray(CompilerOptionName::DisableNotes);
+    for (auto& element : disableArray)
+    {
+        overrideDiagnostics(
+            targetSink,
+            outputSink,
+            element.stringValue.getUnownedSlice(),
+            Severity::Note,
+            Severity::Disable);
+    }
     auto enableArray = options.getArray(CompilerOptionName::EnableWarning);
     for (auto& element : enableArray)
     {
@@ -683,6 +753,13 @@ void applySettingsToDiagnosticSink(
     if (options.shouldEmitMachineReadableDiagnostics())
     {
         targetSink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
+    }
+
+    // Preserve a previously applied format when this option set does not specify one.
+    if (options.hasOption(CompilerOptionName::DiagnosticFormat))
+    {
+        targetSink->setDiagnosticFormat(
+            (SlangDiagnosticFormat)options.getIntOption(CompilerOptionName::DiagnosticFormat));
     }
 
     // Handle diagnostic color setting.

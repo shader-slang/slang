@@ -1,8 +1,0 @@
-result code = 0
-standard error = {
-tests/preprocessor/undef.slang(5): warning 15401: macro 'FOO' is not defined
-#undef FOO
-       ^~~
-}
-standard output = {
-}

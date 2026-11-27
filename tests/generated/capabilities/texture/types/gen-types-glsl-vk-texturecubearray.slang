@@ -10,8 +10,10 @@
 // - Target version for negative test:     330
 //
 
+// Negative test disabled, see https://github.com/shader-slang/slang/issues/8912
 //TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target glsl -profile glsl_400
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -vk -emit-spirv-via-glsl
+//TEST:COMPARE_COMPUTE(targets=glsl, filecheck-buffer=POSITIVE_RESULT):
+//DISABLE_TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target glsl -profile glsl_330
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -26,10 +28,10 @@ SamplerState samplerState;
 void fragMain()
 {
 // POSITIVE-NOT: {{(error|warning).*}}:
-// POSITIVE: result code = 0
-// POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: main
 // POSITIVE-NOT: {{(error|warning).*}}:
+
+//NEGATIVE: error
 
     int ret = 0;
     ret = int((texHandle.SampleLevel(samplerState, float4(0, 0, 0, 0), float(0))).x);

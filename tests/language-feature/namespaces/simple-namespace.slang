@@ -1,6 +1,6 @@
 // simple-namespace.slang
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test that simple `namespace` declarations work as expected
 // Test that the global scope operator `::` works as expected

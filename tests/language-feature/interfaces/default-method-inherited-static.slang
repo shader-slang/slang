@@ -12,7 +12,7 @@
 // only assert that codegen succeeds), while the `-cpu` compute run additionally
 // validates the computed value, guarding against silent mis-resolution.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain
 

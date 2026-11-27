@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-uninitialized-output.cpp
 // Regression tests for issue #11865: the record layer must not read uninitialized caller memory for
 // output parameters when the wrapped API fails without writing them.
@@ -45,7 +46,7 @@ static bool twoRecordedSegmentsIdentical(size_t off0, size_t off1, size_t off2)
 // slang-global-session.cpp), so the same uninitialized-read defect applies. Here the output is a
 // COM pointer, so a regression would serialize an uninitialized ISlangBlob* rather than a stray
 // int; recording twice with distinct poison pointers and byte-comparing confirms the redirect.
-SLANG_UNIT_TEST(replayGetDownstreamCompilerPathFailureNoUninitializedRead)
+SLANG_UNIT_TEST(replayGetDownstreamCompilerPathFailureNoUninitializedRead, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -97,7 +98,7 @@ SLANG_UNIT_TEST(replayGetDownstreamCompilerPathFailureNoUninitializedRead)
 // the same uninitialized-read defect applies. The null-argument failure path is reached without a
 // compiled module or real TypeReflection objects, so this mirrors the test above for the sibling
 // fix.
-SLANG_UNIT_TEST(replayGetTypeConformanceWitnessSequentialIDFailureNoUninitializedRead)
+SLANG_UNIT_TEST(replayGetTypeConformanceWitnessSequentialIDFailureNoUninitializedRead, NoRenderApi)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
@@ -134,3 +135,4 @@ SLANG_UNIT_TEST(replayGetTypeConformanceWitnessSequentialIDFailureNoUninitialize
     // Return to Idle before the session/global-session ComPtrs release during teardown.
     ctx().reset();
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

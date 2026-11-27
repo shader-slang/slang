@@ -123,8 +123,11 @@ public:
     SlangResult init(ISlangSharedLibrary* library);
 
     NVRTCDownstreamCompiler() {}
+    ~NVRTCDownstreamCompiler();
 
 protected:
+    SlangResult _preloadBuiltinsLibrary();
+
     struct ScopeProgram
     {
         ScopeProgram(NVRTCDownstreamCompiler* compiler, nvrtcProgram program)
@@ -184,6 +187,10 @@ protected:
     String m_optixIncludePath;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
+
+    // On Windows, the `nvrtc-builtins64_<major><minor>.dll` that sits next to the NVRTC library.
+    // We keep it loaded for the lifetime of the compiler. See `_preloadBuiltinsLibrary`.
+    SharedLibrary::Handle m_builtinsLibrary = nullptr;
 };
 
 #define SLANG_NVRTC_RETURN_ON_FAIL(x) \
@@ -214,7 +221,49 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
     int major, minor;
     m_nvrtcVersion(&major, &minor);
     m_desc.version.set(major, minor);
+
+    // A failure here is not fatal. NVRTC may still find its builtins library through `PATH`.
+    _preloadBuiltinsLibrary();
     return SLANG_OK;
+}
+
+NVRTCDownstreamCompiler::~NVRTCDownstreamCompiler()
+{
+    if (m_builtinsLibrary)
+        SharedLibrary::unload(m_builtinsLibrary);
+}
+
+// Loads `nvrtc-builtins64_<major><minor>.dll` from the directory of the NVRTC library that we
+// loaded, if that file exists there.
+//
+// NVRTC loads its builtins library by name when `nvrtcCompileProgram` runs. Windows then searches
+// the application directory, System32, the current directory and `PATH`, but not the directory
+// of NVRTC itself. Slang can find NVRTC through `CUDA_PATH\bin\x64` without that directory being
+// on `PATH`; in that case the compile fails with "failed to open nvrtc-builtins64_132.dll".
+// When a module with the requested name is already loaded in the process, Windows returns it
+// without a search. So we load the builtins library by its full path here, and
+// `nvrtcCompileProgram` then finds it. This does not change the DLL search order of the process.
+SlangResult NVRTCDownstreamCompiler::_preloadBuiltinsLibrary()
+{
+#if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
+    const String nvrtcPath =
+        SharedLibraryUtils::getSharedLibraryFileName((void*)m_nvrtcCreateProgram);
+    if (nvrtcPath.getLength() == 0)
+        return SLANG_E_NOT_FOUND;
+
+    // NVRTC 13.2 asks for "nvrtc-builtins64_132.dll", that is, major and minor version.
+    StringBuilder fileName;
+    fileName << "nvrtc-builtins64_" << int(m_desc.version.m_major) << int(m_desc.version.m_minor)
+             << ".dll";
+    const String builtinsPath =
+        Path::combine(Path::getParentDirectory(nvrtcPath), fileName.produceString());
+    if (!File::exists(builtinsPath))
+        return SLANG_E_NOT_FOUND;
+
+    return SharedLibrary::loadWithPlatformPath(builtinsPath.getBuffer(), m_builtinsLibrary);
+#else
+    return SLANG_E_NOT_IMPLEMENTED;
+#endif
 }
 
 static SlangResult _parseLocation(
@@ -1158,6 +1207,22 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddFp8Bf16Support(
     return SLANG_OK;
 }
 
+// Return whether the caller supplied an NVRTC architecture option. Leave its value and any
+// conflicting user options for NVRTC to validate, including architectures unknown to Slang.
+static bool _hasExplicitNVRTCArchitecture(Slice<TerminatedCharSlice> arguments)
+{
+    for (auto argument : arguments)
+    {
+        auto text = asStringSlice(argument);
+        if (text == "-arch" || text.startsWith("-arch=") || text == "--gpu-architecture" ||
+            text.startsWith("--gpu-architecture="))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 SlangResult NVRTCDownstreamCompiler::compile(
     const DownstreamCompileOptions& inOptions,
     IArtifact** outArtifact)
@@ -1302,6 +1367,10 @@ SlangResult NVRTCDownstreamCompiler::compile(
         cmdLine.addArg("-w");
     }
 
+    // An explicit downstream architecture overrides the derived one. For example, a caller may
+    // pass `-arch=compute_120` before Slang has a corresponding capability. Passing both options
+    // would make NVRTC warn or fail, depending on its version, so only emit the caller's option.
+    if (!_hasExplicitNVRTCArchitecture(options.compilerSpecificArguments))
     {
         // The lowest supported CUDA architecture version supported
         // by any version of NVRTC we support is `compute_30`.
@@ -1359,15 +1428,22 @@ SlangResult NVRTCDownstreamCompiler::compile(
     List<const char*> headers;
     List<const char*> headerIncludeNames;
 
-    // If compiling for OptiX, we need to add the appropriate search paths to the
-    // command line.
+    // OptiX needs `--relocatable-device-code=true` only for ray-tracing pipelines. A compute
+    // shader that uses OptiX cooperative vectors needs the headers but not this flag.
     //
     if (options.pipelineType == PipelineType::RayTracing)
     {
         // OptiX requires this flag (OptiX Programming Guide, section 6.1). It prevents the compiler
         // from removing callables as dead code.
         cmdLine.addArg("--relocatable-device-code=true");
+    }
 
+    // If the code needs OptiX, we need to add the appropriate search paths to the
+    // command line.
+    //
+    if (options.pipelineType == PipelineType::RayTracing ||
+        (options.flags & DownstreamCompileOptions::Flag::RequiresOptix))
+    {
         if (SLANG_FAILED(_maybeAddOptixSupport(options, cmdLine, diagnostics)))
         {
             diagnostics->setResult(SLANG_FAIL);

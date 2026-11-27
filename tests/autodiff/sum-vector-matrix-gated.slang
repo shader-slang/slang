@@ -9,7 +9,7 @@
 // gate predicate were a false-negative the un-lowered `SumVectorElements` would reach the CPU
 // emitter and compilation would fail — the CHECK below would not match.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 [Differentiable]
 float f(float x)

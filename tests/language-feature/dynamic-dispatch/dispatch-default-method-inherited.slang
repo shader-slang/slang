@@ -13,7 +13,7 @@
 // silent mis-resolution); the SPIR-V / HLSL / GLSL compile-only runs guard against
 // a crash reintroduction on each backend called out in the original report.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry computeMain

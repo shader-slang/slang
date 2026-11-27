@@ -48,7 +48,7 @@ static size_t _growAndReturnLargeDictionary(ContainerPool& pool, List<int>& valu
     return bucketCount;
 }
 
-SLANG_UNIT_TEST(containerPoolHashSetClearAndDeallocate)
+SLANG_UNIT_TEST(containerPoolHashSetClearAndDeallocate, NoRenderApi)
 {
     HashSet<int> set;
     for (Index i = 0; i < Index(kContainerPoolMinRetireBucketCount); i++)
@@ -68,7 +68,7 @@ SLANG_UNIT_TEST(containerPoolHashSetClearAndDeallocate)
     SLANG_CHECK(set.getBucketCount() < kContainerPoolMinRetireBucketCount);
 }
 
-SLANG_UNIT_TEST(containerPoolDictionaryClearAndDeallocate)
+SLANG_UNIT_TEST(containerPoolDictionaryClearAndDeallocate, NoRenderApi)
 {
     Dictionary<int, int> dict;
     for (Index i = 0; i < Index(kContainerPoolMinRetireBucketCount); i++)
@@ -88,7 +88,7 @@ SLANG_UNIT_TEST(containerPoolDictionaryClearAndDeallocate)
     SLANG_CHECK(dict.getBucketCount() < kContainerPoolMinRetireBucketCount);
 }
 
-SLANG_UNIT_TEST(containerPoolHashSetHysteresisRetiresAfterSecondUnderuse)
+SLANG_UNIT_TEST(containerPoolHashSetHysteresisRetiresAfterSecondUnderuse, NoRenderApi)
 {
     ContainerPool pool;
     List<int> values;
@@ -111,7 +111,7 @@ SLANG_UNIT_TEST(containerPoolHashSetHysteresisRetiresAfterSecondUnderuse)
     pool.free(set);
 }
 
-SLANG_UNIT_TEST(containerPoolDictionaryHysteresisRetiresAfterSecondUnderuse)
+SLANG_UNIT_TEST(containerPoolDictionaryHysteresisRetiresAfterSecondUnderuse, NoRenderApi)
 {
     ContainerPool pool;
     List<int> values;
@@ -134,7 +134,7 @@ SLANG_UNIT_TEST(containerPoolDictionaryHysteresisRetiresAfterSecondUnderuse)
     pool.free(dict);
 }
 
-SLANG_UNIT_TEST(containerPoolHashSetHysteresisResetsAfterSubstantialUse)
+SLANG_UNIT_TEST(containerPoolHashSetHysteresisResetsAfterSubstantialUse, NoRenderApi)
 {
     ContainerPool pool;
     List<int> values;
@@ -168,7 +168,7 @@ SLANG_UNIT_TEST(containerPoolHashSetHysteresisResetsAfterSubstantialUse)
     pool.free(set);
 }
 
-SLANG_UNIT_TEST(containerPoolDictionaryHysteresisResetsAfterSubstantialUse)
+SLANG_UNIT_TEST(containerPoolDictionaryHysteresisResetsAfterSubstantialUse, NoRenderApi)
 {
     ContainerPool pool;
     List<int> values;

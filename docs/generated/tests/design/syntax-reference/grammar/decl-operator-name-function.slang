@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#variable--binding-declarations
-//META: doc_section_digest=34ae2014df6f94e86e6f1c0103e2b1bc5da580d48dd7ba67686044b7b740ee79
+//META: doc_section_digest=581119c2905797d9e5ca17f62d23d4176de2817cf2cb3cd58cf50bd73f2b8fe3
 //META: purpose=`DeclaratorName` accepts the `'operator' OperatorName` form, which is legal on a function declarator.
 //META: intent=functional
 //META: pipeline_stage=parse

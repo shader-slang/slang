@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#undoparametercopy--transformparamstoconstref
-//META: doc_section_digest=79ddec9513950e753aa3cb10c03d98ab4885a8fd448be4549c7698082e2ef35f
+//META: doc_section_digest=90951800db549746ae3a24259c6678e0f33a81236c908ea2c96c3d1d3becca3b
 //META: purpose=`undoParameterCopy` removes the front end's copy-in/copy-out wrapper for an `inout` struct parameter, so the callee takes a `thread*` pointer and the caller passes the address directly.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

@@ -2,7 +2,7 @@
 
 #include "static-unit-test-env.h"
 
-#include "slang/slang-ast-builder.h"
+#include "slang/ast/slang-ast-builder.h"
 #include "slang/slang-module.h"
 #include "slang/slang-session.h"
 

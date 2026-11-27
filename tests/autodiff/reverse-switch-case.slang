@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -18,11 +16,11 @@ float test_simple_switch(float y, int i)
         case 1:
             o = y * 2.0;
             break;
-        
+
         case 2:
             o = y * 3.0;
             break;
-        
+
         default:
             o = y;
     }
@@ -42,7 +40,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
-        
+
         __bwd_diff(test_simple_switch)(dpa, 2, 1.0f);
         outputBuffer[1] = dpa.d; // Expect: 3.0
     }

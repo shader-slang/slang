@@ -1,10 +1,7 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -dx12 -profile cs_6_0 -shaderobj -output-using-type -xslang -DDX12
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -emit-spirv-via-glsl -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK -xslang -minimum-slang-optimization
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -emit-spirv-via-glsl -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=BUF):-profile cs_6_0 -output-using-type -xslang -DDX12
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF):-output-using-type -render-feature hardware-device -xslang -DVK
+//TEST:COMPARE_COMPUTE(targets=glsl, filecheck-buffer=BUF):-output-using-type -render-feature hardware-device -xslang -DVK -xslang -minimum-slang-optimization
+//TEST:COMPARE_COMPUTE(targets=metal+cuda, filecheck-buffer=BUF):-output-using-type
 
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name=uintBuffer

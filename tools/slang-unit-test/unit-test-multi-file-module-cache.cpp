@@ -12,7 +12,7 @@
 using namespace Slang;
 
 // Test loading a precompiled module that imports other modules.
-SLANG_UNIT_TEST(multiFileModuleCache)
+SLANG_UNIT_TEST(multiFileModuleCache, NoRenderApi)
 {
     // Prepare the virtual file system with the module files.
     const char* commonAttrSource = R"(
@@ -78,9 +78,11 @@ SLANG_UNIT_TEST(multiFileModuleCache)
         {
             slang::IModule* mod = session->getLoadedModule(i);
             // path = root1/...
+            // The module file paths in the memory file system are "/"-separated on every
+            // platform, so split on the portable delimiter rather than the OS-canonical one.
             String path = mod->getFilePath();
-            path = String("root1") +
-                   path.getUnownedSlice().tail(path.indexOf(Path::kOSCanonicalPathDelimiter));
+            path =
+                String("root1") + path.getUnownedSlice().tail(path.indexOf(Path::kPathDelimiter));
             path.append("-module");
 
             ComPtr<slang::IBlob> serializedBlob;

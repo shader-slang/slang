@@ -2,9 +2,11 @@
 #include "slang-fiddle-script.h"
 
 #include "compiler-core/slang-diagnostic-sink.h"
+#if !SLANG_USE_SYSTEM_LUA
 #include "lua/lapi.h"
 #include "lua/lauxlib.h"
 #include "lua/lualib.h"
+#endif
 
 #include <cstdio>
 

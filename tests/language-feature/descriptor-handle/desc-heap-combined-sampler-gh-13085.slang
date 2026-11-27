@@ -5,15 +5,15 @@
 // targets. Default SPIR-V and GLSL read a single native combined descriptor and are exercised as a
 // positive case in desc-heap-combined-sampler-default-model-gh-13085.slang.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -profile spirv_1_6 -capability spvDescriptorHeapEXT -emit-spirv-directly
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage fragment -entry main -profile sm_6_6
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target spirv -stage fragment -entry main -profile spirv_1_6 -capability spvDescriptorHeapEXT -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl -stage fragment -entry main -profile sm_6_6
 
 [shader("fragment")]
 float4 main(float3 coordinate : TEXCOORD0) : SV_Target
 {
     // Site 1: the `_Texture` type's own single-index initializer.
     //CHECK: error[E41400]
-    //CHECK: cannot be initialized directly from a single ResourceDescriptorHeap index{{.*}}.Handle(uint2(resourceIndex, samplerIndex))
+    //CHECK: Cannot initialize a combined texture-sampler from a single ResourceDescriptorHeap index{{.*}}load the texture and sampler separately from ResourceDescriptorHeap and SamplerDescriptorHeap
     Sampler3D volume = ResourceDescriptorHeap[11];
 
     // Site 2: the `.Handle` (DescriptorHandle<T>) single-index initializer.

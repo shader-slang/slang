@@ -3,8 +3,7 @@
 // lay out as its base type and read back at full precision (the modifier only
 // affects texture image formats, not buffer/uniform storage).
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o unorm-snorm-layout-12535.spv
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer

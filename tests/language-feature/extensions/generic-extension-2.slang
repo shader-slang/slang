@@ -1,14 +1,14 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 #pragma warning(disable:30856)
 interface IFoo<T>
 {
-    T getFirst();    
+    T getFirst();
 }
 
 __generic<S, T : IArray<S>>
 extension T : IFoo<S>
-{ 
+{
     S getFirst()
     {
         return this[0];

@@ -90,7 +90,7 @@ static size_t _getMetalStructuredBufferFloat3Stride(bool forceScalarLayout)
     return elementTypeLayout->getStride();
 }
 
-SLANG_UNIT_TEST(metalPackedBufferStride)
+SLANG_UNIT_TEST(metalPackedBufferStride, NoRenderApi)
 {
     // Packed (12-byte) stride is the default and is unaffected by the flag.
     SLANG_CHECK(_getMetalStructuredBufferFloat3Stride(false) == 12);

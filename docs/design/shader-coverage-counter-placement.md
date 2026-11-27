@@ -231,13 +231,11 @@ Branch coverage inserts counters at selected control-flow arm entry
 points. It answers "which branch outcome was selected?" It does not
 insert counters before every statement inside the selected arm.
 
-The current scope is source statement/control-flow coverage for:
-`if`/`else`, `for`/`while`/`do while` loop-condition outcomes, and
-`switch` case/default dispatch arms. Expression-level control flow,
-including short-circuit `&&` / `||` and ternary `?:`, is intentionally
-not instrumented by this mode yet. `return`, `break`, and `continue`
-are represented through the branch arm that reaches them rather than
-as separate branch entries.
+The current scope is: `if`/`else`, `for`/`while`/`do while`
+loop-condition outcomes, `switch` case/default dispatch arms, and the
+expression-level branches of a scalar `?:` and a short-circuiting `&&`
+/ `||`. `return`, `break`, and `continue` are represented through the
+branch arm that reaches them rather than as separate branch entries.
 
 ### If / Else
 
@@ -432,6 +430,97 @@ If a switch has no `default`, branch coverage creates a synthetic
 no-match default arm so the report can distinguish "no case matched"
 from "the switch was not reached."
 
+### Ternary `?:`
+
+A `?:` with a scalar condition evaluates only the operand its condition
+selects, so it lowers to the same two-way branch as an `if` with an
+`else`. Slang emits one counter per arm, attributed to the `?` token:
+
+```slang
+uint v = (t > 1u) ? a : b;
+```
+
+Conceptually:
+
+```slang
+uint v;
+if (t > 1u)
+{
+    coverageAtomic("branch: ?: true");
+    v = a;
+}
+else
+{
+    coverageAtomic("branch: ?: false");
+    v = b;
+}
+```
+
+A `?:` with a vector condition selects per element and evaluates both
+operands (this form is deprecated in favor of `select`), so it does not
+branch and gets no counters.
+
+### Short-Circuit `&&` and `||`
+
+`&&` and `||` evaluate their right operand only when the left operand
+does not already decide the result. That decision is the branch, so
+Slang emits a true-arm and a false-arm counter for the value of the left
+operand, attributed to the operator token:
+
+```slang
+bool r = p && q;
+```
+
+Conceptually:
+
+```slang
+bool r;
+if (p)
+{
+    coverageAtomic("branch: && left operand true"); // q is evaluated
+    r = q;
+}
+else
+{
+    coverageAtomic("branch: && left operand false"); // short-circuited
+    r = false;
+}
+```
+
+For `||` the arms are the same, true and false of the left operand,
+but their roles swap: the true arm short-circuits to `true` and the
+false arm evaluates the right operand.
+
+Each operator is its own site. `a && b || c` parses as `(a && b) || c`
+and gets two sites: the `&&` site records `a`, and the `||` site
+records the value of `a && b`. The last right operand of a chain is not
+a branch; it becomes the value of the whole expression. When the
+expression is the condition of an `if` or a loop, that statement's own
+site records the final outcome, so every operand's outcome is
+recoverable:
+
+```slang
+if (a && b) // `&&` site: a true/false; `if` site: (a && b) true/false
+```
+
+Here `b` was true as often as the `if` true arm ran, and false as often
+as the `&&` true arm ran minus that. When the expression is used as a
+value instead, as in `bool r = a && b;`, the outcome of `b` is not
+recorded; branch coverage does not add control flow just to observe it.
+
+The `if` in that example attributes its own site to its condition
+expression, which is located at the `&&` token, so the two sites share
+a line and column. Reports tell sites apart by their branch-site ID, not
+by position.
+
+Under `-disable-short-circuit`, `&&` and `||` evaluate both operands
+without branching and get no counters. `?:` is unaffected by that
+option.
+
+Expressions that are lowered outside a function body, such as the
+initializer of a global (`static bool g = a && b;`), are not
+instrumented.
+
 ## Combined Function and Branch Coverage
 
 With function and branch coverage enabled, but line coverage disabled,
@@ -502,6 +591,15 @@ mapping. Hosts and report converters should aggregate by the source
 attribution fields in `CoverageEntryInfo` or `.coverage-manifest.json`,
 not by assuming that counter slot `K` means the same source location
 in two different compiles.
+
+Automatic differentiation runs after the coverage pass, so the forward
+and backward derivatives generated from a differentiable function carry
+that function's counter increments as non-differentiable side effects.
+They follow autodiff's rule for side effects: how many times a side
+effect runs inside a derivative is not guaranteed. A backward derivative
+can skip primal code whose results it does not need, counters included.
+Counts gathered while derivatives run therefore do not measure how often
+the differentiable function's source executed.
 
 ## Future Region Coverage
 

@@ -70,16 +70,17 @@ namespace Slang
 /// The libraries that must never be unmapped, and why each one is here. See the declaration in
 /// `slang-platform.h` for what this predicate is for.
 ///
-/// * `slang-llvm` statically links two allocator runtimes that install a thread-exit destructor:
-///   LLVM's vendored rpmalloc, which the official LLVM Windows packages enable and ship inside
-///   `LLVMSupport.lib`, and Slang's own mimalloc. On Windows both register their destructor with
-///   `FlsAlloc`, and Windows calls FLS destructors from `ntdll!RtlpFlsDataCleanup` inside
-///   `LdrShutdownProcess` -- that is, during process exit, after every module has already been
-///   unloaded. Neither allocator frees its FLS index when the module goes away, so once
-///   `slang-llvm.dll` has been unloaded, process exit jumps into the hole it left behind and
-///   raises an execute access violation (issue #12292). There is no earlier point at which
-///   unloading would be safe, because the destructor is required to remain callable until the very
-///   end of process shutdown.
+/// * `slang-llvm` statically links LLVM's vendored rpmalloc, which the official LLVM Windows
+///   packages enable and ship inside `LLVMSupport.lib`. On Windows rpmalloc registers a thread-exit
+///   destructor with `FlsAlloc`, and Windows calls FLS destructors from `ntdll!RtlpFlsDataCleanup`
+///   inside `LdrShutdownProcess` -- that is, during process exit, after every module has already
+///   been unloaded. rpmalloc does not free its FLS index when the module goes away, so unloading
+///   `slang-llvm.dll` would leave process exit calling into unmapped code. Issue #12292 shows that
+///   kind of crash, although it did not identify which callback was involved. The destructor has
+///   to stay callable until the very end of process shutdown, so there is no safe point to unload.
+///   `slang-llvm` also links Slang's mimalloc, but mimalloc detects thread exit through TLS
+///   callbacks in the module image rather than `FlsAlloc` unless it is built with `MI_WIN_USE_FLS`,
+///   which Slang does not set.
 /// * `libdxcompiler` invokes undefined behaviour on `dlclose`, see
 ///   https://github.com/microsoft/DirectXShaderCompiler/issues/5119.
 /// * `libdxvk_d3d11` and `libdxvk_dxgi` break GDB when closed, see
@@ -133,11 +134,14 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 
 /* static */ SlangResult PlatformUtil::getInstancePath(StringBuilder& out)
 {
-    wchar_t path[_MAX_PATH];
-    ::GetModuleFileName(::GetModuleHandle(NULL), path, SLANG_COUNT_OF(path));
-    String pathString = String::fromWString(path);
+    // The instance path is the directory holding the executable. Path::getExecutablePath
+    // already owns the grow-retry GetModuleFileNameW query, so re-implementing it here with a
+    // fixed _MAX_PATH buffer would report the truncated path of an executable installed in a
+    // long directory.
+    String pathString = Path::getExecutablePath();
 
-    // We don't want the instance name, just the path to it
+    // We don't want the instance name, just the path to it. An empty executable path leaves
+    // the parent directory empty, and the tail check below reports that failure.
     out.clear();
     out.append(Path::getParentDirectory(pathString));
 

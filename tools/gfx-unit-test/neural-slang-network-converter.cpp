@@ -930,19 +930,19 @@ static void runNeuralNetworkConverterTest(UnitTestContext* context, const Target
     neuralNetworkConverterHalfTestImpl(device, target);
 }
 
-SLANG_UNIT_TEST(neuralSlangNetworkConverterCUDA)
+SLANG_UNIT_TEST(neuralSlangNetworkConverterCUDA, CUDA)
 {
     TargetCase target = {"cuda", ConverterTarget::CUDA, DeviceType::CUDA};
     runNeuralNetworkConverterTest(unitTestContext, target);
 }
 
-SLANG_UNIT_TEST(neuralSlangNetworkConverterVulkan)
+SLANG_UNIT_TEST(neuralSlangNetworkConverterVulkan, Vulkan)
 {
     TargetCase target = {"vulkan", ConverterTarget::SPIRV, DeviceType::Vulkan};
     runNeuralNetworkConverterTest(unitTestContext, target);
 }
 
-SLANG_UNIT_TEST(neuralSlangNetworkConverterMetal)
+SLANG_UNIT_TEST(neuralSlangNetworkConverterMetal, Metal)
 {
     TargetCase target = {"metal", ConverterTarget::Metal, DeviceType::Metal};
     runNeuralNetworkConverterTest(unitTestContext, target);

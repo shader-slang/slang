@@ -59,12 +59,12 @@ void uint16BufferTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, numbersBuffer, std::array<uint16_t, 4>{1, 2, 3, 4});
 }
 
-SLANG_UNIT_TEST(uint16BufferTestD3D12)
+SLANG_UNIT_TEST(uint16BufferTestD3D12, D3D12)
 {
     runTestImpl(uint16BufferTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(uint16BufferTestVulkan)
+SLANG_UNIT_TEST(uint16BufferTestVulkan, Vulkan)
 {
     runTestImpl(uint16BufferTestImpl, unitTestContext, DeviceType::Vulkan);
 }

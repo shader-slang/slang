@@ -2,6 +2,16 @@
 # Our wrapper for glslang
 #
 if(SLANG_ENABLE_SLANG_GLSLANG)
+    if(SLANG_USE_SYSTEM_GLSLANG)
+        # Installed glslang places SPIRV/GlslangToSpv.h below include/glslang.
+        find_path(
+            SLANG_GLSLANG_SPIRV_INCLUDE_DIR
+            NAMES SPIRV/GlslangToSpv.h
+            PATH_SUFFIXES glslang
+            REQUIRED
+        )
+        set(slang_glslang_extra_includes ${SLANG_GLSLANG_SPIRV_INCLUDE_DIR})
+    endif()
     slang_add_target(
         .
         MODULE
@@ -18,11 +28,24 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         SKIP_SANITIZERS
         LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt SPIRV-Tools-link
         INCLUDE_DIRECTORIES_PRIVATE
+            ${slang_SOURCE_DIR}/source
             ${slang_SOURCE_DIR}/include
             ${CMAKE_CURRENT_BINARY_DIR}/../slang/slang-version-header
+            ${slang_glslang_extra_includes}
+        INCLUDE_FROM_PRIVATE
+            unordered_dense::unordered_dense
         INSTALL
         EXPORT_SET_NAME SlangTargets
     )
+    if(SLANG_GLSLANG_USES_MIMALLOC)
+        # The DllMain in slang-glslang.cpp configures the mimalloc copy that SPIRV-Tools-opt links
+        # in, so it needs that copy's header and must link against the same target.
+        target_link_libraries(slang-glslang PRIVATE mimalloc-static)
+        target_compile_definitions(
+            slang-glslang
+            PRIVATE SLANG_GLSLANG_USES_MIMALLOC=1
+        )
+    endif()
     # Our only interface is through what we define in source/slang-glslang, in the
     # interests of hygiene, hide anything else we link in. This hides our own non-exported symbols;
     # the version script below is what bounds the final export list.

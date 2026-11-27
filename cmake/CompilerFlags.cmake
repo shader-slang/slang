@@ -83,15 +83,17 @@ function(add_supported_cxx_linker_flags target)
 endfunction()
 
 #
-# Add sanitizer compile and link options to a target: AddressSanitizer (plus
-# UndefinedBehaviorSanitizer) when SLANG_ENABLE_ASAN is on, or ThreadSanitizer
-# when SLANG_ENABLE_TSAN is on, and nothing otherwise. The two are mutually
-# exclusive (enforced in the top-level CMakeLists).
+# Add the settings a target needs in order to be sanitized: AddressSanitizer
+# (plus UndefinedBehaviorSanitizer) when SLANG_ENABLE_ASAN is on, or
+# ThreadSanitizer when SLANG_ENABLE_TSAN is on, and nothing otherwise. The two
+# are mutually exclusive (enforced in the top-level CMakeLists). Mostly these
+# are compile and link options, but MSVC also needs a debug information format
+# that ASan can symbolize with, so we set that here too.
 #
 # Slang targets normally get these through set_default_compile_options, which
 # calls this function. It is exposed separately so that targets which must not
 # inherit the rest of Slang's flags can still be sanitized: a vendored library
-# such as spvdb (tests/spvdb) brings its own warning configuration, but it is
+# such as spvdb (tools/spvdb) brings its own warning configuration, but it is
 # linked into slang-test, and on MSVC every object in a binary must agree on
 # whether ASan is enabled. /fsanitize=address changes the ABI of the annotated
 # standard containers, so mixing a sanitized slang-test with an unsanitized
@@ -139,8 +141,28 @@ function(add_sanitizer_options target)
                 PRIVATE -fsanitize=address -fsanitize=undefined
             )
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-            target_compile_options(${target} PRIVATE /fsanitize=address)
+            # /bigobj is needed because ASan instrumentation adds sections to
+            # every instrumented function, and with optimization on (Release)
+            # a single large translation unit, such as the one embedding the
+            # core module source or slang itself, can exceed the default
+            # 65,279-section limit of an object file (error C1128). We enable
+            # it for every sanitized target instead of naming the ones that
+            # happen to overflow today.
+            target_compile_options(${target} PRIVATE /fsanitize=address /bigobj)
             target_link_options(${target} BEFORE PRIVATE /INCREMENTAL:NO)
+            # MSVC's ASan needs debug info to turn the addresses in a report
+            # into source locations, and warns (C5072, "ASAN enabled without
+            # debug information emission") when a translation unit is
+            # instrumented without it. An ASan build exists to be debugged, so
+            # we emit debug info for every sanitized target regardless of
+            # config, which also means SLANG_ENABLE_RELEASE_DEBUG_INFO does not
+            # get to switch it off underneath ASan. Setting it here rather than
+            # in slang_add_target is what covers a target that is sanitized
+            # without being a Slang target at all, such as the vendored spvdb.
+            set_target_properties(
+                ${target}
+                PROPERTIES MSVC_DEBUG_INFORMATION_FORMAT "Embedded"
+            )
         else()
             message(FATAL_ERROR "SLANG_ENABLE_ASAN: unsupported C++ compiler")
         endif()
@@ -203,6 +225,11 @@ function(set_default_compile_options target)
             # If a function returns an address/reference to a local, we want it to
             # produce an error, because it probably means something very bad.
             -Werror=return-local-addr
+            # GCC rejects designated initializers that are out of declaration order,
+            # while Clang only warns (and -Wno-reorder above silences that warning,
+            # since Clang's -Wreorder group includes -Wreorder-init-list). We make it
+            # an error on Clang so such code fails locally rather than only on GCC CI.
+            -Werror=reorder-init-list
             # Some warnings which are on by default in MSVC
             -Wnarrowing
         )
@@ -237,6 +264,19 @@ function(set_default_compile_options target)
     endif()
 
     add_supported_cxx_flags(${target} PRIVATE ${warning_flags})
+
+    # GCC before 14.3 (PR108900) numbers the rest of a file one line too low
+    # when an #include in it lands exactly where the translation unit's
+    # location values cross LINE_MAP_MAX_LOCATION_WITH_PACKED_RANGES
+    # (0x50000000). FIDDLE keys its generated macros on __LINE__, so a FIDDLE on
+    # line N then expands FIDDLE_<N-1>, which another header may define. With
+    # -flarge-source-files GCC packs no ranges into location values, so each
+    # line uses far fewer of them and our largest translation units stay well
+    # below the threshold. The flag is cheap, so we pass it to every GCC; the
+    # block can go once the minimum supported GCC is 14.3.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        add_supported_cxx_flags(${target} PRIVATE -flarge-source-files)
+    endif()
 
     # Strip the absolute source directory prefix from __FILE__ so that build-machine
     # paths are not baked into the binary's read-only data section.

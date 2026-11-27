@@ -13,7 +13,7 @@ using namespace Slang;
 
 // Test that the API supports discovering previously checked translation unit in the same
 // FrontEndCompileRequest.
-SLANG_UNIT_TEST(translationUnitImport)
+SLANG_UNIT_TEST(translationUnitImport, NoRenderApi)
 {
     // Source for the first translation unit.
     const char* generatedSource = "public int f() {"

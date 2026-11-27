@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#differentiation-autodiff
-//META: doc_section_digest=cacccd6a57cbe2ad73776f1f2b2c77aba567defd4a6ab0580f1f60c7e9ad1561
+//META: doc_section_digest=ec7ab587fbb04a8acbf7d0b2ad0771119e07b323b2a0efed00309cf96398b83b
 //META: purpose=Forward mode gives the generated derivative function the name hint s_fwd_<original>, so a fwd_diff call on a [Differentiable] function turns into a call to that name in the emit.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

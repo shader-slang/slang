@@ -1,9 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compile-arg -skip-spirv-validation -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-wgpu
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-compile-arg -skip-spirv-validation
+//TEST:COMPARE_COMPUTE(targets=dx12+metal+cuda+cpu+wgpu, filecheck-buffer=CHECK):
 
 // CHECK: 1
 // CHECK-NEXT: 2

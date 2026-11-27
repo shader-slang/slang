@@ -1,6 +1,6 @@
 // Test for limited support of groupshared pointers.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK): -output-using-type
 
 groupshared int gData[1024];
 
@@ -28,7 +28,7 @@ void computeMain(int tid : SV_GroupThreadID)
     GroupMemoryBarrierWithGroupSync();
     if (tid == 0)
     {
-        // CHECK: 300 
+        // CHECK: 300
         outputBuffer[0] = gData[0] + gData[1];
     }
 }

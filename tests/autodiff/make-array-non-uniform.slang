@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -27,7 +25,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 
     {
         float4 a = float4(1.0, 2.0, 3.0, 4.0);
-        
+
         var dpa = diffPair(a);
 
         bwd_diff(f)(dpa, float4(1.0, 0.5, 1.5, 2.5));

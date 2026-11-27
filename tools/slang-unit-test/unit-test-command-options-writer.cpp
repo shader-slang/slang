@@ -66,7 +66,7 @@ bool contains(const String& s, const char* needle)
 // Aliases listed comma-separated must all resolve to the SAME index;
 // callers (parsers) rely on this so users can write either alias
 // interchangeably. The first alias is the canonical one.
-SLANG_UNIT_TEST(commandOptionsAliasesShareIndex)
+SLANG_UNIT_TEST(commandOptionsAliasesShareIndex, NoRenderApi)
 {
     CommandOptions opts;
     fillSampleOptions(opts);
@@ -90,7 +90,7 @@ SLANG_UNIT_TEST(commandOptionsAliasesShareIndex)
 
 // Unknown names return -1 (used as the "not found" sentinel by
 // argv parsers). Both option and category lookups share this rule.
-SLANG_UNIT_TEST(commandOptionsUnknownNameReturnsNegativeOne)
+SLANG_UNIT_TEST(commandOptionsUnknownNameReturnsNegativeOne, NoRenderApi)
 {
     CommandOptions opts;
     fillSampleOptions(opts);
@@ -104,7 +104,7 @@ SLANG_UNIT_TEST(commandOptionsUnknownNameReturnsNegativeOne)
 
 // Values are scoped to their category — same value name across
 // different categories doesn't conflict (and -1 for "wrong category").
-SLANG_UNIT_TEST(commandOptionsValueScopedToCategory)
+SLANG_UNIT_TEST(commandOptionsValueScopedToCategory, NoRenderApi)
 {
     CommandOptions opts;
     fillSampleOptions(opts);
@@ -119,7 +119,7 @@ SLANG_UNIT_TEST(commandOptionsValueScopedToCategory)
 }
 
 // addValues from a ValuePair[] should register every entry.
-SLANG_UNIT_TEST(commandOptionsAddValuesViaPairs)
+SLANG_UNIT_TEST(commandOptionsAddValuesViaPairs, NoRenderApi)
 {
     CommandOptions opts;
     opts.addCategory(CommandOptions::CategoryKind::Value, "level", "Verbosity levels");
@@ -152,7 +152,7 @@ SLANG_UNIT_TEST(commandOptionsAddValuesViaPairs)
 //     they appear only in the "Getting Help" footer's "can be:"
 //     listing. To get the value list, the user runs `slangc -h
 //     <category>` separately. This keeps the default help short.
-SLANG_UNIT_TEST(writerTextRendersOptionCategories)
+SLANG_UNIT_TEST(writerTextRendersOptionCategories, NoRenderApi)
 {
     CommandOptions opts;
     fillSampleOptions(opts);
@@ -205,7 +205,7 @@ SLANG_UNIT_TEST(writerTextRendersOptionCategories)
 // They appear only by name in the footer's `<help-category> can be`
 // listing. This keeps the default help short — the user types
 // `slangc -h format` to see the value list.
-SLANG_UNIT_TEST(writerTextSkipsValueListInline)
+SLANG_UNIT_TEST(writerTextSkipsValueListInline, NoRenderApi)
 {
     CommandOptions opts;
     fillSampleOptions(opts);
@@ -237,7 +237,7 @@ SLANG_UNIT_TEST(writerTextSkipsValueListInline)
 // MARKDOWN: includes a "Quick Links" section at the top, an
 // `<a id>` anchor before each category, and `## category` /
 // `### option` heading levels.
-SLANG_UNIT_TEST(writerMarkdownEmitsAnchorsAndHeadings)
+SLANG_UNIT_TEST(writerMarkdownEmitsAnchorsAndHeadings, NoRenderApi)
 {
     CommandOptions opts;
     fillSampleOptions(opts);
@@ -279,7 +279,7 @@ SLANG_UNIT_TEST(writerMarkdownEmitsAnchorsAndHeadings)
 // NO-LINK-MD: same headings as MARKDOWN, but the Quick Links section
 // and the `<a id>` anchors are stripped. Used when embedding into
 // docs that don't want intra-page navigation links.
-SLANG_UNIT_TEST(writerNoLinkMarkdownStripsLinks)
+SLANG_UNIT_TEST(writerNoLinkMarkdownStripsLinks, NoRenderApi)
 {
     CommandOptions opts;
     fillSampleOptions(opts);
@@ -305,7 +305,7 @@ SLANG_UNIT_TEST(writerNoLinkMarkdownStripsLinks)
 
 // `appendDescriptionForCategory` renders ONLY the requested category.
 // Other categories' option names must not leak into the output.
-SLANG_UNIT_TEST(writerSingleCategoryDoesNotLeakOthers)
+SLANG_UNIT_TEST(writerSingleCategoryDoesNotLeakOthers, NoRenderApi)
 {
     CommandOptions opts;
     fillSampleOptions(opts);
@@ -342,7 +342,7 @@ SLANG_UNIT_TEST(writerSingleCategoryDoesNotLeakOthers)
 // Callers (slangc help) iterate this to render the available styles
 // in `-help-style`. Adding a new Style without updating this catalog
 // breaks the help listing.
-SLANG_UNIT_TEST(writerStyleInfosCoversEnum)
+SLANG_UNIT_TEST(writerStyleInfosCoversEnum, NoRenderApi)
 {
     auto styles = CommandOptionsWriter::getStyleInfos();
     // Three styles (Text, Markdown, NoLinkMarkdown).
@@ -361,7 +361,7 @@ SLANG_UNIT_TEST(writerStyleInfosCoversEnum)
 // Two writers built from the same Options must not share state —
 // the catalog is rendered into each writer's own builder. (Reusing
 // a writer's builder across renders would otherwise concatenate.)
-SLANG_UNIT_TEST(writerInstancesAreIndependent)
+SLANG_UNIT_TEST(writerInstancesAreIndependent, NoRenderApi)
 {
     CommandOptionsWriter::Options writerOptions;
     auto a = CommandOptionsWriter::create(writerOptions);

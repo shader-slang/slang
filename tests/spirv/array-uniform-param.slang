@@ -1,7 +1,7 @@
 // array-uniform-param.slang
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -emit-spirv-directly -force-glsl-scalar-layout
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUFFER):-output-using-type
 
 // CHECK: OpEntryPoint
 

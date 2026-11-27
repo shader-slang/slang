@@ -11,7 +11,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=FN):     -target spirv -entry main_fn -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=DEEP):   -target spirv -entry main_deep -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=GEN):    -target spirv -entry main_gen -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=NEG):    -target spirv -entry main_neg -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=NEG,exit-code=0):    -target spirv -entry main_neg -stage compute
 
 RWStructuredBuffer<float> output;
 

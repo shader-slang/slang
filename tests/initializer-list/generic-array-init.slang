@@ -1,6 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj -vk
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj -mtl
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-cpu -compute -entry computeMain
+//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUFFER):
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=BUFFER):-entry computeMain
 
 //TEST_INPUT:ubuffer(data=[9 9 9 9 9 9 9 9 9 9 9 9], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

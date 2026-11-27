@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=REPORT):-target glsl -stage compute -entry computeMain -report-checkpoint-intermediates
 
@@ -56,7 +55,7 @@ float computeLoop(float y)
 //
 [BackwardDifferentiable]
 float test_simple_loop(float y)
-{  
+{
     float x = computeLoop(y);
     return y + x;
 }
