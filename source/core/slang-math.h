@@ -241,7 +241,12 @@ SLANG_FORCE_INLINE uint32_t DoubleToFloatBits(double value)
 // Rounds a Float32 value to the nearest Half, choosing the even encoding on ties. Constant
 // folding must agree with runtime narrowing: for example, 1.00048828125 is halfway between
 // Half 1.0 and its successor, so it rounds to 1.0. Retain every discarded bit until rounding,
-// including when a normal Float32 becomes a Half subnormal.
+// including when a normal Float32 becomes a Half subnormal. A narrowed NaN is the one
+// divergence from the runtime path: it is always quieted below, while the CPU runtime
+// conversion (f32tof16 in the prelude) preserves the input's quiet-vs-signaling
+// classification. Either policy is permitted — the payload and quiet-vs-signaling
+// classification of a narrowed NaN are unspecified across targets, so no consumer can rely
+// on them.
 inline unsigned short FloatToHalf(float val)
 {
     const unsigned int bits = unsigned(FloatAsInt(val));
@@ -250,9 +255,14 @@ inline unsigned short FloatToHalf(float val)
     const unsigned int fraction = bits & 0x007fffffu;
     if (exponent == 255)
     {
-        // Preserve the NaN-vs-infinity distinction and sign. As before, narrowing does not
-        // preserve the NaN payload or distinguish quiet NaNs from signaling NaNs.
-        return (unsigned short)(sign | 0x7c00u | (fraction != 0));
+        // A NaN narrows to a quiet NaN: the sign and the top payload bits carry over, and
+        // the half quiet bit is forced on, silencing a signaling NaN as an IEEE 754
+        // narrowing operation does. The forced quiet bit also keeps a NaN whose payload is
+        // entirely in the discarded bits distinct from the infinity encoding, which is the
+        // zero-fraction case.
+        if (fraction == 0)
+            return (unsigned short)(sign | 0x7c00u);
+        return (unsigned short)(sign | 0x7c00u | 0x0200u | (fraction >> 13));
     }
     // Float32 uses bias 127; Half uses bias 15. Exponents above 127 + 15 overflow.
     if (exponent > 142)
