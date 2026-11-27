@@ -2947,8 +2947,8 @@ struct TypeFlowSpecializationContext
                 // store that re-seeds it) reuses it directly — the same discipline
                 // `tryGetInfo` applies to refined data types. The guard keys on
                 // `isRefinedInfoType` generally, so it also serves plain interface fields
-                // whose type was refined the same way; for those it replaces the old
-                // fall-through-to-none with the narrowed refinement, which is what
+                // whose type was refined the same way; for those this guard is the
+                // narrowing path, which is what
                 // `conditional-interface-plain-field-reader.slang` pins.
                 if (isRefinedInfoType(structField->getFieldType()))
                 {
