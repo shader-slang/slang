@@ -262,6 +262,10 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
         auto destConditionalType = as<IRConditionalType>(destInfo);
         // `ConditionalType` insts are hoistable and therefore deduplicated module-wide,
         // so this pointer inequality really does mean the payload sets or flags differ.
+        // A merge point (field, parameter, return) has a single declared flag, so the two
+        // flags cannot differ in well-typed input; assert that rather than silently
+        // rewrite the value's compile-time flag in the rebuilt wrapper below.
+        SLANG_ASSERT(argConditionalType->getHasValue() == destConditionalType->getHasValue());
         if (argConditionalType != destConditionalType)
         {
             auto value = builder->emitIntrinsicInst(

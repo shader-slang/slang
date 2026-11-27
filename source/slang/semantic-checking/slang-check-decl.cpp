@@ -18658,6 +18658,22 @@ static bool _astTypeIncludesDynamicDispatch(
             return _astTypeIncludesDynamicDispatch(visitor, valType, seenDecls);
     }
 
+    if (auto conditionalType = as<ConditionalType>(type))
+    {
+        // Mirror the IR-level predicate: a disabled `Conditional` lowers to a zero-sized
+        // struct and carries no payload, so only a literal-false flag is dispatch-free; any
+        // other flag may still specialize to true, so the payload counts.
+        if (auto flagVal = as<ConstantIntVal>(conditionalType->getHasValue()))
+        {
+            if (flagVal->getValue() == 0)
+                return false;
+        }
+        return _astTypeIncludesDynamicDispatch(
+            visitor,
+            conditionalType->getValueType(),
+            seenDecls);
+    }
+
     if (auto tupleType = as<TupleType>(type))
     {
         for (Index i = 0; i < tupleType->getMemberCount(); i++)

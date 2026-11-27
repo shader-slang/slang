@@ -755,17 +755,20 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramTyp
     // concrete `Conditional<Concrete, true>` value flowing into a non-concrete
     // `Conditional<Interface, true>` parameter refines structurally, like the optional case
     // above: the payload becomes a singleton union while the flag is carried along unchanged.
+    // A Conditional value can only flow into a Conditional-typed parameter (attribute
+    // wrappers included, since `as<>` sees through them), so any other paramType shape is out
+    // of contract; falling through to the flat union would wrap the whole wrapper as a
+    // payload, so assert rather than build that unrepresentable info.
     if (auto conditionalType = as<IRConditionalType>(type))
     {
-        if (auto paramConditionalType = as<IRConditionalType>(paramType))
-        {
-            return builder.getConditionalType(
-                (IRType*)makeInfoForConcreteType(
-                    module,
-                    conditionalType->getValueType(),
-                    paramConditionalType->getValueType()),
-                conditionalType->getHasValue());
-        }
+        SLANG_RELEASE_ASSERT(as<IRConditionalType>(paramType));
+        auto paramConditionalType = cast<IRConditionalType>(paramType);
+        return builder.getConditionalType(
+            (IRType*)makeInfoForConcreteType(
+                module,
+                conditionalType->getValueType(),
+                paramConditionalType->getValueType()),
+            conditionalType->getHasValue());
     }
 
     // Non-structural or mismatched structural paramType: produce a flat UntaggedUnion.
@@ -927,9 +930,12 @@ static bool typeIncludesDynamicDispatch(IRType* type)
         return typeIncludesDynamicDispatch((IRType*)optionalType->getValueType());
 
     // A `Conditional` contributes dynamic dispatch only when its flag is (or may
-    // specialize to) true: a literal-false `Conditional` lowers to the empty struct and
-    // carries no payload at all, so a `__ref` of it is harmless. Any non-literal flag
-    // still counts as potentially-true, matching how `isConcreteType` treats it.
+    // specialize to) true: a literal-false `Conditional` lowers to the zero-sized
+    // empty struct and carries no payload at all, so a `__ref` of it is harmless.
+    // The flag is checked in both literal forms — BoolLit and IntLit — because
+    // lowered constant flags arrive in the same two forms that
+    // `tryLowerConditionalType` accepts. Any non-literal flag still counts as
+    // potentially-true, matching how `isConcreteType` treats it.
     if (auto conditionalType = as<IRConditionalType>(type))
     {
         auto hasValueInst = conditionalType->getHasValue();
@@ -1450,9 +1456,9 @@ struct TypeFlowSpecializationContext
             // `makeInfoForConcreteType`). An info can carry attributes the mask lacks
             // (memberwise-constructor parameters are attributed), so `as<IRConditionalType>`
             // — which unwraps attributes — reads each payload rather than a comparison
-            // against the mask. A mismatched pair falls through to the flat union, whose
-            // failure stays active in release builds (matching the Array/Ptr/Optional
-            // blocks above).
+            // against the mask. A mismatched pair falls through to
+            // `flatUnionPropagationInfo`, which terminates via `SLANG_UNEXPECTED`
+            // (active in release builds), matching the Array/Ptr/Optional blocks above.
             auto conditional1 = as<IRConditionalType>(info1);
             auto conditional2 = as<IRConditionalType>(info2);
             if (conditional1 && conditional2)
@@ -2935,14 +2941,15 @@ struct TypeFlowSpecializationContext
                         as<IRPtrTypeBase>(fieldAddress->getDataType()));
                 }
 
-                // A generic reader can be instantiated after an earlier type-flow run already
-                // refined the field (each run uses a fresh context, so `fieldInfo` starts
-                // empty, and a run that contains no new stores to the field cannot re-seed
-                // it). Reuse the refined field type as the info instead of returning none,
-                // which is the same discipline `tryGetInfo` applies to refined data types.
-                // The fixpoint usually compensates (a surviving store re-seeds the map and
-                // re-enqueues readers via `fieldUseSites`), so this is a guard for the shape
-                // where no seeder survives into the current run at all.
+                // The field type an earlier run's `specializeStructType` wrote back is the
+                // canonical refined info for that field, so a run whose `fieldInfo` map has
+                // no entry (each run starts with a fresh map, and this run may contain no
+                // store that re-seeds it) reuses it directly — the same discipline
+                // `tryGetInfo` applies to refined data types. The guard keys on
+                // `isRefinedInfoType` generally, so it also serves plain interface fields
+                // whose type was refined the same way; for those it replaces the old
+                // fall-through-to-none with the narrowed refinement, which is what
+                // `conditional-interface-plain-field-reader.slang` pins.
                 if (isRefinedInfoType(structField->getFieldType()))
                 {
                     return builder.getPtrTypeWithAddressSpace(
@@ -3011,9 +3018,10 @@ struct TypeFlowSpecializationContext
                 return this->fieldInfo[structField];
             }
 
-            // As for field addresses (`analyzeFieldAddress` has the full justification of
-            // this rule), a later generic instantiation must reuse the field's
-            // already-refined type even when this run has no new stores to it.
+            // Same rule as the field-address fallback above: the field type an earlier
+            // run's `specializeStructType` wrote back is the canonical refined info, so a
+            // later generic instantiation reuses it even when this run has no new stores
+            // to the field (the `tryGetInfo` discipline for refined types).
             if (isRefinedInfoType(structField->getFieldType()))
                 return structField->getFieldType();
 
@@ -8435,9 +8443,13 @@ struct TypeFlowSpecializationContext
         // the field to {A,B}: the second store's `upcastSet` re-reads this
         // MakeConditionalValue against the wider wrapper, and if the payload operand were
         // still the narrow {A} value the rebuilt wrapper would wrap a mismatched payload
-        // type. Widening here keeps the operand and its own type in step.
+        // type. Widening here keeps the operand and its own type in step; once the operand's
+        // type equals the refined payload, `upcastSet` returns the operand unchanged, so
+        // the fixpoint converges.
         bool changed = replaceType(context, inst);
         auto conditionalType = as<IRConditionalType>(inst->getDataType());
+        // A data type that is no longer a Conditional cannot arise while the wrapper
+        // survives specialization; keep `replaceType`'s result for the flag plumbing.
         if (!conditionalType)
             return changed;
         IRBuilder builder(inst);

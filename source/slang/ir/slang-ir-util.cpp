@@ -916,12 +916,25 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
             sb << "Conditional<";
             getTypeNameHint(sb, conditionalType->getValueType());
             sb << ", ";
+            // A non-literal flag has no name hint of its own, so like the generic
+            // parameter in the SubpassInputType case above, recurse to render whatever
+            // the flag operand carries (an empty rendering for a plain generic value).
             if (auto boolLit = as<IRBoolLit>(conditionalType->getHasValue()))
                 sb << (boolLit->getValue() ? "true" : "false");
             else
                 getTypeNameHint(sb, conditionalType->getHasValue());
             sb << ">";
         }
+        break;
+    case kIROp_TupleType:
+        sb << "Tuple<";
+        for (UInt i = 0; i < type->getOperandCount(); i++)
+        {
+            if (i > 0)
+                sb << ", ";
+            getTypeNameHint(sb, type->getOperand(i));
+        }
+        sb << ">";
         break;
     case kIROp_SubpassInputType:
         {
