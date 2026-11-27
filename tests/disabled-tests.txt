@@ -77,8 +77,6 @@ These tests need to be binned according to what features they need.
 * serialization/library-entry-point/library-entry-point-test.slang
 * render/cross-compile0.hlsl
 * render/imported-parameters.hlsl
-* render/nointerpolation.hlsl
-* render/render0.hlsl
 * render/tess.hlsl
 * render/unused-discard.hlsl
 * compute/interface-param-partial-specialize.slang
