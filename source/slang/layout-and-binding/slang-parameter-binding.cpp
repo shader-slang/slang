@@ -3915,21 +3915,6 @@ static bool _isCPUTarget(CodeGenTarget target)
     return ArtifactDescUtil::isCpuLikeTarget(desc);
 }
 
-static bool _isPTXTarget(CodeGenTarget target)
-{
-    switch (target)
-    {
-    case CodeGenTarget::CUDASource:
-    case CodeGenTarget::CUDAHeader:
-    case CodeGenTarget::PTX:
-        {
-            return true;
-        }
-    default:
-        return false;
-    }
-}
-
 /// Keep track of the running global counter for entry points and global parameters visited.
 ///
 /// Because of explicit `register` and `[[vk::binding(...)]]` support, parameter binding
@@ -4677,7 +4662,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
     // (because on CPU all resources are 'Uniform')
     // TODO(JS): We'll just assume the same with CUDA target for now..
     if (globalConstantBufferBinding.kind == LayoutResourceKind::None &&
-        !_isCPUTarget(targetReq->getTarget()) && !_isPTXTarget(targetReq->getTarget()))
+        !_isCPUTarget(targetReq->getTarget()) && !isCUDATarget(targetReq))
     {
         for (auto& parameterInfo : sharedContext.parameters)
         {

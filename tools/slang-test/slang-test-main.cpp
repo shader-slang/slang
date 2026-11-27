@@ -1929,9 +1929,11 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
             return PassThroughFlag::Generic_C_CPP;
         }
     case SLANG_PTX:
-        {
-            return PassThroughFlag::NVRTC;
-        }
+        return PassThroughFlag::NVRTC;
+    case SLANG_CUDA_OBJECT_CODE:
+        return PassThroughFlag::NVRTC | PassThroughFlag::Cubin;
+    case SLANG_CUDA_OBJECT_CODE_ASM:
+        return PassThroughFlag::NVRTC | PassThroughFlag::Cubin | PassThroughFlag::Nvdisasm;
 
     default:
         {
@@ -2208,13 +2210,18 @@ static SlangResult _extractSlangCTestRequirements(
 
     // The target if set will also imply a backend
     {
-        String targetName;
-        if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-target", targetName)))
+        String value;
+        SlangCompileTarget target = SLANG_TARGET_UNKNOWN;
+        if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-target", value)))
         {
-            const SlangCompileTarget target =
-                TypeTextUtil::findCompileTargetFromName(targetName.getUnownedSlice());
-            ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
+            target = TypeTextUtil::findCompileTargetFromName(value.getUnownedSlice());
         }
+        else if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-o", value)))
+        {
+            const auto ext = TypeTextUtil::getOutputPathExtension(value.getUnownedSlice());
+            target = TypeTextUtil::findCompileTargetFromExtension(ext);
+        }
+        ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
     }
 
     // `-emit-cpu-via-llvm` routes CPU/host-callable code generation through the slang-llvm
@@ -8135,6 +8142,8 @@ SlangResult innerMain(int argc, char** argv)
                 supportedBackends << buf;
             }
         }
+        if (SLANG_SUCCEEDED(session->checkCompileTargetSupport(SLANG_CUDA_OBJECT_CODE)))
+            context.availableBackendFlags |= PassThroughFlag::Cubin;
     }
 
     {

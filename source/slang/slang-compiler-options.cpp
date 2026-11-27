@@ -8,6 +8,18 @@
 
 namespace Slang
 {
+CapabilityName CompilerOptionValue::getCapabilityName() const
+{
+    switch (kind)
+    {
+    case CompilerOptionValueKind::Int:
+        return CapabilityName(intValue);
+    case CompilerOptionValueKind::String:
+        return findCapabilityName(stringValue.getUnownedSlice());
+    }
+    SLANG_UNEXPECTED("Unknown capability option value kind");
+}
+
 void CompilerOptionSet::load(uint32_t count, const slang::CompilerOptionEntry* entries)
 {
     for (uint32_t i = 0; i < count; i++)

@@ -32,6 +32,27 @@ bool isHeterogeneousTarget(CodeGenTarget target)
            ArtifactStyle::Host;
 }
 
+CodeGenTarget getBinaryTargetForAssembly(CodeGenTarget target)
+{
+    switch (target)
+    {
+    case CodeGenTarget::SPIRVAssembly:
+        return CodeGenTarget::SPIRV;
+    case CodeGenTarget::DXBytecodeAssembly:
+        return CodeGenTarget::DXBytecode;
+    case CodeGenTarget::DXILAssembly:
+        return CodeGenTarget::DXIL;
+    case CodeGenTarget::CUDAObjectCodeAssembly:
+        return CodeGenTarget::CUDAObjectCode;
+    case CodeGenTarget::MetalLibAssembly:
+        return CodeGenTarget::MetalLib;
+    case CodeGenTarget::WGSLSPIRVAssembly:
+        return CodeGenTarget::WGSLSPIRV;
+    default:
+        return CodeGenTarget::None;
+    }
+}
+
 void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
 {
     UnownedStringSlice name = TypeTextUtil::getCompileTargetName(asExternal(val));
@@ -204,6 +225,8 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
         atoms.add(CapabilityName::cuda);
         break;
 
@@ -231,16 +254,7 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
-        CapabilitySet toAdd;
-        switch (atomVal.kind)
-        {
-        case CompilerOptionValueKind::Int:
-            toAdd = CapabilitySet(CapabilityName(atomVal.intValue));
-            break;
-        case CompilerOptionValueKind::String:
-            toAdd = CapabilitySet(findCapabilityName(atomVal.stringValue.getUnownedSlice()));
-            break;
-        }
+        CapabilitySet toAdd(atomVal.getCapabilityName());
 
         if (isGLSLTarget)
             targetCap.addSpirvVersionFromOtherAsGlslSpirvVersion(toAdd);

@@ -225,9 +225,11 @@ static RefPtr<ExtensionTracker> _newExtensionTracker(CodeGenTarget target)
 {
     switch (target)
     {
-    case CodeGenTarget::PTX:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
         {
             return new CUDAExtensionTracker;
         }
@@ -266,6 +268,7 @@ static CodeGenTarget _getDefaultSourceForTarget(CodeGenTarget target)
             return CodeGenTarget::HostCPPSource;
         }
     case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDAObjectCode:
         return CodeGenTarget::CUDASource;
     case CodeGenTarget::DXBytecode:
         return CodeGenTarget::HLSL;
@@ -606,20 +609,30 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         }
     }
 
-    CapabilitySet targetCaps = getTargetCaps();
-    for (auto atomSets : targetCaps.getAtomSets())
+    if (target == CodeGenTarget::CUDAObjectCode)
     {
-        for (auto atomVal : atomSets)
+        // For example, atomic_reduce implies SM 7.0, but only a named SM selects the GPU.
+        // Read the options before capability expansion loses that distinction.
+        for (const auto& option :
+             getTargetProgram()->getOptionSet().getArray(CompilerOptionName::Capability))
         {
-            auto atom = CapabilityAtom(atomVal);
-            // Each present CUDA SM atom contributes its version; the downstream `-arch`
-            // selection takes the maximum across them.
-            if (SemanticVersion cudaSMVersion = getCUDASMVersionForAtom(atom);
-                cudaSMVersion.isSet())
+            auto sm = getCUDASMVersion(option.getCapabilityName());
+            if (sm > options.cudaTargetSM)
+                options.cudaTargetSM = sm;
+        }
+    }
+    else if (target == CodeGenTarget::PTX)
+    {
+        // PTX uses the highest SM required by the target capabilities and the emitted code.
+        CapabilitySet targetCaps = getTargetCaps();
+        for (auto atomSet : targetCaps.getAtomSets())
+        {
+            for (auto atom : atomSet)
             {
-                requiredCapabilityVersions.add(DownstreamCompileOptions::CapabilityVersion{
-                    DownstreamCompileOptions::CapabilityVersion::Kind::CUDASM,
-                    cudaSMVersion});
+                auto sm = getCUDASMVersion(CapabilityName(atom));
+                if (sm.isSet())
+                    requiredCapabilityVersions.add(
+                        {CompileOptions::CapabilityVersion::Kind::CUDASM, sm});
             }
         }
     }
@@ -908,25 +921,16 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         }
 
         {
-            // We need to look at the stage of the entry point(s) we are
-            // being asked to compile, since this will determine the
-            // "pipeline" that the result should be compiled for (e.g.,
-            // compute vs. ray tracing).
-            //
-            // TODO: This logic is kind of messy in that it assumes
-            // a program to be compiled will only contain kernels for
-            // a single pipeline type, but that invariant isn't expressed
-            // at all in the front-end today. It also has no error
-            // checking for the case where there are conflicts.
-            //
-            // HACK: Right now none of the above concerns matter
-            // because we always perform code generation on a single
-            // entry point at a time.
-            //
-            Index entryPointCount = getEntryPointCount();
-            for (Index ee = 0; ee < entryPointCount; ++ee)
+            // Any selected ray-tracing entry point requires the OptiX pipeline, including when a
+            // whole-program request also exports ordinary compute kernels.
+            for (auto entryPointIndex : getEntryPointIndices())
             {
-                auto stage = getEntryPoint(ee)->getStage();
+                auto stage = getEntryPoint(entryPointIndex)->getStage();
+                if (isRaytracingStage(stage))
+                {
+                    options.pipelineType = DownstreamCompileOptions::PipelineType::RayTracing;
+                    break;
+                }
                 switch (stage)
                 {
                 default:
@@ -942,15 +946,6 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 case Stage::Geometry:
                 case Stage::Fragment:
                     options.pipelineType = DownstreamCompileOptions::PipelineType::Rasterization;
-                    break;
-
-                case Stage::RayGeneration:
-                case Stage::Intersection:
-                case Stage::AnyHit:
-                case Stage::ClosestHit:
-                case Stage::Miss:
-                case Stage::Callable:
-                    options.pipelineType = DownstreamCompileOptions::PipelineType::RayTracing;
                     break;
                 }
             }
@@ -1039,6 +1034,18 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
     getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
+    if (!artifact)
+    {
+        SLANG_RELEASE_ASSERT(SLANG_FAILED(compileResult));
+        auto compilerName = TypeTextUtil::getPassThroughName(compiler->getDesc().type);
+        reportExternalCompileError(
+            String(compilerName).getBuffer(),
+            compileResult,
+            toSlice("Downstream compiler returned no output artifact."),
+            sink);
+        return compileResult;
+    }
+
     // Extract diagnostics regardless of compile result
     SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(getSink(), compiler, artifact));
 
@@ -1067,25 +1074,6 @@ SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& ou
 
 SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact);
 
-static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
-{
-    switch (target)
-    {
-    case CodeGenTarget::DXBytecodeAssembly:
-        return CodeGenTarget::DXBytecode;
-    case CodeGenTarget::DXILAssembly:
-        return CodeGenTarget::DXIL;
-    case CodeGenTarget::SPIRVAssembly:
-        return CodeGenTarget::SPIRV;
-    case CodeGenTarget::MetalLibAssembly:
-        return CodeGenTarget::MetalLib;
-    case CodeGenTarget::WGSLSPIRVAssembly:
-        return CodeGenTarget::WGSLSPIRV;
-    default:
-        return CodeGenTarget::None;
-    }
-}
-
 IArtifact* getSeparateDbgArtifact(IArtifact* artifact)
 {
     if (!artifact)
@@ -1112,11 +1100,12 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::SPIRVAssembly:
     case CodeGenTarget::DXBytecodeAssembly:
     case CodeGenTarget::DXILAssembly:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
     case CodeGenTarget::MetalLibAssembly:
     case CodeGenTarget::WGSLSPIRVAssembly:
         {
             // First compile to an intermediate target for the corresponding binary format.
-            const CodeGenTarget intermediateTarget = _getIntermediateTarget(target);
+            const CodeGenTarget intermediateTarget = getBinaryTargetForAssembly(target);
             CodeGenContext intermediateContext(this, intermediateTarget);
 
             ComPtr<IArtifact> intermediateArtifact;
@@ -1185,6 +1174,7 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::DXBytecode:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDAObjectCode:
     case CodeGenTarget::WGSLSPIRV:
         SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
         return SLANG_OK;
@@ -1307,24 +1297,26 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
 
     switch (target)
     {
-    case CodeGenTarget::SPIRVAssembly:
-    case CodeGenTarget::DXBytecodeAssembly:
-    case CodeGenTarget::DXILAssembly:
     case CodeGenTarget::SPIRV:
-    case CodeGenTarget::DXIL:
+    case CodeGenTarget::SPIRVAssembly:
     case CodeGenTarget::DXBytecode:
-    case CodeGenTarget::MetalLib:
-    case CodeGenTarget::MetalLibAssembly:
-    case CodeGenTarget::PTX:
-    case CodeGenTarget::HostHostCallable:
-    case CodeGenTarget::ShaderHostCallable:
-    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::DXBytecodeAssembly:
+    case CodeGenTarget::DXIL:
+    case CodeGenTarget::DXILAssembly:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostSharedLibrary:
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
     case CodeGenTarget::WGSLSPIRVAssembly:
     case CodeGenTarget::HostVM:
     case CodeGenTarget::HostObjectCode:
-    case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::HostLLVMIR:
     case CodeGenTarget::ShaderLLVMIR:
         {
@@ -1395,10 +1387,7 @@ void CodeGenContext::_dumpIntermediateMaybeWithAssembly(IArtifact* artifact)
 {
     _dumpIntermediate(artifact);
 
-    ComPtr<IArtifact> assembly;
-    ArtifactOutputUtil::maybeDisassemble(getSession(), artifact, nullptr, assembly);
-
-    if (assembly)
+    if (auto assembly = ArtifactOutputUtil::maybeDisassemble(getSession(), artifact))
     {
         _dumpIntermediate(assembly);
     }

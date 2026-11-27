@@ -300,6 +300,10 @@ struct DownstreamCompileOptions
     FloatingPointDenormalMode denormalModeFp16 = FloatingPointDenormalMode::Any;
     FloatingPointDenormalMode denormalModeFp32 = FloatingPointDenormalMode::Any;
     FloatingPointDenormalMode denormalModeFp64 = FloatingPointDenormalMode::Any;
+
+    /// Exact SM selected for CUBIN by an explicit CUDA SM capability, e.g. 8.0 for cuda_sm_8_0.
+    /// The emitter records its minimum SM separately in requiredCapabilityVersions.
+    SemanticVersion cudaTargetSM;
 };
 static_assert(std::is_trivially_copyable_v<DownstreamCompileOptions>);
 

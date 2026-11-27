@@ -2,6 +2,7 @@
 #include "slang-global-session.h"
 
 #include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-nvrtc-compiler.h"
 #include "core/slang-archive-file-system.h"
 #include "core/slang-performance-profiler.h"
 #include "core/slang-type-convert-util.h"
@@ -209,11 +210,19 @@ void Session::_initCodeGenTransitionMap()
 
 
     // Add all the straightforward transitions
-    map.addTransition(CodeGenTarget::CUDASource, CodeGenTarget::PTX, PassThroughMode::NVRTC);
-    map.addTransition(CodeGenTarget::CUDAHeader, CodeGenTarget::PTX, PassThroughMode::NVRTC);
+    map.addTransition(CodeGenTarget::GLSL, CodeGenTarget::SPIRV, PassThroughMode::Glslang);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXBytecode, PassThroughMode::Fxc);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXIL, PassThroughMode::Dxc);
-    map.addTransition(CodeGenTarget::GLSL, CodeGenTarget::SPIRV, PassThroughMode::Glslang);
+    map.addTransition(CodeGenTarget::CUDASource, CodeGenTarget::PTX, PassThroughMode::NVRTC);
+    map.addTransition(
+        CodeGenTarget::CUDASource,
+        CodeGenTarget::CUDAObjectCode,
+        PassThroughMode::NVRTC);
+    map.addTransition(CodeGenTarget::CUDAHeader, CodeGenTarget::PTX, PassThroughMode::NVRTC);
+    map.addTransition(
+        CodeGenTarget::CUDAHeader,
+        CodeGenTarget::CUDAObjectCode,
+        PassThroughMode::NVRTC);
     map.addTransition(CodeGenTarget::Metal, CodeGenTarget::MetalLib, PassThroughMode::MetalC);
     map.addTransition(CodeGenTarget::WGSL, CodeGenTarget::WGSLSPIRV, PassThroughMode::Tint);
     // To assembly
@@ -228,6 +237,10 @@ void Session::_initCodeGenTransitionMap()
         CodeGenTarget::DXBytecode,
         CodeGenTarget::DXBytecodeAssembly,
         PassThroughMode::Fxc);
+    map.addTransition(
+        CodeGenTarget::CUDAObjectCode,
+        CodeGenTarget::CUDAObjectCodeAssembly,
+        PassThroughMode::Nvdisasm);
     map.addTransition(
         CodeGenTarget::MetalLib,
         CodeGenTarget::MetalLibAssembly,
@@ -263,6 +276,15 @@ ISlangSharedLibraryLoader* Session::getSharedLibraryLoader()
 SlangResult Session::checkCompileTargetSupport(SlangCompileTarget inTarget)
 {
     auto target = CodeGenTarget(inTarget);
+
+    if (target == CodeGenTarget::CUDAObjectCode || target == CodeGenTarget::CUDAObjectCodeAssembly)
+    {
+        auto compiler = getOrLoadDownstreamCompiler(PassThroughMode::NVRTC, nullptr);
+        if (!compiler || !NVRTCDownstreamCompilerUtil::supportsCubin(compiler))
+            return SLANG_E_NOT_FOUND;
+        if (target == CodeGenTarget::CUDAObjectCode)
+            return SLANG_OK;
+    }
 
     const PassThroughMode mode = getDownstreamCompilerRequiredForTarget(target);
     return (mode != PassThroughMode::None) ? checkPassThroughSupport(SlangPassThrough(mode))

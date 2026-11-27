@@ -27,6 +27,9 @@ struct CompilerOptionValue
     String stringValue;
     String stringValue2;
 
+    /// Returns the capability named by an integer ID or a string option value.
+    CapabilityName getCapabilityName() const;
+
     template<typename T>
     static CompilerOptionValue fromEnum(T val)
     {

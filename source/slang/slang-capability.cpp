@@ -83,31 +83,42 @@ static CapabilityAtomInfo const& _getInfo(CapabilityAtom atom)
     return kCapabilityNameInfos[Int(atom)];
 }
 
-SemanticVersion getCUDASMVersionForAtom(CapabilityAtom atom)
+SemanticVersion getCUDASMVersion(CapabilityName name)
 {
-    switch (atom)
+    switch (name)
     {
-    case CapabilityAtom::_cuda_sm_1_0:
+    case CapabilityName::cuda_sm_1_0:
+    case CapabilityName::_cuda_sm_1_0:
         return SemanticVersion(1, 0);
-    case CapabilityAtom::_cuda_sm_2_0:
+    case CapabilityName::cuda_sm_2_0:
+    case CapabilityName::_cuda_sm_2_0:
         return SemanticVersion(2, 0);
-    case CapabilityAtom::_cuda_sm_3_0:
+    case CapabilityName::cuda_sm_3_0:
+    case CapabilityName::_cuda_sm_3_0:
         return SemanticVersion(3, 0);
-    case CapabilityAtom::_cuda_sm_3_5:
+    case CapabilityName::cuda_sm_3_5:
+    case CapabilityName::_cuda_sm_3_5:
         return SemanticVersion(3, 5);
-    case CapabilityAtom::_cuda_sm_4_0:
+    case CapabilityName::cuda_sm_4_0:
+    case CapabilityName::_cuda_sm_4_0:
         return SemanticVersion(4, 0);
-    case CapabilityAtom::_cuda_sm_5_0:
+    case CapabilityName::cuda_sm_5_0:
+    case CapabilityName::_cuda_sm_5_0:
         return SemanticVersion(5, 0);
-    case CapabilityAtom::_cuda_sm_6_0:
+    case CapabilityName::cuda_sm_6_0:
+    case CapabilityName::_cuda_sm_6_0:
         return SemanticVersion(6, 0);
-    case CapabilityAtom::_cuda_sm_7_0:
+    case CapabilityName::cuda_sm_7_0:
+    case CapabilityName::_cuda_sm_7_0:
         return SemanticVersion(7, 0);
-    case CapabilityAtom::_cuda_sm_8_0:
+    case CapabilityName::cuda_sm_8_0:
+    case CapabilityName::_cuda_sm_8_0:
         return SemanticVersion(8, 0);
-    case CapabilityAtom::_cuda_sm_8_9:
+    case CapabilityName::cuda_sm_8_9:
+    case CapabilityName::_cuda_sm_8_9:
         return SemanticVersion(8, 9);
-    case CapabilityAtom::_cuda_sm_9_0:
+    case CapabilityName::cuda_sm_9_0:
+    case CapabilityName::_cuda_sm_9_0:
         return SemanticVersion(9, 0);
     default:
         return SemanticVersion();

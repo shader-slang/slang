@@ -2429,6 +2429,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
         {
             SLANG_PASS(synthesizeActiveMask, codeGenContext->getSink());
 

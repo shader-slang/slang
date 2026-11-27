@@ -226,6 +226,8 @@ static bool isKernelCPPOrCUDASourceTarget(TargetRequest* target)
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
         return true;
     default:
         return false;
@@ -250,6 +252,8 @@ static bool doesTargetSupportFuncTypedValue(TargetRequest* target)
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::ShaderHostCallable:
     case CodeGenTarget::ShaderLLVMIR:

@@ -1201,6 +1201,7 @@ Downstream Compilers (aka Pass through)
 * `spirv-opt` : spirv-tools SPIRV optimizer 
 * `metal` : Metal shader compiler 
 * `tint` : Tint compiler 
+* `nvdisasm` : NVIDIA CUDA binary disassembler 
 
 <a id="language"></a>
 ## language
@@ -1363,6 +1364,7 @@ Target
 * `cuh` : CUDA source header 
 * `ptx` : PTX assembly 
 * `cuobj`, `cubin` : CUDA binary 
+* `cubin-asm` : CUDA machine assembly 
 * `host-callable`, `callable` : Host callable 
 * `object-code`, `shader-object-code` : Object code for host execution (shader style) 
 * `host-host-callable` : Host callable for host execution 
