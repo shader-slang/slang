@@ -428,6 +428,54 @@ public vector<T,N> roundEven(vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
+[OverloadRank(15)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+public T sign(T x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "$TR(sign($0))";
+    case metal: __intrinsic_asm "sign($0)";
+    case glsl: __intrinsic_asm "sign($0)";
+    case wgsl: __intrinsic_asm "sign($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtInst $$T result glsl450 FSign $x;
+        };
+    default:
+        return x == T(0) ? T(0) : (x < T(0) ? T(-1) : T(1));
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[ForceInline]
+[OverloadRank(15)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+public vector<T, N> sign(vector<T, N> x)
+{
+    if (N == 1)
+        return vector<T, N>(sign(x[0]));
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "$TR(sign($0))";
+    case glsl: __intrinsic_asm "sign($0)";
+    case metal: __intrinsic_asm "sign($0)";
+    case wgsl: __intrinsic_asm "sign($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtInst $$vector<T, N> result glsl450 FSign $x;
+        };
+    default:
+        VECTOR_MAP_UNARY(T, N, sign, x);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public T mod(T x, T y)
 {
