@@ -60,6 +60,25 @@ float processGenericRef<let E : bool>(__ref Conditional<IFoo, E> c)
     return 0.0;
 }
 
+// Link-time-constant flags (extern const) exercise the IntLit spelling of the
+// flag that reaches the IR-level predicate.
+extern static const bool EXTERN_ENABLED = true;
+extern static const bool EXTERN_DISABLED = false;
+
+float processExternEnabledRef(__ref Conditional<IFoo, EXTERN_ENABLED> c)
+//CHECK:                                                              ^ ref parameter incompatible with dynamic dispatch
+//CHECK:                                                              ^ '__ref' parameter of type 'Conditional<IFoo, true>' cannot be used in a dynamic dispatch context.
+{
+    if (let member = c.get())
+        return member.getValue();
+    return 0.0;
+}
+
+float processExternDisabledRef(__ref Conditional<IFoo, EXTERN_DISABLED> c)
+{
+    return 2.0;
+}
+
 IFoo factory(uint id)
 {
     if (id == 0)
@@ -80,4 +99,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[2] = processDisabledRef(disabled);
 
     outputBuffer[3] = processGenericRef<true>(enabled);
+
+    Conditional<IFoo, EXTERN_ENABLED> externEnabled =
+        Conditional<IFoo, EXTERN_ENABLED>(factory(dispatchThreadID.x));
+    outputBuffer[4] = processExternEnabledRef(externEnabled);
+
+    Conditional<IFoo, EXTERN_DISABLED> externDisabled;
+    outputBuffer[5] = processExternDisabledRef(externDisabled);
 }

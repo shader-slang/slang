@@ -7,7 +7,7 @@
 
 //TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputs
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputs
 RWStructuredBuffer<uint> outputs;
 
 interface IValue
@@ -35,6 +35,40 @@ Conditional<IValue, true> makeSmall(uint value)
 Conditional<IValue, true> makeLarge(uint value)
 {
     return Conditional<IValue, true>(Large(uint4(value, 2, 3, 4)));
+}
+
+// A generic with a top-level Conditional parameter: two call sites with
+// differing payload sets ({Small} then {Small, Large}) exercise the
+// Conditional case in the set-substitution path during generic specialization.
+uint processGeneric<let enabled : bool>(Conditional<IValue, enabled> value)
+{
+    if (let payload = value.get())
+        return payload.read();
+    return 123;
+}
+
+// An interface method returning a Conditional exercises the same analysis
+// paths through dynamic dispatch.
+interface IFactory
+{
+    Conditional<IValue, true> make(uint id);
+}
+
+struct FactoryA : IFactory
+{
+    Conditional<IValue, true> make(uint id) { return makeSmall(id); }
+}
+
+struct FactoryB : IFactory
+{
+    Conditional<IValue, true> make(uint id) { return makeLarge(id); }
+}
+
+IFactory chooseFactory(uint id)
+{
+    if ((id & 1) == 0)
+        return FactoryA();
+    return FactoryB();
 }
 
 Conditional<IValue, true> selectValue(bool large, uint value)
@@ -156,4 +190,17 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     direct = Conditional<IValue, true>(Large(uint4(tid.x, 2, 3, 4)));
     outputs[18] = read(direct);
     // CHECK: 9
+
+    // Generic with a top-level Conditional parameter, called with a narrow
+    // payload set then a wide one.
+    outputs[19] = processGeneric<true>(makeSmall(tid.x));
+    // CHECK: 10
+    outputs[20] = processGeneric<true>(makeLarge(tid.x));
+    // CHECK: 9
+
+    // Interface method returning a Conditional, dispatched dynamically.
+    outputs[21] = read(chooseFactory(tid.x).make(tid.x));
+    // CHECK: 10
+    outputs[22] = read(chooseFactory(tid.x + 1).make(tid.x + 1));
+    // CHECK: 10
 }
