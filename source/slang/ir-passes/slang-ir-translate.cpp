@@ -324,6 +324,25 @@ IRInst* TranslationContext::maybeTranslateIdentityRemat(IRInst* inst)
     SLANG_ASSERT(params[0]->getDataType() == funcType->getResultType());
     funcBuilder.emitReturn(params[0]);
 
+    // The identity remat is synthesized with no name and no debug info. Its first parameter is
+    // the minimal context struct, so name it after that type, and give it debug info from the
+    // apply function an IdentityRemat is generated alongside — its operand 0, created by the
+    // front end alongside the conformance — which carries the user's source location. Operand
+    // resolution normally happens before this handler runs, but the memoized translation flow
+    // does not guarantee it, so resolve a still-untranslated operand through the dictionary
+    // here.
+    auto applyOperand = inst->getOperand(0);
+    if (as<IRTranslateBase>(applyOperand))
+        applyOperand = maybeTranslateInst(applyOperand);
+    SLANG_RELEASE_ASSERT(as<IRFunc>(applyOperand));
+    if (auto ctxNameHint = funcType->getParamType(0)->findDecoration<IRNameHintDecoration>())
+    {
+        StringBuilder nameSb;
+        nameSb << "s_rematCtx_" << ctxNameHint->getName();
+        subBuilder.addNameHintDecoration(func, nameSb.getUnownedSlice());
+    }
+    copyDebugInfoForSynthesizedFunc(&subBuilder, applyOperand, func);
+
     return func;
 }
 
