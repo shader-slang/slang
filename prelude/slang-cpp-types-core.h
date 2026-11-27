@@ -469,9 +469,13 @@ struct Matrix
         rows[1][0] = v2;
         rows[1][1] = v3;
     }
+    // Each branch below is well-formed only for its own COLS value: a branch's
+    // indexing assumes the shape it lays out, so the mismatched branch must not
+    // be instantiated. `if constexpr` discards it; the 8- and 12-scalar
+    // constructors below rely on this as well.
     Matrix(T v0, T v1, T v2, T v3, T v4, T v5)
     {
-        if (COLS == 3)
+        if constexpr (COLS == 3)
         {
             rows[0][0] = v0;
             rows[0][1] = v1;
@@ -492,7 +496,7 @@ struct Matrix
     }
     Matrix(T v0, T v1, T v2, T v3, T v4, T v5, T v6, T v7)
     {
-        if (COLS == 4)
+        if constexpr (COLS == 4)
         {
             rows[0][0] = v0;
             rows[0][1] = v1;
@@ -529,7 +533,7 @@ struct Matrix
     }
     Matrix(T v0, T v1, T v2, T v3, T v4, T v5, T v6, T v7, T v8, T v9, T v10, T v11)
     {
-        if (COLS == 4)
+        if constexpr (COLS == 4)
         {
             rows[0][0] = v0;
             rows[0][1] = v1;
@@ -626,7 +630,7 @@ struct Matrix
         Matrix<T, R, C> result;                                 \
         for (int i = 0; i < R; i++)                             \
             for (int j = 0; j < C; j++)                         \
-                result[i].rows[i][j] = op thisVal.rows[i][j];   \
+                result.rows[i][j] = op thisVal.rows[i][j];      \
         return result;                                          \
     }
 
@@ -661,6 +665,11 @@ struct Matrix
     SLANG_MATRIX_BINARY_COMPARE_OP(T, <=) \
     SLANG_MATRIX_BINARY_COMPARE_OP(T, ==) \
     SLANG_MATRIX_BINARY_COMPARE_OP(T, !=)
+// Bool matrices instantiate the integer operator set, mirroring
+// SLANG_INT_VECTOR_OPS(bool) for vectors; the checker promotes arithmetic on
+// bool matrices to int, so entries such as `+` and `*` never appear in
+// emitted code.
+SLANG_INT_MATRIX_OPS(bool)
 SLANG_INT_MATRIX_OPS(int)
 SLANG_INT_MATRIX_OPS(int8_t)
 SLANG_INT_MATRIX_OPS(int16_t)

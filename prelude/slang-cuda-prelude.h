@@ -1095,7 +1095,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(
     T v5)
 {
     Matrix<T, ROWS, COLS> rs;
-    if (COLS == 3)
+    if constexpr (COLS == 3)
     {
         *_slang_vector_get_element_ptr(&rs.rows[0], 0) = v0;
         *_slang_vector_get_element_ptr(&rs.rows[0], 1) = v1;
@@ -1128,7 +1128,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(
     T v7)
 {
     Matrix<T, ROWS, COLS> rs;
-    if (COLS == 4)
+    if constexpr (COLS == 4)
     {
         *_slang_vector_get_element_ptr(&rs.rows[0], 0) = v0;
         *_slang_vector_get_element_ptr(&rs.rows[0], 1) = v1;
@@ -1194,7 +1194,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(
     T v11)
 {
     Matrix<T, ROWS, COLS> rs;
-    if (COLS == 4)
+    if constexpr (COLS == 4)
     {
         *_slang_vector_get_element_ptr(&rs.rows[0], 0) = v0;
         *_slang_vector_get_element_ptr(&rs.rows[0], 1) = v1;
@@ -1338,6 +1338,10 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(
     SLANG_MATRIX_BINARY_COMPARE_OP(T, <=) \
     SLANG_MATRIX_BINARY_COMPARE_OP(T, ==) \
     SLANG_MATRIX_BINARY_COMPARE_OP(T, !=)
+// Mirrors the C++ prelude: bool matrices use the integer operator set the way
+// bool vectors do; the checker promotes arithmetic on bool matrices to int,
+// so the arithmetic entries never appear in emitted code.
+SLANG_INT_MATRIX_OPS(bool)
 SLANG_INT_MATRIX_OPS(int)
 SLANG_INT_MATRIX_OPS(uint)
 SLANG_INT_MATRIX_OPS(short)
