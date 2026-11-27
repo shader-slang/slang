@@ -8454,6 +8454,22 @@ SlangResult innerMain(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+#if !SLANG_HAS_EXCEPTIONS
+    // Fatal-output tests need buffering established before runner initialization can use stderr.
+    // Keep this buffer alive until the child terminates, including during the fatal signal.
+    if (const char* mode = getenv("SLANG_FATAL_DIAGNOSTIC_OUTPUT_TEST"))
+    {
+        if (mode[0])
+        {
+            static char stderrBuffer[8192];
+            if (setvbuf(stderr, stderrBuffer, _IOFBF, sizeof(stderrBuffer)) != 0)
+            {
+                fputs("fatal diagnostic buffering setup failed\n", stdout);
+                return 1;
+            }
+        }
+    }
+#endif
 #if SLANG_UNIX_FAMILY
     // Ignore SIGPIPE so that writing to a broken pipe (e.g. a crashed test-server)
     // returns EPIPE instead of killing this process (exit code 141).
