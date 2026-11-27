@@ -905,6 +905,24 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         getTypeNameHint(sb, type->getOperand(0));
         sb << ">";
         break;
+    case kIROp_OptionalType:
+        sb << "Optional<";
+        getTypeNameHint(sb, as<IROptionalType>(type)->getValueType());
+        sb << ">";
+        break;
+    case kIROp_ConditionalType:
+        {
+            auto conditionalType = as<IRConditionalType>(type);
+            sb << "Conditional<";
+            getTypeNameHint(sb, conditionalType->getValueType());
+            sb << ", ";
+            if (auto boolLit = as<IRBoolLit>(conditionalType->getHasValue()))
+                sb << (boolLit->getValue() ? "true" : "false");
+            else
+                getTypeNameHint(sb, conditionalType->getHasValue());
+            sb << ">";
+        }
+        break;
     case kIROp_SubpassInputType:
         {
             auto subpassInputType = as<IRSubpassInputType>(type);

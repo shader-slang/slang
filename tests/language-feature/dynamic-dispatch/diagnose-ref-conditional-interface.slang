@@ -26,7 +26,7 @@ struct ImplB : IFoo
 // Scenario 1: enabled Conditional with interface payload passed by __ref
 float processEnabledRef(__ref Conditional<IFoo, true> c)
 //CHECK:                                              ^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                              ^ '__ref' parameter of type '' cannot be used in a dynamic dispatch context.
+//CHECK:                                              ^ '__ref' parameter of type 'Conditional<IFoo, true>' cannot be used in a dynamic dispatch context.
 {
     if (let member = c.get())
         return member.getValue();
@@ -36,7 +36,7 @@ float processEnabledRef(__ref Conditional<IFoo, true> c)
 // Scenario 2: enabled Conditional with interface payload passed by __constref
 float processEnabledConstref(__constref Conditional<IFoo, true> c)
 //CHECK:                                                        ^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                                        ^ '__constref' parameter of type '' cannot be used in a dynamic dispatch context.
+//CHECK:                                                        ^ '__constref' parameter of type 'Conditional<IFoo, true>' cannot be used in a dynamic dispatch context.
 {
     if (let member = c.get())
         return member.getValue();

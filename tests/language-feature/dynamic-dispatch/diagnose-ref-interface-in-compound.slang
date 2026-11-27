@@ -45,7 +45,7 @@ float processTupleConstref(__constref TupleWithInterface t)
 // Optional wrapping an interface: the contained value is AnyValue-packed.
 float processOptionalRef(__ref Optional<IFoo> opt)
 //CHECK:                                      ^^^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                      ^^^ '__ref' parameter of type '' cannot be used in a dynamic dispatch context.
+//CHECK:                                      ^^^ '__ref' parameter of type 'Optional<IFoo>' cannot be used in a dynamic dispatch context.
 {
     if (opt.hasValue)
         return opt.value.getValue();
@@ -54,7 +54,7 @@ float processOptionalRef(__ref Optional<IFoo> opt)
 
 float processOptionalConstref(__constref Optional<IFoo> opt)
 //CHECK:                                                ^^^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                                ^^^ '__constref' parameter of type '' cannot be used in a dynamic dispatch context.
+//CHECK:                                                ^^^ '__constref' parameter of type 'Optional<IFoo>' cannot be used in a dynamic dispatch context.
 {
     if (opt.hasValue)
         return opt.value.getValue();
