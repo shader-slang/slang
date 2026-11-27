@@ -25,11 +25,6 @@ const MathIntType MathIntType::UInt64Type = MathIntType{.width = 64, .isSigned =
 namespace
 {
 
-bool isNegative(const MathIntValue& v)
-{
-    return v.getType().isSigned && (v.getSignedValue() < 0);
-}
-
 int64_t getMinForType(const MathIntType& type)
 {
     SLANG_RELEASE_ASSERT(type.width <= 64U);
@@ -143,10 +138,10 @@ enum class ArgumentOrder
 ArgumentOrder determineOrder(const MathIntValue& a, const MathIntValue& b)
 {
     // First: sign-based ordering
-    if (isNegative(a) && !isNegative(b))
+    if (a.isNegative() && !b.isNegative())
         return ArgumentOrder::LhsLessThanRhs;
 
-    if (!isNegative(a) && isNegative(b))
+    if (!a.isNegative() && b.isNegative())
         return ArgumentOrder::LhsGreaterThanRhs;
 
     // Second: same sign, compare unsigned raw values. This is correct for both
@@ -376,7 +371,7 @@ MathIntResult MathIntOps::sub(
 // including that of INT64_MIN, which is 2^63.
 static uint64_t getMagnitude(const MathIntValue& v)
 {
-    return isNegative(v) ? negU64(v.getUnsignedValue()) : v.getUnsignedValue();
+    return v.isNegative() ? negU64(v.getUnsignedValue()) : v.getUnsignedValue();
 }
 
 MathIntResult MathIntOps::mul(
@@ -393,7 +388,7 @@ MathIntResult MathIntOps::mul(
     // when positive and at most 128 when negative, and an unsigned product may not be negative.
     const uint64_t lhsMagnitude = getMagnitude(a);
     const uint64_t rhsMagnitude = getMagnitude(b);
-    const bool isResultNegative = isNegative(a) != isNegative(b);
+    const bool isResultNegative = a.isNegative() != b.isNegative();
     const uint64_t maxResultMagnitude =
         isResultNegative ? negU64(static_cast<uint64_t>(getMinForType(resultType)))
                          : getMaxForType(resultType);
@@ -422,18 +417,18 @@ MathIntResult MathIntOps::div(
     uint64_t res;
     bool overflow;
 
-    if (isNegative(a) && isNegative(b))
+    if (a.isNegative() && b.isNegative())
     {
         res = negU64(a.getUnsignedValue()) / negU64(b.getUnsignedValue());
         overflow = !valueInRange(resultType, extendToI128(res));
     }
-    else if (isNegative(a) && !isNegative(b))
+    else if (a.isNegative() && !b.isNegative())
     {
         Int128 res128 = negI128(extendToI128(negU64(a.getUnsignedValue()) / b.getUnsignedValue()));
         overflow = !valueInRange(resultType, res128);
         res = res128.lo;
     }
-    else if (!isNegative(a) && isNegative(b))
+    else if (!a.isNegative() && b.isNegative())
     {
         // a is in range [0, UINT64_MAX] and b is in range [INT64_MIN, -1].
         //
@@ -474,7 +469,7 @@ MathIntResult MathIntOps::rem(
     uint64_t dividend;
     uint64_t divisor;
 
-    if (isNegative(a))
+    if (a.isNegative())
     {
         dividend = negU64(a.getUnsignedValue());
         signedRem = true;
@@ -485,7 +480,7 @@ MathIntResult MathIntOps::rem(
         signedRem = false;
     }
 
-    if (isNegative(b))
+    if (b.isNegative())
         divisor = negU64(b.getUnsignedValue());
     else
         divisor = b.getUnsignedValue();

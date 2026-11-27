@@ -832,7 +832,10 @@ void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)
     // Nothing to do
 }
 
-enum class CalculateNumLoopIterations_StepDirection
+// The operator that steps a for-loop variable: `Add` for `++` and `+=`, `Sub` for `--` and `-=`.
+// The operator alone does not give the direction the variable moves: the sign of the step value
+// does too. For example, `i -= -2` increases `i`.
+enum class LoopStepOperator
 {
     Add,
     Sub,
@@ -864,10 +867,13 @@ static BuiltinOperationKind getSwapSideComparisonOp(BuiltinOperationKind op)
 //     for (i = initialValue; i OP comparisonValue; i STEP stepValue)
 //
 // Return -1 when the count cannot be inferred or does not fit in `int`. The loop variable `i` has
-// type `iteratorType`, `OP` is `comparisonKind`, and `STEP` is `+=` or `-=` as given by `stepDir`.
+// type `iteratorType`, `OP` is `comparisonKind`, and `STEP` is `+=` or `-=` as given by `stepOp`.
 // The comparison happens in the type of `comparisonValue`, which is the common type of the loop
-// variable and the bound. For example, in `for (int i = 0; i < 10u; i++)` it is `uint`. The caller
-// has already rejected a zero step and a step that moves the variable away from the bound.
+// variable and the bound. For example, in `for (int i = 0; i < 10u; i++)` it is `uint`.
+//
+// If the condition is false for the initial value, the count is 0 whatever the step is. Otherwise a
+// zero step or a step that moves the variable away from the bound gives -1, and the caller reports
+// the step.
 //
 // Nothing is inferred when the loop variable would leave the range of `iteratorType` or of the
 // comparison type before the condition fails, because the loop then wraps around and may never
@@ -879,7 +885,7 @@ static int calculateNumLoopIterations(
     const MathIntValue& comparisonValue,
     BuiltinOperationKind comparisonKind,
     const MathIntValue& stepValue,
-    CalculateNumLoopIterations_StepDirection stepDir)
+    LoopStepOperator stepOp)
 {
     const MathIntType comparisonType{comparisonValue.getType()};
 
@@ -890,16 +896,17 @@ static int calculateNumLoopIterations(
     //    never runs, and the count is 0.
     // 2. If that conversion changes `initialValue`, as when `int` -10 becomes `uint` 0xFFFFFFF6,
     //    the values the loop compares differ from the values it steps, and we infer nothing.
-    // 3. `step` is the size of the step in the direction of travel, and `delta` is the distance
-    //    from `initialValue` to `comparisonValue`. After steps 1 and 2, both are non-negative and
-    //    fit in `uint64_t`.
-    // 4. The count is `ceil(delta / step)` for `<` and `>`, and `floor(delta / step) + 1` for `<=`
+    // 3. `step` is the size of the step in the direction of travel. If it is zero or negative, the
+    //    variable does not move toward the bound, and we infer nothing.
+    // 4. `delta` is the distance from `initialValue` to `comparisonValue`. After steps 1 to 3,
+    //    `step` is positive, `delta` is non-negative, and both fit in `uint64_t`.
+    // 5. The count is `ceil(delta / step)` for `<` and `>`, and `floor(delta / step) + 1` for `<=`
     //    and `>=`, because an inclusive bound runs the body once more when the variable lands on
     //    it.
-    // 5. The value after the last iteration, `initialValue +/- count * step`, must be in the range
+    // 6. The value after the last iteration, `initialValue +/- count * step`, must be in the range
     //    of both `iteratorType` and the comparison type. Otherwise the variable wraps around
     //    before the condition fails, and we infer nothing.
-    // 6. The count must fit in `int`, the type of the inferred `[MaxIters]` value.
+    // 7. The count must fit in `int`, the type of the inferred `[MaxIters]` value.
 
     const bool reverseDirection{
         comparisonKind == BuiltinOperationKind::Greater ||
@@ -940,8 +947,8 @@ static int calculateNumLoopIterations(
 
     MathIntResult adjStepRes;
 
-    if ((!reverseDirection && stepDir == CalculateNumLoopIterations_StepDirection::Add) ||
-        (reverseDirection && stepDir == CalculateNumLoopIterations_StepDirection::Sub))
+    if ((!reverseDirection && stepOp == LoopStepOperator::Add) ||
+        (reverseDirection && stepOp == LoopStepOperator::Sub))
         adjStepRes = MathIntOps::cast(MathIntType::UInt64Type, stepValue);
     else
         adjStepRes = MathIntOps::sub(
@@ -949,10 +956,16 @@ static int calculateNumLoopIterations(
             MathIntValue::constructFromValue(MathIntType::UInt8Type, 0U),
             stepValue);
 
-    // The caller has rejected a step that moves the variable away from the bound, so the step in
-    // the direction of travel is positive. That holds for `i += stepValue` with a positive
-    // `stepValue` and for `i -= stepValue` with a negative one, mirrored for `>` and `>=`.
-    SLANG_RELEASE_ASSERT(adjStepRes.flags == 0U);
+    // If we have an overflow here, the iterator is incremented in the wrong
+    // direction. It is also possible that it's not incremented at all, which
+    // we'll check separately. Examples:
+    //
+    //     for (int i = 0; i < 5; --i)
+    //     for (int i = 5; i >= 0; ++i)
+    //     for (int i = 0; i < 5; i += 0)
+    //
+    if ((adjStepRes.flags & MathIntResult::Overflow) || adjStepRes.value.isZero())
+        return -1;
 
     MathIntResult deltaRes =
         reverseDirection ? MathIntOps::sub(MathIntType::UInt64Type, initialValue, comparisonValue)
@@ -967,7 +980,7 @@ static int calculateNumLoopIterations(
     MathIntResult remRes =
         MathIntOps::rem(MathIntType::UInt64Type, deltaRes.value, adjStepRes.value);
 
-    // The caller has rejected a zero step, so the division and remainder are always defined.
+    // We have returned above for a zero step, so the division and remainder are always defined.
     SLANG_RELEASE_ASSERT(divRes.flags == 0U && remRes.flags == 0U);
 
     // The count is `ceil(delta / step)` for an exclusive bound and `floor(delta / step) + 1` for
@@ -1009,7 +1022,7 @@ static int calculateNumLoopIterations(
     // finally, check that numIters fits in the return type
     uint64_t numIters = stepsRes.value.getUnsignedValue();
     if (numIters <= std::numeric_limits<int>::max())
-        return numIters;
+        return static_cast<int>(numIters);
     else
         return -1;
 }
@@ -1049,10 +1062,10 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     MathIntValue comparisonValue{};
     BuiltinOperationKind compareOp{BuiltinOperationKind::Unknown};
     MathIntValue stepValue{};
-    CalculateNumLoopIterations_StepDirection stepDir{};
+    LoopStepOperator stepOp{};
 
-    DeclRef<Decl> initialVar = {};
-    Type* initialVarType = {};
+    DeclRef<Decl> iteratorVar = {};
+    Type* iteratorVarType = {};
     DeclRef<Decl> predicateVar = {};
     BuiltinOperatorExpr* cmpExpr = nullptr;
     Type* comparisonValueType = nullptr;
@@ -1065,10 +1078,10 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
             auto varDecl = as<VarDecl>(varStmt->decl);
             if (!varDecl)
                 return;
-            initialVar = makeDeclRef<Decl>(varDecl);
+            iteratorVar = makeDeclRef<Decl>(varDecl);
             initialVal = varDecl->initExpr;
-            initialVarType = varDecl->getType();
-            iteratorType = getIntegerFoldingMathIntType(m_astBuilder, initialVarType);
+            iteratorVarType = varDecl->getType();
+            iteratorType = getIntegerFoldingMathIntType(m_astBuilder, iteratorVarType);
         }
         else if (auto exprStmt = as<ExpressionStmt>(stmt->initialStatement))
         {
@@ -1078,13 +1091,13 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
             auto varExpr = as<VarExpr>(assignExpr->left);
             if (!varExpr)
                 return;
-            initialVar = varExpr->declRef;
+            iteratorVar = varExpr->declRef;
             initialVal = assignExpr->right;
 
             // The variable can be any variable declaration, such as a function parameter, so we
             // take its type from the expression that names it.
-            initialVarType = varExpr->type.type;
-            iteratorType = getIntegerFoldingMathIntType(m_astBuilder, initialVarType);
+            iteratorVarType = varExpr->type.type;
+            iteratorType = getIntegerFoldingMathIntType(m_astBuilder, iteratorVarType);
         }
         else
             return;
@@ -1176,19 +1189,23 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         else
         {
             // If neither left or right is constant, we'll check if either is
-            // the predicate variable. If not, we'll assume that leftVar is the
-            // predicate variable for diagnostics.
-            if (auto leftVar = getVarExprLookingThroughImplicitCast(leftCompareOperand))
+            // the iterator variable. If not and both are variables, we'll
+            // assume that leftVar is the predicate variable for diagnostics.
+            VarExpr* leftVar = getVarExprLookingThroughImplicitCast(leftCompareOperand);
+            VarExpr* rightVar = getVarExprLookingThroughImplicitCast(rightCompareOperand);
+
+            if (leftVar && leftVar->declRef == iteratorVar)
             {
                 predicateVar = leftVar->declRef;
             }
-            if (auto rightVar = getVarExprLookingThroughImplicitCast(rightCompareOperand))
+            else if (rightVar && rightVar->declRef == iteratorVar)
             {
-                if (rightVar->declRef == initialVar)
-                {
-                    predicateVar = rightVar->declRef;
-                    compareOp = getSwapSideComparisonOp(compareOp);
-                }
+                predicateVar = rightVar->declRef;
+                compareOp = getSwapSideComparisonOp(compareOp);
+            }
+            else if (leftVar && rightVar)
+            {
+                predicateVar = leftVar->declRef;
             }
         }
     }
@@ -1207,9 +1224,9 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         if (auto opName = sideEffectFuncDecl->getName())
         {
             if (opName->text == "++" || opName->text == "+=")
-                stepDir = CalculateNumLoopIterations_StepDirection::Add;
+                stepOp = LoopStepOperator::Add;
             else if (opName->text == "--" || opName->text == "-=")
-                stepDir = CalculateNumLoopIterations_StepDirection::Sub;
+                stepOp = LoopStepOperator::Sub;
             else
                 return;
         }
@@ -1219,13 +1236,13 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
             auto varExpr = as<VarExpr>(opSideEffectExpr->arguments[0]);
             if (!varExpr)
                 return;
-            if (varExpr->declRef.getDecl() != initialVar.getDecl())
+            if (varExpr->declRef.getDecl() != iteratorVar.getDecl())
             {
                 // If the user writes something like `for (int i = 0; i < 5; j++)`,
                 // it is most likely a bug, so we issue a warning.
-                if (predicateVar == initialVar)
+                if (predicateVar == iteratorVar)
                     getSink()->diagnose(Diagnostics::ForLoopSideEffectChangingDifferentVar{
-                        .initVar = initialVar.getDecl(),
+                        .initVar = iteratorVar.getDecl(),
                         .modifiedVar = varExpr->declRef.getDecl(),
                         .sideEffect = varExpr});
                 return;
@@ -1254,11 +1271,11 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
             stepValue = MathIntValue::constructFromValue(MathIntType::UInt8Type, 1);
         }
 
-        if (predicateVar.getDecl() != initialVar.getDecl())
+        if (predicateVar.getDecl() != iteratorVar.getDecl())
         {
             if (predicateVar)
                 getSink()->diagnose(Diagnostics::ForLoopPredicateCheckingDifferentVar{
-                    .initVar = initialVar.getDecl(),
+                    .initVar = iteratorVar.getDecl(),
                     .predicateVar = predicateVar.getDecl(),
                     .predicate = stmt->predicateExpression});
             return;
@@ -1288,7 +1305,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
             {
                 getSink()->diagnose(Diagnostics::ForLoopIteratorValueCannotReachComparison{
                     .toValue = comparisonValue.toString(),
-                    .iteratorType = initialVarType,
+                    .iteratorType = iteratorVarType,
                     .comparison = cmpExpr});
             }
         }
@@ -1297,54 +1314,19 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
             return;
     }
 
-    if (stepValue.isPositive())
-    {
-
-        if ((stepDir == CalculateNumLoopIterations_StepDirection::Add &&
-             (compareOp == BuiltinOperationKind::Greater ||
-              compareOp == BuiltinOperationKind::Geq)) ||
-            (stepDir == CalculateNumLoopIterations_StepDirection::Sub &&
-             (compareOp == BuiltinOperationKind::Less || compareOp == BuiltinOperationKind::Leq)))
-        {
-            getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppositeDirection{
-                .var = initialVar.getDecl(),
-                .sideEffect = stmt->sideEffectExpression});
-            return;
-        }
-    }
-    else if (stepValue.isNegative())
-    {
-        if ((stepDir == CalculateNumLoopIterations_StepDirection::Add &&
-             (compareOp == BuiltinOperationKind::Less || compareOp == BuiltinOperationKind::Leq)) ||
-            (stepDir == CalculateNumLoopIterations_StepDirection::Sub &&
-             (compareOp == BuiltinOperationKind::Greater ||
-              compareOp == BuiltinOperationKind::Geq)))
-        {
-            getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppositeDirection{
-                .var = initialVar.getDecl(),
-                .sideEffect = stmt->sideEffectExpression});
-            return;
-        }
-    }
-    else
-    {
-        getSink()->diagnose(Diagnostics::ForLoopNotModifyingIterationVariable{
-            .var = initialVar.getDecl(),
-            .sideEffect = stmt->sideEffectExpression});
-        return;
-    }
+    int loopIterations{-1};
 
     // do we have everything we need to determine loop iterations?
     if (iteratorType.width > 0U && initialValue.hasValue() && comparisonValue.hasValue() &&
         stepValue.hasValue())
     {
-        int loopIterations = calculateNumLoopIterations(
+        loopIterations = calculateNumLoopIterations(
             iteratorType,
             initialValue,
             comparisonValue,
             compareOp,
             stepValue,
-            stepDir);
+            stepOp);
 
         if (loopIterations >= 0)
         {
@@ -1361,8 +1343,45 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
             maxItersAttr->intArgVals.add(
                 m_astBuilder->getIntVal(m_astBuilder->getIntType(), loopIterations));
             maxItersAttr->value = (int32_t)loopIterations;
-            maxItersAttr->inductionVar = initialVar;
+            maxItersAttr->inductionVar = iteratorVar;
             addModifier(stmt, maxItersAttr);
+        }
+    }
+
+    if (loopIterations != 0)
+    {
+        if (stepValue.isPositive())
+        {
+
+            if ((stepOp == LoopStepOperator::Add && (compareOp == BuiltinOperationKind::Greater ||
+                                                     compareOp == BuiltinOperationKind::Geq)) ||
+                (stepOp == LoopStepOperator::Sub && (compareOp == BuiltinOperationKind::Less ||
+                                                     compareOp == BuiltinOperationKind::Leq)))
+            {
+                getSink()->diagnose(
+                    Diagnostics::ForLoopChangingIterationVariableInOppositeDirection{
+                        .var = iteratorVar.getDecl(),
+                        .sideEffect = stmt->sideEffectExpression});
+            }
+        }
+        else if (stepValue.isNegative())
+        {
+            if ((stepOp == LoopStepOperator::Add && (compareOp == BuiltinOperationKind::Less ||
+                                                     compareOp == BuiltinOperationKind::Leq)) ||
+                (stepOp == LoopStepOperator::Sub && (compareOp == BuiltinOperationKind::Greater ||
+                                                     compareOp == BuiltinOperationKind::Geq)))
+            {
+                getSink()->diagnose(
+                    Diagnostics::ForLoopChangingIterationVariableInOppositeDirection{
+                        .var = iteratorVar.getDecl(),
+                        .sideEffect = stmt->sideEffectExpression});
+            }
+        }
+        else
+        {
+            getSink()->diagnose(Diagnostics::ForLoopNotModifyingIterationVariable{
+                .var = iteratorVar.getDecl(),
+                .sideEffect = stmt->sideEffectExpression});
         }
     }
 }

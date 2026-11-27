@@ -5,6 +5,9 @@
 // inferred and a larger count is not. Without a target, the dump contains only the LOWER-TO-IR
 // section, so the checks see the loops as lowering creates them.
 //
+// A loop without a count is checked to still be present, so its missing decoration is not
+// mistaken for a missing loop. The decoration would come right before the `loop` instruction.
+//
 // The diagnostic `[MaxIters]` comparison that `tests/diagnostics/for-loop-trip-count-types.slang`
 // uses cannot show a count of INT32_MAX, because `[MaxIters]` itself is at most INT32_MAX.
 
@@ -37,6 +40,7 @@ void atLimitExclusive()
 // F2: 2^31 iterations do not fit in `int`, so nothing is inferred.
 // CHECK-LABEL: func %overLimitExclusive
 // CHECK-NOT: loopMaxIters
+// CHECK: loop(
 void overLimitExclusive()
 {
     for (uint i = 0; i < 0x80000000u; i++) {}
@@ -45,6 +49,7 @@ void overLimitExclusive()
 // F5: 2^31 iterations, counting the bound with `<=`.
 // CHECK-LABEL: func %overLimitInclusive
 // CHECK-NOT: loopMaxIters
+// CHECK: loop(
 void overLimitInclusive()
 {
     for (uint i = 0; i <= 0x7FFFFFFFu; i++) {}

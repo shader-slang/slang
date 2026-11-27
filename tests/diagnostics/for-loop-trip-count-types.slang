@@ -342,6 +342,42 @@ void f(int j, uint n)
     [MaxIters(2147483647)]
     for (int8_t i = -128; i >= -128; i--) {}
 
+    // G13: the body never runs. The condition is false before the step runs, so the step moving `i` away from the bound does not matter.
+    [MaxIters(2147483647)]
+/*diag:
+     ^^^^^^^^ MaxIters exceeds actual iterations
+     ^^^^^^^^ the for loop is statically determined to terminate within 0 iterations, which is less than what [MaxIters] specifies.
+*/
+    for (int i = 1; i <= 0; i--) {}
+/*diag:
+    ^^^ loop runs zero times
+    ^^^ the loop runs for 0 iterations and will be removed.
+*/
+
+    // G14: the body never runs. The same with an exclusive bound.
+    [MaxIters(2147483647)]
+/*diag:
+     ^^^^^^^^ MaxIters exceeds actual iterations
+     ^^^^^^^^ the for loop is statically determined to terminate within 0 iterations, which is less than what [MaxIters] specifies.
+*/
+    for (int i = 1; i < 0; i--) {}
+/*diag:
+    ^^^ loop runs zero times
+    ^^^ the loop runs for 0 iterations and will be removed.
+*/
+
+    // G15: the body never runs. The condition is false before the step runs, so the zero step does not matter.
+    [MaxIters(2147483647)]
+/*diag:
+     ^^^^^^^^ MaxIters exceeds actual iterations
+     ^^^^^^^^ the for loop is statically determined to terminate within 0 iterations, which is less than what [MaxIters] specifies.
+*/
+    for (int i = 1; i <= 0; i += 0) {}
+/*diag:
+    ^^^ loop runs zero times
+    ^^^ the loop runs for 0 iterations and will be removed.
+*/
+
     // A condition that checks a different variable than the loop initializes and steps. Only the
     // wrong-variable warning is reported, and nothing is inferred.
 
@@ -362,4 +398,16 @@ void f(int j, uint n)
     for (int i = 0; j < n; i++) {}
 //diag:               ^ for loop predicate checks wrong variable
 //diag:               ^ the for loop initializes and modifies variable 'i' but the predicate expression is checking 'j'.
+
+    // A condition that reads the loop variable inside a larger expression. The condition does
+    // check `i`, so no wrong-variable warning is reported. The bound is not a constant, so nothing
+    // is inferred.
+
+    // H4: `j` is converted to `uint` in the comparison.
+    [MaxIters(2147483647)]
+    for (uint i = 0; j > i + 1u; ++i) {}
+
+    // H5: both operands are `int`.
+    [MaxIters(2147483647)]
+    for (int i = 0; j > i + 1; ++i) {}
 }
