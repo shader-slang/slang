@@ -1,12 +1,10 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST(compute):COMPARE_COMPUTE(targets=cpu+vk,filecheck-buffer=CHECK):-output-using-type
 
-// IR SCCP folds `uint64_t` comparisons as signed (#13978), so `0xFFFFFFFFFFFFFFFFull > 5ull`
-// folds to false. The comparisons below are in ordinary code, which the front end does not fold,
-// so only SCCP folds them. Each store writes 1 when SCCP compares the unsigned operands as
-// unsigned and 2 otherwise. The test stays disabled until SCCP integer folding takes the operand
-// types into account.
+// GitHub issue #13978: IR SCCP folded `uint64_t` comparisons as signed, so
+// `0xFFFFFFFFFFFFFFFFull > 5ull` folded to false. SCCP now compares the operands in their own
+// types. The comparisons below are in ordinary code, which the front end does not fold, so only
+// SCCP folds them. Each store writes 1 when SCCP compares the unsigned operands as unsigned and 2
+// otherwise.
 // `gh-13978-int-compare-folding-ast.slang` covers the same comparison in the front end.
 
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer

@@ -3340,7 +3340,10 @@ public:
 
     IRInst* getBoolValue(bool value);
     IRInst* getIntValue(IRIntegerValue value);
+
+    // Note: Truncates the input to fit into type
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
+
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
     IRBlobLit* getBlobValue(ISlangBlob* blob);
