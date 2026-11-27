@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -emit-spirv-directly -entry main -stage compute -O0
 //TEST:SIMPLE(filecheck=CHECK1): -target spirv-asm -emit-spirv-directly -entry main -stage compute -O1
+//TEST:SIMPLE(filecheck=CHECK1): -target spirv-asm -emit-spirv-directly -entry main -stage compute -O2
+//TEST:SIMPLE(filecheck=CHECK1): -target spirv-asm -emit-spirv-directly -entry main -stage compute -O3
 //TEST:SIMPLE(filecheck=CHECKM): -target spirv-asm -emit-spirv-directly -entry main1 -entry main2 -O0
 //TEST:SIMPLE(filecheck=CHECKV): -target spirv-asm -emit-spirv-directly -entry mainVec -O0
 
@@ -71,19 +73,30 @@ void mainVec(uint3 id : SV_DispatchThreadID)
     gOut[0] = kVec[id.x % 4];
 }
 
+// The `-O2`/`-O3` legs reuse the `CHECK1` patterns: the downstream spirv-opt
+// presets for every level above `-O0` share the same pass list, so all three
+// produce the same demoted single-copy shape.
+//
 // At `-O0` the array is one Private global, stored into exactly once before
-// the first read, with no function-scope copy anywhere in the module.
+// the first read, with no function-scope copy anywhere in the module. The
+// leading and trailing CHECK-NOTs cover every region a function-scope array
+// variable could legally appear in, since SPIR-V places function variables
+// at the top of their function body.
+// CHECK-NOT: OpVariable %_ptr_Function__arr_float_int_8 Function
 // CHECK: %[[TABLE:[0-9]+]] = OpVariable %_ptr_Private__arr_float_int_8 Private
+// CHECK-NOT: OpVariable %_ptr_Function__arr_float_int_8 Function
 // CHECK: OpStore %[[TABLE]]
 // CHECK-NOT: OpStore %[[TABLE]]
 // CHECK: OpAccessChain %_ptr_Private_float %[[TABLE]]
-// ... no Private duplicate and no function-scope copy anywhere else.
 // CHECK-NOT: OpVariable %_ptr_Private__arr_float_int_8 Private
 // CHECK-NOT: OpVariable %_ptr_Function__arr_float_int_8 Function
 
-// After the `-O1` downstream inlining and `private-to-local` demotion, the
-// array has exactly one variable, stored into once, and all reads share it.
+// After the `-O1`..`-O3` downstream inlining and `private-to-local`
+// demotion, the array has exactly one variable, stored into once, and all
+// reads share it.
+// CHECK1-NOT: OpVariable %_ptr_Function__arr_float_int_8 Function
 // CHECK1: %[[T1:[0-9]+]] = OpVariable %_ptr_Function__arr_float_int_8 Function
+// CHECK1-NOT: OpVariable %_ptr_Function__arr_float_int_8 Function
 // CHECK1: OpStore %[[T1]]
 // CHECK1-NOT: OpStore %[[T1]]
 // CHECK1: OpAccessChain %_ptr_Function_float %[[T1]]
@@ -91,7 +104,9 @@ void mainVec(uint3 id : SV_DispatchThreadID)
 
 // Two entry points share one Private global; each entry point's body stores
 // the table into it exactly once.
+// CHECKM-NOT: OpVariable %_ptr_Function__arr_float_int_8 Function
 // CHECKM: %[[TM:[0-9]+]] = OpVariable %_ptr_Private__arr_float_int_8 Private
+// CHECKM-NOT: OpVariable %_ptr_Function__arr_float_int_8 Function
 // CHECKM: OpStore %[[TM]]
 // CHECKM: OpAccessChain %_ptr_Private_float %[[TM]]
 // CHECKM: OpStore %[[TM]]
