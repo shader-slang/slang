@@ -1189,18 +1189,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    // Maps the base of a dynamic-index `getElement` to the variable its reads
+    // load through. Function-scope bases map to a function-scope `IRVar` whose
+    // store is emitted eagerly, right after the base (line ~1292); module-scope
+    // bases map to a shared Private `IRGlobalVar` whose stores are emitted at
+    // the start of every entry point by
+    // `createSharedGlobalVarForModuleValue`. The name predates the
+    // module-scope branch; "array" was already loose for vector and matrix
+    // bases.
     Dictionary<IRInst*, IRInst*> m_mapArrayValueToVar;
-
-    // Module-scope values that `processGetElement` has materialized into a
-    // shared Private global variable, in discovery order. Each entry pairs the
-    // value with its global variable so `insertSharedModuleValueVarInitializers`
-    // can store the value into the variable once per entry point.
-    struct SharedModuleValueVar
-    {
-        IRInst* value;
-        IRGlobalVar* var;
-    };
-    List<SharedModuleValueVar> m_sharedModuleValueVars;
 
     // Cache of `Abort` message struct types, keyed on a tuple type whose element
     // sequence matches the message field types. This keeps identical payload
@@ -1210,7 +1207,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     // Materialize a module-scope value that `processGetElement` reads with a
     // dynamic index into a single Private global variable shared by every read
-    // site.
+    // site, and store the value into it at the start of every module-scope
+    // entry-point definition.
     //
     // Consider a module-scope lookup table:
     //
@@ -1223,28 +1221,27 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     // inlining multiplies read sites, so a table read from N inlined call sites
     // becomes N full copies. A module-scope value cannot change during an
     // invocation — it is a constant, a specialization constant, or an immutable
-    // global parameter — so one Private global initialized by a single store in
-    // each entry point keeps the copies at one per module. This is the same end
-    // state a `static` non-const array already reaches through
-    // `moveGlobalVarInitializationToEntryPoints`. That pass runs before SPIR-V
-    // legalization, so its injection cannot cover variables created here; the
-    // stores are inserted later by `insertSharedModuleValueVarInitializers`.
+    // global parameter — so one Private global keeps the copies at one per
+    // module. This is the same end state a `static` non-const array already
+    // reaches through `moveGlobalVarInitializationToEntryPoints`; that pass runs
+    // before SPIR-V legalization, so it cannot cover variables created here
+    // and the stores are inserted below.
+    //
+    // The stores are emitted eagerly — here, not in a later sweep — so the
+    // stored value stays in the use-def chain. A later step of this pass can
+    // still rewrite the value (for example `processConstructor` normalizes a
+    // general-form module-scope `MakeVector` with `replaceUsesWith`), and an
+    // eagerly emitted store's operand updates with the rest of the uses. A
+    // deferred store holding the value as a raw pointer would miss that
+    // rewrite, because `processGetElement` has already removed the
+    // `getElement`, typically the value's last other use. A shader can only
+    // begin executing at a module-scope entry point, so a store at each entry
+    // point's first instruction dominates every read of its global.
     IRGlobalVar* createSharedGlobalVarForModuleValue(IRBuilder* builder, IRInst* value)
     {
         builder->setInsertBefore(value);
         auto globalVar = builder->createGlobalVar(value->getDataType(), AddressSpace::ThreadLocal);
         m_mapArrayValueToVar.set(value, globalVar);
-        m_sharedModuleValueVars.add({value, globalVar});
-        return globalVar;
-    }
-
-    // Store each shared Private global's module-scope value at the start of every
-    // module-scope entry-point definition. A shader can only begin executing at
-    // such an entry point, so each store dominates every read of its global.
-    void insertSharedModuleValueVarInitializers()
-    {
-        if (m_sharedModuleValueVars.getCount() == 0)
-            return;
         for (auto globalInst : m_module->getGlobalInsts())
         {
             auto func = as<IRFunc>(globalInst);
@@ -1252,16 +1249,20 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 continue;
             if (!func->findDecoration<IREntryPointDecoration>())
                 continue;
-            IRBuilder builder(m_module);
-            builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
-            for (auto sharedVar : m_sharedModuleValueVars)
-                builder.emitStore(sharedVar.var, sharedVar.value);
+            IRBuilder funcBuilder(m_module);
+            funcBuilder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+            funcBuilder.emitStore(globalVar, value);
         }
+        return globalVar;
     }
 
-    // Replace getElement(x, i) with, y = store(x); p = getElementPtr(y, i); load(p),
-    // when i is not a constant. SPIR-V has no support for dynamic indexing into values like we do.
-    // It may be advantageous however to do this further up the pipeline
+    // Replace a dynamic-index `getElement(x, i)` with a load through a variable:
+    // p = getElementPtr(y, i); load(p). For a function-scope `x`, `y` is a
+    // function-scope variable stored once right after `x`; for a module-scope
+    // `x`, `y` is a shared Private global whose stores land at the start of
+    // every entry point (see `createSharedGlobalVarForModuleValue`). SPIR-V has
+    // no support for dynamic indexing into values like we do. It may be
+    // advantageous however to do this further up the pipeline.
     void processGetElement(IRGetElement* inst)
     {
         IRInst* x = nullptr;
@@ -3120,11 +3121,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 sortBlocksInFunc(func);
             }
         }
-
-        // The shared Private globals that `processGetElement` created for
-        // module-scope values receive their value here, once entry points have
-        // been legalized, so each store lands in the final entry-point body.
-        insertSharedModuleValueVarInitializers();
 
         GlobalInstInliningContext().inlineGlobalValuesAndRemoveIfUnused(m_module);
 
