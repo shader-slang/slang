@@ -9601,6 +9601,7 @@ static DeclRef<ExtensionDecl> extendContainerDecl(
     auto funcAsType = DeclRefType::create(astBuilder, decl->getDefaultDeclRef());
 
     auto extensionDecl = astBuilder->create<ExtensionDecl>();
+    extensionDecl->isAttributeExtension = true;
     extensionDecl->parentDecl = decl;
     extensionDecl->loc = synthesizedLoc;
     extensionDecl->nameAndLoc.loc = synthesizedLoc;
@@ -19465,6 +19466,16 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
             {
                 _addCandidateExtensionsFromModule(moduleDecl);
             }
+
+            // Consider a library declaring `[Differentiable] float Operations.square(float x)`
+            // and a facade that imports the library and exposes an Operations field. A caller
+            // importing only the facade can find square through that field's type. Its generated
+            // fwd_diff/apply_bwd extensions must be discoverable too, even though the library's
+            // ordinary names and handwritten extensions are not imported into the caller.
+            for (auto moduleDecl : _getTransitiveOnlyModuleDependencies())
+            {
+                _addCandidateExtensionsFromModule(moduleDecl, true);
+            }
         }
         else
         {
@@ -19597,12 +19608,36 @@ void SharedSemanticsContext::registerSynthesizedDeclRoot(Decl* decl)
         m_synthesizedDeclRoots.add(decl);
 }
 
-void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
+List<ModuleDecl*> SharedSemanticsContext::_getTransitiveOnlyModuleDependencies()
+{
+    // `getModuleDependencies` already holds the transitive closure of the primary module's
+    // imports. We skip the primary module, the core modules, and the modules it imports directly
+    // or through `__exported import`, because callers include everything from those modules.
+    SLANG_ASSERT(m_module);
+    List<ModuleDecl*> result;
+    for (auto dependency : m_module->getModuleDependencies())
+    {
+        auto moduleDecl = dependency->getModuleDecl();
+        if (dependency == m_module || importedModulesSet.contains(moduleDecl) ||
+            getSession()->coreModules.contains(dependency))
+            continue;
+        result.add(moduleDecl);
+    }
+    return result;
+}
+
+void SharedSemanticsContext::_addCandidateExtensionsFromModule(
+    ModuleDecl* moduleDecl,
+    bool onlyAttributeExtensions)
 {
     for (auto& [entryKey, entryValue] : moduleDecl->mapDeclToCandidateExtensions)
     {
         auto& list = _getCandidateExtensionList(entryKey, m_mapDeclToCandidateExtensions);
-        list.addRange(entryValue->candidateExtensions);
+        for (auto extension : entryValue->candidateExtensions)
+        {
+            if (!onlyAttributeExtensions || extension->isAttributeExtension)
+                list.add(extension);
+        }
     }
 }
 
@@ -19665,6 +19700,17 @@ List<RefPtr<DeclAssociation>> const& SharedSemanticsContext::getAssociatedDeclsF
         {
             _addDeclAssociationsFromModule(m_module->getModuleDecl());
             for (auto moduleDecl : this->importedModulesList)
+            {
+                _addDeclAssociationsFromModule(moduleDecl);
+            }
+
+            // Associations are recorded only by derivative attributes such as
+            // `[BackwardDerivativeOf(primal)]`, so they follow the same transitive imports as the
+            // attribute-generated extensions in `getCandidateExtensionsForTypeDecl`. Otherwise a
+            // caller that reaches `primal` through a facade would find its derivative extension
+            // but miss the association, and with it the derivative's `[require]` capabilities at
+            // the differentiation use-site.
+            for (auto moduleDecl : _getTransitiveOnlyModuleDependencies())
             {
                 _addDeclAssociationsFromModule(moduleDecl);
             }
@@ -21250,6 +21296,7 @@ static void translateFwdDerivativeAttributeToAD2(
     //
     auto astBuilder = visitor->getASTBuilder();
     auto fwdDiffExtension = astBuilder->create<ExtensionDecl>();
+    fwdDiffExtension->isAttributeExtension = true;
     auto funcAsType = DeclRefType::create(astBuilder, primalDeclRef);
     auto userDefinedFwdDiffFunc = as<DeclRefExpr>(attr->funcExpr)->declRef.as<CallableDecl>();
     auto visibility = getMoreRestrictiveVisibility(
