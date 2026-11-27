@@ -3482,6 +3482,57 @@ ${
 
 $}
 
+// The `*` shapes below have no element-wise meaning: a matrix against a vector, or two
+// matrices of different shapes. A call with those operands would otherwise fail overload
+// resolution with a plain "no overload" error and a long list of unrelated candidate notes.
+// These fallback declarations cover those shapes at a low overload rank, and carry
+// `[__diagnoseOnUse]`, so referencing one is an error that names the `mul` spelling:
+//
+//     float4x4 m; float4 v;
+//     float4 r = m * v; // error: use of '*' is an error: '*' does not define a
+//                       // matrix-vector product in Slang; use 'mul(m, v)' instead.
+//
+// A fallback is only ever *selected* for the invalid shapes: overload comparison ranks the
+// per-argument conversion cost ahead of overload rank, so a real overload whose parameters
+// fit the operands exactly — and a scalar operand reaches the real scalar-broadcast
+// overloads at zero cost — wins before the rank tie-break is ever consulted. The rank of
+// -10 then loses every remaining tie: to the rank-10 generic forms, to the per-type forms
+// (which carry no `[OverloadRank]` and therefore default to rank 0), and to the glsl
+// module's rank-15 algebraic products in GLSL operator scope. The mixed-shape declaration
+// also applies to same-shape products, where it loses that same tie and the element-wise
+// result stands.
+//
+// The `__BuiltinArithmeticType` constraint mirrors the generic real overloads' element
+// family. It keeps the hint to the arithmetic element families; the logical family keeps
+// the old error even though `mul` has logical-element variants, because a logical-element
+// fallback family would need its own review of the generic-body interactions below. The
+// constraint is also what keeps the fallbacks out of generic bodies with narrowly
+// constrained element parameters (for example the stdlib's
+// `__BuiltinFloatingPointType`-constrained matrix generics): a fallback constrained to one
+// of those narrower families is selected for `matrix * scalar` calls inside such bodies
+// and takes over resolutions the real overloads should win — building the core module with
+// these fallbacks narrowed to `__BuiltinFloatingPointType` fails exactly at the module's
+// own `radians` and `__smoothstep_impl` matrix generics — so the constraint must match the
+// real family rather than narrow it.
+//
+// The declarations have no body: there is no element-wise `matrix * vector` to lower, and
+// the algebraic product belongs to `mul`; the only purpose of these declarations is to be
+// selected by resolution when nothing real applies, and report the error.
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[OverloadRank(-10)]
+[__diagnoseOnUse("'*' does not define a matrix-vector product in Slang; use 'mul(m, v)' instead.")]
+vector<T,N> operator*(matrix<T,N,M> m, vector<T,M> v);
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[OverloadRank(-10)]
+[__diagnoseOnUse("'*' does not define a vector-matrix product in Slang; use 'mul(v, m)' instead.")]
+vector<T,M> operator*(vector<T,N> v, matrix<T,N,M> m);
+
+__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int>
+[OverloadRank(-10)]
+[__diagnoseOnUse("'*' is element-wise and requires same-shape matrices; use 'mul(m1, m2)' for the matrix product.")]
+matrix<T,R,C> operator*(matrix<T,R,N> m1, matrix<T,N,C> m2);
+
 //@ public:
 
 
@@ -5106,6 +5157,24 @@ attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;
 /// @see `[deprecated]`.
 __attributeTarget(DeclBase)
 attribute_syntax [RemovedSince(languageVersion: int, message: String)] : RemovedSinceAttribute;
+
+/// Mark a declaration so that referencing it is an error that reports `message`.
+/// @param message The diagnostic message to show when the declaration is referenced.
+///
+/// Unlike `[deprecated]` (a warning) and `[RemovedSince]` (an error tied to a language
+/// version), this attribute does not depend on the module's language version: the error
+/// applies at any reference. If an overload carrying this attribute is the one a call
+/// resolves to, the call is an error; overloads that lose resolution report nothing.
+/// A constructor reached through a multi-argument type call such as `LegacyGrid(1, 2)`
+/// counts as a reference to the `__init` declaration that carries the attribute, while a
+/// single-argument construction is an explicit coercion and is not diagnosed. A declaration
+/// that also carries `[RemovedSince]` reports the removal error instead once the module's
+/// language version reaches the removal version.
+///
+/// @internal The spelling is reserved for the standard library's own declarations; a
+/// public spelling can be introduced later without breaking code that uses this one.
+__attributeTarget(DeclBase)
+attribute_syntax [__diagnoseOnUse(message: String)] : DiagnoseOnUseAttribute;
 
 /// Controls the behavior of the compiler when a differentiable function is detected to have side-effects.
 /// @category misc_types

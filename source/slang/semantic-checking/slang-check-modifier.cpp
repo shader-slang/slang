@@ -1251,7 +1251,18 @@ Modifier* SemanticsVisitor::validateAttribute(
     }
     else if (auto deprecatedAttr = as<DeprecatedAttribute>(attr))
     {
-        SLANG_ASSERT(attr->args.getCount() == 1);
+        // A surplus argument is user-reachable (the generic argument/parameter matching
+        // only diagnoses a too-small list), so the count is checked rather than asserted.
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
 
         String message;
         if (!checkLiteralStringVal(attr->args[0], &message))
@@ -1263,7 +1274,16 @@ Modifier* SemanticsVisitor::validateAttribute(
     }
     else if (auto removedSinceAttr = as<RemovedSinceAttribute>(attr))
     {
-        SLANG_ASSERT(attr->args.getCount() == 2);
+        auto argCount = attr->args.getCount();
+        if (argCount != 2)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "2",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
 
         auto sinceVersion = checkConstantIntVal(attr->args[0]);
         if (sinceVersion == nullptr)
@@ -1290,6 +1310,32 @@ Modifier* SemanticsVisitor::validateAttribute(
 
         removedSinceAttr->sinceVersion = int32_t(sinceVersion->getValue());
         removedSinceAttr->message = message;
+    }
+    else if (auto diagnoseOnUseAttr = as<DiagnoseOnUseAttribute>(attr))
+    {
+        // A surplus argument is user-reachable (the generic argument/parameter matching
+        // only diagnoses a too-small list), so the count is checked rather than asserted:
+        // an assert aborts debug builds on the surplus case, while a release build
+        // compiles it out and silently proceeds — for a branch that indexes `args[0]`,
+        // toward an unchecked read whenever the list is shorter than the branch assumes.
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+
+        String message;
+        if (!checkLiteralStringVal(attr->args[0], &message))
+        {
+            return nullptr;
+        }
+
+        diagnoseOnUseAttr->message = message;
     }
     else if (auto knownBuiltinAttr = as<KnownBuiltinAttribute>(attr))
     {

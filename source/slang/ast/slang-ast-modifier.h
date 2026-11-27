@@ -2169,6 +2169,24 @@ class RemovedSinceAttribute : public Attribute
     FIDDLE() String message;
 };
 
+/// A `[__diagnoseOnUse("message")]` attribute indicates that any reference to
+/// the target declaration is an error that reports the given message. In
+/// particular, an overload-resolution candidate carrying this attribute can be
+/// selected as the winner (when no real overload applies), and materializing
+/// that reference reports the error. A constructor selected through a
+/// multi-argument type call such as `LegacyGrid(1, 2)` is materialized as a
+/// reference to the `__init` declaration, so the attribute is diagnosed when
+/// the `__init` carries it; only a single-argument construction is an explicit
+/// coercion, which routes through `coerce()` instead of declaration reference
+/// checking and so bypasses this check.
+///
+FIDDLE()
+class DiagnoseOnUseAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() String message;
+};
+
 FIDDLE()
 class NonCopyableTypeAttribute : public Attribute
 {

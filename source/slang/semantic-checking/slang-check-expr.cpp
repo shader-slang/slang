@@ -386,13 +386,18 @@ ContainerDecl* isStaticScopeDecl(Decl* decl)
     return nullptr;
 }
 
-void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
+void SemanticsVisitor::diagnoseUsageAttrDeclRefUsage(
     DeclRef<Decl> declRef,
     SourceLoc loc,
     Expr* originalExpr)
 {
-    // Usage attributes depend on the language version of the module being checked.
-    // We first look for that module in the current lexical scope.
+    // Usage attributes depend on the language version of the module being checked
+    // (`[RemovedSince]` only applies once the version reaches the removal version;
+    // `[deprecated]` reports its warning version-independently, and so does
+    // `[__diagnoseOnUse]`). We first look for that module in the current lexical
+    // scope; a query with no module context reports nothing for any of the three.
+    // The version-independent `[__diagnoseOnUse]` check shares this gate deliberately,
+    // so that all three attributes are enforced through this one code path.
     ModuleDecl* moduleDecl = getModuleDecl(getOuterScope());
 
     // Some semantic queries run outside a lexical module scope. We then try the module
@@ -459,6 +464,24 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
 
             return;
         }
+    }
+
+    // A `[__diagnoseOnUse]` declaration is a reference error that does not depend on the
+    // module's language version. The three usage attributes are checked in a fixed order,
+    // and the first one that applies wins: a removed declaration reports its removal error,
+    // then this attribute reports its error, and only a declaration carrying none of the
+    // first two falls through to the deprecation warning. This is also the path that turns
+    // a diagnostic-carrying fallback overload into an error: overload resolution selects it
+    // as the chosen candidate only when no real overload applies, and the reference it then
+    // materializes flows through this check.
+    if (auto diagnoseOnUseAttr = declRef.getDecl()->findModifier<DiagnoseOnUseAttribute>())
+    {
+        getSink()->diagnose(Diagnostics::DiagnoseOnUse{
+            .decl = declRef.getDecl(),
+            .message = diagnoseOnUseAttr->message,
+            .location = loc});
+
+        return;
     }
 
     // If the declaration has not been removed in this language version, we report deprecation
@@ -547,7 +570,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     // We report deprecation or removal at this use's location before constructing its
     // checked expression. For a uniform shadow, we check the parameter selected above.
     if (getSink())
-        diagnoseDeprecatedAndRemovedDeclRefUsage(declRefForUsageDiagnostics, loc, originalExpr);
+        diagnoseUsageAttrDeclRefUsage(declRefForUsageDiagnostics, loc, originalExpr);
 
     // We now choose the expression kind. A reference without a base becomes a `VarExpr`.
     // With a base, we distinguish static member references from instance member accesses.
