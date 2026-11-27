@@ -2673,17 +2673,6 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.lateRequireCapability)
         SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
 
-    // E41037 is reported here, after the final DCE; see `specializeTargetSwitch` for why.
-    // `NoTargetCaseDecoration` is only added at link time, before the last
-    // `calcRequiredLoweringPassSet` scan, so the `missingReturn` flag covers it. We stop on an
-    // error because the remaining passes would lower code that cannot be generated.
-    if (requiredLoweringPassSet.missingReturn)
-    {
-        SLANG_PASS(diagnoseRemainingNoTargetCases, target, sink);
-        if (sink->getErrorCount() != 0)
-            return SLANG_FAIL;
-    }
-
     SLANG_PASS(cleanUpVoidType);
 
     if (isKhronosTarget(targetRequest))
@@ -2859,6 +2848,19 @@ Result linkAndOptimizeIR(
     // Legalization keeps a void placeholder for `differential` to preserve field positions.
     // The earlier void cleanup has already run, so remove these new placeholders before emit.
     SLANG_PASS(cleanUpVoidType);
+
+    // E41037 is reported here, after the last force-inlining and full simplifyIR passes, so that
+    // only functions that will actually be emitted are diagnosed; the passes that remain inline
+    // only compiler-synthesized helpers. `specializeTargetSwitch` explains why the report cannot
+    // run at link time. `NoTargetCaseDecoration` is only added at link time, before the last
+    // `calcRequiredLoweringPassSet` scan, so the `missingReturn` flag covers it. We stop on an
+    // error because emission would otherwise print a function that falls off its end.
+    if (requiredLoweringPassSet.missingReturn)
+    {
+        SLANG_PASS(diagnoseRemainingNoTargetCases, target, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
 
     // Most targets need block parameters lowered to explicit temporary variables before emission.
     // Direct SPIR-V retains scalar and composite parameters so their incoming values remain

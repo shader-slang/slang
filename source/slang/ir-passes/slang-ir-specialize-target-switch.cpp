@@ -86,6 +86,9 @@ void specializeTargetSwitch(
                     });
                 }
                 auto missingReturn = builder.emitMissingReturn();
+                // The location serves both the late E41037 and the early missing-return check on
+                // targets that run it, so both diagnostics point at the switch instead of an
+                // unset location.
                 missingReturn->sourceLoc = targetSwitch->sourceLoc;
                 // A value-returning function that falls off its end is undefined behavior once
                 // emitted, so the switch is reported as E41037 later, if its code is still
