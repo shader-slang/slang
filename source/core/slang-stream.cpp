@@ -130,10 +130,15 @@ SlangResult FileStream::_init(
 
     if (File::exists(fileName))
     {
-        // Check that the path exists and is a file; not a directory.
+        // We never open a directory as a file. `Open` mode also requires a regular file, because
+        // readers size a file by seeking to its end, and opening a FIFO for reading blocks until a
+        // writer appears (`File::writeAllTextIfChanged` relies on its read-back failing fast).
+        // In `Create` and `Append` modes, an existing FIFO or device is left to the platform.
         SlangPathType pathType;
-        SLANG_RETURN_ON_FAIL(Path::getPathType(fileName, &pathType));
-        if (pathType != SLANG_PATH_TYPE_FILE)
+        const bool isClassified = SLANG_SUCCEEDED(Path::getPathType(fileName, &pathType));
+        const bool isDirectory = isClassified && pathType == SLANG_PATH_TYPE_DIRECTORY;
+        const bool isRegularFile = isClassified && pathType == SLANG_PATH_TYPE_FILE;
+        if (isDirectory || (fileMode == FileMode::Open && !isRegularFile))
         {
             return SLANG_E_CANNOT_OPEN;
         }
