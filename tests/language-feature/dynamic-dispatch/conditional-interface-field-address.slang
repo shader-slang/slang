@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // A late-instantiated generic reader reaches the Conditional field through a
 // pointer (a local copy), with an unrolled loop in the entry point forcing a
 // second specialization iteration — so the reader runs in a fresh typeflow

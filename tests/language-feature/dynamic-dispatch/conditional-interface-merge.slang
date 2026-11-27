@@ -7,7 +7,7 @@
 
 //TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputs
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputs
 RWStructuredBuffer<uint> outputs;
 
 interface IValue
@@ -146,5 +146,14 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     {
         outputs[16] = read(present);
     }
+    // CHECK: 9
+
+    // Two direct stores of distinct single impls into the same variable, with
+    // a read between them: the second store widens the payload set.
+    Conditional<IValue, true> direct = Conditional<IValue, true>(Small(tid.x));
+    outputs[17] = read(direct);
+    // CHECK: 10
+    direct = Conditional<IValue, true>(Large(uint4(tid.x, 2, 3, 4)));
+    outputs[18] = read(direct);
     // CHECK: 9
 }

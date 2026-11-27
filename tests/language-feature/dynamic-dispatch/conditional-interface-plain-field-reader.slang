@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Plain-interface-field variant of the late-reader test: the field is a bare
 // IValue (no Conditional), and a late-instantiated generic reader must reuse
 // the refined field type instead of re-widening from globally available

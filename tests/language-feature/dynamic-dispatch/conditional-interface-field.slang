@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Storing an interface value in a `Conditional` struct field must behave like
-// a plain interface field: retain the selected implementation and dispatch on it.
+// a plain interface field for module-stored values: retain the selected
+// implementation and dispatch on it. (The never-stored shape — e.g. a
+// Conditional field loaded from resource memory with no in-module store — is
+// out of this parity's scope: the payload takes the generic existential path,
+// which is correct but stays dynamic.)
 
 //TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 

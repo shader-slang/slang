@@ -30,14 +30,14 @@ typealias TupleWithInterface = Tuple<IFoo, float>;
 
 float processTupleRef(__ref TupleWithInterface t)
 //CHECK:                                       ^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                       ^ '__ref' parameter of type '' cannot be used in a dynamic dispatch context.
+//CHECK:                                       ^ '__ref' parameter of type 'Tuple<IFoo, float>' cannot be used in a dynamic dispatch context.
 {
     return t._0.getValue();
 }
 
 float processTupleConstref(__constref TupleWithInterface t)
 //CHECK:                                                 ^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                                 ^ '__constref' parameter of type '' cannot be used in a dynamic dispatch context.
+//CHECK:                                                 ^ '__constref' parameter of type 'Tuple<IFoo, float>' cannot be used in a dynamic dispatch context.
 {
     return t._0.getValue() + t._1;
 }
@@ -66,7 +66,7 @@ typealias NestedCompound = Tuple<Optional<IFoo>, int>;
 
 float processNestedRef(__ref NestedCompound nc)
 //CHECK:                                    ^^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                    ^^ '__ref' parameter of type '' cannot be used in a dynamic dispatch context.
+//CHECK:                                    ^^ '__ref' parameter of type 'Tuple<Optional<IFoo>, int>' cannot be used in a dynamic dispatch context.
 {
     if (nc._0.hasValue)
         return nc._0.value.getValue();

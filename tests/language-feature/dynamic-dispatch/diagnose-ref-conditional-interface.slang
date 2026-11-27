@@ -49,6 +49,17 @@ float processDisabledRef(__ref Conditional<IFoo, false> c)
     return 1.0;
 }
 
+// Scenario 4: generic flag — instantiating with a literal-true flag produces the
+// same rejection (a non-literal flag counts as potentially-true).
+float processGenericRef<let E : bool>(__ref Conditional<IFoo, E> c)
+//CHECK:                                                         ^ ref parameter incompatible with dynamic dispatch
+//CHECK:                                                         ^ '__ref' parameter of type 'Conditional<IFoo, true>' cannot be used in a dynamic dispatch context.
+{
+    if (let member = c.get())
+        return member.getValue();
+    return 0.0;
+}
+
 IFoo factory(uint id)
 {
     if (id == 0)
@@ -67,4 +78,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     Conditional<IFoo, false> disabled;
     outputBuffer[2] = processDisabledRef(disabled);
+
+    outputBuffer[3] = processGenericRef<true>(enabled);
 }
