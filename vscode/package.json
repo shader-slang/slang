@@ -1,0 +1,258 @@
+{
+    "name": "slang-language-extension",
+    "displayName": "Slang",
+    "description": "Extension for the Slang Shading Language",
+    "publisher": "shader-slang",
+    "version": "2.0.1",
+    "icon": "./images/icon.png",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "keywords": [
+        "shader",
+        "shading",
+        "hlsl",
+        "slang",
+        "highlight",
+        "completion",
+        "hinting",
+        "formatting"
+    ],
+    "categories": [
+        "Programming Languages",
+        "Formatters"
+    ],
+    "activationEvents": [
+        "onLanguage:slang"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/shader-slang/slang-vscode-extension"
+    },
+    "main": "./client/dist/nativeClientMain",
+    "browser": "./client/dist/browserClientMain",
+    "contributes": {
+        "commands": [
+            {
+                "command": "slang.compile",
+                "title": "Slang Compile",
+                "category": "Slang",
+                "enablement": "editorLangId == slang",
+                "icon": "$(tools)"
+            },
+            {
+                "command": "slang.playgroundRun",
+                "title": "Run Playground",
+                "category": "Slang",
+                "enablement": "editorLangId == slang",
+                "icon": "$(run)"
+            },
+            {
+                "command": "slang.reflection",
+                "title": "Show Reflection",
+                "category": "Slang",
+                "enablement": "editorLangId == slang",
+                "icon": "$(search)"
+            },
+            {
+                "command": "slang.playgroundDocumentation",
+                "title": "Show Playground Documentation",
+                "category": "Slang"
+            }
+        ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "slang.compile",
+                    "when": "resourceLangId == slang",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "slang.playgroundRun",
+                    "when": "resourceLangId == slang && isPlaygroundFile == true",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "slang.reflection",
+                    "when": "resourceLangId == slang",
+                    "group": "navigation@3"
+                }
+            ]
+        },
+        "languages": [
+            {
+                "id": "slang",
+                "aliases": [
+                    "Slang",
+                    "slang",
+                    "hlsl"
+                ],
+                "extensions": [
+                    ".slang",
+                    ".slangh",
+                    ".hlsl",
+                    ".usf",
+                    ".ush",
+                    ".vfx",
+                    ".fxc"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "configurationDefaults": {
+            "[slang]": {
+                "editor.wordBasedSuggestions": "off",
+                "editor.formatOnType": true,
+                "editor.formatOnPaste": true,
+                "editor.inlayHints.enabled": "offUnlessPressed"
+            }
+        },
+        "grammars": [
+            {
+                "language": "slang",
+                "scopeName": "source.slang",
+                "path": "./syntaxes/slang.tmLanguage.json"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Slang/HLSL",
+            "properties": {
+                "slang.predefinedMacros": {
+                    "scope": "window",
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "examples": [["MY_MACRO", "MY_VALUE_MACRO=1"]],
+                    "default": [],
+                    "markdownDescription": "Predefined macros to use in the language server. Each item contains one macro definition. You can also use `macro_name=value` syntax to specify the value of the macro."
+                },
+                "slang.searchInAllWorkspaceDirectories": {
+                    "scope": "window",
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Controls whether or not the language server should look in all sub-directories in the current workspace for an include or imported file if it is not found in the explicitly specified search paths."
+                },
+                "slang.additionalSearchPaths": {
+                    "scope": "window",
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "examples": [["include/", "c:\\external-lib\\include"]],
+                    "default": [],
+                    "description": "The language server will search for the included or imported file in these additional directories first. If not found, the server will look in all sub directories in the current workspace (if enabled by the setting)."
+                },
+                "slang.enableCommitCharactersInAutoCompletion": {
+                    "scope": "window",
+                    "type": "string",
+                    "enum": [
+                        "off",
+                        "membersOnly",
+                        "on"
+                    ],
+                    "default": "membersOnly",
+                    "markdownDescription": "Controls whether or not to enable commit characters for selecting an auto completion item in addition to pressing enter. 'off' - disabled. 'memberOnly' - use commit characters in a member list only. 'on' - use commit characters for all types of completions."
+                },
+                "slang.format.enableFormatOnType": {
+                    "scope": "window",
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Controls whether or not to format code automatically while typing. Requires clang-format to be discoverable from PATH."
+                },
+                "slang.format.clangFormatLocation": {
+                    "scope": "machine-overridable",
+                    "type": "string",
+                    "default": "",
+                    "markdownDescription": "The location of clang-format for auto formatting, including the executable name. If left unspecified, will attempt to find `clang-format` under `PATH`, or under the C++ extension installation path."
+                },
+                "slang.slangdLocation": {
+                    "scope": "machine-overridable",
+                    "type": "string",
+                    "markdownDescription": "The location of Slang's language server executable `slangd`. If left unspecified, will use bundled language server if present, otherwise will attempt to find `slangd` under `PATH`."
+                },
+                "slang.format.clangFormatStyle": {
+                    "scope": "window",
+                    "type": "string",
+                    "default": "file",
+                    "markdownDescription": "The `-style` argument to pass to clang-format, without quotes. Examples: `Microsoft`, `LLVM`, `file:fileName`. Default value is `file`"
+                },
+                "slang.format.clangFormatFallbackStyle": {
+                    "scope": "window",
+                    "type": "string",
+                    "default": "{BasedOnStyle: Microsoft, BreakBeforeBraces: Allman, ColumnLimit: 0}",
+                    "markdownDescription": "The `-fallback-style` argument to pass to clang-format, without quotes. Examples: `Microsoft`, `LLVM`, `file:fileName`. Default value is `{BasedOnStyle: Microsoft, BreakBeforeBraces: Allman, ColumnLimit: 0}`"
+                },
+                "slang.format.allowLineBreakChangesInOnTypeFormatting":
+                {
+                    "scope": "window",
+                    "type": "boolean",
+                    "default": false,
+                    "markdownDescription": "Controls whether the extension is allowed to make line-break changes when reformatting the code on typing."
+                },
+                "slang.format.allowLineBreakChangesInRangeFormatting": {
+                    "scope": "window",
+                    "type": "boolean",
+                    "default": false,
+                    "markdownDescription": "Controls whether the extension is allowed to make line-break changes when doing range formatting, such as formatting on paste or on command."
+                },
+                "slang.inlayHints.deducedTypes": {
+                    "scope": "window",
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Enable inlay hints for duduced decl types, e.g. the deduced type in `var i = 2`"
+                },
+                "slang.inlayHints.parameterNames": {
+                    "scope": "window",
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable inlay hints for parameter names at call sites."
+                },
+                "slangLanguageServer.trace.server": {
+                    "scope": "window",
+                    "type": "string",
+                    "enum": [
+                        "off",
+                        "messages",
+                        "verbose"
+                    ],
+                    "default": "off",
+                    "description": "Traces the communication between VS Code and the language server."
+                }
+            }
+        },
+        "keybindings": [
+            {
+                "command": "slang.compile",
+                "key": "ctrl+shift+b",
+                "when": "editorLangId == slang"
+            },
+            {
+                "command": "slang.playgroundRun",
+                "key": "ctrl+shift+r",
+                "when": "editorLangId == slang"
+            }
+        ]
+    },
+    "workspaces": [
+        "client",
+        "server",
+        "uniform_webview",
+        "webview",
+        "external/slang-playground/engine/*"
+    ],
+    "scripts": {
+        "preinstall": "npm --prefix ./external/slang-playground run build-engine",
+        "vscode:prepublish": "npm run compile",
+        "compile": "node esbuild.config.mjs",
+        "watch": "esbuild --config=esbuild.config.mjs --watch",
+        "package": "node esbuild.config.mjs",
+        "chrome": "npm run compile && vscode-test-web --browserType=chromium --browserOption=--enable-unsafe-webgpu --extensionDevelopmentPath=. ./test-data"
+    },
+    "devDependencies": {
+        "@types/node": "^24.0.8",
+        "@vscode/test-web": "^0.0.70",
+        "esbuild": "^0.25.5",
+        "esbuild-plugin-vue3": "^0.4.2",
+        "eslint": "^9.29.0",
+        "path-browserify": "^1.0.1",
+        "typescript": "^5.8.2"
+    }
+}
