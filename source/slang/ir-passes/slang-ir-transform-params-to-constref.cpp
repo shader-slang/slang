@@ -291,7 +291,7 @@ struct TransformParamsToConstRefContext
 
             // Skip functions with CudaDeviceExport decoration.
             // These functions have externally visible signatures that should not be changed.
-            if (func->findDecorationImpl(kIROp_CudaDeviceExportDecoration))
+            if (decoration->getOp() == kIROp_CudaDeviceExportDecoration)
                 return false;
         }
 
