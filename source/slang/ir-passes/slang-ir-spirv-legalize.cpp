@@ -1194,9 +1194,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     // store is emitted eagerly, right after the base, in `processGetElement`'s
     // function-scope branch. Module-scope bases map to a shared Private
     // `IRGlobalVar` whose stores are emitted at the start of every entry point
-    // by `createSharedGlobalVarForModuleValue`. The name predates the
-    // module-scope branch; "array" was already loose for vector and matrix
-    // bases.
+    // by `createSharedGlobalVarForModuleValue`. The "array" in the name is
+    // historical; the keys include vector and matrix bases.
     Dictionary<IRInst*, IRInst*> m_mapArrayValueToVar;
 
     // Cache of `Abort` message struct types, keyed on a tuple type whose element
@@ -1204,6 +1203,33 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     // signatures on one nominal struct type instead of bloating the module with
     // a fresh struct type per call site.
     Dictionary<IRTupleType*, IRStructType*> m_abortMessageTypes;
+
+    // Result of the one-time scan for a defined module-scope entry point, used
+    // to decide whether the shared-global strategy is available (see
+    // `createSharedGlobalVarForModuleValue`).
+    bool m_hasCheckedModuleEntryPointDefinition = false;
+    bool m_hasModuleEntryPointDefinition = false;
+
+    // Return whether the module contains at least one module-scope entry-point
+    // definition with a body. The set of entry points is fixed while the
+    // worklist drains, so the scan runs once.
+    bool hasModuleEntryPointDefinition()
+    {
+        if (m_hasCheckedModuleEntryPointDefinition)
+            return m_hasModuleEntryPointDefinition;
+        m_hasCheckedModuleEntryPointDefinition = true;
+        m_hasModuleEntryPointDefinition = false;
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (func && func->getFirstBlock() && func->findDecoration<IREntryPointDecoration>())
+            {
+                m_hasModuleEntryPointDefinition = true;
+                break;
+            }
+        }
+        return m_hasModuleEntryPointDefinition;
+    }
 
     // Materialize a module-scope value that `processGetElement` reads with a
     // dynamic index into a single Private global variable shared by every read
@@ -1225,7 +1251,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     // module. This is the same end state a `static` non-const array already
     // reaches through `moveGlobalVarInitializationToEntryPoints`; that pass runs
     // before SPIR-V legalization, so it cannot cover variables created here
-    // and the stores are inserted below.
+    // and the stores are inserted below. Like that pass, the store lands in
+    // every entry point whether or not its call tree reads the value, so a
+    // multi-entry-point compile at `-O0` carries one full-value store per entry
+    // point; at `-O1` and above, downstream inlining plus `private-to-local`
+    // demotion collapses the global into a single entry-point-local copy.
     //
     // The stores are emitted eagerly — here, not in a later sweep — so the
     // stored value stays in the use-def chain. A later step of this pass can
@@ -1234,13 +1264,23 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     // eagerly emitted store's operand updates with the rest of the uses. A
     // deferred store holding the value as a raw pointer would miss that
     // rewrite, because `processGetElement` has already removed the
-    // `getElement`, typically the value's last other use. A shader can only
-    // begin executing at a module-scope entry point, so a store at each entry
-    // point's first instruction dominates every read of its global.
+    // `getElement`, typically the value's last other use. The same eager
+    // emission lets one builder serve both insertion scopes: the module scope
+    // for the variable and each entry point's body for its store. A shader can
+    // only begin executing at a module-scope entry point, so a store at each
+    // entry point's first instruction dominates every read of its global —
+    // which is why this strategy is only taken when the module has a defined
+    // entry point (`hasModuleEntryPointDefinition`); a precompiled-library
+    // compile has none, and its reads keep the self-contained per-read-site
+    // copy instead.
     IRGlobalVar* createSharedGlobalVarForModuleValue(IRBuilder* builder, IRInst* value)
     {
         builder->setInsertBefore(value);
+        // `AddressSpace::ThreadLocal` is what the SPIR-V emitter maps to the
+        // Private storage class.
         auto globalVar = builder->createGlobalVar(value->getDataType(), AddressSpace::ThreadLocal);
+        if (auto nameHint = value->findDecoration<IRNameHintDecoration>())
+            builder->addNameHintDecoration(globalVar, nameHint->getName());
         m_mapArrayValueToVar.set(value, globalVar);
         for (auto globalInst : m_module->getGlobalInsts())
         {
@@ -1249,9 +1289,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 continue;
             if (!func->findDecoration<IREntryPointDecoration>())
                 continue;
-            IRBuilder funcBuilder(m_module);
-            funcBuilder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
-            funcBuilder.emitStore(globalVar, value);
+            builder->setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+            builder->emitStore(globalVar, value);
         }
         return globalVar;
     }
@@ -1261,8 +1300,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     // function-scope variable stored once right after `x`; for a module-scope
     // `x`, `y` is a shared Private global whose stores land at the start of
     // every entry point (see `createSharedGlobalVarForModuleValue`). SPIR-V has
-    // no support for dynamic indexing into values like we do. It may be
-    // advantageous however to do this further up the pipeline.
+    // no support for dynamic indexing into values, and loading through memory
+    // is a target-specific requirement rather than a language-level one, so
+    // this rewrite lives here in SPIR-V legalization rather than further up
+    // the pipeline.
     void processGetElement(IRGetElement* inst)
     {
         IRInst* x = nullptr;
@@ -1284,16 +1325,24 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(inst);
         if (!m_mapArrayValueToVar.tryGetValue(x, y))
         {
-            if (x->getParent()->getOp() == kIROp_ModuleInst)
+            if (x->getParent()->getOp() == kIROp_ModuleInst && hasModuleEntryPointDefinition())
             {
                 y = createSharedGlobalVarForModuleValue(&builder, x);
             }
             else
             {
-                setInsertAfterOrdinaryInst(&builder, x);
+                // A module-scope base in an entry-point-less module (a
+                // precompiled-library compile) takes this self-contained path,
+                // because the shared global would have no legal store site; the
+                // copy lives at the read site, like the code on master.
+                if (x->getParent()->getOp() == kIROp_ModuleInst)
+                    builder.setInsertBefore(inst);
+                else
+                    setInsertAfterOrdinaryInst(&builder, x);
                 y = builder.emitVar(x->getDataType(), AddressSpace::Function);
                 builder.emitStore(y, x);
-                m_mapArrayValueToVar.set(x, y);
+                if (x->getParent()->getOp() != kIROp_ModuleInst)
+                    m_mapArrayValueToVar.set(x, y);
             }
         }
         builder.setInsertBefore(inst);
