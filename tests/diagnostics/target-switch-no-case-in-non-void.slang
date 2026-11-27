@@ -3,9 +3,12 @@
 // function would still be generated — here because the entry point reaches it through an
 // interface-constrained generic, which the frontend capability check does not see through, or
 // because `-ignore-capabilities` disabled that check — the compiler reports E41037 instead of
-// emitting the empty body. Void functions keep compiling silently, because an empty body is a
-// well-defined no-op for them, and a helper that only another target's case references is not
-// diagnosed either, because DCE removes it before the report.
+// emitting the empty body. On targets that tolerate a missing return, a case-less switch in a void
+// function keeps compiling silently, because an empty body is a well-defined no-op there; the
+// targets that reject a missing return keep their pre-existing E41009 for any `missingReturn`, and
+// the `slangvm` target keeps its link-time E41011, because its empty capability profile matches no
+// case. A helper that only another target's case references is not diagnosed either, because DCE
+// removes it before the report.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC):-target cuda -entry main_generic -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC):-target cpp -entry main_generic -stage compute
@@ -25,11 +28,25 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=METALONLY):-target hlsl -entry main_metal_only -stage compute -ignore-capabilities
 //DIAGNOSTIC_TEST:SIMPLE(diag=METALONLY):-target spirv -entry main_metal_only -stage compute -ignore-capabilities -disable-non-essential-validations
 
-// Void functions with an unmatched switch keep compiling silently, and a helper that only
-// another target's case references is removed by DCE before the report, so both stay clean.
+// With the early check intact, the strict targets keep their pre-existing E41009 for the same
+// function — never E41037.
+//TEST:SIMPLE(filecheck=PIN_E41009_GLSL,exit-code=2):-target glsl -entry main_metal_only -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_E41009_WGSL,exit-code=2):-target wgsl -entry main_metal_only -stage compute -ignore-capabilities
+
+// The `slangvm` target has an empty capability profile, so the same function is rejected at link
+// time with E41011 and the late report never runs for it.
+//TEST:SIMPLE(filecheck=PIN_SLANGVM,exit-code=2):-target slangvm -entry main_metal_only -stage compute
+
+// A case-less switch in a void function: silent on the missing-return-tolerant targets, E41009 on
+// the strict ones with the early check intact, and silent on GLSL when that check was skipped,
+// because the void function carries no mark for the late report.
 //TEST:SIMPLE(filecheck=CLEAN):-target cuda -entry main_void -stage compute -ignore-capabilities
 //TEST:SIMPLE(filecheck=CLEAN):-target cpp -entry main_void -stage compute -ignore-capabilities
 //TEST:SIMPLE(filecheck=CLEAN):-target hlsl -entry main_void -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_VOID_E41009,exit-code=2):-target spirv -entry main_void_metal_only -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=CLEAN):-target glsl -entry main_void_metal_only -stage compute -ignore-capabilities -disable-non-essential-validations
+
+// A helper that only another target's case references is removed by DCE before the report.
 //TEST:SIMPLE(filecheck=CLEAN):-target cuda -entry main_helper_user -stage compute -ignore-capabilities
 //TEST:SIMPLE(filecheck=CLEAN):-target spirv -entry main_helper_user -stage compute -ignore-capabilities
 //TEST:SIMPLE(filecheck=CLEAN):-target hlsl -entry main_helper_user -stage compute -ignore-capabilities
@@ -41,21 +58,32 @@
 //TEST:SIMPLE(filecheck=CLEAN):-target spirv -entry main_sincos -stage compute -ignore-capabilities
 
 // The target named in E41037 is pinned per target family. PTX is generated from CUDA source and
-// reports 'cuda'. `Buffer<T>.Load` has no `cpp` case, so using it there is the same E41037
-// rather than a silent empty body.
+// reports 'cuda'. `Buffer<T>.Load` has no `cpp` case and is force-inlined, so its name reaches the
+// report only through the decoration — pinning it proves the inlined-away-name mechanism.
 //TEST:SIMPLE(filecheck=PIN_CUDA,exit-code=2):-target cuda -entry main_generic -stage compute
 //TEST:SIMPLE(filecheck=PIN_CUDA,exit-code=2):-target ptx -entry main_generic -stage compute
 //TEST:SIMPLE(filecheck=PIN_CPP,exit-code=2):-target cpp -entry main_generic -stage compute
 //TEST:SIMPLE(filecheck=PIN_METAL,exit-code=2):-target metal -entry main_generic -stage compute
 //TEST:SIMPLE(filecheck=PIN_SPIRV,exit-code=2):-target spirv -entry main_metal_only -stage compute -ignore-capabilities -disable-non-essential-validations
+//TEST:SIMPLE(filecheck=PIN_GLSL,exit-code=2):-target glsl -entry main_metal_only -stage compute -ignore-capabilities -disable-non-essential-validations
+//TEST:SIMPLE(filecheck=PIN_WGSL,exit-code=2):-target wgsl -entry main_metal_only -stage compute -ignore-capabilities -disable-non-essential-validations
 //TEST:SIMPLE(filecheck=PIN_LOAD_CPP,exit-code=2):-target cpp -entry main_typed_load -stage compute
 // PIN_CUDA: error[E41037]: __target_switch has no case for the current target
 // PIN_CUDA: 'positive_only_on_gpu' contains a __target_switch with no case for target 'cuda'
 // PIN_CPP: 'positive_only_on_gpu' contains a __target_switch with no case for target 'cpp'
 // PIN_METAL: 'positive_only_on_gpu' contains a __target_switch with no case for target 'metal'
 // PIN_SPIRV: 'metalOnlyPositive' contains a __target_switch with no case for target 'spirv'
+// PIN_GLSL: 'metalOnlyPositive' contains a __target_switch with no case for target 'glsl'
+// PIN_WGSL: 'metalOnlyPositive' contains a __target_switch with no case for target 'wgsl'
 // PIN_LOAD_CPP: error[E41037]: __target_switch has no case for the current target
-// PIN_LOAD_CPP: contains a __target_switch with no case for target 'cpp'
+// PIN_LOAD_CPP: '_Texture.Load' contains a __target_switch with no case for target 'cpp'
+// PIN_E41009_GLSL: non-void function must return in all cases for target 'glsl'
+// PIN_E41009_GLSL-NOT: E41037
+// PIN_E41009_WGSL: non-void function must return in all cases for target 'wgsl'
+// PIN_E41009_WGSL-NOT: E41037
+// PIN_SLANGVM: error[E41011]: __target_switch has no compatible target
+// PIN_VOID_E41009: non-void function must return in all cases for target 'spirv'
+// PIN_VOID_E41009-NOT: E41037
 // CLEAN: result code = 0
 // CLEAN-NOT: error[
 
@@ -152,6 +180,24 @@ void setToTwo(inout float x)
     case spirv:
         x = 2;
     }
+}
+
+void metalOnlyClear(inout float x)
+{
+    __target_switch
+    {
+    case metal:
+        x = 0;
+    }
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main_void_metal_only(uint3 tid : SV_DispatchThreadID)
+{
+    float v = 1;
+    metalOnlyClear(v);
+    g_out[0] = uint(v);
 }
 
 [shader("compute")]
