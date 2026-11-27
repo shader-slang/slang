@@ -120,5 +120,5 @@ void mainVec(uint3 id : SV_DispatchThreadID)
 // CHECKV: %[[VEC:[0-9]+]] = OpVariable %_ptr_Private_v4float Private
 // CHECKV: {{%[0-9]+}} = OpCompositeConstruct %v4float %float_1 %float_2 %float_3 %float_4
 // CHECKV: OpStore %[[VEC]]
-// CHECKV: OpAccessChain %_ptr_Private_float %[[VEC]]
 // CHECKV-NOT: OpStore %[[VEC]]
+// CHECKV: OpAccessChain %_ptr_Private_float %[[VEC]]
