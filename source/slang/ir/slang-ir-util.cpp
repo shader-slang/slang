@@ -916,25 +916,38 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
             sb << "Conditional<";
             getTypeNameHint(sb, conditionalType->getValueType());
             sb << ", ";
-            // A non-literal flag has no name hint of its own, so like the generic
-            // parameter in the SubpassInputType case above, recurse to render whatever
-            // the flag operand carries (an empty rendering for a plain generic value).
+            // The flag arrives as either a BoolLit or an IntLit (the two literal forms
+            // `tryLowerConditionalType` accepts; extern const flags arrive as IntLit), so
+            // print either spelling. A genuinely non-literal flag has no name hint of its
+            // own, so like the generic parameter in the SubpassInputType case below,
+            // recurse to render whatever the flag operand carries.
             if (auto boolLit = as<IRBoolLit>(conditionalType->getHasValue()))
                 sb << (boolLit->getValue() ? "true" : "false");
+            else if (auto intLit = as<IRIntLit>(conditionalType->getHasValue()))
+                sb << (getIntVal(intLit) != 0 ? "1" : "0");
             else
                 getTypeNameHint(sb, conditionalType->getHasValue());
             sb << ">";
         }
         break;
     case kIROp_TupleType:
-        sb << "Tuple<";
-        for (UInt i = 0; i < type->getOperandCount(); i++)
         {
-            if (i > 0)
-                sb << ", ";
-            getTypeNameHint(sb, type->getOperand(i));
+            // A TupleType may carry a trailing IRTupleNameType sentinel that names the
+            // lowered struct (autodiff creates such tuples); every other consumer excludes
+            // it from element iteration, and rendering it would emit a stray separator.
+            sb << "Tuple<";
+            bool emittedAny = false;
+            for (UInt i = 0; i < type->getOperandCount(); i++)
+            {
+                if (as<IRTupleNameType>(type->getOperand(i)))
+                    continue;
+                if (emittedAny)
+                    sb << ", ";
+                getTypeNameHint(sb, type->getOperand(i));
+                emittedAny = true;
+            }
+            sb << ">";
         }
-        sb << ">";
         break;
     case kIROp_SubpassInputType:
         {

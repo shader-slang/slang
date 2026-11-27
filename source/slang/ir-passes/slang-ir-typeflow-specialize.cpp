@@ -755,14 +755,17 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramTyp
     // concrete `Conditional<Concrete, true>` value flowing into a non-concrete
     // `Conditional<Interface, true>` parameter refines structurally, like the optional case
     // above: the payload becomes a singleton union while the flag is carried along unchanged.
-    // A Conditional value can only flow into a Conditional-typed parameter (attribute
-    // wrappers included, since `as<>` sees through them), so any other paramType shape is out
-    // of contract; falling through to the flat union would wrap the whole wrapper as a
-    // payload, so assert rather than build that unrepresentable info.
+    // A Conditional value can only flow into a Conditional-typed parameter, so any other
+    // paramType shape is out of contract; falling through to the flat union would wrap the
+    // whole wrapper as a payload, so assert rather than build that unrepresentable info.
+    // `as<>` unwraps attribute types in every build mode, so asserting on its result yields
+    // the actual ConditionalType even for an attributed parameter (e.g. a synthesized
+    // memberwise-constructor parameter), keeping the checked shape and the dereferenced
+    // pointer the same inst.
     if (auto conditionalType = as<IRConditionalType>(type))
     {
-        SLANG_RELEASE_ASSERT(as<IRConditionalType>(paramType));
-        auto paramConditionalType = cast<IRConditionalType>(paramType);
+        auto paramConditionalType = as<IRConditionalType>(paramType);
+        SLANG_RELEASE_ASSERT(paramConditionalType);
         return builder.getConditionalType(
             (IRType*)makeInfoForConcreteType(
                 module,
@@ -2948,8 +2951,9 @@ struct TypeFlowSpecializationContext
                 // `tryGetInfo` applies to refined data types. The guard keys on
                 // `isRefinedInfoType` generally, so it also serves plain interface fields
                 // whose type was refined the same way; for those this guard is the
-                // narrowing path, which is what
-                // `conditional-interface-plain-field-reader.slang` pins.
+                // narrowing path, which `conditional-interface-plain-field-reader.slang`
+                // pins as crash-free (the checked values alone do not distinguish
+                // narrowing from re-widening — the on-record limitation).
                 if (isRefinedInfoType(structField->getFieldType()))
                 {
                     return builder.getPtrTypeWithAddressSpace(
@@ -3604,10 +3608,13 @@ struct TypeFlowSpecializationContext
     }
 
     // The get produces a value of payload type, so its info is the payload's info returned
-    // bare — the same shape as the non-existential branch of `analyzeGetOptionalValue`. No
-    // `!isConcreteType` guard is needed on the payload: concrete-payload Conditionals never
-    // acquire info (`analyzeMakeConditionalValue` gates on it), so the unwrap cannot
-    // misfire on a concrete Conditional.
+    // bare — the same shape as the non-existential branch of `analyzeGetOptionalValue`. The
+    // unwrap is safe without a `!isConcreteType` guard because every producer of
+    // Conditional-shaped info — `analyzeMakeConditionalValue` and the Conditional case in
+    // `makeInfoForConcreteType` — puts *info* in the payload: the former gates on
+    // non-concreteness, the latter wraps a concrete payload into a singleton union through
+    // its own recursion. A `ConditionalType` info therefore never carries a bare concrete
+    // type in the payload slot.
     IRInst* analyzeGetConditionalValue(IRInst* context, IRGetConditionalValue* inst)
     {
         if (auto conditionalInfo =
@@ -4077,7 +4084,11 @@ struct TypeFlowSpecializationContext
         }
 
         // Substitute inside the payload; the wrapper's flag must survive until
-        // `lowerConditionalType`.
+        // `lowerConditionalType`. The substitution sites reachable from ordinary
+        // code are covered end-to-end by conditional-interface-merge.slang; these
+        // cases also carry set-specialized generic signatures whose Conditional
+        // parameters keep refined info (the Optional sibling here has the same
+        // role), so removal is not justified by the suite alone.
         if (auto conditionalType = as<IRConditionalType>(typeLike))
         {
             IRBuilder builder(module);
@@ -4151,7 +4162,9 @@ struct TypeFlowSpecializationContext
         }
 
         // Substitute inside the payload; the wrapper's flag must survive until
-        // `lowerConditionalType`.
+        // `lowerConditionalType`. As in `substituteSetsInTypeLike`, this carries
+        // set-specialized generic signatures that the end-to-end tests reach only
+        // through the merged behavior.
         if (auto conditionalType = as<IRConditionalType>(type))
         {
             IRBuilder builder(module);
@@ -8447,9 +8460,11 @@ struct TypeFlowSpecializationContext
         // type equals the refined payload, `upcastSet` returns the operand unchanged, so
         // the fixpoint converges.
         bool changed = replaceType(context, inst);
+        // `replaceType` maps Conditional info to a Conditional type (see `getLoweredType`),
+        // so the data type stays a Conditional through every type-flow run. Treat a
+        // non-Conditional data type as a no-op for the widening below rather than
+        // dereference it.
         auto conditionalType = as<IRConditionalType>(inst->getDataType());
-        // A data type that is no longer a Conditional cannot arise while the wrapper
-        // survives specialization; keep `replaceType`'s result for the flag plumbing.
         if (!conditionalType)
             return changed;
         IRBuilder builder(inst);

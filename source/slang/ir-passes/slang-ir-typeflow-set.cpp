@@ -263,10 +263,13 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
         // `ConditionalType` insts are hoistable and therefore deduplicated module-wide,
         // so this pointer inequality really does mean the payload sets or flags differ.
         // A merge point (field, parameter, return) has a single declared flag, so the two
-        // literal flags cannot differ in well-typed input; assert that rather than
-        // silently rewrite the value's compile-time flag in the rebuilt wrapper below.
-        // The flag may be spelled as either a BoolLit or an IntLit (see
-        // `typeIncludesDynamicDispatch`), so compare literal values, not insts.
+        // literal flags cannot differ in well-typed input; fail loudly rather than silently
+        // rewrite the value's compile-time flag in the rebuilt wrapper below — that flag
+        // decides `lowerConditionalType`'s keep-payload-vs-empty-struct layout. The flag may
+        // be spelled as either a BoolLit or an IntLit (see `typeIncludesDynamicDispatch`),
+        // so compare literal values, not insts. `flagValue` returns -1 for a non-literal
+        // (generic) flag; such flags are excluded from the comparison instead of assumed
+        // equal.
         auto flagValue = [](IRInst* flag)
         {
             if (auto boolLit = as<IRBoolLit>(flag))
@@ -278,7 +281,7 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
         auto argFlag = flagValue(argConditionalType->getHasValue());
         auto destFlag = flagValue(destConditionalType->getHasValue());
         if (argFlag != -1 && destFlag != -1)
-            SLANG_ASSERT(argFlag == destFlag);
+            SLANG_RELEASE_ASSERT(argFlag == destFlag);
         if (argConditionalType != destConditionalType)
         {
             auto value = builder->emitIntrinsicInst(
