@@ -88,6 +88,7 @@ void mainVec(uint3 id : SV_DispatchThreadID)
 // CHECK: OpStore %[[TABLE]]
 // CHECK-NOT: OpStore %[[TABLE]]
 // CHECK: OpAccessChain %_ptr_Private_float %[[TABLE]]
+// CHECK-NOT: OpStore %[[TABLE]]
 // CHECK-NOT: OpVariable %_ptr_Function__arr_float_int_8 Function
 
 // After the `-O1`..`-O3` downstream inlining and `private-to-local`
@@ -101,6 +102,7 @@ void mainVec(uint3 id : SV_DispatchThreadID)
 // CHECK1: OpStore %[[T1]]
 // CHECK1-NOT: OpStore %[[T1]]
 // CHECK1: OpAccessChain %_ptr_Function_float %[[T1]]
+// CHECK1-NOT: OpStore %[[T1]]
 // CHECK1-NOT: OpVariable %_ptr_Function__arr_float_int_8 Function
 
 // Two entry points share one Private global; each entry point's body stores

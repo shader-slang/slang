@@ -1334,7 +1334,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // A module-scope base in an entry-point-less module (a
                 // precompiled-library compile) takes this self-contained path,
                 // because the shared global would have no legal store site; the
-                // copy lives at the read site, like the code on master.
+                // copy lives at the read site.
                 if (x->getParent()->getOp() == kIROp_ModuleInst)
                     builder.setInsertBefore(inst);
                 else
