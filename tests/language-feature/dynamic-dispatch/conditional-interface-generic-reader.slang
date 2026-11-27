@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Generic readers instantiated after the field has acquired a refined payload
 // type: the later instantiation must reuse the field's refined info instead of
 // re-widening it from globally available witness tables.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Storing an interface value in a `Conditional` struct field must behave like
 // a plain interface field: retain the selected implementation and dispatch on it.
 

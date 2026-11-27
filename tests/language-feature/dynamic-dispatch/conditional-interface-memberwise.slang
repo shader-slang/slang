@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Synthesized memberwise constructors have attributed parameters; Conditional
 // payload propagation must inspect the matched payload type, not the outer
 // attributed operand.
