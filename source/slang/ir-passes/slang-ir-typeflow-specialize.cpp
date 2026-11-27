@@ -926,6 +926,26 @@ static bool typeIncludesDynamicDispatch(IRType* type)
     if (auto optionalType = as<IROptionalType>(type))
         return typeIncludesDynamicDispatch((IRType*)optionalType->getValueType());
 
+    // A `Conditional` contributes dynamic dispatch only when its flag is (or may
+    // specialize to) true: a literal-false `Conditional` lowers to the empty struct and
+    // carries no payload at all, so a `__ref` of it is harmless. Any non-literal flag
+    // still counts as potentially-true, matching how `isConcreteType` treats it.
+    if (auto conditionalType = as<IRConditionalType>(type))
+    {
+        auto hasValueInst = conditionalType->getHasValue();
+        if (auto boolLit = as<IRBoolLit>(hasValueInst))
+        {
+            if (!boolLit->getValue())
+                return false;
+        }
+        else if (auto intLit = as<IRIntLit>(hasValueInst))
+        {
+            if (getIntVal(intLit) == 0)
+                return false;
+        }
+        return typeIncludesDynamicDispatch((IRType*)conditionalType->getValueType());
+    }
+
     if (auto tupleType = as<IRTupleType>(type))
     {
         for (UInt i = 0; i < tupleType->getOperandCount(); i++)
@@ -1425,22 +1445,26 @@ struct TypeFlowSpecializationContext
         // Conditional (non-concrete payload)
         if (auto conditionalMask = as<IRConditionalType>(typeUnionMask))
         {
-            // Both infos are refined Conditionals: every producer that shapes info to a
-            // non-concrete `Conditional` mask wraps the payload info in a `ConditionalType`
-            // (`analyzeMakeConditionalValue`, `makeInfoForConcreteType`). Join their payload
-            // sets and carry the mask's flag, since the wrapper survives until
-            // `lowerConditionalType`. `as<>` unwraps attribute types, so read the payload from
-            // the matched conditional rather than assuming each info is exactly the mask type.
+            // Every producer that shapes info to a non-concrete `Conditional` mask wraps
+            // the payload info in a `ConditionalType` (`analyzeMakeConditionalValue`,
+            // `makeInfoForConcreteType`). An info can carry attributes the mask lacks
+            // (memberwise-constructor parameters are attributed), so `as<IRConditionalType>`
+            // — which unwraps attributes — reads each payload rather than a comparison
+            // against the mask. A mismatched pair falls through to the flat union, whose
+            // failure stays active in release builds (matching the Array/Ptr/Optional
+            // blocks above).
             auto conditional1 = as<IRConditionalType>(info1);
             auto conditional2 = as<IRConditionalType>(info2);
-            SLANG_ASSERT(conditional1 && conditional2);
-            IRBuilder builder(module);
-            return builder.getConditionalType(
-                (IRType*)unionPropagationInfo(
-                    conditionalMask->getValueType(),
-                    conditional1->getValueType(),
-                    conditional2->getValueType()),
-                conditionalMask->getHasValue());
+            if (conditional1 && conditional2)
+            {
+                IRBuilder builder(module);
+                return builder.getConditionalType(
+                    (IRType*)unionPropagationInfo(
+                        conditionalMask->getValueType(),
+                        conditional1->getValueType(),
+                        conditional2->getValueType()),
+                    conditionalMask->getHasValue());
+            }
         }
 
         // AttributedType
@@ -2916,6 +2940,9 @@ struct TypeFlowSpecializationContext
                 // empty, and a run that contains no new stores to the field cannot re-seed
                 // it). Reuse the refined field type as the info instead of returning none,
                 // which is the same discipline `tryGetInfo` applies to refined data types.
+                // The fixpoint usually compensates (a surviving store re-seeds the map and
+                // re-enqueues readers via `fieldUseSites`), so this is a guard for the shape
+                // where no seeder survives into the current run at all.
                 if (isRefinedInfoType(structField->getFieldType()))
                 {
                     return builder.getPtrTypeWithAddressSpace(
@@ -2984,8 +3011,9 @@ struct TypeFlowSpecializationContext
                 return this->fieldInfo[structField];
             }
 
-            // As for field addresses, a later generic instantiation must reuse the
-            // field's already-refined type even when this run has no new stores to it.
+            // As for field addresses (`analyzeFieldAddress` has the full justification of
+            // this rule), a later generic instantiation must reuse the field's
+            // already-refined type even when this run has no new stores to it.
             if (isRefinedInfoType(structField->getFieldType()))
                 return structField->getFieldType();
 
@@ -3567,6 +3595,11 @@ struct TypeFlowSpecializationContext
         return none();
     }
 
+    // The get produces a value of payload type, so its info is the payload's info returned
+    // bare — the same shape as the non-existential branch of `analyzeGetOptionalValue`. No
+    // `!isConcreteType` guard is needed on the payload: concrete-payload Conditionals never
+    // acquire info (`analyzeMakeConditionalValue` gates on it), so the unwrap cannot
+    // misfire on a concrete Conditional.
     IRInst* analyzeGetConditionalValue(IRInst* context, IRGetConditionalValue* inst)
     {
         if (auto conditionalInfo =
@@ -5912,8 +5945,8 @@ struct TypeFlowSpecializationContext
                 return nullptr;
         }
 
-        // Keep the wrapper around the lowered payload; the flag only becomes erasable in
-        // `lowerConditionalType`.
+        // Keep the wrapper around the lowered payload: `lowerConditionalType` reads the
+        // flag to decide the rewrite and removes the wrapper there.
         if (auto conditionalType = as<IRConditionalType>(info))
         {
             IRBuilder builder(module);
@@ -8397,8 +8430,12 @@ struct TypeFlowSpecializationContext
         // The wrapper survives until `lowerConditionalType`, so specialization only retypes
         // the wrapper to its refined payload and widens the payload operand to that refined
         // set, like any other value flowing into a field or parameter of the refined type.
-        // The widened value must be produced eagerly because a store into a field that is
-        // refined wider in the same round re-reads the operand through `upcastSet`.
+        // Consider `holder.wrapped` first stored `Conditional<IValue, true>(choose(data))`
+        // when the field's payload set is {A}, then stored again from a `choose` that widens
+        // the field to {A,B}: the second store's `upcastSet` re-reads this
+        // MakeConditionalValue against the wider wrapper, and if the payload operand were
+        // still the narrow {A} value the rebuilt wrapper would wrap a mismatched payload
+        // type. Widening here keeps the operand and its own type in step.
         bool changed = replaceType(context, inst);
         auto conditionalType = as<IRConditionalType>(inst->getDataType());
         if (!conditionalType)

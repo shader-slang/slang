@@ -260,6 +260,8 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
         // for conditional lowering.
         auto argConditionalType = as<IRConditionalType>(argInfo);
         auto destConditionalType = as<IRConditionalType>(destInfo);
+        // `ConditionalType` insts are hoistable and therefore deduplicated module-wide,
+        // so this pointer inequality really does mean the payload sets or flags differ.
         if (argConditionalType != destConditionalType)
         {
             auto value = builder->emitIntrinsicInst(
