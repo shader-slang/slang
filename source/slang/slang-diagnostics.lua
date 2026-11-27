@@ -6000,6 +6000,13 @@ err(
     span { loc = "location", message = "Interface-typed entry point parameter of type '~interfaceType' is not supported on the current target. Use a concrete type or a different target." }
 )
 
+err(
+    "duplicate-type-conformance-sequential-id",
+    50105,
+    "duplicate type conformance sequential ID",
+    span { loc = "location", message = "Sequential ID '~id:Int' is assigned to both '~firstType' and '~secondType' for interface '~interfaceType', so dynamic dispatch on that ID is ambiguous. Give each conformance a distinct ID." }
+)
+
 standalone_note(
     "dynamic-dispatch-code-generated-here",
     50102,
