@@ -1,4 +1,4 @@
-//DISABLED_TEST(smoke,compute):COMPARE_COMPUTE: -shaderobj
+//DISABLE_TEST(smoke,compute):COMPARE_COMPUTE: -shaderobj
 
 //TEST_INPUT:type Wrapper<Impl>
 

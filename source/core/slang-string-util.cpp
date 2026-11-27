@@ -1135,4 +1135,43 @@ Index StringUtil::calcLevenshteinDistanceCaseInsensitive(
     return _calcLevenshteinDistance(a, b, /*caseInsensitive:*/ true);
 }
 
+bool StringUtil::isNearMissSpelling(
+    const UnownedStringSlice& typed,
+    const UnownedStringSlice& intended)
+{
+    const Index typedLength = typed.getLength();
+    const Index intendedLength = intended.getLength();
+
+    if (typedLength == intendedLength)
+    {
+        // A transposition of two adjacent characters differs in exactly one neighboring pair,
+        // swapped, as in "TSET" vs "TEST". The scan stops without a differing pair on an exact
+        // match, and with the only difference at the final position on a trailing substitution
+        // such as "TESA" vs "TEST"; neither is a misspelling, so both return false.
+        Index firstDiff = 0;
+        while (firstDiff < typedLength && typed[firstDiff] == intended[firstDiff])
+            firstDiff++;
+        if (firstDiff + 1 >= typedLength)
+            return false;
+        if (typed[firstDiff] != intended[firstDiff + 1] ||
+            typed[firstDiff + 1] != intended[firstDiff])
+            return false;
+        for (Index i = firstDiff + 2; i < typedLength; ++i)
+        {
+            if (typed[i] != intended[i])
+                return false;
+        }
+        return true;
+    }
+
+    // What reaches here differs in length: equal-length pairs, including every substitution,
+    // were decided by the branch above. A length difference of one where the plain edit
+    // distance is one is exactly a single insertion or deletion, as in "dTEST" vs "TEST" or
+    // "TST" vs "TEST".
+    if (typedLength - intendedLength == 1 || intendedLength - typedLength == 1)
+        return calcLevenshteinDistance(typed, intended) == 1;
+
+    return false;
+}
+
 } // namespace Slang

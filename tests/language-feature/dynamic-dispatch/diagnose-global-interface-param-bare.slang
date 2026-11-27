@@ -4,8 +4,8 @@
 // The diagnostic fires, but the compiler crashes immediately afterward in the
 // same `collect-global-uniforms` / hoisted-insts path as
 // global-interface-param-bare.slang. Tracked in #10892.
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
 
 [anyValueSize(16)]
 interface IFoo

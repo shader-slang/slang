@@ -34,6 +34,7 @@
 #include "slangc-tool.h"
 #include "slangi-tool.h"
 #include "test-context.h"
+#include "test-directive-util.h"
 #include "test-output-path-util.h"
 #include "test-reporter.h"
 #include "test-target-util.h"
@@ -935,12 +936,11 @@ static SlangResult _gatherTestsForFile(
 
         TestDetails testDetails;
 
+        const bool hasDisablePrefix = command.startsWith(disablePrefix);
+        if (hasDisablePrefix)
         {
-            if (command.startsWith(disablePrefix))
-            {
-                testDetails.options.isEnabled = false;
-                command = command.tail(disablePrefix.getLength());
-            }
+            testDetails.options.isEnabled = false;
+            command = command.tail(disablePrefix.getLength());
         }
 
         if (command == "TEST_CATEGORY")
@@ -1046,6 +1046,53 @@ static SlangResult _gatherTestsForFile(
         }
         else
         {
+            // The command is not one this harness recognizes. Most such lines belong to other
+            // consumers of the same file — `CHECK` and the other filecheck labels, `TEST_INPUT`
+            // lines that render-test parses, a diagnostic test's free-form annotation labels —
+            // so they are skipped without a diagnostic. A near-miss spelling of a directive the
+            // harness does recognize is different: the author meant a real directive, and
+            // silently skipping it would drop a test from the run with no diagnostic.
+            // Mistyping the only directive of a file at least shows when that file is run
+            // alone (it contributes zero tests to the summary), but mistyping one directive
+            // among several leaves no trace anywhere. Failing the whole file, like the
+            // parse-error returns above, keeps the file's remaining lines from silently
+            // running partial coverage.
+            const UnownedStringSlice nearMiss =
+                TestDirectiveUtil::findNearMissDirectiveCommand(command);
+            if (nearMiss.getLength() != 0)
+            {
+                // Build `suggestion` from the matched spelling and `asWritten` from the
+                // unrecognized command, re-attaching the `DISABLE_` prefix the loop stripped.
+                const String suggestion =
+                    TestDirectiveUtil::getNearMissDirectiveSuggestion(nearMiss, hasDisablePrefix);
+                StringBuilder asWritten;
+                if (hasDisablePrefix)
+                {
+                    asWritten << "DISABLE_";
+                }
+                asWritten << command;
+
+                if (context && context->getTestReporter())
+                {
+                    context->getTestReporter()->messageFormat(
+                        TestMessageType::RunError,
+                        "Failed to recognize test directive '%s' in file '%s'. Did you mean '%s'?",
+                        asWritten.getBuffer(),
+                        filePath.getBuffer(),
+                        suggestion.getBuffer());
+                }
+                else
+                {
+                    fprintf(
+                        stderr,
+                        "Failed to recognize test directive '%s' in file '%s'. Did you mean "
+                        "'%s'?\n",
+                        asWritten.getBuffer(),
+                        filePath.getBuffer(),
+                        suggestion.getBuffer());
+                }
+                return SLANG_E_INVALID_ARG;
+            }
             // Hmm we don't know what kind of test this actually is.
             // Assume that's ok and this *isn't* a test and ignore.
             skipToEndOfLine(&cursor);

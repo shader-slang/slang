@@ -115,6 +115,12 @@ Tests are identified by a special comment at the start of the test file: `//TEST
 
 To ignore a test, use `//DISABLE_TEST` instead of `//TEST`.
 
+A directive comment whose command is one character inserted, deleted, or transposed away from
+a directive of this list (`//TEST:`, `//DIAGNOSTIC_TEST:`, `//TEST_CATEGORY:`,
+`//TEST_IGNORE_FILE`, and the `DISABLE_`-prefixed forms the harness dispatches on) fails the
+file with a "Did you mean" error instead of being silently skipped, so a mistyped directive
+cannot quietly drop a test from the run.
+
 Available test types:
 
 - `SIMPLE`: Runs the slangc compiler with specified options after the command

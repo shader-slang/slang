@@ -1,7 +1,7 @@
 // tagged-union.slang
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 
 
 // The goal of this test is to show that we can generate

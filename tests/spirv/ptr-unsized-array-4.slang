@@ -1,8 +1,8 @@
 //TEST:COMPARE_COMPUTE(targets=vk+llvm, filecheck-buffer=CHECK):
-//DISABLED_TEST: COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
-//DISABLED_TEST: COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d11
-//DISABLED_TEST: COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d12
-//DISABLED_TEST: COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d11
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d12
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal
 
 // Test a pointer to a struct that has only one field and is an unsized array.
 struct MeshStorage {

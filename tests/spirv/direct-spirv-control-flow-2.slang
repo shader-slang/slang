@@ -1,6 +1,6 @@
 // direct-spirv-control-flow-2.slang
 
-//TESTD:SIMPLE:-target spirv -entry computeMain -stage compute
+//DISABLE_TEST:SIMPLE:-target spirv -entry computeMain -stage compute
 //TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 // Test direct SPIR-V emit on control flows.

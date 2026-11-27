@@ -343,3 +343,53 @@ SLANG_UNIT_TEST(stringUtilLevenshteinDistance, NoRenderApi)
     SLANG_CHECK(
         StringUtil::calcLevenshteinDistanceCaseInsensitive(toSlice("ABC"), toSlice("abc")) == 0);
 }
+
+SLANG_UNIT_TEST(stringUtilNearMissSpelling, NoRenderApi)
+{
+    // An exact match is not a misspelling.
+    SLANG_CHECK(!StringUtil::isNearMissSpelling(toSlice("TEST"), toSlice("TEST")));
+
+    // One adjacent transposition.
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TSET"), toSlice("TEST")));
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TEST"), toSlice("TSET")));
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("DISABLE_TSET"), toSlice("DISABLE_TEST")));
+
+    // One insertion.
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TESTD"), toSlice("TEST")));
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("dTEST"), toSlice("TEST")));
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TESST"), toSlice("TEST")));
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("DISABLED_TEST"), toSlice("DISABLE_TEST")));
+
+    // The second real-world misspelling class from slang-test's directive sweep.
+    SLANG_CHECK(StringUtil::isNearMissSpelling(
+        toSlice("DISABLED_DIAGNOSTIC_TEST"),
+        toSlice("DISABLE_DIAGNOSTIC_TEST")));
+
+    // One deletion.
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TST"), toSlice("TEST")));
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TEST"), toSlice("TESTS")));
+
+    // A transposition at the final pair.
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TETS"), toSlice("TEST")));
+
+    // A single substitution is deliberately not a near miss: one substitution away from a
+    // short word is usually a different real word.
+    SLANG_CHECK(!StringUtil::isNearMissSpelling(toSlice("NEST"), toSlice("TEST")));
+    SLANG_CHECK(!StringUtil::isNearMissSpelling(toSlice("cat"), toSlice("cot")));
+
+    // More than one edit, in any combination, is not a near miss.
+    SLANG_CHECK(!StringUtil::isNearMissSpelling(toSlice("TEST_INPUT"), toSlice("TEST")));
+    SLANG_CHECK(!StringUtil::isNearMissSpelling(toSlice("CHECK"), toSlice("TEST")));
+    SLANG_CHECK(!StringUtil::isNearMissSpelling(toSlice("TSETT"), toSlice("TEST")));
+    SLANG_CHECK(!StringUtil::isNearMissSpelling(toSlice("TEST_DISABLED"), toSlice("TEST")));
+
+    // Case matters: a case difference is a substitution per character, not a near miss.
+    SLANG_CHECK(!StringUtil::isNearMissSpelling(toSlice("Test"), toSlice("TEST")));
+    SLANG_CHECK(!StringUtil::isNearMissSpelling(toSlice("test"), toSlice("TEST")));
+
+    // Degenerate inputs: shorter than a transposition pair, or empty against non-empty. The
+    // empty slice is one deletion from a single-character word, but four deletions from TEST.
+    SLANG_CHECK(!StringUtil::isNearMissSpelling(toSlice(""), toSlice("TEST")));
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice(""), toSlice("T")));
+    SLANG_CHECK(StringUtil::isNearMissSpelling(toSlice("TS"), toSlice("ST")));
+}

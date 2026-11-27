@@ -1,5 +1,5 @@
 // tests/compute/*type-param* tests are broken #5627
-//DISABLED_TEST(compute):COMPARE_RENDER_COMPUTE:
+//DISABLE_TEST(compute):COMPARE_RENDER_COMPUTE:
 
 //TEST_INPUT: global_type AssembledVertex
 //TEST_INPUT: ubuffer(data=[0], stride=4):out

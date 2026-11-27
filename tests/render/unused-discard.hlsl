@@ -1,5 +1,5 @@
-//DISABLED_TEST(smoke,render):COMPARE_HLSL_GLSL_RENDER:
-//DISABLED_TEST(smoke,render):COMPARE_HLSL_GLSL_RENDER: -dx12
+//DISABLE_TEST(smoke,render):COMPARE_HLSL_GLSL_RENDER:
+//DISABLE_TEST(smoke,render):COMPARE_HLSL_GLSL_RENDER: -dx12
 
 // This is a basic test case for cross-compilation behavior.
 //
