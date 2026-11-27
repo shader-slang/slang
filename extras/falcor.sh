@@ -338,7 +338,7 @@ preflight_target_tools() {
 # Fail early (with build instructions) when the requested local Slang build is
 # missing, and warn when slang-gfx is absent since Falcor imports it. The
 # artifact names follow the build target, not the host: a Windows target needs
-# slang.dll, a Linux target needs libslang.so.
+# slang-compiler.dll, a Linux target needs libslang-compiler.so.
 verify_slang_build() {
   if [ ! -f "$SLANG_DIR/include/slang.h" ]; then
     log_error "Slang headers not found at $SLANG_DIR/include/slang.h"
@@ -349,10 +349,10 @@ verify_slang_build() {
   local base="$SLANG_DIR/build/$SLANG_CONFIG"
   local slang_lib gfx_lib
   if [ "$TARGET_OS" = windows ]; then
-    slang_lib="$base/bin/slang.dll"
+    slang_lib="$base/bin/slang-compiler.dll"
     gfx_lib="$base/bin/gfx.dll"
   else
-    slang_lib="$base/lib/libslang.so"
+    slang_lib="$base/lib/libslang-compiler.so"
     gfx_lib="$base/lib/libgfx.so"
   fi
 

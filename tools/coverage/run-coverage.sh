@@ -42,7 +42,7 @@ CONFIG="${CONFIG:-RelWithDebInfo}"
 
 # Coverage binary and library paths
 SLANG_TEST="$BUILD_DIR/$CONFIG/bin/slang-test"
-LIBSLANG="$BUILD_DIR/$CONFIG/lib/libslang.$LIB_EXT"
+LIBSLANG="$BUILD_DIR/$CONFIG/lib/libslang-compiler.$LIB_EXT"
 
 # Coverage output directory (use build dir to keep repo clean)
 COVERAGE_DIR="${COVERAGE_DIR:-$BUILD_DIR/coverage-data}"

@@ -23,7 +23,7 @@
 
 // Validation checks on deserialized data guard against mal-formed input, but
 // cost performance on a hot path (loading the trusted core module out of
-// `slang.dll`). This build option selects whether they are compiled in.
+// `slang-compiler.dll`). This build option selects whether they are compiled in.
 //
 #ifndef SLANG_ENABLE_VALIDATION_FOSSIL
 #define SLANG_ENABLE_VALIDATION_FOSSIL 0

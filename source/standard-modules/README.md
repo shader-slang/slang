@@ -21,8 +21,8 @@ The following CMake variables control the standard modules configuration:
   - The file name for the compiled experimental workgraph module
 
 - `SLANG_STANDARD_MODULE_INSTALL_DIR`
-  - **Windows**: `bin/slang-standard-module-${SLANG_VERSION_NUMERIC}` (installed next to slang.dll)
-  - **Linux/Mac**: `lib/slang-standard-module-${SLANG_VERSION_NUMERIC}` (installed next to libslang.so/libslang.dylib)
+  - **Windows**: `bin/slang-standard-module-${SLANG_VERSION_NUMERIC}` (installed next to slang-compiler.dll)
+  - **Linux/Mac**: `lib/slang-standard-module-${SLANG_VERSION_NUMERIC}` (installed next to libslang-compiler.so/libslang-compiler.dylib)
   - The installation directory for all standard modules in release packages
 
 ## Directory Structure
@@ -85,7 +85,7 @@ To change the standard module paths:
 3. C++ code includes `slang-standard-module-config.h` and uses the constants internally
 4. Each module's CMakeLists.txt uses the same variables for consistent paths
 5. Standard modules are compiled using `slangc` at build time
-6. Standard modules are placed under subdirectories next to libslang.so/slang.dll that match
+6. Standard modules are placed under subdirectories next to libslang-compiler.so/slang-compiler.dll that match
    their import paths:
    - **Build - Windows**:
      - `build/Debug/bin/slang-standard-module-${SLANG_VERSION_NUMERIC}/slang/`

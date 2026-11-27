@@ -853,7 +853,7 @@ jobs:
 
       - name: Generate command line reference
         run: |
-          # slangc is dynamically linked against libslang; the artifact lays
+          # slangc is dynamically linked against libslang-compiler; the artifact lays
           # libraries under Release/lib, separate from the Release/bin binaries.
           chmod +x artifacts/Release/bin/* 2>/dev/null || true
           export LD_LIBRARY_PATH="$PWD/artifacts/Release/lib:$LD_LIBRARY_PATH"

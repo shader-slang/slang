@@ -401,10 +401,11 @@ function(set_default_compile_options target)
             # Force /INCREMENTAL:NO at the target level. Windows +
             # Ninja-Multi-Config + RelWithDebInfo otherwise leaves
             # /INCREMENTAL on the link line (CMake's default for the
-            # configuration), racing with slang-proxy's explicit
-            # /INCREMENTAL:NO and producing LNK1104 on slang.ilk. Disabling
-            # incremental linking globally for coverage targets avoids the
-            # .ilk file entirely. No runtime cost.
+            # configuration). Incremental linking routes calls through
+            # jump thunks recorded separately in the PDB, which distorts
+            # OpenCppCoverage's line attribution; disabling it keeps every
+            # function body attributed to its source lines. No runtime
+            # cost.
             target_link_options(${target} PRIVATE /INCREMENTAL:NO)
         endif()
     endif()

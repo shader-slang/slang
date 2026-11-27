@@ -37,7 +37,7 @@ their compilation live in `source/standard-modules`.
 - The compiler loads it in the standard-module import fallback
   (`source/slang/slang-session.cpp`,
   `tryLoadStandardModuleFromMonolithicLibrary`): load the library beside
-  `slang.dll`, verify the build tag, look up by import path, **decompress with the
+  `slang-compiler.dll`, verify the build tag, look up by import path, **decompress with the
   same `LZ4CompressionSystem`**, and feed the bytes to the same
   `loadModuleImpl(..., ModuleBlobType::IR, ...)` used for the loose files. The
   `-experimental-feature` gate is unaffected (enforced during import resolution,

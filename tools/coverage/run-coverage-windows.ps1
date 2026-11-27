@@ -69,10 +69,9 @@ if ($env:BUILD_DIR) {
 }
 
 $SlangTest = Join-Path $BuildDir "$Config\bin\slang-test.exe"
-# slang.dll on Windows is a thin proxy that forwards exports to
-# slang-compiler.dll (see source/slang/CMakeLists.txt). The real compiler code
-# we want to measure lives in slang-compiler.dll -- the Unix equivalent of
-# libslang-compiler.so that the Linux/macOS coverage already targets.
+# The real compiler code we want to measure lives in
+# slang-compiler.dll -- the Windows equivalent of the
+# libslang-compiler.so that the Linux/macOS coverage targets.
 $SlangDll  = Join-Path $BuildDir "$Config\bin\slang-compiler.dll"
 
 $CoverageDir = if ($env:COVERAGE_DIR) { $env:COVERAGE_DIR } else { Join-Path $BuildDir 'coverage-data' }

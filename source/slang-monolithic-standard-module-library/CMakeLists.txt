@@ -6,8 +6,8 @@
 # library's generator input) but its install() rules in source/standard-modules
 # are skipped (guarded on NOT SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY).
 #
-# This is a runtime-loaded MODULE library, loaded on demand by slang.dll rather
-# than linked into it.
+# This is a runtime-loaded MODULE library, loaded on demand by
+# slang-compiler.dll rather than linked into it.
 #
 # Inputs are taken explicitly here rather than inherited from the standard-modules
 # directory scope:

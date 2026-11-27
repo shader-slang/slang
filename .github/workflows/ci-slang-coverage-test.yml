@@ -396,7 +396,7 @@ jobs:
             LIB_EXT="so"
           fi
 
-          LIBSLANG="$BUILD_DIR/$CONFIG/lib/libslang.$LIB_EXT"
+          LIBSLANG="$BUILD_DIR/$CONFIG/lib/libslang-compiler.$LIB_EXT"
 
           # Load slangc compiler-only ignore patterns (shared definition)
           source tools/coverage/slangc-ignore-patterns.sh
@@ -588,12 +588,14 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: coverage-${{ inputs.os }}-${{ inputs.platform }}
-          # coverage-html-slangc/ and libslang.* are Linux/macOS-only; the
+          # coverage-html-slangc/ and libslang-compiler.* are Linux/macOS-only; the
           # Cobertura XML and slangc LCOV are Windows-only;
           # coverage-report*.txt are Linux/macOS-only (llvm-cov report
           # text, not produced from OpenCppCoverage).
           # upload-artifact silently skips missing paths, so one path
-          # list works for all OSes.
+          # list works for all OSes. The split-debug .dwarf companion
+          # files are hundreds of MB and nothing downstream consumes
+          # them, so they are excluded from the archival upload.
           path: |
             coverage-summary.json
             coverage-report.txt
@@ -602,7 +604,8 @@ jobs:
             coverage-html-slangc/
             coverage-slangc.lcov
             build/${{ inputs.config }}/coverage-data/slang-test.profdata
-            build/${{ inputs.config }}/lib/libslang.*
+            build/${{ inputs.config }}/lib/libslang-compiler.*
+            !build/${{ inputs.config }}/lib/libslang-compiler.*.dwarf
             build/coverage-data/full.cobertura.xml
           retention-days: 7
 
