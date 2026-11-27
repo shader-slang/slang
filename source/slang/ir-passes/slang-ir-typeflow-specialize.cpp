@@ -2953,7 +2953,7 @@ struct TypeFlowSpecializationContext
                 // whose type was refined the same way; for those this guard is the
                 // narrowing path, which `conditional-interface-plain-field-reader.slang`
                 // pins as crash-free (the checked values alone do not distinguish
-                // narrowing from re-widening — the on-record limitation).
+                // narrowing from re-widening).
                 if (isRefinedInfoType(structField->getFieldType()))
                 {
                     return builder.getPtrTypeWithAddressSpace(
@@ -4084,11 +4084,10 @@ struct TypeFlowSpecializationContext
         }
 
         // Substitute inside the payload; the wrapper's flag must survive until
-        // `lowerConditionalType`. The substitution sites reachable from ordinary
-        // code are covered end-to-end by conditional-interface-merge.slang; these
-        // cases also carry set-specialized generic signatures whose Conditional
-        // parameters keep refined info (the Optional sibling here has the same
-        // role).
+        // `lowerConditionalType`. The substitution sites are exercised by
+        // conditional-interface-merge.slang; these cases also carry
+        // set-specialized generic signatures whose Conditional parameters keep
+        // refined info (the Optional sibling here has the same role).
         if (auto conditionalType = as<IRConditionalType>(typeLike))
         {
             IRBuilder builder(module);
