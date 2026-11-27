@@ -3663,6 +3663,20 @@ warning(
 )
 
 warning(
+    "for-loop-initial-value-changes-in-comparison",
+    30527,
+    "initial value changes in comparison due to an implicit cast",
+    span { loc = "comparison:Expr", message = "the comparison casts the initial value to type '~toType:Type', which changes its value from ~fromValue to ~toValue." }
+)
+
+warning(
+    "for-loop-iterator-value-cannot-reach-comparison",
+    30528,
+    "comparison value is not representable by the iterator",
+    span { loc = "comparison:Expr", message = "the comparison value ~toValue is not representable by the iterator type '~iteratorType:Type'." }
+)
+
+warning(
     "for-loop-predicate-checking-different-var",
     30508,
     "for loop predicate checks wrong variable",
@@ -3670,7 +3684,7 @@ warning(
 )
 
 warning(
-    "for-loop-changing-iteration-variable-in-oppsoite-direction",
+    "for-loop-changing-iteration-variable-in-opposite-direction",
     30511,
     "for loop modifies variable in wrong direction",
     span { loc = "sideEffect:Expr", message = "the for loop is modifiying variable '~var:Decl' in the opposite direction from loop exit condition." }

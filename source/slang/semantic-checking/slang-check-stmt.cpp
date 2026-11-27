@@ -832,6 +832,214 @@ void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)
     // Nothing to do
 }
 
+// The operator that steps a for-loop variable: `Add` for `++` and `+=`, `Sub` for `--` and `-=`.
+// The operator alone does not give the direction the variable moves: the sign of the step value
+// does too. For example, `i -= -2` increases `i`.
+enum class LoopStepOperator
+{
+    Add,
+    Sub,
+};
+
+static BuiltinOperationKind getSwapSideComparisonOp(BuiltinOperationKind op)
+{
+    switch (op)
+    {
+    case BuiltinOperationKind::Less:
+        return BuiltinOperationKind::Greater;
+
+    case BuiltinOperationKind::Leq:
+        return BuiltinOperationKind::Geq;
+
+    case BuiltinOperationKind::Greater:
+        return BuiltinOperationKind::Less;
+
+    case BuiltinOperationKind::Geq:
+        return BuiltinOperationKind::Leq;
+
+    default:
+        SLANG_UNEXPECTED("Unexpected BuiltinOperationKind value");
+    }
+}
+
+// Return how many times the body of this loop runs:
+//
+//     for (i = initialValue; i OP comparisonValue; i STEP stepValue)
+//
+// Return -1 when the count cannot be inferred or does not fit in `int`. The loop variable `i` has
+// type `iteratorType`, `OP` is `comparisonKind`, and `STEP` is `+=` or `-=` as given by `stepOp`.
+// The comparison happens in the type of `comparisonValue`, which is the common type of the loop
+// variable and the bound. For example, in `for (int i = 0; i < 10u; i++)` it is `uint`.
+//
+// If the condition is false for the initial value, the count is 0 whatever the step is. Otherwise a
+// zero step or a step that moves the variable away from the bound gives -1, and the caller reports
+// the step.
+//
+// Nothing is inferred when the loop variable would leave the range of `iteratorType` or of the
+// comparison type before the condition fails, because the loop then wraps around and may never
+// end. For example, `for (int i = 5; i >= 0u; i--)` never ends, because `uint(-1)` is still
+// `>= 0u`.
+static int calculateNumLoopIterations(
+    const MathIntType& iteratorType,
+    const MathIntValue& initialValue,
+    const MathIntValue& comparisonValue,
+    BuiltinOperationKind comparisonKind,
+    const MathIntValue& stepValue,
+    LoopStepOperator stepOp)
+{
+    const MathIntType comparisonType{comparisonValue.getType()};
+
+    // We compute the count in these steps. A loop that counts down with `>` or `>=` mirrors one
+    // that counts up with `<` or `<=`, so we measure distances in the direction the variable moves.
+    //
+    // 1. If the condition is false for `initialValue` converted to the comparison type, the body
+    //    never runs, and the count is 0.
+    // 2. If that conversion changes `initialValue`, as when `int` -10 becomes `uint` 0xFFFFFFF6,
+    //    the values the loop compares differ from the values it steps, and we infer nothing.
+    // 3. `step` is the size of the step in the direction of travel. If it is zero or negative, the
+    //    variable does not move toward the bound, and we infer nothing.
+    // 4. `delta` is the distance from `initialValue` to `comparisonValue`. After steps 1 to 3,
+    //    `step` is positive, `delta` is non-negative, and both fit in `uint64_t`.
+    // 5. The count is `ceil(delta / step)` for `<` and `>`, and `floor(delta / step) + 1` for `<=`
+    //    and `>=`, because an inclusive bound runs the body once more when the variable lands on
+    //    it.
+    // 6. The value after the last iteration, `initialValue +/- count * step`, must be in the range
+    //    of both `iteratorType` and the comparison type. Otherwise the variable wraps around
+    //    before the condition fails, and we infer nothing.
+    // 7. The count must fit in `int`, the type of the inferred `[MaxIters]` value.
+
+    const bool reverseDirection{
+        comparisonKind == BuiltinOperationKind::Greater ||
+        comparisonKind == BuiltinOperationKind::Geq};
+    const MathIntValue initialCastToCompType{MathIntOps::cast(comparisonType, initialValue).value};
+
+    // check whether the loop predicate is false for the initial value
+    switch (comparisonKind)
+    {
+    case BuiltinOperationKind::Less:
+        if (MathIntOps::compLess(initialCastToCompType, comparisonValue).value.isZero())
+            return 0;
+        break;
+
+    case BuiltinOperationKind::Leq:
+        if (MathIntOps::compLeq(initialCastToCompType, comparisonValue).value.isZero())
+            return 0;
+        break;
+
+    case BuiltinOperationKind::Geq:
+        if (MathIntOps::compGeq(initialCastToCompType, comparisonValue).value.isZero())
+            return 0;
+        break;
+
+    case BuiltinOperationKind::Greater:
+        if (MathIntOps::compGreater(initialCastToCompType, comparisonValue).value.isZero())
+            return 0;
+        break;
+
+    default:
+        SLANG_UNEXPECTED("Bad comparisonKind");
+    }
+
+    // check whether the initial value is changed when cast to comparison type
+    if (MathIntOps::cast(comparisonValue.getType(), initialValue).flags & MathIntResult::Overflow)
+        return -1;
+
+    MathIntResult adjStepRes;
+
+    if ((!reverseDirection && stepOp == LoopStepOperator::Add) ||
+        (reverseDirection && stepOp == LoopStepOperator::Sub))
+        adjStepRes = MathIntOps::cast(MathIntType::UInt64Type, stepValue);
+    else
+        adjStepRes = MathIntOps::sub(
+            MathIntType::UInt64Type,
+            MathIntValue::constructFromValue(MathIntType::UInt8Type, 0U),
+            stepValue);
+
+    // If we have an overflow here, the iterator is incremented in the wrong
+    // direction. It is also possible that it's not incremented at all, which
+    // we'll check separately. Examples:
+    //
+    //     for (int i = 0; i < 5; --i)
+    //     for (int i = 5; i >= 0; ++i)
+    //     for (int i = 0; i < 5; i += 0)
+    //
+    if ((adjStepRes.flags & MathIntResult::Overflow) || adjStepRes.value.isZero())
+        return -1;
+
+    MathIntResult deltaRes =
+        reverseDirection ? MathIntOps::sub(MathIntType::UInt64Type, initialValue, comparisonValue)
+                         : MathIntOps::sub(MathIntType::UInt64Type, comparisonValue, initialValue);
+
+    // assert: deltaRes is within Uint64Type range. We've already established that initialValue
+    // didn't change when cast to comparisonType, so we can't have deltas such as [-1, UINT64_MAX].
+    SLANG_RELEASE_ASSERT(deltaRes.flags == 0U);
+
+    MathIntResult divRes =
+        MathIntOps::div(MathIntType::UInt64Type, deltaRes.value, adjStepRes.value);
+    MathIntResult remRes =
+        MathIntOps::rem(MathIntType::UInt64Type, deltaRes.value, adjStepRes.value);
+
+    // We have returned above for a zero step, so the division and remainder are always defined.
+    SLANG_RELEASE_ASSERT(divRes.flags == 0U && remRes.flags == 0U);
+
+    // The count is `ceil(delta / step)` for an exclusive bound and `floor(delta / step) + 1` for
+    // an inclusive one.
+    MathIntResult stepsRes = MathIntOps::add(
+        MathIntType::UInt64Type,
+        divRes.value,
+        MathIntValue::constructFromValue(
+            MathIntType::UInt8Type,
+            (remRes.value.getUnsignedValue() != 0U || comparisonKind == BuiltinOperationKind::Leq ||
+             comparisonKind == BuiltinOperationKind::Geq)
+                ? 1U
+                : 0U));
+
+    // this may overflow in something such as 'for (uint64_t i = 0; i <= UINT64_MAX; ++i)'
+    if (stepsRes.flags & MathIntResult::Overflow)
+        return -1;
+
+    MathIntResult deltaFromSteps =
+        MathIntOps::mul(MathIntType::UInt64Type, stepsRes.value, adjStepRes.value);
+
+    // this may overflow in something such as 'for (uint64_t i = 0; i < UINT64_MAX; i +=
+    // UINT64_MAX/2)'
+    if (deltaFromSteps.flags & MathIntResult::Overflow)
+        return -1;
+
+    // compute the final value and check that it's within iteratorType range
+    const MathIntResult finalValueRes{
+        reverseDirection ? MathIntOps::sub(iteratorType, initialValue, deltaFromSteps.value)
+                         : MathIntOps::add(iteratorType, initialValue, deltaFromSteps.value)};
+
+    if (finalValueRes.flags & MathIntResult::Overflow)
+        return -1;
+
+    // check that the final value is also within comparisonType range
+    if (MathIntOps::cast(comparisonType, finalValueRes.value).flags & MathIntResult::Overflow)
+        return -1;
+
+    // finally, check that numIters fits in the return type
+    uint64_t numIters = stepsRes.value.getUnsignedValue();
+    if (numIters <= std::numeric_limits<int>::max())
+        return static_cast<int>(numIters);
+    else
+        return -1;
+}
+
+// Return the variable reference that `expr` reads, looking through an implicit conversion of
+// it. Consider `for (int i = 0; i < 5u; i++)`: checking promotes both operands of `<` to their
+// common type `uint`, so the predicate's left operand is `ImplicitCastExpr(uint, VarExpr(i))`.
+// An explicit cast is not looked through, because it is user code and may narrow.
+static VarExpr* getVarExprLookingThroughImplicitCast(Expr* expr)
+{
+    if (auto castExpr = as<ImplicitCastExpr>(expr))
+    {
+        SLANG_ASSERT(castExpr->arguments.getCount() == 1);
+        expr = castExpr->arguments[0];
+    }
+    return as<VarExpr>(expr);
+}
+
 void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
 {
     // If a for loop is in the form of `for (var = initialVal; var $compareOp otherVal; var
@@ -847,267 +1055,334 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     // If we see suspicious code like `for (int i = 0; i < 5; j++)`, we will produce a warning along
     // the way.
     //
+
+    MathIntType iteratorType{};
+    MathIntValue initialValue{};
+    MathIntValue comparisonValue{};
+    BuiltinOperationKind compareOp{BuiltinOperationKind::Unknown};
+    MathIntValue stepValue{};
+    LoopStepOperator stepOp{};
+
+    DeclRef<Decl> iteratorVar = {};
+    Type* iteratorVarType = {};
     DeclRef<Decl> predicateVar = {};
-    Expr* initialVal = nullptr;
-    DeclRef<Decl> initialVar = {};
-    if (auto varStmt = as<DeclStmt>(stmt->initialStatement))
-    {
-        auto varDecl = as<VarDecl>(varStmt->decl);
-        if (!varDecl)
-            return;
-        initialVar = makeDeclRef<Decl>(varDecl);
-        initialVal = varDecl->initExpr;
-    }
-    else if (auto exprStmt = as<ExpressionStmt>(stmt->initialStatement))
-    {
-        auto assignExpr = as<AssignExpr>(exprStmt->expression);
-        if (!assignExpr)
-            return;
-        auto varExpr = as<VarExpr>(assignExpr->left);
-        if (!varExpr)
-            return;
-        initialVar = varExpr->declRef;
-        initialVal = assignExpr->right;
-    }
-    else
-        return;
+    BuiltinOperatorExpr* cmpExpr = nullptr;
+    Type* comparisonValueType = nullptr;
 
-    auto initialLitVal = as<ConstantIntVal>(
-        tryFoldIntegerConstantExpression(initialVal, ConstantFoldingKind::CompileTime, nullptr));
-
-    ConstantIntVal* finalVal = nullptr;
-    IROp compareOp = kIROp_Nop;
-    // A comparison loop predicate `i < N` on builtin scalar operands is always rewritten by the
-    // fast path to a `BuiltinOperatorExpr`, so that is the only form we need to recognize here.
-    auto cmpExpr = as<BuiltinOperatorExpr>(stmt->predicateExpression);
-    if (!cmpExpr)
-        return;
-    switch (cmpExpr->op)
+    // determine iterator type and initial value
     {
-    case BuiltinOperationKind::Less:
-        compareOp = kIROp_Less;
-        break;
-    case BuiltinOperationKind::Leq:
-        compareOp = kIROp_Leq;
-        break;
-    case BuiltinOperationKind::Greater:
-        compareOp = kIROp_Greater;
-        break;
-    case BuiltinOperationKind::Geq:
-        compareOp = kIROp_Geq;
-        break;
-    default:
-        // Only ordering comparisons drive trip-count inference.
-        return;
-    }
-    if (cmpExpr->arguments.getCount() != 2)
-        return;
-    auto leftCompareOperand = cmpExpr->arguments[0];
-    auto rightCompareOperand = cmpExpr->arguments[1];
-    if (!leftCompareOperand)
-        return;
-    if (!rightCompareOperand)
-        return;
-    if (auto rightVal = tryFoldIntegerConstantExpression(
-            cmpExpr->arguments[1],
-            ConstantFoldingKind::CompileTime,
-            nullptr))
-    {
-        auto leftVar = as<VarExpr>(leftCompareOperand);
-        if (!leftVar)
-            return;
-        predicateVar = leftVar->declRef;
-        finalVal = as<ConstantIntVal>(rightVal);
-    }
-    else if (
-        auto leftVal = tryFoldIntegerConstantExpression(
-            cmpExpr->arguments[0],
-            ConstantFoldingKind::CompileTime,
-            nullptr))
-    {
-        auto rightVar = as<VarExpr>(rightCompareOperand);
-        if (!rightVar)
-            return;
-        predicateVar = rightVar->declRef;
-        finalVal = as<ConstantIntVal>(leftVal);
-        compareOp = getSwapSideComparisonOp(compareOp);
-    }
-    else
-    {
-        // If neither left or right is constant, we assume left is variable and continue checking.
-        if (auto leftVar = as<VarExpr>(leftCompareOperand))
+        Expr* initialVal = nullptr;
+        if (auto varStmt = as<DeclStmt>(stmt->initialStatement))
         {
-            predicateVar = leftVar->declRef;
+            auto varDecl = as<VarDecl>(varStmt->decl);
+            if (!varDecl)
+                return;
+            iteratorVar = makeDeclRef<Decl>(varDecl);
+            initialVal = varDecl->initExpr;
+            iteratorVarType = varDecl->getType();
+            iteratorType = getIntegerFoldingMathIntType(m_astBuilder, iteratorVarType);
         }
-        if (auto rightVar = as<VarExpr>(rightCompareOperand))
+        else if (auto exprStmt = as<ExpressionStmt>(stmt->initialStatement))
         {
-            if (rightVar->declRef == initialVar)
+            auto assignExpr = as<AssignExpr>(exprStmt->expression);
+            if (!assignExpr)
+                return;
+            auto varExpr = as<VarExpr>(assignExpr->left);
+            if (!varExpr)
+                return;
+            iteratorVar = varExpr->declRef;
+            initialVal = assignExpr->right;
+
+            // The variable can be any variable declaration, such as a function parameter, so we
+            // take its type from the expression that names it.
+            iteratorVarType = varExpr->type.type;
+            iteratorType = getIntegerFoldingMathIntType(m_astBuilder, iteratorVarType);
+        }
+        else
+            return;
+
+        if (auto initialLitVal = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
+                initialVal,
+                ConstantFoldingKind::CompileTime,
+                nullptr)))
+            initialValue = MathIntValue::constructFromValue(
+                getIntegerFoldingMathIntType(m_astBuilder, initialLitVal->getType()),
+                initialLitVal->getValue());
+    }
+
+    // Determine comparison. The comparison is normalized as:
+    //
+    //     predicateVar compareOp comparisonValue
+    //
+    // Note: predicateVar is looked through an implicit cast if necessary, e.g., in
+    //
+    //   for (int8_t i = 0; i < 100; ++i)  // note: i < 100 is promoted to int(i) < 100
+    //
+    // We'll check here whether the iterator values survive the implicit cast.
+    {
+        // A comparison loop predicate `i < N` on builtin scalar operands is always rewritten by the
+        // fast path to a `BuiltinOperatorExpr`, so that is the only form we need to recognize here.
+        cmpExpr = as<BuiltinOperatorExpr>(stmt->predicateExpression);
+        if (!cmpExpr)
+            return;
+        switch (cmpExpr->op)
+        {
+        case BuiltinOperationKind::Less:
+        case BuiltinOperationKind::Leq:
+        case BuiltinOperationKind::Greater:
+        case BuiltinOperationKind::Geq:
+            compareOp = cmpExpr->op;
+            break;
+        default:
+            // Only ordering comparisons drive trip-count inference.
+            return;
+        }
+
+        if (cmpExpr->arguments.getCount() != 2)
+            return;
+        auto leftCompareOperand = cmpExpr->arguments[0];
+        auto rightCompareOperand = cmpExpr->arguments[1];
+        if (!leftCompareOperand)
+            return;
+        if (!rightCompareOperand)
+            return;
+        // Note: we'll try integer constant folding before VarExpr casting,
+        // since VarExpr may be foldable to a constant.
+        if (auto rightVal = tryFoldIntegerConstantExpression(
+                cmpExpr->arguments[1],
+                ConstantFoldingKind::CompileTime,
+                nullptr))
+        {
+
+            auto leftVar = getVarExprLookingThroughImplicitCast(leftCompareOperand);
+            if (!leftVar)
+                return;
+            predicateVar = leftVar->declRef;
+            if (auto finalVal = as<ConstantIntVal>(rightVal))
+            {
+                comparisonValueType = finalVal->getType();
+                comparisonValue = MathIntValue::constructFromValue(
+                    getIntegerFoldingMathIntType(m_astBuilder, comparisonValueType),
+                    finalVal->getValue());
+            }
+        }
+        else if (
+            auto leftVal = tryFoldIntegerConstantExpression(
+                cmpExpr->arguments[0],
+                ConstantFoldingKind::CompileTime,
+                nullptr))
+        {
+            auto rightVar = getVarExprLookingThroughImplicitCast(rightCompareOperand);
+            if (!rightVar)
+                return;
+            predicateVar = rightVar->declRef;
+            if (auto finalVal = as<ConstantIntVal>(leftVal))
+            {
+                comparisonValueType = finalVal->getType();
+                comparisonValue = MathIntValue::constructFromValue(
+                    getIntegerFoldingMathIntType(m_astBuilder, comparisonValueType),
+                    finalVal->getValue());
+            }
+            compareOp = getSwapSideComparisonOp(compareOp);
+        }
+        else
+        {
+            // If neither left or right is constant, we'll check if either is
+            // the iterator variable. If not and both are variables, we'll
+            // assume that leftVar is the predicate variable for diagnostics.
+            VarExpr* leftVar = getVarExprLookingThroughImplicitCast(leftCompareOperand);
+            VarExpr* rightVar = getVarExprLookingThroughImplicitCast(rightCompareOperand);
+
+            if (leftVar && leftVar->declRef == iteratorVar)
+            {
+                predicateVar = leftVar->declRef;
+            }
+            else if (rightVar && rightVar->declRef == iteratorVar)
             {
                 predicateVar = rightVar->declRef;
                 compareOp = getSwapSideComparisonOp(compareOp);
             }
+            else if (leftVar && rightVar)
+            {
+                predicateVar = leftVar->declRef;
+            }
         }
     }
 
-    switch (compareOp)
+    // determine step and step direction
     {
-    case kIROp_Less:
-    case kIROp_Leq:
-    case kIROp_Greater:
-    case kIROp_Geq:
-        break;
-    default:
-        return;
-    }
+        auto opSideEffectExpr = as<InvokeExpr>(stmt->sideEffectExpression);
+        if (!opSideEffectExpr)
+            return;
+        auto sideEffectFuncExpr = as<DeclRefExpr>(opSideEffectExpr->functionExpr);
+        if (!sideEffectFuncExpr)
+            return;
+        auto sideEffectFuncDecl = sideEffectFuncExpr->declRef.getDecl();
+        if (!sideEffectFuncDecl)
+            return;
+        if (auto opName = sideEffectFuncDecl->getName())
+        {
+            if (opName->text == "++" || opName->text == "+=")
+                stepOp = LoopStepOperator::Add;
+            else if (opName->text == "--" || opName->text == "-=")
+                stepOp = LoopStepOperator::Sub;
+            else
+                return;
+        }
 
-    ConstantIntVal* stepSize = nullptr;
-    IROp sideEffectFuncOp = kIROp_Nop;
-    auto opSideEffectExpr = as<InvokeExpr>(stmt->sideEffectExpression);
-    if (!opSideEffectExpr)
-        return;
-    auto sideEffectFuncExpr = as<DeclRefExpr>(opSideEffectExpr->functionExpr);
-    if (!sideEffectFuncExpr)
-        return;
-    auto sideEffectFuncDecl = sideEffectFuncExpr->declRef.getDecl();
-    if (!sideEffectFuncDecl)
-        return;
-    if (auto opName = sideEffectFuncDecl->getName())
-    {
-        if (opName->text == "++")
-            sideEffectFuncOp = kIROp_Add;
-        else if (opName->text == "--")
-            sideEffectFuncOp = kIROp_Sub;
-        else if (opName->text == "+=")
-            sideEffectFuncOp = kIROp_Add;
-        else if (opName->text == "-=")
-            sideEffectFuncOp = kIROp_Sub;
+        if (opSideEffectExpr->arguments.getCount())
+        {
+            auto varExpr = as<VarExpr>(opSideEffectExpr->arguments[0]);
+            if (!varExpr)
+                return;
+            if (varExpr->declRef.getDecl() != iteratorVar.getDecl())
+            {
+                // If the user writes something like `for (int i = 0; i < 5; j++)`,
+                // it is most likely a bug, so we issue a warning.
+                if (predicateVar == iteratorVar)
+                    getSink()->diagnose(Diagnostics::ForLoopSideEffectChangingDifferentVar{
+                        .initVar = iteratorVar.getDecl(),
+                        .modifiedVar = varExpr->declRef.getDecl(),
+                        .sideEffect = varExpr});
+                return;
+            }
+        }
         else
             return;
-    }
-    if (opSideEffectExpr->arguments.getCount())
-    {
-        auto varExpr = as<VarExpr>(opSideEffectExpr->arguments[0]);
-        if (!varExpr)
-            return;
-        if (varExpr->declRef.getDecl() != initialVar.getDecl())
+
+        if (opSideEffectExpr->arguments.getCount() == 2)
         {
-            // If the user writes something like `for (int i = 0; i < 5; j++)`,
-            // it is most likely a bug, so we issue a warning.
-            if (predicateVar == initialVar)
-                getSink()->diagnose(Diagnostics::ForLoopSideEffectChangingDifferentVar{
-                    .initVar = initialVar.getDecl(),
-                    .modifiedVar = varExpr->declRef.getDecl(),
-                    .sideEffect = varExpr});
+            auto stepVal = tryFoldIntegerConstantExpression(
+                opSideEffectExpr->arguments[1],
+                ConstantFoldingKind::CompileTime,
+                nullptr);
+            if (!stepVal)
+                return;
+            if (auto constantIntVal = as<ConstantIntVal>(stepVal))
+            {
+                stepValue = MathIntValue::constructFromValue(
+                    getIntegerFoldingMathIntType(m_astBuilder, constantIntVal->getType()),
+                    constantIntVal->getValue());
+            }
+        }
+        else
+        {
+            stepValue = MathIntValue::constructFromValue(MathIntType::UInt8Type, 1);
+        }
+
+        if (predicateVar.getDecl() != iteratorVar.getDecl())
+        {
+            if (predicateVar)
+                getSink()->diagnose(Diagnostics::ForLoopPredicateCheckingDifferentVar{
+                    .initVar = iteratorVar.getDecl(),
+                    .predicateVar = predicateVar.getDecl(),
+                    .predicate = stmt->predicateExpression});
             return;
         }
-    }
-    else
-        return;
-    if (opSideEffectExpr->arguments.getCount() == 2)
-    {
-        auto stepVal = tryFoldIntegerConstantExpression(
-            opSideEffectExpr->arguments[1],
-            ConstantFoldingKind::CompileTime,
-            nullptr);
-        if (!stepVal)
-            return;
-        if (auto constantIntVal = as<ConstantIntVal>(stepVal))
+
+        // The condition and the step both use the loop variable, so we can check how the comparison
+        // treats its values. Consider `for (int i = -5; i < 10u; i++)`: the comparison is in
+        // `uint`, where the initial value -5 becomes 0xFFFFFFFB, which is most likely not what the
+        // user meant.
+        if (iteratorType.width > 0U && initialValue.hasValue() && comparisonValue.hasValue())
         {
-            stepSize = constantIntVal;
+            // check that initial value survives the cast to comparison type
+            MathIntResult initValueCastRes =
+                MathIntOps::cast(comparisonValue.getType(), initialValue);
+            if (initValueCastRes.flags & MathIntResult::Overflow)
+            {
+                getSink()->diagnose(Diagnostics::ForLoopInitialValueChangesInComparison{
+                    .toType = comparisonValueType,
+                    .fromValue = initialValue.toString(),
+                    .toValue = initValueCastRes.value.toString(),
+                    .comparison = cmpExpr});
+            }
+
+            // check that the comparison value is representable by the iterator
+            MathIntResult comparisonValueCastRes = MathIntOps::cast(iteratorType, comparisonValue);
+            if (comparisonValueCastRes.flags & MathIntResult::Overflow)
+            {
+                getSink()->diagnose(Diagnostics::ForLoopIteratorValueCannotReachComparison{
+                    .toValue = comparisonValue.toString(),
+                    .iteratorType = iteratorVarType,
+                    .comparison = cmpExpr});
+            }
         }
-    }
-    else
-    {
-        stepSize = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
+
+        if (!stepValue.hasValue())
+            return;
     }
 
-    if (predicateVar.getDecl() != initialVar.getDecl())
+    int loopIterations{-1};
+
+    // do we have everything we need to determine loop iterations?
+    if (iteratorType.width > 0U && initialValue.hasValue() && comparisonValue.hasValue() &&
+        stepValue.hasValue())
     {
-        if (predicateVar)
-            getSink()->diagnose(Diagnostics::ForLoopPredicateCheckingDifferentVar{
-                .initVar = initialVar.getDecl(),
-                .predicateVar = predicateVar.getDecl(),
-                .predicate = stmt->predicateExpression});
-        return;
-    }
-    if (!stepSize)
-        return;
-    if (stepSize->getValue() > 0)
-    {
-        if (sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Greater ||
-            sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Less)
+        loopIterations = calculateNumLoopIterations(
+            iteratorType,
+            initialValue,
+            comparisonValue,
+            compareOp,
+            stepValue,
+            stepOp);
+
+        if (loopIterations >= 0)
         {
-            getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppsoiteDirection{
-                .var = initialVar.getDecl(),
+            if (loopIterations == 0)
+            {
+                getSink()->diagnose(Diagnostics::LoopRunsForZeroIterations{.stmt = stmt});
+            }
+
+            auto maxItersAttr = m_astBuilder->create<InferredMaxItersAttribute>();
+            auto litExpr = m_astBuilder->create<IntegerLiteralExpr>();
+            litExpr->type.type = m_astBuilder->getIntType();
+            litExpr->token.setName(getNamePool()->getName(String(loopIterations)));
+            maxItersAttr->args.add(litExpr);
+            maxItersAttr->intArgVals.add(
+                m_astBuilder->getIntVal(m_astBuilder->getIntType(), loopIterations));
+            maxItersAttr->value = (int32_t)loopIterations;
+            maxItersAttr->inductionVar = iteratorVar;
+            addModifier(stmt, maxItersAttr);
+        }
+    }
+
+    if (loopIterations != 0)
+    {
+        if (stepValue.isPositive())
+        {
+
+            if ((stepOp == LoopStepOperator::Add && (compareOp == BuiltinOperationKind::Greater ||
+                                                     compareOp == BuiltinOperationKind::Geq)) ||
+                (stepOp == LoopStepOperator::Sub && (compareOp == BuiltinOperationKind::Less ||
+                                                     compareOp == BuiltinOperationKind::Leq)))
+            {
+                getSink()->diagnose(
+                    Diagnostics::ForLoopChangingIterationVariableInOppositeDirection{
+                        .var = iteratorVar.getDecl(),
+                        .sideEffect = stmt->sideEffectExpression});
+            }
+        }
+        else if (stepValue.isNegative())
+        {
+            if ((stepOp == LoopStepOperator::Add && (compareOp == BuiltinOperationKind::Less ||
+                                                     compareOp == BuiltinOperationKind::Leq)) ||
+                (stepOp == LoopStepOperator::Sub && (compareOp == BuiltinOperationKind::Greater ||
+                                                     compareOp == BuiltinOperationKind::Geq)))
+            {
+                getSink()->diagnose(
+                    Diagnostics::ForLoopChangingIterationVariableInOppositeDirection{
+                        .var = iteratorVar.getDecl(),
+                        .sideEffect = stmt->sideEffectExpression});
+            }
+        }
+        else
+        {
+            getSink()->diagnose(Diagnostics::ForLoopNotModifyingIterationVariable{
+                .var = iteratorVar.getDecl(),
                 .sideEffect = stmt->sideEffectExpression});
-            return;
         }
     }
-    else if (stepSize->getValue() < 0)
-    {
-        if (sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Less ||
-            sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Greater)
-        {
-            getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppsoiteDirection{
-                .var = initialVar.getDecl(),
-                .sideEffect = stmt->sideEffectExpression});
-            return;
-        }
-    }
-    else
-    {
-        getSink()->diagnose(Diagnostics::ForLoopNotModifyingIterationVariable{
-            .var = initialVar.getDecl(),
-            .sideEffect = stmt->sideEffectExpression});
-        return;
-    }
-
-    if (!initialLitVal || !finalVal)
-        return;
-
-    auto absStepSize = abs(stepSize->getValue());
-    int adjustment = 0;
-    if (compareOp == kIROp_Geq || compareOp == kIROp_Leq)
-        adjustment = 1;
-
-    auto iterations = (Math::Max(finalVal->getValue(), initialLitVal->getValue()) -
-                       Math::Min(finalVal->getValue(), initialLitVal->getValue()) + absStepSize -
-                       1 + adjustment) /
-                      absStepSize;
-    switch (compareOp)
-    {
-    case kIROp_Geq:
-    case kIROp_Greater:
-        // Expect final value to be less than initial value.
-        if (finalVal->getValue() > initialLitVal->getValue())
-            iterations = 0;
-        break;
-    case kIROp_Leq:
-    case kIROp_Less:
-        if (finalVal->getValue() < initialLitVal->getValue())
-            iterations = 0;
-        break;
-    }
-    if (iterations == 0)
-    {
-        getSink()->diagnose(Diagnostics::LoopRunsForZeroIterations{.stmt = stmt});
-    }
-
-    // Note: the inferred max iterations may not be valid if the loop body
-    // also modifies the induction variable.
-    // We detect this case during lower-to-ir and will remove the `InferredMaxItersAttribute`
-    // if the loop body modifies the induction variable.
-    //
-    auto maxItersAttr = m_astBuilder->create<InferredMaxItersAttribute>();
-    auto litExpr = m_astBuilder->create<IntegerLiteralExpr>();
-    litExpr->type.type = m_astBuilder->getIntType();
-    litExpr->token.setName(getNamePool()->getName(String(iterations)));
-    maxItersAttr->args.add(litExpr);
-    maxItersAttr->intArgVals.add(m_astBuilder->getIntVal(m_astBuilder->getIntType(), iterations));
-    maxItersAttr->value = (int32_t)iterations;
-    maxItersAttr->inductionVar = initialVar;
-    addModifier(stmt, maxItersAttr);
-    return;
 }
 
 void SemanticsStmtVisitor::checkLoopInDifferentiableFunc(Stmt* stmt)

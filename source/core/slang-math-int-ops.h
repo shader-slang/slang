@@ -117,6 +117,10 @@ public:
 
     bool hasValue() const { return type.width > 0U; }
 
+    bool isZero() const { return getUnsignedValue() == 0U; }
+    bool isNegative() const { return type.isSigned && (getSignedValue() < 0); }
+    bool isPositive() const { return !(isZero() || isNegative()); }
+
     /// @brief Produces a typed value
     ///
     /// The format is as follows:
