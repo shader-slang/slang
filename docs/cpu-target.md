@@ -15,6 +15,7 @@ Slang has preliminary support for producing CPU source and binaries.
 These limitations apply to Slang transpiling to C++. 
 
 * Barriers are not supported (making these work would require an ABI change)
+* Ray tracing and ray queries are not supported; a shader may declare or pass a `RaytracingAccelerationStructure`, but tracing against it is rejected
 * Atomics are not supported in user code; the C++ backend implements only 32- and 64-bit integer atomic add, for compiler-generated code such as shader coverage counters
 * Limited support for [out of bounds](#out-of-bounds) accesses handling
 * Entry point/s cannot be named `main` (this is because downstream C++ compiler/s expecting a regular `main`)
@@ -460,7 +461,7 @@ Notice that of the entry point parameters `dispatchThreadID` is not part of Unif
 ```    
 
 
-Resource types become pointers to interfaces that implement their features. For example `Texture2D` become a pointer to a `ITexture2D` interface that has to be implemented in client side code. Similarly SamplerState and SamplerComparisonState become `ISamplerState` and `ISamplerComparisonState`.  
+Resource types become pointers to interfaces that implement their features. For example `Texture2D` become a pointer to a `ITexture2D` interface that has to be implemented in client side code. Similarly SamplerState and SamplerComparisonState become `ISamplerState` and `ISamplerComparisonState`. `RaytracingAccelerationStructure` becomes a struct holding one pointer to the opaque `IRaytracingAccelerationStructure`; ray tracing is not supported on CPU, so a shader can declare or pass one but not trace against it, and the host may leave the `handle` null.  
  
 The actual definitions for the interfaces for resource types, and types are specified in 'slang-cpp-types.h' in the `prelude` directory.
 
