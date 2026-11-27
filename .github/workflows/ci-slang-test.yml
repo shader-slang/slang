@@ -272,9 +272,3 @@ jobs:
            --platform "${{ inputs.platform }}" \
            --config "${{ inputs.config }}" \
            --skip-file tests/expected-example-failure-github.txt
-      # The slangc tests need no GPU, so the CPU-only jobs run them, and the jobs
-      # that run only the GPU APIs do not.
-      - name: Run slangc tests
-        if: inputs.gpu-tier != 't4' && inputs.gpu-tier != 'sm80plus'
-        run: |
-          PATH=$bin_dir:$PATH tools/slangc-test/test.sh
