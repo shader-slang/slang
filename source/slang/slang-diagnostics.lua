@@ -5504,6 +5504,13 @@ err(
     span { loc = "location", message = "__target_switch has no compatable target with current profile '~profile'" }
 )
 
+err(
+    "target-switch-no-case-for-target",
+    41037,
+    "__target_switch has no case for the current target",
+    span { loc = "location", message = "'~funcName' contains a __target_switch with no case for target '~targetName', so this code cannot be generated" }
+)
+
 warning(
     "profile-implicitly-upgraded",
     41012,

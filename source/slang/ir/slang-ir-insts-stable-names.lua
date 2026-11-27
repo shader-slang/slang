@@ -893,5 +893,6 @@ return {
 	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedStructuredBuffer"] = 917,
 	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedRWStructuredBuffer"] = 918,
 	["sizedBufferToUnsizedBuffer"] = 919,
-	["Type.PtrTypeBase.BorrowInParamBase.ByValueBorrowInParam"] = 920
+	["Type.PtrTypeBase.BorrowInParamBase.ByValueBorrowInParam"] = 920,
+	["Decoration.noTargetCase"] = 921
 }

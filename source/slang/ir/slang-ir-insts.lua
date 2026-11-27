@@ -1971,6 +1971,20 @@ local insts = {
 					struct_name = "UninitializedGlobalCheckFoundPossibleWriteDecoration",
 				},
 			},
+			-- Marks the `missingReturn` that `specializeTargetSwitch` emits for a `__target_switch`
+			-- with no case for the target in a value-returning function, which is reported as
+			-- E41037 (see that function). We reuse `missingReturn` because every CFG pass and
+			-- emitter already treats it as an unreachable terminator. A `missingReturn` without
+			-- this decoration is either the front end's fall-off-the-end marker (which the
+			-- missing-return checks report as E41009/E41010) or a case-less `__target_switch` in a
+			-- void function; neither is E41037's to report. The operand is the display name of
+			-- the function that held the switch.
+			{
+				noTargetCase = {
+					struct_name = "NoTargetCaseDecoration",
+					operands = { { "funcNameOperand", "IRStringLit" } },
+				},
+			},
 			{
 				requireSPIRVVersion = {
 					struct_name = "RequireSPIRVVersionDecoration",
