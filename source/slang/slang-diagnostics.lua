@@ -6522,6 +6522,13 @@ err(
 )
 
 err(
+    "int8-not-supported-in-wgsl",
+    56110,
+    "8-bit integers not supported in WGSL",
+    span { loc = "location", message = "8-bit integer type '~typeName' is not supported by the WGSL backend." }  -- Raised at emit time, so it prints without a source position
+)
+
+err(
     "byte-address-buffer-sub-word-store-not-supported-in-wgsl",
     56112,
     "byte-address buffer stores of 8- or 16-bit values are not supported in WGSL",
