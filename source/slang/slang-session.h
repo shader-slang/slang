@@ -87,6 +87,32 @@ struct ContainerTypeKey
     }
 };
 
+/// One occupancy slot in the sequential-ID allocation space: a sequential ID reserved against a
+/// specific interface (identified by the interface's mangled name, not the witness's). The same
+/// numeric ID on two different interfaces is legal, so it is the pair — not the ID alone — that
+/// must be unique. Because the interface is keyed by mangled name, obfuscated or otherwise
+/// divergent linkage names for one logical interface split its occupancy into two keys.
+struct TypeConformanceSequentialIDKey
+{
+    typedef TypeConformanceSequentialIDKey ThisType;
+
+    String interfaceMangledName;
+    uint32_t sequentialID;
+
+    bool operator==(const ThisType& other) const
+    {
+        return interfaceMangledName == other.interfaceMangledName &&
+               sequentialID == other.sequentialID;
+    }
+
+    HashCode getHashCode() const
+    {
+        return combineHash(
+            Slang::getHashCode(interfaceMangledName),
+            Slang::getHashCode(sequentialID));
+    }
+};
+
 /// A context for loading and re-using code modules.
 class Linkage : public RefObject, public slang::ISession
 {
@@ -233,6 +259,24 @@ public:
 
     RefPtr<ASTBuilder> m_astBuilder;
 
+    // These helpers maintain the shared sequential-ID bookkeeping. Callers must hold
+    // `m_sequentialIDMapMutex`. Both are allocation-protocol steps, not plain queries:
+    // `getFirstFree...` advances the per-interface cursor past occupied slots and returns the
+    // first free ID *without reserving it* — the caller must immediately pair it with
+    // `registerTypeConformanceWitnessSequentialID`, or two callers can be handed the same ID.
+    uint32_t getFirstFreeTypeConformanceWitnessSequentialID(String const& interfaceMangledName);
+
+    // Records that a witness table owns `sequentialID` for its interface: the witness-name-to-ID
+    // map is overwritten last-wins (the old slot stays marked occupied and is never handed out
+    // again), and the (interface, ID) pair is marked occupied. Conflicting registrations are not
+    // reported here — duplicates are diagnosed only when both colliding tables share one
+    // `GetTagFromSequentialID` dispatch set during lowering; programs that only produce
+    // sequential IDs (for example RTTI bytes consumed host-side) stay silent.
+    void registerTypeConformanceWitnessSequentialID(
+        String const& witnessTableMangledName,
+        String const& interfaceMangledName,
+        uint32_t sequentialID);
+
     // Cache for container types.
     Dictionary<ContainerTypeKey, Type*> m_containerTypes;
 
@@ -260,7 +304,25 @@ public:
     // used by `switch`-based dynamic dispatch.
     Dictionary<String, uint32_t> mapMangledNameToRTTIObjectIndex;
 
-    // Counters for allocating sequential IDs to witness tables conforming to each interface type.
+    // Sequential-ID allocation protocol, shared across four sites: explicit overrides are
+    // registered into `usedTypeConformanceWitnessSequentialIDKeys` at
+    // `createTypeConformanceComponentType` time; implicit allocations (the query API and the
+    // IR lowering pass) take the first free slot for their interface; and the IR pass
+    // re-registers decorated witness tables so explicit IDs arriving via linked or serialized
+    // IR are also visible to the allocator. Registration never reports a conflict — a
+    // collision only matters inside one dispatch set, so duplicates are diagnosed during
+    // `lowerGetTagFromSequentialID`, not when an ID is reserved.
+    //
+    // Tracks which interface/sequential-ID pairs are already occupied.
+    HashSet<TypeConformanceSequentialIDKey> usedTypeConformanceWitnessSequentialIDKeys;
+
+    // Lower-bound cursors for allocating sequential IDs to witness tables conforming to each
+    // interface: `getFirstFreeTypeConformanceWitnessSequentialID` advances a cursor lazily past
+    // occupied slots, while actual occupancy is decided by
+    // `usedTypeConformanceWitnessSequentialIDKeys` above. Occupancy only ever grows (nothing
+    // un-registers), so every slot a cursor has already advanced past was occupied at the time
+    // and stays occupied — the lowest free ID is therefore always at or after the cursor, and
+    // explicit reservations below the cursor are harmless.
     Dictionary<String, uint32_t> mapInterfaceMangledNameToSequentialIDCounters;
     // Witness-table sequential ID assignment updates both maps together.
     std::mutex m_sequentialIDMapMutex;

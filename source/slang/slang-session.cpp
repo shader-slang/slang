@@ -937,6 +937,37 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessMangled
     return SLANG_OK;
 }
 
+uint32_t Linkage::getFirstFreeTypeConformanceWitnessSequentialID(String const& interfaceMangledName)
+{
+    auto idAllocator =
+        mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceMangledName);
+    if (!idAllocator)
+    {
+        mapInterfaceMangledNameToSequentialIDCounters[interfaceMangledName] = 0;
+        idAllocator =
+            mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceMangledName);
+    }
+
+    while (usedTypeConformanceWitnessSequentialIDKeys.contains(
+        TypeConformanceSequentialIDKey{interfaceMangledName, *idAllocator}))
+    {
+        ++(*idAllocator);
+    }
+
+    return *idAllocator;
+}
+
+void Linkage::registerTypeConformanceWitnessSequentialID(
+    String const& witnessTableMangledName,
+    String const& interfaceMangledName,
+    uint32_t sequentialID)
+{
+    // Caller holds `m_sequentialIDMapMutex`.
+    mapMangledNameToRTTIObjectIndex[witnessTableMangledName] = sequentialID;
+    usedTypeConformanceWitnessSequentialIDKeys.add(
+        TypeConformanceSequentialIDKey{interfaceMangledName, sequentialID});
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequentialID(
     slang::TypeReflection* type,
     slang::TypeReflection* interfaceType,
@@ -962,15 +993,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
             *outId = resultIndex;
         return SLANG_OK;
     }
-    auto idAllocator = mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceName);
-    if (!idAllocator)
-    {
-        mapInterfaceMangledNameToSequentialIDCounters[interfaceName] = 0;
-        idAllocator = mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceName);
-    }
-    resultIndex = (*idAllocator);
-    ++(*idAllocator);
-    mapMangledNameToRTTIObjectIndex[name] = resultIndex;
+    resultIndex = getFirstFreeTypeConformanceWitnessSequentialID(interfaceName);
+    registerTypeConformanceWitnessSequentialID(name, interfaceName, resultIndex);
     if (outId)
         *outId = resultIndex;
     return SLANG_OK;
@@ -1019,6 +1043,25 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
 
     SLANG_EXCEPTION_TRY
     {
+        if (conformanceIdOverride != -1 &&
+            (conformanceIdOverride < 0 || (uint64_t)conformanceIdOverride > 0xFFFFFFFFull))
+        {
+            // Only -1 is the "assign automatically" sentinel; every other value must be a
+            // valid 32-bit sequential ID, otherwise the cast into the occupancy bookkeeping
+            // would wrap it into an unrelated ID silently. The uint64_t comparison is
+            // width-independent: on hosts where SlangInt is 32-bit the parameter can never
+            // exceed INT32_MAX, so the upper bound correctly never fires there.
+            // The message is emitted raw (without a registered diagnostic ID) because
+            // argument validation happens here at the API boundary, outside any compile
+            // context and without a source location to attach.
+            sink.diagnoseRaw(
+                Severity::Error,
+                "conformance sequential ID override must be -1 (assign automatically) "
+                "or an integer in [0, 4294967295].");
+            *outConformanceComponentType = nullptr;
+            sink.getBlobIfNeeded(outDiagnostics);
+            return SLANG_E_INVALID_ARG;
+        }
         auto sharedSemanticsContext = getSemanticsForReflection();
         SemanticsVisitor visitor(sharedSemanticsContext);
         visitor = visitor.withSink(&sink);
@@ -1030,6 +1073,25 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
         if (auto subtypeWitness = as<SubtypeWitness>(witness))
         {
             result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
+            if (conformanceIdOverride != -1)
+            {
+                // The override is registered into the Linkage occupancy maps immediately, so
+                // that implicit allocations — including pre-compilation
+                // `getTypeConformanceWitnessSequentialID` queries — skip the reserved slot.
+                // The explicit-reservations-first ordering contract in slang.h relies on this.
+                // A subtype check that produced a SubtypeWitness cannot have succeeded on
+                // non-internal reflection types, so `asInternal` failing here is an
+                // out-of-contract state that fails loudly rather than degrading to the
+                // SLANG_FAIL the sibling query uses for its pre-check null handling.
+                auto subType = asInternal(type);
+                auto supType = asInternal(interfaceType);
+                SLANG_RELEASE_ASSERT(subType && supType);
+                std::lock_guard<std::mutex> lock(m_sequentialIDMapMutex);
+                registerTypeConformanceWitnessSequentialID(
+                    getMangledNameForConformanceWitness(m_astBuilder, subType, supType),
+                    getMangledTypeName(m_astBuilder, supType),
+                    uint32_t(conformanceIdOverride));
+            }
         }
     }
 #if SLANG_HAS_EXCEPTIONS

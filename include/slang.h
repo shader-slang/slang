@@ -4783,7 +4783,21 @@ struct ISession : public ISlangUnknown
 
     /** Get the sequential ID used to identify a type witness in a dynamic object.
         The sequential ID is part of the RTTI bytes returned by `getDynamicObjectRTTIBytes`.
-     */
+
+        If no sequential ID has been assigned for `type : interfaceType`, this call will allocate an
+        implicit ID and return it. Implicit IDs are assigned from the lowest free slot for the
+        interface, skipping past explicit reservations and filling gaps in ascending order.
+
+        Any explicit sequential-ID reservations made via
+        `ISession::createTypeConformanceComponentType(..., conformanceIdOverride, ...)` should be
+        performed before calling this API. A slot here is one (interface, sequential ID) pair.
+
+        If a conflicting explicit ID is reserved after an implicit ID was already allocated for
+        the same slot, the conflict surfaces as an error at code generation — and only if both
+        conformances participate in sequential-ID-based dynamic dispatch in the compiled program.
+        A program that never dispatches over both can compile while carrying the latent
+        collision. This guarantee assumes non-obfuscated linkage names.
+    */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessSequentialID(
         slang::TypeReflection* type,
         slang::TypeReflection* interfaceType,
@@ -4811,7 +4825,12 @@ struct ISession : public ISlangUnknown
         automatically assign IDs to implementation types. The automatically assigned IDs can be
         queried via `ISession::getTypeConformanceWitnessSequentialID`.
 
+        If an application mixes explicit ID reservations with implicitly allocated IDs, explicit
+        reservations should be established first before any implicit IDs are queried.
+
         Returns SLANG_OK if succeeds, or SLANG_FAIL if `type` does not conform to `interfaceType`.
+        A `conformanceIdOverride` other than -1 must be an integer in [0, 4294967295]; the call
+        returns SLANG_E_INVALID_ARG otherwise.
     */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createTypeConformanceComponentType(
         slang::TypeReflection* type,
@@ -4875,6 +4894,12 @@ struct ISession : public ISlangUnknown
         this case, fields in the `Impl` type).
 
         `bufferSizeInBytes` must be greater than 16.
+
+        This call allocates an implicit sequential ID for `type : interfaceType` when none has
+        been assigned yet, following the same allocation and ordering rules as
+        `getTypeConformanceWitnessSequentialID`: explicit ID reservations made via
+        `ISession::createTypeConformanceComponentType(..., conformanceIdOverride, ...)` should
+        be established before any implicit IDs are requested.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDynamicObjectRTTIBytes(
         slang::TypeReflection* type,
