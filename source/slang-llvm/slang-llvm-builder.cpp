@@ -32,6 +32,7 @@
 #include <core/slang-blob.h>
 #include <core/slang-com-object.h>
 #include <core/slang-list.h>
+#include <core/slang-math.h>
 
 using namespace slang;
 
@@ -1621,6 +1622,15 @@ LLVMInst* LLVMBuilder::getConstantPtr(uint64_t value)
 
 LLVMInst* LLVMBuilder::getConstantFloat(LLVMType* type, double value)
 {
+    // For a `float` type, `ConstantFP::get` narrows `value` with `APFloat::convert`, which sets
+    // the quiet bit of a signaling NaN. The IR holds a `float` NaN widened by its bits (see
+    // `FloatBitsToDouble`), so build the constant from the bits `DoubleToFloatBits` returns.
+    if (type->isFloatTy() && std::isnan(value))
+    {
+        return llvm::ConstantFP::get(
+            type->getContext(),
+            llvm::APFloat(llvm::APFloat::IEEEsingle(), llvm::APInt(32, DoubleToFloatBits(value))));
+    }
     return llvm::ConstantFP::get(type, value);
 }
 
