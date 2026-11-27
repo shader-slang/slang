@@ -2069,44 +2069,129 @@ static LegalVal legalizeDefaultConstruct(IRTypeLegalizationContext* context, Leg
     }
 }
 
-static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* inst)
+/// Emit a fresh undefined value of `leafType` that preserves the IRUndefined kind and the
+/// source location of the original `inst`, so a decomposed leaf behaves like the whole and a
+/// later diagnosis can still point at the user's code.
+static IRInst* emitUndefinedLeaf(IRTypeLegalizationContext* context, IRInst* inst, IRType* leafType)
 {
-    // HACK: We check here if an undefined value we are trying to legalize is
-    // of an opaque type (such as a texture, buffer, or sampler), and issue
-    // a diagnostic (since there is really no way to make such code compile
-    // correctly for may of our downstream compilers).
-    //
-    // TODO(tfoley): This is emphatically *not* the right place for a diagnostic
-    // like this to be issued. We need rigorous checking for use of undefined
-    // values in the front-end. Once the front-end's checking can be trusted,
-    // the back-end should be able to remove any code that appears to use
-    // an uninitialized value of opaque type, since such code would have undefined
-    // behavior anyway.
-    //
-    IRType* opaqueType = nullptr;
-    if (isOpaqueType(inst->getFullType(), &opaqueType))
+    auto builder = context->builder;
+
+    // Re-emit with the same IRUndefined kind: a `Poison` of a leaf type is a poison of that
+    // type, and likewise for a `LoadFromUninitializedMemory`.
+    IRInst* undefined = nullptr;
+    if (inst->getOp() == kIROp_Poison)
     {
-        SourceLoc loc = findBestSourceLocFromUses(inst);
-
-        if (!loc.isValid())
-            loc = getDiagnosticPos(opaqueType);
-
-        context->m_sink->diagnose(
-            Diagnostics::UseOfUninitializedOpaqueHandle{.handleType = opaqueType, .location = loc});
+        undefined = builder->getPoison(leafType);
+    }
+    else
+    {
+        SLANG_ASSERT(inst->getOp() == kIROp_LoadFromUninitializedMemory);
+        undefined = builder->emitLoadFromUninitializedMemory(leafType);
     }
 
-    // It is not ideal, but this pass legalizes an undefined value to... nothing.
-    //
-    // As a result, in any context that tries to consume a `LegalVal` based on its type,
-    // we need to be prepared not only for a value that matches the structure of that type,
-    // but also the possibility of an empty value like this.
-    //
-    // TODO(tfoley): We should *either* have a distinct case of `LegalVal` to represent
-    // undefined-ness, or this code should follow the same flow as the other cases by
-    // recursively decomposing the structure of the instruction's type and building up
-    // a `LegalVal` that just happens to have undefined values at its leaves.
-    //
-    return LegalVal();
+    // Each leaf keeps the original's location, which is what makes the post-DCE diagnosis
+    // point at the user's declaration rather than nowhere.
+    undefined->sourceLoc = inst->sourceLoc;
+    return undefined;
+}
+
+/// Legalize an undefined value (`LoadFromUninitializedMemory` or `Poison`) by recursively
+/// decomposing the structure of its legalized type: each `simple` leaf, each half of a `pair`
+/// and each element of a `tuple` becomes one fresh undefined value of the same IRUndefined
+/// kind and source location — the same flow `legalizeDefaultConstruct` uses for `{}`. The
+/// remaining flavors also produce a value of their own shape: a `wrappedBuffer` names an
+/// undefined buffer handle with its element wrapping, and an `implicitDeref` names the
+/// undefined pointee it dereferences to. Only a `none` type legalizes to the empty value here.
+/// More generally, a consumer that consumes a `LegalVal` by type must tolerate an empty value
+/// wherever the type promises structure — other legalization paths still produce them.
+///
+/// Consider this example:
+///
+///     struct SampleArgs
+///     {
+///         Texture2D<float4> texture;
+///         float4 scale;
+///     };
+///     SampleArgs args;
+///     output[0] = getScale(args);
+///
+/// The undefined `args` reaches this function because its struct type legalizes to a pair of
+/// an ordinary part and a resource part. Decomposition yields one undefined value of the
+/// ordinary struct and one undefined `Texture2D` handle, exactly the values the program
+/// would contain if the fields were initialized separately. A field that is never read has
+/// no use, so dead-code elimination removes its undefined value and a program that leaves
+/// the texture field unread compiles with only the front-end uninitialized-variable
+/// warning. A genuinely-used handle keeps its uses and is treated exactly like a handle the
+/// user left undefined on its own: the SPIR-V pipeline rewrites a recognized access and
+/// diagnoses a handle that a surviving use keeps alive; HLSL and D3D emit it as an unbound
+/// resource with the warning as the only diagnostic; the GLSL and WGSL emitters compile it
+/// the same way but leave the undefined argument unnamed in the emitted code, as they
+/// already do for a directly-declared undefined handle.
+static LegalVal legalizeUndefined(
+    IRTypeLegalizationContext* context,
+    IRInst* inst,
+    LegalType const& legalType)
+{
+    switch (legalType.flavor)
+    {
+    case LegalType::Flavor::none:
+        return LegalVal();
+
+    case LegalType::Flavor::simple:
+        return LegalVal::simple(emitUndefinedLeaf(context, inst, legalType.getSimple()));
+
+    case LegalType::Flavor::pair:
+        {
+            auto pairType = legalType.getPair();
+            auto pairInfo = pairType->pairInfo;
+            LegalType ordinaryType = pairType->ordinaryType;
+            LegalType specialType = pairType->specialType;
+
+            LegalVal ordinaryVal = legalizeUndefined(context, inst, ordinaryType);
+
+            LegalVal specialVal = legalizeUndefined(context, inst, specialType);
+
+            return LegalVal::pair(ordinaryVal, specialVal, pairInfo);
+        }
+
+    case LegalType::Flavor::tuple:
+        {
+            auto tupleType = legalType.getTuple();
+
+            RefPtr<TuplePseudoVal> resTupleInfo = new TuplePseudoVal();
+            for (auto typeElem : tupleType->elements)
+            {
+                auto elemKey = typeElem.key;
+                TuplePseudoVal::Element resElem;
+                resElem.key = elemKey;
+                resElem.val = legalizeUndefined(context, inst, typeElem.type);
+                resTupleInfo->elements.add(resElem);
+            }
+            return LegalVal::tuple(resTupleInfo);
+        }
+
+    case LegalType::Flavor::implicitDeref:
+        // The flavor represents the value as the pointee it dereferences to, so an undefined
+        // pointer-like value decomposes into the undefined pointee, wrapped back the same way
+        // consumers unwrap it.
+        return LegalVal::implicitDeref(
+            legalizeUndefined(context, inst, legalType.getImplicitDeref()->valueType));
+
+    case LegalType::Flavor::wrappedBuffer:
+        {
+            // The flavor names the buffer handle (`simpleType`) plus the wrapping of the
+            // element type it fetches, so the undefined value names an undefined buffer
+            // handle and keeps the element wrapping as metadata, like a declared variable
+            // of this shape does.
+            auto wrappedBuffer = legalType.getWrappedBuffer();
+            auto undefined = emitUndefinedLeaf(context, inst, wrappedBuffer->simpleType);
+            return LegalVal::wrappedBuffer(LegalVal::simple(undefined), wrappedBuffer->elementInfo);
+        }
+
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
+    }
 }
 
 static LegalVal legalizeInst(
@@ -2199,7 +2284,7 @@ static LegalVal legalizeInst(
         break;
     case kIROp_LoadFromUninitializedMemory:
     case kIROp_Poison:
-        return legalizeUndefined(context, inst);
+        return legalizeUndefined(context, inst, type);
     case kIROp_GpuForeach:
         // This case should only happen when compiling for a target that does not support
         // GpuForeach
