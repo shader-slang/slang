@@ -938,7 +938,6 @@ static int calculateNumLoopIterations(
 
     default:
         SLANG_UNEXPECTED("Bad comparisonKind");
-        return -1;
     }
 
     // check whether the initial value is changed when cast to comparison type
