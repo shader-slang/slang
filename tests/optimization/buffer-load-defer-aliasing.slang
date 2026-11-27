@@ -13,7 +13,8 @@ struct Bottom
         // bottomGetValue. So we should not defer loading bigArray until after this write.
         *gOther = 100; 
 
-        // We should return the value from bigArray from a previously loaded value of `this`.
+        // The element must be read before the write through `gOther` above. Only that element is
+        // loaded, not all of `this`.
         return bigArray[index];
     }
 }
@@ -33,6 +34,12 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void compute_main(uint3 tid: SV_DispatchThreadID)
 {
-    // SPV: OpLoad %Bottom_natural
+    // The value must be loaded before the aliasing store to `*gOther`, and not again after it.
+    // SPV-LABEL: %Bottom_bottomGetValue = OpFunction
+    // SPV: %[[P:[0-9]+]] = OpAccessChain %_ptr_PhysicalStorageBuffer_float
+    // SPV: %[[V:[0-9]+]] = OpLoad %float %[[P]]
+    // SPV: OpStore %{{[0-9]+}} %int_100
+    // SPV-NOT: OpLoad %float
+    // SPV: OpReturnValue %[[V]]
     outputBuffer[0] = gRoot.bottom1.bottomGetValue(0);
 }
