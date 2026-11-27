@@ -82,8 +82,8 @@
 // PIN_WGSL: 'metalOnlyPositive' contains a __target_switch with no case for target 'wgsl'
 // PIN_HLSL: 'metalOnlyPositive' contains a __target_switch with no case for target 'hlsl'
 // PIN_LLVM: 'metalOnlyPositive' contains a __target_switch with no case for target 'llvm-host-ir'
-// One E41037 per source switch, even though this lane runs at -O0 (slang-test's default), where
-// the callee is inlined and the inlined copy carries the same mark.
+// This lane runs at -O0 (slang-test's default) and pins that exactly one E41037 is reported for
+// its single source switch, although the callee is force-inlined into the caller.
 // PIN_LOAD_CPP-COUNT-1: error[E41037]: __target_switch has no case for the current target
 // PIN_LOAD_CPP: '_Texture.Load' contains a __target_switch with no case for target 'cpp'
 // PIN_E41009_GLSL: non-void function must return in all cases for target 'glsl'
