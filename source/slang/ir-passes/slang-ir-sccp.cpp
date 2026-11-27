@@ -10,12 +10,14 @@
 namespace Slang
 {
 
-/// Return the `MathIntType` of the IR integer type with opcode `op`. Pointer-sized integer
-/// types are 64 bits wide.
+/// Return the `MathIntType` of the IR integer or bool type with opcode `op`. Pointer-sized
+/// integer types are 64 bits wide.
 static MathIntType getMathIntTypeOfIRIntType(IROp op)
 {
     switch (op)
     {
+    case kIROp_BoolType:
+        return MathIntType::BoolType;
     case kIROp_Int8Type:
         return MathIntType::Int8Type;
     case kIROp_Int16Type:
@@ -400,8 +402,8 @@ struct SCCPContext
             case kIROp_IntLit:
             case kIROp_BoolLit:
                 {
-                    IRIntegerValue intVal = irConstant->value.intVal;
-                    resultVal = getBuilder()->getIntValue(type, (IRIntegerValue)intVal);
+                    const IRIntegerValue intVal{irConstant->value.intVal};
+                    resultVal = getBuilder()->getIntValue(type, intVal);
                 }
                 break;
             default:
@@ -608,12 +610,12 @@ struct SCCPContext
         return LatticeVal::getConstant(resultVal);
     }
 
-    template<typename TIntFunc, typename TFloatFunc>
+    template<typename TMathIntOpsFunc, typename TFloatFunc>
     LatticeVal evalComparisonImpl(
         IRType*,
         LatticeVal v0,
         LatticeVal v1,
-        const TIntFunc& intFunc,
+        const TMathIntOpsFunc& mathIntOpsFunc,
         const TFloatFunc& floatFunc)
     {
         SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v0)
@@ -645,7 +647,12 @@ struct SCCPContext
         else
         {
             // Integer path - all integer types
-            resultVal = getBuilder()->getBoolValue(intFunc(c0->value.intVal, c1->value.intVal));
+            const MathIntValue c0IntVal{
+                MathIntValue::constructFromValue(getMathIntTypeOfIRIntType(op0), c0->value.intVal)};
+            const MathIntValue c1IntVal{
+                MathIntValue::constructFromValue(getMathIntTypeOfIRIntType(op1), c1->value.intVal)};
+            resultVal =
+                getBuilder()->getBoolValue(!mathIntOpsFunc(c0IntVal, c1IntVal).value.isZero());
         }
         if (!resultVal)
             return LatticeVal::getAny();
@@ -738,7 +745,7 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 == c1; },
+            MathIntOps::compEql,
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 == c1; });
     }
     LatticeVal evalNeq(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -747,7 +754,7 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 != c1; },
+            MathIntOps::compNeq,
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 != c1; });
     }
     LatticeVal evalGeq(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -756,7 +763,7 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 >= c1; },
+            MathIntOps::compGeq,
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 >= c1; });
     }
     LatticeVal evalLeq(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -765,7 +772,7 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 <= c1; },
+            MathIntOps::compLeq,
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 <= c1; });
     }
     LatticeVal evalGreater(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -774,7 +781,7 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 > c1; },
+            MathIntOps::compGreater,
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 > c1; });
     }
     LatticeVal evalLess(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -783,7 +790,7 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 < c1; },
+            MathIntOps::compLess,
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 < c1; });
     }
     LatticeVal evalAnd(IRType* type, LatticeVal v0, LatticeVal v1)
