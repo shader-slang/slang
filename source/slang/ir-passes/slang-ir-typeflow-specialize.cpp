@@ -4088,7 +4088,7 @@ struct TypeFlowSpecializationContext
         // code are covered end-to-end by conditional-interface-merge.slang; these
         // cases also carry set-specialized generic signatures whose Conditional
         // parameters keep refined info (the Optional sibling here has the same
-        // role), so removal is not justified by the suite alone.
+        // role).
         if (auto conditionalType = as<IRConditionalType>(typeLike))
         {
             IRBuilder builder(module);
