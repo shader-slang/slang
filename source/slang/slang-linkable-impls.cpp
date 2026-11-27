@@ -631,7 +631,16 @@ void RenamedEntryPointComponentType::acceptVisitor(
 
 void RenamedEntryPointComponentType::buildHash(DigestBuilder<SHA1>& builder)
 {
-    SLANG_UNUSED(builder);
+    // Hash this component's own state — the name override — ahead of the base
+    // component it decorates, so a renamed sibling reaches the composite hash the same
+    // way a plain entry point sibling does. When the renamed entry point is the
+    // requested one, `getEntryPointHash`'s tail appends the override too; that
+    // deliberate overlap aside, this fold is what carries a *sibling's* identity —
+    // including the delegated base entry point, without which two programs whose
+    // siblings are distinct underlying entry points renamed to the same name would
+    // collide while generating different code.
+    builder.append(m_entryPointNameOverride);
+    m_base->buildHash(builder);
 }
 
 //

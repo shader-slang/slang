@@ -218,7 +218,10 @@ public:
     /// The `target` must be a target on the `Linkage` that was used to create this program.
     TargetProgram* getTargetProgram(TargetRequest* target);
 
-    /// Update the hash builder with the dependencies for this component type.
+    /// Update the hash builder with this component's contribution to a program cache
+    /// key: its own identifying state first, then its children/base. An override that
+    /// hashes nothing leaves the component invisible to every composite key, so
+    /// sibling-driven code differences then collide.
     virtual void buildHash(DigestBuilder<SHA1>& builder) = 0;
 
     /// Get the number of entry points linked into this component type.
