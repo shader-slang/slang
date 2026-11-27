@@ -37,6 +37,9 @@
 // time with E41011 and the late report never runs for it.
 //TEST:SIMPLE(filecheck=PIN_SLANGVM,exit-code=2):-target slangvm -entry main_metal_only -stage compute
 
+// A matching case is the positive control: on metal the same function compiles cleanly.
+//TEST:SIMPLE(filecheck=CLEAN):-target metal -entry main_metal_only -stage compute
+
 // A case-less switch in a void function: silent on the missing-return-tolerant targets, E41009 on
 // the strict ones with the early check intact, and silent on GLSL when that check was skipped,
 // because the void function carries no mark for the late report.
@@ -67,6 +70,8 @@
 //TEST:SIMPLE(filecheck=PIN_SPIRV,exit-code=2):-target spirv -entry main_metal_only -stage compute -ignore-capabilities -disable-non-essential-validations
 //TEST:SIMPLE(filecheck=PIN_GLSL,exit-code=2):-target glsl -entry main_metal_only -stage compute -ignore-capabilities -disable-non-essential-validations
 //TEST:SIMPLE(filecheck=PIN_WGSL,exit-code=2):-target wgsl -entry main_metal_only -stage compute -ignore-capabilities -disable-non-essential-validations
+//TEST:SIMPLE(filecheck=PIN_HLSL,exit-code=2):-target hlsl -entry main_metal_only -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_LLVM,exit-code=2):-target llvm-ir -entry main_metal_only -stage compute -ignore-capabilities
 //TEST:SIMPLE(filecheck=PIN_LOAD_CPP,exit-code=2):-target cpp -entry main_typed_load -stage compute
 // PIN_CUDA: error[E41037]: __target_switch has no case for the current target
 // PIN_CUDA: 'positive_only_on_gpu' contains a __target_switch with no case for target 'cuda'
@@ -75,7 +80,11 @@
 // PIN_SPIRV: 'metalOnlyPositive' contains a __target_switch with no case for target 'spirv'
 // PIN_GLSL: 'metalOnlyPositive' contains a __target_switch with no case for target 'glsl'
 // PIN_WGSL: 'metalOnlyPositive' contains a __target_switch with no case for target 'wgsl'
-// PIN_LOAD_CPP: error[E41037]: __target_switch has no case for the current target
+// PIN_HLSL: 'metalOnlyPositive' contains a __target_switch with no case for target 'hlsl'
+// PIN_LLVM: 'metalOnlyPositive' contains a __target_switch with no case for target 'llvm-host-ir'
+// One E41037 per source switch, even though this lane runs at -O0 (slang-test's default), where
+// the callee is inlined and the inlined copy carries the same mark.
+// PIN_LOAD_CPP-COUNT-1: error[E41037]: __target_switch has no case for the current target
 // PIN_LOAD_CPP: '_Texture.Load' contains a __target_switch with no case for target 'cpp'
 // PIN_E41009_GLSL: non-void function must return in all cases for target 'glsl'
 // PIN_E41009_GLSL-NOT: E41037

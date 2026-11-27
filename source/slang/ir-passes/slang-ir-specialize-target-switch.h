@@ -4,7 +4,6 @@
 namespace Slang
 {
 struct IRModule;
-struct IRNoTargetCaseDecoration;
 class TargetRequest;
 class DiagnosticSink;
 enum class CodeGenTarget;
@@ -23,9 +22,10 @@ enum class CodeGenTarget;
 // no-op there: those functions compile exactly as before. On targets that reject missing returns
 // (SPIR-V, GLSL, WGSL) every `missingReturn`, bare or marked, still gets the pre-existing E41009
 // from the early `checkForMissingReturns`, unless `-disable-non-essential-validations` skipped
-// that check, in which case the late report covers those targets too. The `slangvm` target never
-// reaches the late report: its capability profile is empty, so a switch with no case for it
-// errors E41011 here at link time instead.
+// that check, in which case the late report covers those targets too. Targets whose format has
+// no case in `TargetRequest::getTargetCaps()` — `slangvm`, and a directly requested `host-cpp` —
+// have the same empty capability profile and never reach the late report: a switch with no case
+// for them errors E41011 here at link time instead.
 //
 void specializeTargetSwitch(TargetRequest* target, IRModule* module, DiagnosticSink* sink);
 
