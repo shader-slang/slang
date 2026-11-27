@@ -21,8 +21,11 @@ void computeMainS(uniform RWStructuredBuffer<int> outp)
 
 // The pointer-sized local's debug type must resolve to a 64-bit signed integer
 // type declaration plus a signed `DebugTypeBasic` named after the source type.
-// The result-id anchor keeps the pattern off the file's own source text, which
-// `-g` embeds in the module as an OpString.
+// The result-id anchor matters because `-g` embeds the whole source file in the
+// module as an OpString — these CHECK comment lines included — so an unanchored
+// `OpTypeInt 64 1` would match the embedded copy of this very comment. The
+// `OpString "intptr_t"` pattern needs no anchor: spirv-dis escapes the quotes in
+// the embedded text, so only the real instruction matches.
 // CHECK_G_S-DAG: %{{[a-zA-Z_0-9]+}} = OpTypeInt 64 1
 // CHECK_G_S-DAG: OpString "intptr_t"
 // CHECK_G_S-DAG: OpExtInst %void %{{[0-9]+}} DebugTypeBasic %{{[0-9]+}} %uint_64 %uint_4 %uint_{{[0-9]+}}

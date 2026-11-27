@@ -8816,7 +8816,7 @@ bool getIntTypeSigned(IRType* intType)
     case kIROp_IntPtrType:
         return true;
     default:
-        SLANG_UNEXPECTED("Unhandled type passed to getIntTypeInfo");
+        SLANG_UNEXPECTED("Unhandled type passed to getIntTypeSigned");
     }
 }
 

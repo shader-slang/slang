@@ -3605,8 +3605,13 @@ bool isSignedType(IRType* type)
     case kIROp_FloatE5M2Type:
     case kIROp_BFloat16Type:
         return true;
-    // These signed cases must stay in sync with the canonical getIntTypeSigned (slang-ir.cpp);
-    // intptr_t is signed there, so classifying it unsigned here would desync the two classifiers.
+    // The signed integer cases must stay in sync with the canonical getIntTypeSigned
+    // (slang/ir/slang-ir.cpp) and with the signed-op sets that getUnsignedTypeFromSignedType
+    // and getOppositeSignIntTypeOp switch over: a signed integer type added to one of these
+    // places but not the others desyncs classification from emission. Full delegation to
+    // getIntTypeSigned is not possible here because this predicate also returns true for
+    // floating-point and vector/matrix element types, which getIntTypeSigned rejects as
+    // out of contract.
     case kIROp_IntType:
     case kIROp_Int16Type:
     case kIROp_Int64Type:
