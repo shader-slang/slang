@@ -252,6 +252,51 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
             return builder->emitMakeTuple(destTupleType, upcastedElements);
         }
     }
+    else if (as<IRConditionalType>(argInfo) && as<IRConditionalType>(destInfo))
+    {
+        // A `Conditional` value keeps its wrapper until `lowerConditionalType`, so both sides
+        // are refined Conditionals. A field or parameter can merge payload sets wider than
+        // this value's, so rebuild the wrapper around the widened payload, leaving the flag
+        // for conditional lowering.
+        auto argConditionalType = as<IRConditionalType>(argInfo);
+        auto destConditionalType = as<IRConditionalType>(destInfo);
+        // `ConditionalType` insts are hoistable and therefore deduplicated module-wide,
+        // so this pointer inequality really does mean the payload sets or flags differ.
+        // A merge point (field, parameter, return) has a single declared flag, so the two
+        // literal flags cannot differ in well-typed input; fail loudly rather than silently
+        // rewrite the value's compile-time flag in the rebuilt wrapper below — that flag
+        // decides `lowerConditionalType`'s keep-payload-vs-empty-struct layout. The flag may
+        // be spelled as either a BoolLit or an IntLit (see `typeIncludesDynamicDispatch`),
+        // so compare literal values, not insts. `flagValue` returns -1 for a non-literal
+        // (generic) flag; such flags are excluded from the comparison instead of assumed
+        // equal.
+        auto flagValue = [](IRInst* flag)
+        {
+            if (auto boolLit = as<IRBoolLit>(flag))
+                return (int)boolLit->getValue();
+            if (auto intLit = as<IRIntLit>(flag))
+                return (int)getIntVal(intLit);
+            return -1;
+        };
+        auto argFlag = flagValue(argConditionalType->getHasValue());
+        auto destFlag = flagValue(destConditionalType->getHasValue());
+        if (argFlag != -1 && destFlag != -1)
+            SLANG_RELEASE_ASSERT(argFlag == destFlag);
+        if (argConditionalType != destConditionalType)
+        {
+            auto value = builder->emitIntrinsicInst(
+                argConditionalType->getValueType(),
+                kIROp_GetConditionalValue,
+                1,
+                &arg);
+            auto upcastedValue = upcastSet(builder, value, destConditionalType->getValueType());
+            return builder->emitIntrinsicInst(
+                destConditionalType,
+                kIROp_MakeConditionalValue,
+                1,
+                &upcastedValue);
+        }
+    }
     else if (as<IROptionalType>(argInfo) && as<IROptionalType>(destInfo))
     {
         // If both arg and dest are optionals, we need to upcast the value type.

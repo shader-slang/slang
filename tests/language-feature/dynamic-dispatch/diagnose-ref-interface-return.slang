@@ -161,6 +161,20 @@ struct ContainerNestedRef
     }
 }
 
+// Scenario 9: enabled Conditional with interface payload — the flag is true,
+// so after conditional lowering the accessor exposes the raw interface.
+struct ContainerConditionalRef
+{
+    Conditional<IFoo, true> stored;
+    property Conditional<IFoo, true> val
+    {
+        get { return stored; }
+        ref { return stored; }
+//CHECK:^^^ ref accessor incompatible with dynamic dispatch
+//CHECK:^^^ 'ref' accessor returning type 'Conditional<IFoo, 1>' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+    }
+}
+
 // --- Positive tests: these should NOT produce error 52012 ---
 
 // Positive 1: ref accessor on a concrete (non-interface) type is fine.
@@ -206,6 +220,18 @@ struct ContainerComRef
 {
     ICom stored;
     property ICom val
+    {
+        get { return stored; }
+        ref { return stored; }
+    }
+}
+
+// Positive 5: disabled Conditional lowers to a zero-sized empty struct, so a
+// reference to it carries no interface payload at all.
+struct ContainerConditionalDisabledRef
+{
+    Conditional<IFoo, false> stored;
+    property Conditional<IFoo, false> val
     {
         get { return stored; }
         ref { return stored; }
