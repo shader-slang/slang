@@ -3689,6 +3689,8 @@ public vector<T.Element,4> textureGradOffset(Sampler1D<T> sampler, float p, floa
     return __vectorReshape2<T.Element,4>(sampler.SampleGrad(p, dPdx, dPdy, offset));
 }
 
+// Texel offsets are sized by the shape's plane dimensions (a cube face is 2D even though
+// the location is 3D), matching the offset-taking methods in the texture extensions.
 __generic<T:ITexelElement, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 [ForceInline]
@@ -3702,7 +3704,7 @@ public vector<T.Element,4> textureGradOffset(_Texture<
         0, // isShadow
         1, // isCombined
         format
-    > sampler, vector<float,Shape.dimensions+isArray> p, vector<float,Shape.dimensions> dPdx, vector<float,Shape.dimensions> dPdy, constexpr vector<int,Shape.dimensions> offset)
+    > sampler, vector<float,Shape.dimensions+isArray> p, vector<float,Shape.dimensions> dPdx, vector<float,Shape.dimensions> dPdy, constexpr vector<int,Shape.planeDimensions> offset)
 {
     return __vectorReshape2<T.Element,4>(sampler.SampleGrad(p, dPdx, dPdy, offset));
 }

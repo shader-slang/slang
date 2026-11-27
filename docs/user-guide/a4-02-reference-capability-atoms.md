@@ -430,7 +430,10 @@ Extensions
 > Represents the GL_ARB_sparse_texture2 extension.
 
 `GL_ARB_sparse_texture_clamp`
-> Represents the GL_ARB_sparse_texture_clamp extension.
+> Represents the GL_ARB_sparse_texture_clamp extension. The SPIR-V
+> companion atom is spvMinLod because a clamp-only lowering emits just the
+> MinLod image operand; the residency-status forms add spvSparseResidency
+> explicitly on the overloads that emit OpImageSparseSample*.
 
 `GL_ARB_texture_gather`
 > Represents the GL_ARB_texture_gather extension.
@@ -1198,6 +1201,9 @@ Compound Capabilities
 
 `cpp_glsl`
 > CPP, and GLSL code-gen targets
+
+`cpp_glsl_hlsl_metal`
+> CPP, GLSL, HLSL, and Metal code-gen targets
 
 `cpp_glsl_hlsl_metal_spirv`
 > CPP, GLSL, HLSL, Metal, and SPIRV code-gen targets

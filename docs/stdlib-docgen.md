@@ -62,10 +62,11 @@ The following code is an example of how `_Texture.Sample` is documented. Notice 
     ///@param s The `SamplerState` to use for the sampling operation. This parameter is omitted when `this` is a combined texture sampler type (`isCombined == 0`).
     ///@param location The location to sample the texture at.
     ///@param offset Texel offset to apply.
-    ///@param clamp The max level of detail to use.
+    ///@param clamp The minimum level of detail (LOD clamp) to use.
     ///@param[out] status The result status of the operation.
-    ///                   This parameter is currently only used when targeting HLSL.
-    ///                   For other targets, the result status is always 0.
+    ///                   On HLSL and SPIR-V this is the sparse-residency status
+    ///                   (see `CheckAccessFullyMapped`); on targets without
+    ///                   residency support, the result status is always 0.
     ///@return The sampled texture value.
     ///@see `SampleBias`, `SampleLevel`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`.
     ///@remarks

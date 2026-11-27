@@ -152,8 +152,7 @@ bool TEST_texture<T>(
 
         // Offset variant
 
-        // WGSL: textureSample({{\(*}}t1D
-        && all(Tvn(T.Element(0)) == t1D.Sample(samplerState, u, 1))
+        // WGSL doesn't support offset variant for 1d
 
         // WGSL: textureSample({{\(*}}t2D
         && all(Tvn(T.Element(0)) == t2D.Sample(samplerState, float2(u, u), int2(1, 1)))
