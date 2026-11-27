@@ -410,6 +410,7 @@ def extract_job_data(job, run):
     return {
         "id": job["id"],
         "run_id": run["id"],
+        "run_attempt": job.get("run_attempt") or run.get("run_attempt"),
         "name": job.get("name", ""),
         "workflow_name": run.get("name", ""),
         "workflow_path": run.get("path", ""),
