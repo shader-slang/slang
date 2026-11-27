@@ -1,5 +1,6 @@
 #include "slang-ir-specialize-target-switch.h"
 
+#include "core/slang-type-text-util.h"
 #include "slang-ir-dce.h"
 #include "slang/ir/slang-ir-insts.h"
 #include "slang/ir/slang-ir.h"
@@ -84,7 +85,28 @@ void specializeTargetSwitch(
                         .location = targetSwitch->sourceLoc,
                     });
                 }
-                builder.emitMissingReturn();
+                auto missingReturn = builder.emitMissingReturn();
+                missingReturn->sourceLoc = targetSwitch->sourceLoc;
+                // A value-returning function that falls off its end is undefined behavior once
+                // emitted, so the switch is reported as E41037 later, if its code is still
+                // generated; see the comment on `specializeTargetSwitch` in the header. A void
+                // function is left bare, because an empty body is a well-defined no-op there. The
+                // function is unwrapped from its `IRGeneric` by the recursion above, and only an
+                // `IRFunc` carries the result type that distinguishes the two.
+                if (auto func = as<IRFunc>(code))
+                {
+                    if (!as<IRVoidType>(func->getResultType()))
+                    {
+                        // The function name is recorded as a string because `code` may be inlined
+                        // into its callers and removed before the error is reported.
+                        StringBuilder funcName;
+                        printDiagnosticArg(funcName, code);
+                        builder.addDecoration(
+                            missingReturn,
+                            kIROp_NoTargetCaseDecoration,
+                            builder.getStringValue(funcName.getUnownedSlice()));
+                    }
+                }
             }
             targetSwitch->removeAndDeallocate();
             changed = true;
@@ -104,6 +126,31 @@ void specializeTargetSwitch(TargetRequest* target, IRModule* module, DiagnosticS
         if (auto code = as<IRGlobalValueWithCode>(globalInst))
         {
             specializeTargetSwitch(target, code, sink);
+        }
+    }
+}
+
+void diagnoseRemainingNoTargetCases(IRModule* module, CodeGenTarget target, DiagnosticSink* sink)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto code = as<IRGlobalValueWithCode>(globalInst);
+        if (!code)
+            continue;
+        for (auto block : code->getBlocks())
+        {
+            auto missingReturn = as<IRMissingReturn>(block->getTerminator());
+            if (!missingReturn)
+                continue;
+            if (auto noTargetCase = missingReturn->findDecoration<IRNoTargetCaseDecoration>())
+            {
+                sink->diagnose(Diagnostics::TargetSwitchNoCaseForTarget{
+                    .funcName = noTargetCase->getFuncNameOperand()->getStringSlice(),
+                    .targetName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)),
+                    .location = missingReturn->sourceLoc,
+                });
+                diagnoseCallStack(missingReturn, sink);
+            }
         }
     }
 }
