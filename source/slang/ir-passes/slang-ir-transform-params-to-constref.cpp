@@ -293,6 +293,12 @@ struct TransformParamsToConstRefContext
             // These functions have externally visible signatures that should not be changed.
             if (func->findDecorationImpl(kIROp_CudaDeviceExportDecoration))
                 return false;
+
+            // Skip `[DllExport]` wrappers. Their signature is the native ABI that a `[DllImport]`
+            // of the same function calls through a function pointer, which passes a struct
+            // argument by value, so the wrapper must keep taking it by value.
+            if (as<IRDllExportDecoration>(decoration))
+                return false;
         }
 
         // Skip functions with `kIROp_GenericAsm` since

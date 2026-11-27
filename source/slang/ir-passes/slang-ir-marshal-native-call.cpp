@@ -39,6 +39,125 @@ IRType* NativeCallMarshallingContext::getNativeType(IRBuilder& builder, IRType* 
     }
 }
 
+/// Returns whether a value of `type` is plain old data for a native call: its bytes mean the
+/// same thing to native code, and copying them neither creates nor ends any ownership.
+///
+/// For example, `float3`, `NativeString`, `int*`, `Tuple<int, float>`, and
+/// `struct { int a; float b[4]; }` qualify, while `String`, a class, a resource, a COM pointer, an
+/// unsized array, and any struct, tuple, or array containing one of them do not.
+///
+/// `typesInProgress` holds the aggregates whose classification is under way. A self-referential
+/// type such as `struct Node { int value; Node* next; }` reaches `Node` again through the pointer;
+/// that occurrence adds no new element types, so it counts as plain data and the recursion stops.
+static bool isPlainOldDataForNativeCall(IRType* type, HashSet<IRType*>& typesInProgress)
+{
+    if (as<IRBasicType>(type))
+        return true;
+    switch (type->getOp())
+    {
+    case kIROp_NativeStringType:
+        return true;
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+        return isPlainOldDataForNativeCall((IRType*)type->getOperand(0), typesInProgress);
+    case kIROp_PtrType:
+        {
+            // A raw pointer is plain data only if native code can use what it points to.
+            auto valueType = as<IRPtrTypeBase>(type)->getValueType();
+            return as<IRVoidType>(valueType) ||
+                   isPlainOldDataForNativeCall(valueType, typesInProgress);
+        }
+    case kIROp_ArrayType:
+        return isPlainOldDataForNativeCall(
+            as<IRArrayType>(type)->getElementType(),
+            typesInProgress);
+    case kIROp_UnsizedArrayType:
+        // An unsized array has no size that native code could agree on. A trailing unsized
+        // member could later map to a C flexible array member, but no form is supported yet.
+        return false;
+    case kIROp_StructType:
+    case kIROp_TupleType:
+        {
+            if (!typesInProgress.add(type))
+                return true;
+            bool result = true;
+            if (auto structType = as<IRStructType>(type))
+            {
+                for (auto field : structType->getFields())
+                    result = result &&
+                             isPlainOldDataForNativeCall(field->getFieldType(), typesInProgress);
+            }
+            else
+            {
+                // The DLL passes run before `lowerTuples`, so a tuple is still a tuple here; its
+                // operands are its element types.
+                for (UInt i = 0; i < type->getOperandCount(); ++i)
+                    result =
+                        result &&
+                        isPlainOldDataForNativeCall((IRType*)type->getOperand(i), typesInProgress);
+            }
+            typesInProgress.remove(type);
+            return result;
+        }
+    default:
+        return false;
+    }
+}
+
+/// Returns whether a value of `type` is plain old data for a native call.
+static bool isPlainOldDataForNativeCall(IRType* type)
+{
+    HashSet<IRType*> typesInProgress;
+    return isPlainOldDataForNativeCall(type, typesInProgress);
+}
+
+/// Returns whether `type` is a `[COM]` interface or a `ComPtr` to one, which a native signature
+/// accepts because COM reference counting defines its ownership.
+static bool isComInterfaceForNativeCall(IRType* type)
+{
+    return type->getOp() == kIROp_InterfaceType || type->getOp() == kIROp_ComPtrType;
+}
+
+bool NativeCallMarshallingContext::isFunctionSignatureValidForNativeCall(IRFunc* func)
+{
+    bool isSupported = true;
+    auto funcType = func->getDataType();
+    auto diagnose = [&](IRType* type, const char* position)
+    {
+        diagnosticSink->diagnose(Diagnostics::TypeNotSupportedInNativeSignature{
+            .func = func,
+            .type = type,
+            .position = position,
+            .location = func->sourceLoc});
+        isSupported = false;
+    };
+
+    for (UInt i = 0; i < funcType->getParamCount(); ++i)
+    {
+        auto paramType = funcType->getParamType(i);
+        if (auto ptrType = as<IRPtrTypeBase>(paramType);
+            ptrType && paramType->getOp() != kIROp_PtrType)
+        {
+            // `out`, `inout`, `ref`, and `__constref` pass the address of the caller's storage,
+            // so native code reads and writes the pointee directly.
+            auto valueType = ptrType->getValueType();
+            if (!isPlainOldDataForNativeCall(valueType) && !isComInterfaceForNativeCall(valueType))
+                diagnose(valueType, "by-reference parameter");
+        }
+        else if (
+            !isPlainOldDataForNativeCall(paramType) && !isComInterfaceForNativeCall(paramType) &&
+            paramType->getOp() != kIROp_StringType)
+        {
+            diagnose(paramType, "parameter");
+        }
+    }
+
+    auto resultType = funcType->getResultType();
+    if (!isPlainOldDataForNativeCall(resultType) && !isComInterfaceForNativeCall(resultType))
+        diagnose(resultType, "result");
+    return isSupported;
+}
+
 IRFuncType* NativeCallMarshallingContext::getNativeFuncType(
     IRBuilder& builder,
     IRFuncType* declaredFuncType)
@@ -168,18 +287,8 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeResultValue(
         SLANG_UNREACHABLE("out and ref types should be handled before reaching here.");
         break;
     case kIROp_StringType:
-        {
-            diagnosticSink->diagnose(Diagnostics::Unimplemented{
-                .feature = "marshal string to native return value",
-                .location = originalArg->sourceLoc});
-        }
-        break;
     case kIROp_ClassType:
-        {
-            diagnosticSink->diagnose(Diagnostics::Unimplemented{
-                .feature = "marshal class to native return value",
-                .location = originalArg->sourceLoc});
-        }
+        SLANG_UNREACHABLE("isFunctionSignatureValidForNativeCall rejects managed native results.");
         break;
     case kIROp_InterfaceType:
         {
@@ -317,56 +426,16 @@ IRInst* NativeCallMarshallingContext::marshalNativeCall(
         auto paramType = originalFuncType->getParamType(i);
         marshalManagedValueToNativeValue(builder, paramType, originalArgs[i], args);
     }
-    IRType* originalReturnType = originalFuncType->getResultType();
-
-    IRVar* resultVar = nullptr;
-    IRVar* errorVar = nullptr;
-    if (auto resultType = as<IRResultType>(originalReturnType))
-    {
-        // Declare a local variable to receive result.
-        resultVar = builder.emitVar(getNativeType(builder, resultType->getValueType()));
-        errorVar = builder.emitVar(getNativeType(builder, resultType->getErrorType()));
-        args.add(resultVar);
-        args.add(resultVar);
-    }
+    // `lowerErrorHandling` runs during lower-to-IR, so a `throws` function reaches this pass
+    // returning its lowered result struct rather than an `IRResultType`.
+    SLANG_ASSERT(!as<IRResultType>(originalFuncType->getResultType()));
 
     // Insert call.
     IRInst* call = builder.emitCallInst(nativeFuncType->getResultType(), nativeFunc, args);
 
     // TODO: marshal output/ref args back to original args.
 
-    IRInst* returnValue = call;
-
-    // Marshal result and out arguments back to managed values.
-    if (auto resultType = as<IRResultType>(originalReturnType))
-    {
-        auto val = builder.emitLoad(resultVar);
-        auto err = builder.emitLoad(errorVar);
-        auto tag = call;
-        val = marshalNativeValueToManagedValue(builder, val);
-        err = marshalNativeValueToManagedValue(builder, err);
-        auto intTag = tag;
-        if (tag->getDataType()->getOp() != kIROp_IntType)
-        {
-            intTag = builder.emitCast(builder.getIntType(), tag);
-        }
-        auto tagIsError = builder.emitLess(intTag, builder.getIntValue(builder.getIntType(), 0));
-        IRBlock *trueBlock, *falseBlock, *afterBlock;
-        builder.emitIfElseWithBlocks(tagIsError, trueBlock, falseBlock, afterBlock);
-        builder.setInsertInto(trueBlock);
-        returnValue = builder.emitMakeResultError(resultType, err);
-        builder.emitBranch(afterBlock, 1, &returnValue);
-        builder.setInsertInto(falseBlock);
-        returnValue = builder.emitMakeResultValue(resultType, val);
-        builder.emitBranch(afterBlock, 1, &returnValue);
-        builder.setInsertInto(afterBlock);
-        returnValue = builder.emitParam(resultType);
-    }
-    else
-    {
-        returnValue = marshalNativeValueToManagedValue(builder, call);
-    }
-    return returnValue;
+    return marshalNativeValueToManagedValue(builder, call);
 }
 
 } // namespace Slang

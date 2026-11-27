@@ -26,6 +26,19 @@ public:
     // Get a native function type of `func`.
     IRFuncType* getNativeFuncType(IRBuilder& builder, IRFuncType* declaredFuncType);
 
+    /// Returns whether every parameter and the result of `func` can cross a native `[DllImport]`
+    /// or `[DllExport]` boundary, and diagnoses each one that cannot. The function only validates;
+    /// it generates no marshalling code.
+    ///
+    /// Only types without managed elements have a lifetime that native code can honor, so a
+    /// signature may use plain-old-data types (scalars, vectors, matrices, `NativeString`, raw
+    /// pointers to such types, and structs and fixed-size arrays of them) and `[COM]` interfaces,
+    /// whose ownership follows `AddRef`/`Release`. A `String` is additionally accepted as a
+    /// by-value input parameter, because the call only borrows its bytes (an import passes
+    /// `const char*`) or copies them (an export builds a new `String`). Any other `String`, and
+    /// any class, resource, or aggregate containing one, is rejected.
+    bool isFunctionSignatureValidForNativeCall(IRFunc* func);
+
     // Insert a call at builder's current position into a native func with original arguments.
     // `originalArgs` will be marshalled to native args before the actual call.
     // returns the managed result value of the call.

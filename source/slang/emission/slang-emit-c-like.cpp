@@ -5505,6 +5505,10 @@ void CLikeSourceEmitter::ensureGlobalInst(
     {
         if (ctx->openInsts.contains(inst))
         {
+            // An open pointer is reached again only from inside its pointee's definition, as in
+            // `struct Node { Node* next; }`, where `Node*` needs only the name `Node`.
+            if (as<IRPtrType>(inst))
+                return;
             SLANG_UNEXPECTED("circularity during codegen");
             return;
         }
