@@ -6882,6 +6882,25 @@ Decl* Parser::ParseGLSLInterfaceBlock()
 static EnumCaseDecl* parseEnumCaseDecl(Parser* parser)
 {
     EnumCaseDecl* decl = parser->astBuilder->create<EnumCaseDecl>();
+
+    // An enum case accepts bracket attributes only, so that a case can carry its
+    // own `[require(...)]` capability requirements. Keyword modifiers are
+    // deliberately not parsed here: `ParseModifiers` would also consume
+    // identifiers registered as modifier keywords (`point`, `linear`, `sample`,
+    // `const`, ...), but those are legal case names, and the first identifier
+    // after the attribute list is the case's own name — parsing it as a
+    // modifier would reject `enum FilterMode { point = 0, linear = 1 }`, which
+    // parses fine without any attributes. A keyword modifier on a case remains
+    // a parse error, as before. `FillPosition` runs after this loop so the
+    // case's `loc` stays on its identifier rather than the leading attribute.
+    Modifiers modifiers;
+    Modifier** modifierLink = &modifiers.first;
+    while (peekTokenType(parser) == TokenType::LBracket)
+    {
+        ParseSquareBracketAttributes(parser, &modifierLink);
+    }
+    _addModifiers(decl, modifiers);
+
     parser->FillPosition(decl);
 
     decl->nameAndLoc = expectIdentifier(parser);
