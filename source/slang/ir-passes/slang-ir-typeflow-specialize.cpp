@@ -602,8 +602,9 @@ bool isConcreteType(IRInst* inst)
     return true;
 }
 
-// Returns true if `type` is a propagation-info kind (`TaggedUnionType`, `UntaggedUnionType` or
-// `ElementOfSetType`) rather than an ordinary IR type.
+// Returns true if `type` is a propagation-info kind (`TaggedUnionType`, `UntaggedUnionType`,
+// `ElementOfSetType`, or a `ConditionalType` around one of these) rather than an ordinary IR
+// type.
 //
 // An earlier `specializeDynamicInsts` run writes lowered infos back onto the insts it specializes,
 // so a later run can find info where it expects an IR type: as an inst's data type, as a callee's
@@ -627,6 +628,13 @@ bool isRefinedInfoType(IRInst* type)
     case kIROp_UntaggedUnionType:
     case kIROp_ElementOfSetType:
         return true;
+    case kIROp_ConditionalType:
+        // `Conditional` keeps its wrapper through specialization; only `lowerConditionalType`,
+        // which runs after `finalizeSpecialization`, may erase it, because erasing it earlier
+        // loses the compile-time flag. Refined info for a `Conditional<I, true>` existential is
+        // therefore a `ConditionalType` around the payload's info, and a later run must reuse
+        // it as info rather than treat the wrapper as an ordinary refinable type.
+        return isRefinedInfoType(cast<IRConditionalType>(type)->getValueType());
     default:
         return false;
     }
@@ -740,6 +748,23 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramTyp
                 module,
                 optionalType->getValueType(),
                 paramOptionalType->getValueType()));
+        }
+    }
+
+    // `Conditional` keeps its wrapper through specialization (see `isRefinedInfoType`), so a
+    // concrete `Conditional<Concrete, true>` value flowing into a non-concrete
+    // `Conditional<Interface, true>` parameter refines structurally, like the optional case
+    // above: the payload becomes a singleton union while the flag is carried along unchanged.
+    if (auto conditionalType = as<IRConditionalType>(type))
+    {
+        if (auto paramConditionalType = as<IRConditionalType>(paramType))
+        {
+            return builder.getConditionalType(
+                (IRType*)makeInfoForConcreteType(
+                    module,
+                    conditionalType->getValueType(),
+                    paramConditionalType->getValueType()),
+                conditionalType->getHasValue());
         }
     }
 
@@ -1397,6 +1422,27 @@ struct TypeFlowSpecializationContext
             }
         }
 
+        // Conditional (non-concrete payload)
+        if (auto conditionalMask = as<IRConditionalType>(typeUnionMask))
+        {
+            // Both infos are refined Conditionals: every producer that shapes info to a
+            // non-concrete `Conditional` mask wraps the payload info in a `ConditionalType`
+            // (`analyzeMakeConditionalValue`, `makeInfoForConcreteType`). Join their payload
+            // sets and carry the mask's flag, since the wrapper survives until
+            // `lowerConditionalType`. `as<>` unwraps attribute types, so read the payload from
+            // the matched conditional rather than assuming each info is exactly the mask type.
+            auto conditional1 = as<IRConditionalType>(info1);
+            auto conditional2 = as<IRConditionalType>(info2);
+            SLANG_ASSERT(conditional1 && conditional2);
+            IRBuilder builder(module);
+            return builder.getConditionalType(
+                (IRType*)unionPropagationInfo(
+                    conditionalMask->getValueType(),
+                    conditional1->getValueType(),
+                    conditional2->getValueType()),
+                conditionalMask->getHasValue());
+        }
+
         // AttributedType
         if (auto attrUnionMask = as<IRAttributedType>(typeUnionMask))
         {
@@ -1917,6 +1963,12 @@ struct TypeFlowSpecializationContext
             break;
         case kIROp_MakeOptionalNone:
             info = analyzeMakeOptionalNone(context, as<IRMakeOptionalNone>(inst));
+            break;
+        case kIROp_MakeConditionalValue:
+            info = analyzeMakeConditionalValue(context, as<IRMakeConditionalValue>(inst));
+            break;
+        case kIROp_GetConditionalValue:
+            info = analyzeGetConditionalValue(context, as<IRGetConditionalValue>(inst));
             break;
         case kIROp_MakeOptionalValue:
             info = analyzeMakeOptionalValue(context, as<IRMakeOptionalValue>(inst));
@@ -3468,6 +3520,44 @@ struct TypeFlowSpecializationContext
         return none();
     }
 
+    // `Conditional` analysis refines the payload while preserving the wrapper, which only
+    // `lowerConditionalType` (running after `finalizeSpecialization`) may erase. Consider:
+    //
+    //     struct Holder { Conditional<IValue, true> wrapped; }
+    //     Holder holder;
+    //     holder.wrapped = Conditional<IValue, true>(choose(data));
+    //
+    // `choose` returns an existential whose info is a tagged union. Wrapping that payload
+    // info in a `ConditionalType` lets the store into `wrapped` refine the field to
+    // `Conditional<TaggedUnion, true>` instead of leaving the declared type in place. If we
+    // propagated the payload info bare, `lowerConditionalType` would later rewrite the field
+    // to the raw interface type and expose a store of a tagged union into an unrefined
+    // interface field, which emission cannot handle.
+    IRInst* analyzeMakeConditionalValue(IRInst* context, IRMakeConditionalValue* inst)
+    {
+        auto conditionalType = as<IRConditionalType>(inst->getDataType());
+        if (conditionalType && !isConcreteType(conditionalType))
+        {
+            if (auto valueInfo = tryGetInfo(context, inst->getValue()))
+            {
+                IRBuilder builder(module);
+                return builder.getConditionalType(
+                    (IRType*)valueInfo,
+                    conditionalType->getHasValue());
+            }
+        }
+
+        return none();
+    }
+
+    IRInst* analyzeGetConditionalValue(IRInst* context, IRGetConditionalValue* inst)
+    {
+        if (auto conditionalInfo =
+                as<IRConditionalType>(tryGetInfo(context, inst->getConditionalOperand())))
+            return conditionalInfo->getValueType();
+        return none();
+    }
+
     IRInst* analyzeLookupWitnessMethod(IRInst* context, IRLookupWitnessMethod* inst)
     {
         // A LookupWitnessMethod is assumed to by dynamic, so we
@@ -3928,6 +4018,16 @@ struct TypeFlowSpecializationContext
                 (IRType*)substituteSetsInTypeLike(optionalType->getValueType()));
         }
 
+        // Substitute inside the payload; the wrapper's flag must survive until
+        // `lowerConditionalType`.
+        if (auto conditionalType = as<IRConditionalType>(typeLike))
+        {
+            IRBuilder builder(module);
+            return builder.getConditionalType(
+                (IRType*)substituteSetsInTypeLike(conditionalType->getValueType()),
+                conditionalType->getHasValue());
+        }
+
         if (auto diffPairType = as<IRDifferentialPairType>(typeLike))
         {
             IRBuilder builder(module);
@@ -3990,6 +4090,16 @@ struct TypeFlowSpecializationContext
             IRBuilder builder(module);
             return builder.getOptionalType(
                 (IRType*)substituteSets(context, optionalType->getValueType()));
+        }
+
+        // Substitute inside the payload; the wrapper's flag must survive until
+        // `lowerConditionalType`.
+        if (auto conditionalType = as<IRConditionalType>(type))
+        {
+            IRBuilder builder(module);
+            return builder.getConditionalType(
+                (IRType*)substituteSets(context, conditionalType->getValueType()),
+                conditionalType->getHasValue());
         }
 
         if (auto diffPairType = as<IRDifferentialPairType>(type))
@@ -5785,6 +5895,21 @@ struct TypeFlowSpecializationContext
                 return nullptr;
         }
 
+        // Keep the wrapper around the lowered payload; the flag only becomes erasable in
+        // `lowerConditionalType`.
+        if (auto conditionalType = as<IRConditionalType>(info))
+        {
+            IRBuilder builder(module);
+            if (auto specializedValueType = getLoweredType(conditionalType->getValueType()))
+            {
+                return builder.getConditionalType(
+                    (IRType*)specializedValueType,
+                    conditionalType->getHasValue());
+            }
+            else
+                return nullptr;
+        }
+
         if (auto taggedUnion = as<IRTaggedUnionType>(info))
         {
             return (IRType*)taggedUnion;
@@ -5901,6 +6026,10 @@ struct TypeFlowSpecializationContext
             return specializeIsType(context, as<IRIsType>(inst));
         case kIROp_MakeOptionalNone:
             return specializeMakeOptionalNone(context, as<IRMakeOptionalNone>(inst));
+        case kIROp_MakeConditionalValue:
+            return specializeMakeConditionalValue(context, as<IRMakeConditionalValue>(inst));
+        case kIROp_GetConditionalValue:
+            return replaceType(context, inst);
         case kIROp_MakeOptionalValue:
             return specializeMakeOptionalValue(context, as<IRMakeOptionalValue>(inst));
         case kIROp_OptionalHasValue:
@@ -8244,6 +8373,28 @@ struct TypeFlowSpecializationContext
         }
 
         return replaceType(context, inst);
+    }
+
+    bool specializeMakeConditionalValue(IRInst* context, IRMakeConditionalValue* inst)
+    {
+        // The wrapper survives until `lowerConditionalType`, so specialization only retypes
+        // the wrapper to its refined payload and widens the payload operand to that refined
+        // set, like any other value flowing into a field or parameter of the refined type.
+        // The widened value must be produced eagerly because a store into a field that is
+        // refined wider in the same round re-reads the operand through `upcastSet`.
+        bool changed = replaceType(context, inst);
+        auto conditionalType = as<IRConditionalType>(inst->getDataType());
+        if (!conditionalType)
+            return changed;
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto value = upcastSet(&builder, inst->getValue(), conditionalType->getValueType());
+        if (value != inst->getValue())
+        {
+            inst->setOperand(0, value);
+            changed = true;
+        }
+        return changed;
     }
 
     bool specializeGetOptionalValue(IRInst* context, IRGetOptionalValue* inst)

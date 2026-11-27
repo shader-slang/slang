@@ -252,6 +252,29 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
             return builder->emitMakeTuple(destTupleType, upcastedElements);
         }
     }
+    else if (as<IRConditionalType>(argInfo) && as<IRConditionalType>(destInfo))
+    {
+        // A `Conditional` value keeps its wrapper until `lowerConditionalType`, so both sides
+        // are refined Conditionals. A field or parameter can merge payload sets wider than
+        // this value's, so rebuild the wrapper around the widened payload, leaving the flag
+        // for conditional lowering.
+        auto argConditionalType = as<IRConditionalType>(argInfo);
+        auto destConditionalType = as<IRConditionalType>(destInfo);
+        if (argConditionalType != destConditionalType)
+        {
+            auto value = builder->emitIntrinsicInst(
+                argConditionalType->getValueType(),
+                kIROp_GetConditionalValue,
+                1,
+                &arg);
+            auto upcastedValue = upcastSet(builder, value, destConditionalType->getValueType());
+            return builder->emitIntrinsicInst(
+                destConditionalType,
+                kIROp_MakeConditionalValue,
+                1,
+                &upcastedValue);
+        }
+    }
     else if (as<IROptionalType>(argInfo) && as<IROptionalType>(destInfo))
     {
         // If both arg and dest are optionals, we need to upcast the value type.
