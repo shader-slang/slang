@@ -74,8 +74,9 @@ void mainVec(uint3 id : SV_DispatchThreadID)
 }
 
 // The `-O2`/`-O3` legs reuse the `CHECK1` patterns: the downstream spirv-opt
-// presets for every level above `-O0` share the same pass list, so all three
-// produce the same demoted single-copy shape.
+// presets differ between optimization levels, but every level above `-O0`
+// runs inlining and `private-to-local`, and all three legs produce the same
+// demoted single-copy shape.
 //
 // At `-O0` the array is one Private global, stored into exactly once before
 // the first read, with no function-scope copy anywhere in the module. The
@@ -108,7 +109,9 @@ void mainVec(uint3 id : SV_DispatchThreadID)
 // CHECKM: %[[TM:[0-9]+]] = OpVariable %_ptr_Private__arr_float_int_8 Private
 // CHECKM-NOT: OpVariable %_ptr_Function__arr_float_int_8 Function
 // CHECKM: OpStore %[[TM]]
+// CHECKM-NOT: OpVariable %_ptr_Function__arr_float_int_8 Function
 // CHECKM: OpAccessChain %_ptr_Private_float %[[TM]]
+// CHECKM-NOT: OpVariable %_ptr_Function__arr_float_int_8 Function
 // CHECKM: OpStore %[[TM]]
 // CHECKM-NOT: OpStore %[[TM]]
 
