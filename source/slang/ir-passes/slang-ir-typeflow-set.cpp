@@ -236,18 +236,24 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
 
         if (argTupleType != destTupleType)
         {
-            UInt argElementCount = argTupleType->getOperandCount();
+            // The name sentinel of an autodiff context tuple has no field to extract, so it gets a
+            // poison operand, as in `convertStructToNamedTuple`.
+            //
+            auto nameSentinel = findTupleNameSentinel(destTupleType);
+            SLANG_RELEASE_ASSERT(nameSentinel == findTupleNameSentinel(argTupleType));
+            UInt elementCount = destTupleType->getOperandCount() - (nameSentinel ? 1 : 0);
 
             List<IRInst*> upcastedElements;
-            upcastedElements.setCount((Index)argElementCount);
-            for (UInt i = 0; i < argElementCount; i++)
+            upcastedElements.reserve((Index)destTupleType->getOperandCount());
+            for (UInt i = 0; i < elementCount; i++)
             {
                 auto argElementType = (IRType*)argTupleType->getOperand(i);
                 auto destElementType = (IRType*)destTupleType->getOperand(i);
                 auto argElement = builder->emitGetTupleElement(argElementType, arg, i);
-                auto upcastedElement = upcastSet(builder, argElement, destElementType);
-                upcastedElements[(Index)i] = upcastedElement;
+                upcastedElements.add(upcastSet(builder, argElement, destElementType));
             }
+            if (nameSentinel)
+                upcastedElements.add(builder->getPoison(nameSentinel));
 
             return builder->emitMakeTuple(destTupleType, upcastedElements);
         }

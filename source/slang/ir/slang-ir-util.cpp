@@ -368,6 +368,14 @@ bool isPtrToArrayType(IRInst* type)
     return isPointerOfType(type, kIROp_ArrayType) || isPointerOfType(type, kIROp_UnsizedArrayType);
 }
 
+IRTupleNameType* findTupleNameSentinel(IRInst* tupleType)
+{
+    SLANG_ASSERT(as<IRTupleType>(tupleType));
+    UInt operandCount = tupleType->getOperandCount();
+    if (operandCount == 0)
+        return nullptr;
+    return as<IRTupleNameType>(tupleType->getOperand(operandCount - 1));
+}
 
 bool isComInterfaceType(IRType* type)
 {
