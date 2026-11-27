@@ -602,6 +602,39 @@ bool isConcreteType(IRInst* inst)
     return true;
 }
 
+// Returns true if `type` stands for any one of a set of types, such as the type of `this` or an
+// associated type looked up from a witness table.
+//
+bool isTypeVariable(IRInst* type)
+{
+    type = unwrapAttributedType(type);
+    if (!type)
+        return false;
+    if (as<IRUntaggedUnionType>(type))
+        return true;
+    if (isConcreteType(type))
+        return false;
+
+    switch (type->getOp())
+    {
+    case kIROp_LookupWitnessMethod:
+    case kIROp_AssociatedType:
+    case kIROp_ThisType:
+    case kIROp_ExtractExistentialType:
+        return true;
+    case kIROp_Param:
+        return as<IRTypeType>(type->getDataType()) || as<IRTypeKind>(type->getDataType());
+    default:
+        break;
+    }
+
+    // `specializeLookupWitnessMethod` and `specializeExtractExistentialType` replace a type
+    // variable with an inst that selects its type by a run-time tag.
+    if (auto tagType = as<IRSetTagType>(type->getDataType()))
+        return as<IRTypeSet>(tagType->getSet()) != nullptr;
+    return false;
+}
+
 // Returns true if `type` is a propagation-info kind (`TaggedUnionType`, `UntaggedUnionType` or
 // `ElementOfSetType`) rather than an ordinary IR type.
 //
@@ -1093,6 +1126,191 @@ struct TypeFlowSpecializationContext
     {
         IRBuilder builder(module);
         return builder.getSetTagType(set);
+    }
+
+    // Return the function type that a calling context was declared with. A
+    // `SpecializeExistentialsInFunc` context has no function type of its own, so we use the type
+    // of the function that it binds.
+    //
+    IRFuncType* getDeclaredFuncType(IRInst* context)
+    {
+        if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(context))
+            context = getFuncDefinitionForContext(existentialSpecializedFunc);
+        auto funcType = as<IRFuncType>(context->getDataType());
+        SLANG_RELEASE_ASSERT(funcType);
+        return funcType;
+    }
+
+    // The helpers below handle values that cross a dispatched call as payloads, such as the
+    // backward context that a dispatched derivative returns as `T.MinimalContext`. The caller
+    // holds an untagged union and the callee sees the payload type. Both derive that type from the
+    // callee's declared type alone, so they agree on its layout.
+
+    // Return the payload type of the declared type `type`: `type` with each interface replaced by
+    // the tagged union over its witness tables, looking through tuples and arrays. A concrete type
+    // is its own payload type. Returns null, after diagnosing once, if `type` has none.
+    //
+    IRType* getPayloadType(IRInst* type, SourceLoc loc)
+    {
+        if (isConcreteType(type))
+            return (IRType*)type;
+
+        IRBuilder builder(module);
+        if (auto interfaceType = as<IRInterfaceType>(type))
+        {
+            auto payloadType = makeTaggedUnionOfAllConformances(interfaceType);
+            if (!payloadType && diagnosedNoTypeConformancesInterfaces.add(interfaceType))
+                diagnoseNoTypeConformances(interfaceType, loc);
+            return payloadType;
+        }
+
+        // A backward context checkpoints the values of a loop in arrays.
+        if (auto arrayType = as<IRArrayType>(type))
+        {
+            auto elementType = getPayloadType(arrayType->getElementType(), loc);
+            if (!elementType)
+                return nullptr;
+            return builder.getArrayType(
+                elementType,
+                arrayType->getElementCount(),
+                getArrayStride(arrayType));
+        }
+
+        if (auto tupleType = as<IRTupleType>(type))
+        {
+            List<IRType*> elementTypes;
+            for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+            {
+                auto elementType = getPayloadType(tupleType->getOperand(i), loc);
+                if (!elementType)
+                    return nullptr;
+                elementTypes.add(elementType);
+            }
+            return builder.getTupleType(elementTypes);
+        }
+
+        if (diagnosedUnsupportedPayloadTypes.add(type))
+        {
+            sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
+                .type = (IRType*)type,
+                .location = loc});
+        }
+        return nullptr;
+    }
+
+    // A value crosses a call as a payload where the call site sees a type variable and the callee
+    // declares a type of its own. A callee that declares a type variable, such as a generic
+    // parameter, receives the value unchanged.
+    //
+    bool isPayloadPosition(IRInst* maskType, IRInst* declaredType)
+    {
+        return isTypeVariable(maskType) && !isTypeVariable(declaredType);
+    }
+
+    // Returns true if `declaredType` is a payload position or holds one as a tuple element, as in
+    // the `Tuple<float, T.MinimalContext>` that a primal half returns.
+    //
+    bool hasPayloadPosition(IRInst* maskType, IRInst* declaredType)
+    {
+        if (isPayloadPosition(maskType, declaredType))
+            return true;
+
+        auto maskTuple = as<IRTupleType>(maskType);
+        auto declaredTuple = as<IRTupleType>(declaredType);
+        if (!maskTuple || !declaredTuple ||
+            maskTuple->getOperandCount() != declaredTuple->getOperandCount())
+            return false;
+        for (UInt i = 0; i < maskTuple->getOperandCount(); i++)
+        {
+            if (hasPayloadPosition(maskTuple->getOperand(i), declaredTuple->getOperand(i)))
+                return true;
+        }
+        return false;
+    }
+
+    enum class PayloadView
+    {
+        Caller, // Sees the untagged union of the payload type.
+        Callee, // Sees the payload type itself.
+    };
+
+    // Return `info` with the info at each payload position replaced by what `view` sees there.
+    // That info depends only on the declared type, so it is known even when `info` is null. Returns
+    // null if another tuple element has no info and no concrete declared type.
+    //
+    IRInst* mapPayloadPositions(
+        IRInst* maskType,
+        IRInst* declaredType,
+        IRInst* info,
+        PayloadView view,
+        SourceLoc loc)
+    {
+        if (!hasPayloadPosition(maskType, declaredType))
+            return info;
+
+        // Attributes such as `no_diff` do not change the payload.
+        maskType = unwrapAttributedType(maskType);
+        declaredType = unwrapAttributedType(declaredType);
+        info = unwrapAttributedType(info);
+
+        IRBuilder builder(module);
+        if (isPayloadPosition(maskType, declaredType))
+        {
+            auto payloadType = getPayloadType(declaredType, loc);
+            if (!payloadType || view == PayloadView::Callee)
+                return payloadType;
+            return makeUntaggedUnionType(
+                cast<IRTypeSet>(builder.getSingletonSet(kIROp_TypeSet, payloadType)));
+        }
+
+        auto maskTuple = cast<IRTupleType>(maskType);
+        auto declaredTuple = cast<IRTupleType>(declaredType);
+        auto infoTuple = as<IRTupleType>(info);
+        List<IRType*> elementInfos;
+        for (UInt i = 0; i < declaredTuple->getOperandCount(); i++)
+        {
+            auto declaredElementType = declaredTuple->getOperand(i);
+            IRInst* elementInfo = infoTuple ? infoTuple->getOperand(i) : nullptr;
+            if (!elementInfo && isConcreteType(declaredElementType))
+                elementInfo = declaredElementType;
+
+            elementInfo = mapPayloadPositions(
+                maskTuple->getOperand(i),
+                declaredElementType,
+                elementInfo,
+                view,
+                loc);
+            if (!elementInfo)
+                return none();
+            elementInfos.add((IRType*)elementInfo);
+        }
+        return builder.getTupleType(elementInfos);
+    }
+
+    // `mapPayloadPositions` for a parameter, whose types may carry a direction such as `inout`.
+    IRInst* mapPayloadPositionsOfParam(
+        IRType* maskParamType,
+        IRType* declaredParamType,
+        IRInst* info,
+        PayloadView view,
+        SourceLoc loc)
+    {
+        const auto [maskDirection, maskValueType] = splitParameterDirectionAndType(maskParamType);
+        const auto [declaredDirection, declaredValueType] =
+            splitParameterDirectionAndType(declaredParamType);
+        if (!hasPayloadPosition(maskValueType, declaredValueType))
+            return info;
+
+        if (declaredDirection.kind == ParameterDirectionInfo::Kind::In)
+            return mapPayloadPositions(maskValueType, declaredValueType, info, view, loc);
+
+        auto valueInfo = info ? cast<IRPtrTypeBase>(info)->getValueType() : nullptr;
+        auto mappedValueInfo =
+            mapPayloadPositions(maskValueType, declaredValueType, valueInfo, view, loc);
+        if (!mappedValueInfo)
+            return none();
+        IRBuilder builder(module);
+        return fromDirectionAndType(&builder, declaredDirection, (IRType*)mappedValueInfo);
     }
 
     IRInst* _tryGetInfo(InstWithContext element)
@@ -1605,17 +1823,14 @@ struct TypeFlowSpecializationContext
     void updateFuncReturnInfo(IRInst* callable, IRInst* returnInfo, WorkQueue<WorkItem>& workQueue)
     {
         // Don't update info if the callee has a concrete return type.
-        IRInst* callableForType = callable;
-        if (auto fwb = as<IRSpecializeExistentialsInFunc>(callable))
-            callableForType = getFuncDefinitionForContext(fwb);
-        auto callableFuncType = cast<IRFuncType>(callableForType->getDataType());
-        if (isConcreteType(callableFuncType->getResultType()))
+        auto declaredResultType = getDeclaredFuncType(callable)->getResultType();
+        if (isConcreteType(declaredResultType))
             return;
 
         auto existingReturnInfo = getFuncReturnInfo(callable);
         // Use the function's declared return type as union mask for structural union.
         auto newReturnInfo =
-            unionPropagationInfo(callableFuncType->getResultType(), existingReturnInfo, returnInfo);
+            unionPropagationInfo(declaredResultType, existingReturnInfo, returnInfo);
 
         if (!areInfosEqual(existingReturnInfo, newReturnInfo))
         {
@@ -1682,27 +1897,12 @@ struct TypeFlowSpecializationContext
             if (!interfaceType || isComInterfaceType(interfaceType))
                 continue;
 
-            // Collect witness tables for the interface from -conformance flags.
-            IRBuilder builder(module);
-            HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
-            collectExistentialTables(interfaceType, tables);
-            if (tables.getCount() > 0)
-            {
-                auto taggedUnion = makeTaggedUnionType(
-                    as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
+            // The witness tables for the interface come from -conformance flags. Without any, we
+            // emit error 50100 so the user knows they need such flags.
+            if (auto taggedUnion = makeTaggedUnionOfAllConformances(interfaceType))
                 updateInfo(moduleInst, globalParam, taggedUnion, workQueue);
-            }
             else
-            {
-                // No conformances registered for a bare interface global param.
-                // Emit error 50100 so the user knows they need -conformance flags.
-                StringBuilder typeStr;
-                printDiagnosticArg(typeStr, interfaceType);
-                sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
-                    .interfaceType = typeStr.produceString(),
-                    .location = globalParam->sourceLoc});
-            }
-            module->getContainerPool().free(&tables);
+                diagnoseNoTypeConformances(interfaceType, globalParam->sourceLoc);
         }
     }
 
@@ -2081,6 +2281,10 @@ struct TypeFlowSpecializationContext
                 if (!firstBlock)
                     return;
 
+                // The callee's signature as the caller sees it locates the payload positions.
+                auto callSiteMask = maybeExpandFuncType(
+                    this->callSiteFuncType[InstWithContext(edge.callerContext, callInst)]);
+
                 UInt argIndex = 1; // Skip callee (operand 0)
                 for (auto param : firstBlock->getParams())
                 {
@@ -2131,6 +2335,15 @@ struct TypeFlowSpecializationContext
 
                         IRInst* argInfo =
                             tryGetArgInfo(edge.callerContext, arg, param->getDataType());
+
+                        // At a payload position the callee sees its declared payload type
+                        // rather than the caller's untagged union.
+                        argInfo = mapPayloadPositionsOfParam(
+                            callSiteMask->getParamType(argIndex - 1),
+                            param->getDataType(),
+                            argInfo,
+                            PayloadView::Callee,
+                            callInst->sourceLoc);
 
                         switch (paramDirection.kind)
                         {
@@ -2187,30 +2400,20 @@ struct TypeFlowSpecializationContext
                 //
                 if (!isConcreteType(callInst->getDataType()))
                 {
-                    auto returnInfoPtr = funcReturnInfo.tryGetValue(targetCallee);
-                    auto returnInfo = (returnInfoPtr) ? *returnInfoPtr : nullptr;
-                    if (!returnInfo)
-                    {
-                        // If the targetCallee's return type is concrete, but the
-                        // callInst's return type is not, we should still propagate the
-                        // known concrete type. The return type may also be info that an
-                        // earlier `specializeDynamicInsts` run wrote there, which
-                        // `makeInfoForConcreteType` returns unchanged.
-                        //
-                        IRInst* calleeForType = targetCallee;
-                        if (auto fwb = as<IRSpecializeExistentialsInFunc>(targetCallee))
-                            calleeForType = getFuncDefinitionForContext(fwb);
-                        auto concreteReturnType =
-                            cast<IRFuncType>(calleeForType->getDataType())->getResultType();
-                        if (isConcreteType(concreteReturnType))
-                        {
-                            IRBuilder builder(module);
-                            returnInfo = makeInfoForConcreteType(
-                                module,
-                                concreteReturnType,
-                                callInst->getDataType());
-                        }
-                    }
+                    // The callee must return exactly the payload type that the caller unpacks, so
+                    // we widen its return info at payload positions.
+                    if (auto widenedReturnInfo = mapPayloadPositions(
+                            callInst->getDataType(),
+                            getDeclaredFuncType(targetCallee)->getResultType(),
+                            getFuncReturnInfo(targetCallee),
+                            PayloadView::Callee,
+                            callInst->sourceLoc))
+                        updateFuncReturnInfo(targetCallee, widenedReturnInfo, workQueue);
+
+                    auto returnInfo = getReturnInfoForCaller(
+                        targetCallee,
+                        callInst->getDataType(),
+                        callInst->sourceLoc);
 
                     if (returnInfo)
                     {
@@ -2272,7 +2475,6 @@ struct TypeFlowSpecializationContext
     {
         SLANG_UNUSED(context);
 
-        IRBuilder builder(module);
         if (auto interfaceType = as<IRInterfaceType>(inst->getDataType()))
         {
             if (isComInterfaceType(interfaceType))
@@ -2281,25 +2483,10 @@ struct TypeFlowSpecializationContext
                 return none();
             }
 
-            HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
-            collectExistentialTables(interfaceType, tables);
-            if (tables.getCount() > 0)
-            {
-                auto resultTaggedUnionType = makeTaggedUnionType(
-                    as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
-                module->getContainerPool().free(&tables);
-                return resultTaggedUnionType;
-            }
-            else
-            {
-                StringBuilder typeStr;
-                printDiagnosticArg(typeStr, interfaceType);
-                sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
-                    .interfaceType = typeStr.produceString(),
-                    .location = inst->sourceLoc});
-                module->getContainerPool().free(&tables);
-                return none();
-            }
+            if (auto taggedUnion = makeTaggedUnionOfAllConformances(interfaceType))
+                return taggedUnion;
+            diagnoseNoTypeConformances(interfaceType, inst->sourceLoc);
+            return none();
         }
 
         return none();
@@ -2543,25 +2730,10 @@ struct TypeFlowSpecializationContext
             //
             auto findGlobalTables = [&](IRInterfaceType* interfaceType) -> IRInst*
             {
-                HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
-                collectExistentialTables(interfaceType, tables);
-                if (tables.getCount() > 0)
-                {
-                    auto resultTaggedUnionType = makeTaggedUnionType(
-                        as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
-                    module->getContainerPool().free(&tables);
-                    return resultTaggedUnionType;
-                }
-                else
-                {
-                    StringBuilder typeStr;
-                    printDiagnosticArg(typeStr, interfaceType);
-                    sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
-                        .interfaceType = typeStr.produceString(),
-                        .location = loadInst->sourceLoc});
-                    module->getContainerPool().free(&tables);
-                    return none();
-                }
+                if (auto taggedUnion = makeTaggedUnionOfAllConformances(interfaceType))
+                    return taggedUnion;
+                diagnoseNoTypeConformances(interfaceType, loadInst->sourceLoc);
+                return none();
             };
 
             if (isResourcePointer(loadInst->getPtr()))
@@ -2624,25 +2796,10 @@ struct TypeFlowSpecializationContext
             {
                 if (!isComInterfaceType(interfaceType))
                 {
-                    HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
-                    collectExistentialTables(interfaceType, tables);
-                    if (tables.getCount() > 0)
-                    {
-                        auto resultTaggedUnionType = makeTaggedUnionType(
-                            as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
-                        module->getContainerPool().free(&tables);
-                        return resultTaggedUnionType;
-                    }
-                    else
-                    {
-                        StringBuilder typeStr;
-                        printDiagnosticArg(typeStr, interfaceType);
-                        sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
-                            .interfaceType = typeStr.produceString(),
-                            .location = inst->sourceLoc});
-                        module->getContainerPool().free(&tables);
-                        return none();
-                    }
+                    if (auto taggedUnion = makeTaggedUnionOfAllConformances(interfaceType))
+                        return taggedUnion;
+                    diagnoseNoTypeConformances(interfaceType, inst->sourceLoc);
+                    return none();
                 }
                 else
                 {
@@ -2867,18 +3024,12 @@ struct TypeFlowSpecializationContext
                 {
                     if (!isComInterfaceType(interfaceType))
                     {
-                        HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
-                        collectExistentialTables(interfaceType, tables);
-                        if (tables.getCount() > 0)
+                        if (auto valueInfo = makeTaggedUnionOfAllConformances(interfaceType))
                         {
-                            auto valueInfo = makeTaggedUnionType(as<IRWitnessTableSet>(
-                                builder.getSet(kIROp_WitnessTableSet, tables)));
-                            module->getContainerPool().free(&tables);
                             return builder.getPtrTypeWithAddressSpace(
-                                (IRType*)valueInfo,
+                                valueInfo,
                                 as<IRPtrTypeBase>(fieldAddress->getDataType()));
                         }
-                        module->getContainerPool().free(&tables);
                     }
                 }
                 else if (
@@ -2929,16 +3080,8 @@ struct TypeFlowSpecializationContext
             {
                 if (!isComInterfaceType(interfaceType))
                 {
-                    HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
-                    collectExistentialTables(interfaceType, tables);
-                    if (tables.getCount() > 0)
-                    {
-                        auto result = makeTaggedUnionType(
-                            as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
-                        module->getContainerPool().free(&tables);
+                    if (auto result = makeTaggedUnionOfAllConformances(interfaceType))
                         return result;
-                    }
-                    module->getContainerPool().free(&tables);
                 }
             }
             else if (
@@ -3678,13 +3821,7 @@ struct TypeFlowSpecializationContext
                     HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
                     collectExistentialTables(interfaceType, tables);
                     if (tables.getCount() == 0)
-                    {
-                        StringBuilder typeStr;
-                        printDiagnosticArg(typeStr, interfaceType);
-                        sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
-                            .interfaceType = typeStr.produceString(),
-                            .location = lookup->sourceLoc});
-                    }
+                        diagnoseNoTypeConformances(interfaceType, lookup->sourceLoc);
                     module->getContainerPool().free(&tables);
                 }
             }
@@ -4280,7 +4417,14 @@ struct TypeFlowSpecializationContext
     // info for them yet (not ready to propagate). The caller should skip adding
     // the propagation edge in this case.
     //
-    IRInst* maybeGetBoundFunc(IRInst* callee, List<IRInst*>& paramInfos, WorkQueue<WorkItem>&)
+    // `callSiteMask` is the callee's signature as a dispatched call site sees it, or null for a
+    // direct call.
+    //
+    IRInst* maybeGetBoundFunc(
+        IRInst* callee,
+        IRFuncType* callSiteMask,
+        List<IRInst*>& paramInfos,
+        WorkQueue<WorkItem>&)
     {
         // Only handle direct (non-generic, non-intrinsic) functions.
         IRFunc* func = as<IRFunc>(callee);
@@ -4311,7 +4455,7 @@ struct TypeFlowSpecializationContext
             const auto [paramDirection, paramType] =
                 splitParameterDirectionAndType(param->getDataType());
 
-            // There are three cases where we don't need to create a binding for a parameter:
+            // There are four cases where we don't need to create a binding for a parameter:
             // (i) Concrete parameter: if the parameter is already concrete, we don't need to bind
             //     it.
             // (ii) Out parameter: we currently only support specialization based on input
@@ -4320,9 +4464,19 @@ struct TypeFlowSpecializationContext
             //     de-functionalization here, and do so in a
             //     later pass. If we eventually merged these two passes, we could remove
             //     this exception and handle FuncType parameters with bindings as well.
+            // (iv) Payload parameter: the callee sees its declared payload type there, whatever
+            //     the caller passes, so there is nothing to specialize on.
             //
+            bool isPayloadParam = false;
+            if (callSiteMask)
+            {
+                const auto [maskDirection, maskValueType] =
+                    splitParameterDirectionAndType(callSiteMask->getParamType(argIndex));
+                isPayloadParam = hasPayloadPosition(maskValueType, paramType);
+            }
+
             if (isConcreteType(paramType) || paramDirection == ParameterDirectionInfo::Kind::Out ||
-                paramType->getOp() == kIROp_FuncType)
+                paramType->getOp() == kIROp_FuncType || isPayloadParam)
             {
                 IRBuilder builder(module);
                 bindings.add(builder.getVoidValue());
@@ -4804,6 +4958,12 @@ struct TypeFlowSpecializationContext
                 elementOfSetType->getSet(),
                 [&](IRInst* func) { funcs.add(func); });
 
+            // A dispatched call sees each callee through the signature of the callee value, which
+            // locates the payload positions.
+            auto calleeFuncType = as<IRFuncType>(callee->getDataType());
+            SLANG_RELEASE_ASSERT(calleeFuncType);
+            auto callSiteMask = maybeExpandFuncType(calleeFuncType);
+
             for (auto func : funcs)
             {
                 auto resolvedFunc = translationContext.resolveInst(func);
@@ -4815,7 +4975,8 @@ struct TypeFlowSpecializationContext
                 }
                 auto paramInfos =
                     convertArgInfosToParamInfos(cast<IRFuncType>(resolvedFunc->getDataType()));
-                if (auto boundCallee = maybeGetBoundFunc(resolvedFunc, paramInfos, workQueue))
+                if (auto boundCallee =
+                        maybeGetBoundFunc(resolvedFunc, callSiteMask, paramInfos, workQueue))
                     propagateToCallSite(boundCallee);
             }
 
@@ -4827,9 +4988,11 @@ struct TypeFlowSpecializationContext
             if (!resolvedCallee)
                 return none();
 
+            // A direct call sees the callee's own signature, so it has no payload positions.
             auto paramInfos =
                 convertArgInfosToParamInfos(cast<IRFuncType>(resolvedCallee->getDataType()));
-            if (auto boundCallee = maybeGetBoundFunc(resolvedCallee, paramInfos, workQueue))
+            if (auto boundCallee =
+                    maybeGetBoundFunc(resolvedCallee, nullptr, paramInfos, workQueue))
                 propagateToCallSite(boundCallee);
         }
 
@@ -5064,6 +5227,9 @@ struct TypeFlowSpecializationContext
         }
     }
 
+    // Return the info of each parameter of `context` as a caller with the signature
+    // `funcTypeUnionMask` sees it.
+    //
     List<IRInst*> getParamInfos(IRInst* context, IRFuncType* funcTypeUnionMask)
     {
         auto baseFunc = getFuncDefinitionForContext(context);
@@ -5071,20 +5237,27 @@ struct TypeFlowSpecializationContext
         UInt index = 0;
         for (auto param : baseFunc->getParams())
         {
-            if (auto paramInfo = tryGetInfo(context, param))
-                paramInfos.add(paramInfo);
-            else if (isConcreteType(param->getDataType()))
+            auto maskType = funcTypeUnionMask->getParamType(index);
+            auto paramType = param->getDataType();
+
+            // A concrete parameter's info derives from its type. For any other parameter, a null
+            // info means the info is not ready yet.
+            IRInst* paramInfo = tryGetInfo(context, param);
+            if (isConcreteType(paramType))
             {
-                paramInfos.add(makeInfoForConcreteType(
-                    module,
-                    param->getDataType(),
-                    funcTypeUnionMask->getParamType(index)));
+                if (!paramInfo)
+                    paramInfo = makeInfoForConcreteType(module, paramType, maskType);
             }
             else
             {
-                // Info not ready yet.
-                paramInfos.add(nullptr);
+                paramInfo = mapPayloadPositionsOfParam(
+                    maskType,
+                    paramType,
+                    paramInfo,
+                    PayloadView::Caller,
+                    param->sourceLoc);
             }
+            paramInfos.add(paramInfo);
 
             index++;
         }
@@ -5231,6 +5404,26 @@ struct TypeFlowSpecializationContext
         //
         funcReturnInfo.addIfNotExists(context, none());
         return funcReturnInfo[context];
+    }
+
+    // Return the info of a call to `context` as a caller with result type `maskType` sees it. A
+    // callee with a concrete declared result type has no return info, so we derive it from that
+    // type.
+    //
+    IRInst* getReturnInfoForCaller(IRInst* context, IRType* maskType, SourceLoc loc)
+    {
+        auto declaredResultType = getDeclaredFuncType(context)->getResultType();
+        IRInst* returnInfo = getFuncReturnInfo(context);
+        if (isConcreteType(declaredResultType))
+            return returnInfo ? returnInfo
+                              : makeInfoForConcreteType(module, declaredResultType, maskType);
+
+        return mapPayloadPositions(
+            maskType,
+            declaredResultType,
+            returnInfo,
+            PayloadView::Caller,
+            loc);
     }
 
     // Set up initial information for parameters based on their types.
@@ -6296,38 +6489,10 @@ struct TypeFlowSpecializationContext
             for (Index i = 0; i < paramInfos.getCount(); i++)
                 updateParamType(i, paramInfos[i]);
 
-            if (auto resultInfo = getFuncReturnInfo(context))
-            {
-                resultType = updateType(resultTypeUnionMask, resultType, (IRType*)resultInfo);
-            }
-            else if (auto funcType = as<IRFuncType>(context->getDataType()))
-            {
-                SLANG_ASSERT(isGlobalInst(funcType->getResultType()));
-                resultType = updateType(
-                    resultTypeUnionMask,
-                    resultType,
-                    (IRType*)makeInfoForConcreteType(
-                        module,
-                        funcType->getResultType(),
-                        resultTypeUnionMask));
-            }
-            else if (auto boundFuncContext = as<IRSpecializeExistentialsInFunc>(context))
-            {
-                auto baseFuncForType = getFuncDefinitionForContext(boundFuncContext);
-                auto funcType2 = cast<IRFuncType>(baseFuncForType->getDataType());
-                SLANG_ASSERT(isGlobalInst(funcType2->getResultType()));
-                resultType = updateType(
-                    resultTypeUnionMask,
-                    resultType,
-                    (IRType*)makeInfoForConcreteType(
-                        module,
-                        funcType2->getResultType(),
-                        resultTypeUnionMask));
-            }
-            else
-            {
-                SLANG_UNEXPECTED("Cannot determine result type for context");
-            }
+            auto resultInfo =
+                getReturnInfoForCaller(context, resultTypeUnionMask, getDiagnosticPos(context));
+            SLANG_RELEASE_ASSERT(resultInfo);
+            resultType = updateType(resultTypeUnionMask, resultType, (IRType*)resultInfo);
         }
 
         module->getContainerPool().free(&calleesToProcess);
@@ -6401,22 +6566,9 @@ struct TypeFlowSpecializationContext
         IRType* resultType = nullptr;
         auto returnInfo = getFuncReturnInfo(callee);
         if (auto loweredResult = getLoweredType(returnInfo))
-        {
             resultType = loweredResult;
-        }
-        else if (auto funcType = as<IRFuncType>(callee->getDataType()))
-        {
-            resultType = funcType->getResultType();
-        }
-        else if (auto boundFunc = as<IRSpecializeExistentialsInFunc>(callee))
-        {
-            auto baseFunc = getFuncDefinitionForContext(boundFunc);
-            resultType = cast<IRFuncType>(baseFunc->getDataType())->getResultType();
-        }
         else
-        {
-            SLANG_UNEXPECTED("Cannot determine result type for callee");
-        }
+            resultType = getDeclaredFuncType(callee)->getResultType();
 
         // Handle set-specialized generics: add tag types for dynamic WitnessTableSet args.
         List<IRType*>& extraParamTypes = *module->getContainerPool().getList<IRType>();
@@ -8406,6 +8558,33 @@ struct TypeFlowSpecializationContext
         }
     }
 
+    // Return the tagged union over all witness tables of `interfaceType`, which is the info of a
+    // value that can hold any conforming type, or null if the interface has no conformances.
+    IRTaggedUnionType* makeTaggedUnionOfAllConformances(IRInterfaceType* interfaceType)
+    {
+        HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+        collectExistentialTables(interfaceType, tables);
+        IRTaggedUnionType* result = nullptr;
+        if (tables.getCount() != 0)
+        {
+            IRBuilder builder(module);
+            result = makeTaggedUnionType(
+                cast<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
+        }
+        module->getContainerPool().free(&tables);
+        return result;
+    }
+
+    // Report error 50100: `interfaceType` has no conformances, so we cannot dispatch on it.
+    void diagnoseNoTypeConformances(IRInterfaceType* interfaceType, SourceLoc loc)
+    {
+        StringBuilder typeStr;
+        printDiagnosticArg(typeStr, interfaceType);
+        sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+            .interfaceType = typeStr.produceString(),
+            .location = loc});
+    }
+
     bool processModule()
     {
         bool hasChanges = false;
@@ -8483,13 +8662,12 @@ struct TypeFlowSpecializationContext
     // non-concrete result types during propagation.
     HashSet<IRInst*> diagnosedBitCasts;
 
-    // Set of interface types already diagnosed with E50100 "no type conformances"
-    // inside `diagnoseUnresolvedLookupWitnesses`, so a single missing conformance
-    // surfacing at multiple surviving `lookupWitnessMethod` sites fires at most
-    // one diagnostic.  Local to the post-specialization walker — `processModule`
-    // bails out on any Part-1 error before that walker runs, so there is no
-    // cross-phase deduplication to coordinate.
+    // Interfaces that `getPayloadType` or `diagnoseUnresolvedLookupWitnesses` already reported with
+    // E50100 "no type conformances", so that each reports an interface at most once.
     HashSet<IRInst*> diagnosedNoTypeConformancesInterfaces;
+
+    // Non-concrete types that `getPayloadType` already diagnosed as having no payload type.
+    HashSet<IRInst*> diagnosedUnsupportedPayloadTypes;
 
     // Emit error 33180 for an invalid existential specialization, deduplicating by `dedupKey`.
     // Returns true if the diagnostic was emitted (first time for this key).

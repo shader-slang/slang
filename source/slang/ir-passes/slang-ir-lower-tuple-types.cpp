@@ -3,6 +3,7 @@
 #include "slang-ir-lower-tuple-types.h"
 
 #include "slang/ir/slang-ir-insts.h"
+#include "slang/ir/slang-ir-util.h"
 #include "slang/ir/slang-ir.h"
 
 namespace Slang
@@ -54,12 +55,10 @@ struct TupleLoweringContext
         auto structType = builder->createStructType();
         info->structType = structType;
 
-        // Check if the last operand is a TupleNameType sentinel.
-        // If so, use its string as the struct name and exclude it from fields.
+        // If the tuple is named by a TupleNameType sentinel, use its string as the struct name and
+        // exclude it from the fields.
         UInt operandCount = type->getOperandCount();
-        IRTupleNameType* tupleNameType = nullptr;
-        if (operandCount > 0)
-            tupleNameType = as<IRTupleNameType>(type->getOperand(operandCount - 1));
+        IRTupleNameType* tupleNameType = findTupleNameSentinel(type);
 
         if (tupleNameType)
         {

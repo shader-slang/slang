@@ -776,8 +776,36 @@ struct UntaggedUnionLoweringContext : public InstPassBase
         return true;
     }
 
+    // Returns true if `type` holds a dynamically dispatched interface through tuples and arrays.
+    // Type-flow gives such positions a tagged union (see `getPayloadType`), so a payload never
+    // holds one. Struct fields of interface type are left to existential lowering.
+    //
+    static bool holdsInterfaceThroughTuplesOrArrays(IRType* type)
+    {
+        if (auto interfaceType = as<IRInterfaceType>(type))
+            return !isComInterfaceType(interfaceType);
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+            return holdsInterfaceThroughTuplesOrArrays(arrayType->getElementType());
+        if (auto tupleType = as<IRTupleType>(type))
+        {
+            for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+            {
+                if (auto elementType = as<IRType>(tupleType->getOperand(i));
+                    elementType && holdsInterfaceThroughTuplesOrArrays(elementType))
+                    return true;
+            }
+        }
+        return false;
+    }
+
     void lowerUntaggedUnionType(IRUntaggedUnionType* untaggedUnionType)
     {
+        for (UInt i = 0; i < untaggedUnionType->getSet()->getCount(); i++)
+        {
+            if (auto type = as<IRType>(untaggedUnionType->getSet()->getElement(i)))
+                SLANG_RELEASE_ASSERT(!holdsInterfaceThroughTuplesOrArrays(type));
+        }
+
         // `none` has no payload, so a set with one real type needs no AnyValue container. For
         // example, `UntaggedUnion({Foo, none})` can store `Foo` directly while the tagged union's
         // separate witness-table tag continues to record whether the value is `Foo` or `none`.

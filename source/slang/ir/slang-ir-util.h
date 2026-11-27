@@ -313,6 +313,10 @@ bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);
 /// `IRArrayType` element count; an `IRUnsizedArrayType` has no count.
 bool isUnsizedType(IRType* type);
 
+/// Return the trailing `TupleNameType` operand that names an autodiff context tuple, or null.
+/// It is not an element: tuple lowering gives it no field.
+IRTupleNameType* findTupleNameSentinel(IRInst* tupleType);
+
 // True if `type` (after unwrapping attributed types) is a texture or a sampler-state-family type,
 // i.e. one the `spvBindlessTextureNV` descriptor-handle-to-resource conversion can produce. This is
 // also the set of `DescriptorHandle` element types that are represented as `uint64` under that
