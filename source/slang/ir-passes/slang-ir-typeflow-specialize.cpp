@@ -2911,6 +2911,18 @@ struct TypeFlowSpecializationContext
                         as<IRPtrTypeBase>(fieldAddress->getDataType()));
                 }
 
+                // A generic reader can be instantiated after an earlier type-flow run already
+                // refined the field (each run uses a fresh context, so `fieldInfo` starts
+                // empty, and a run that contains no new stores to the field cannot re-seed
+                // it). Reuse the refined field type as the info instead of returning none,
+                // which is the same discipline `tryGetInfo` applies to refined data types.
+                if (isRefinedInfoType(structField->getFieldType()))
+                {
+                    return builder.getPtrTypeWithAddressSpace(
+                        structField->getFieldType(),
+                        as<IRPtrTypeBase>(fieldAddress->getDataType()));
+                }
+
                 // When accessing an interface-typed field and no fieldInfo has been
                 // propagated, fall back to enumerating global witness tables.
                 // See the analogous logic in analyzeLoad for direct interface
@@ -2971,6 +2983,11 @@ struct TypeFlowSpecializationContext
             {
                 return this->fieldInfo[structField];
             }
+
+            // As for field addresses, a later generic instantiation must reuse the
+            // field's already-refined type even when this run has no new stores to it.
+            if (isRefinedInfoType(structField->getFieldType()))
+                return structField->getFieldType();
 
             // When extracting an interface-typed field from a struct and no fieldInfo
             // has been propagated (e.g. the struct was loaded from a constant buffer
