@@ -1191,7 +1191,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     // Maps the base of a dynamic-index `getElement` to the variable its reads
     // load through. Function-scope bases map to a function-scope `IRVar` whose
-    // store is emitted eagerly, right after the base (line ~1292); module-scope
+    // store is emitted eagerly, right after the base, in `processGetElement`'s
+    // function-scope branch; module-scope
     // bases map to a shared Private `IRGlobalVar` whose stores are emitted at
     // the start of every entry point by
     // `createSharedGlobalVarForModuleValue`. The name predates the
