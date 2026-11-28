@@ -6604,7 +6604,7 @@ public float hitObjectGetRayTMinEXT(hitObjectEXT hitObject)
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetRayTMinEXT($0)";
-    case spvShaderInvocationReorderEXT:
+    case spirv:
         return spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6626,7 +6626,7 @@ public float hitObjectGetRayTMaxEXT(hitObjectEXT hitObject)
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetRayTMaxEXT($0)";
-    case spvShaderInvocationReorderEXT:
+    case spirv:
         return spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6648,7 +6648,7 @@ public uint hitObjectGetRayFlagsEXT(hitObjectEXT hitObject)
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetRayFlagsEXT($0)";
-    case spvShaderInvocationReorderEXT:
+    case spirv:
         return spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6670,7 +6670,7 @@ public vec3 hitObjectGetWorldRayOriginEXT(hitObjectEXT hitObject)
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetWorldRayOriginEXT($0)";
-    case spvShaderInvocationReorderEXT:
+    case spirv:
         return spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6692,7 +6692,7 @@ public vec3 hitObjectGetWorldRayDirectionEXT(hitObjectEXT hitObject)
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetWorldRayDirectionEXT($0)";
-    case spvShaderInvocationReorderEXT:
+    case spirv:
         return spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6828,7 +6828,7 @@ public void hitObjectGetAttributesEXT<attr_t>(hitObjectEXT hitObject, out attr_t
             hitObject.__glslGetAttributesEXT(attributeLocation);
             attributes = __hitObjectAttributes<attr_t>();
         }
-    case spvShaderInvocationReorderEXT:
+    case spirv:
         {
             __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
             spirv_asm
@@ -6962,7 +6962,7 @@ public void hitObjectGetIntersectionTriangleVertexPositionsEXT(hitObjectEXT hitO
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetIntersectionTriangleVertexPositionsEXT($0, $1)";
-    case spvShaderInvocationReorderEXT:
+    case spirv:
         typedef vec3[3] vec3Arr3;
         positions = spirv_asm
         {
@@ -6987,7 +6987,7 @@ public void hitObjectReorderExecuteEXT(hitObjectEXT hitObject, int payload)
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectReorderExecuteEXT($0, $1)";
-    case spvShaderInvocationReorderEXT:
+    case spirv:
         spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -7011,7 +7011,7 @@ public void hitObjectReorderExecuteEXT(hitObjectEXT hitObject, uint coherenceHin
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectReorderExecuteEXT($0, $1, $2, $3)";
-    case spvShaderInvocationReorderEXT:
+    case spirv:
         spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -7049,7 +7049,7 @@ public void hitObjectTraceReorderExecuteEXT(
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectTraceReorderExecuteEXT";
-    case spvShaderInvocationReorderEXT:
+    case spirv:
     {
         spirv_asm
         {
@@ -7099,7 +7099,7 @@ public void hitObjectTraceReorderExecuteEXT(
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectTraceReorderExecuteEXT";
-    case spvShaderInvocationReorderEXT:
+    case spirv:
     {
         spirv_asm
         {
@@ -7153,7 +7153,7 @@ public void hitObjectTraceMotionReorderExecuteEXT(
     {
     case _GL_EXT_shader_invocation_reorder_motion:
         __intrinsic_asm "hitObjectTraceMotionReorderExecuteEXT";
-    case spvShaderInvocationReorderMotionEXT:
+    case spirv:
     {
         spirv_asm
         {
