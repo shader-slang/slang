@@ -1985,6 +1985,7 @@ SlangResult EndToEndCompileRequest::compile()
             getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
                 .exceptionType = typeid(e).name(),
                 .exceptionMessage = e.Message});
+            diagnoseCrashReportOfLastInternalError(*getSink(), e.Message.getBuffer());
             res = SLANG_E_ABORT;
         }
     }
@@ -1997,6 +1998,7 @@ SlangResult EndToEndCompileRequest::compile()
         getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
             .exceptionType = typeid(e).name(),
             .exceptionMessage = e.Message});
+        diagnoseCrashReportOfLastInternalError(*getSink(), e.Message.getBuffer());
         res = SLANG_E_ABORT;
     }
     catch (...)
@@ -2006,6 +2008,7 @@ SlangResult EndToEndCompileRequest::compile()
         // let the user know that we messed up, so they know to blame Slang
         // and not some other component in their system.
         getSink()->diagnose(Diagnostics::CompilationAborted{});
+        diagnoseCrashReportOfLastInternalError(*getSink(), nullptr);
         res = SLANG_E_ABORT;
     }
 #endif

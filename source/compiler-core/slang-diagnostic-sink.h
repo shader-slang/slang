@@ -612,6 +612,14 @@ void outputExceptionDiagnostic(
 
 void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics);
 
+/// Write the crash report of the internal error that the calling thread just caught to `sink`.
+///
+/// The catch at a public API boundary calls this after it has diagnosed the error, so that the
+/// diagnostics of the failed call end with the report. `message` is the message of the caught
+/// error, or null. The call writes nothing while crash reports are off, which is the default
+/// for a library inside a host application.
+void diagnoseCrashReportOfLastInternalError(DiagnosticSink& sink, const char* message);
+
 } // namespace Slang
 
 #endif

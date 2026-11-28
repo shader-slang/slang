@@ -1,5 +1,7 @@
 // test-process-main.cpp
 
+#include "core/slang-crash-handler.h"
+#include "core/slang-crash-report.h"
 #include "core/slang-http.h"
 #include "core/slang-io.h"
 #include "core/slang-process-util.h"
@@ -25,6 +27,83 @@ static void _makeStdStreamsUnbuffered()
     // Make these streams unbuffered
     setvbuf(stdout, nullptr, _IONBF, 0);
     setvbuf(stderr, nullptr, _IONBF, 0);
+}
+
+// The crash mode below faults on purpose, and the sanitizers must not take those faults for
+// bugs. AddressSanitizer reads its default options from this function at start-up, before the
+// ASAN_OPTIONS of the environment; with them, it leaves the fatal signals to the crash handler
+// under test instead of handling them and reporting a finding.
+#if defined(__SANITIZE_ADDRESS__)
+#define SLANG_TEST_PROCESS_HAS_ASAN 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define SLANG_TEST_PROCESS_HAS_ASAN 1
+#endif
+#endif
+#if SLANG_TEST_PROCESS_HAS_ASAN
+// The runtime looks this function up by name in the executable, so it must stay visible and
+// survive the linker even though nothing in the program calls it.
+extern "C" __attribute__((visibility("default"), used)) const char* __asan_default_options()
+{
+    return "handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0:handle_abort=0";
+}
+#endif
+
+// UndefinedBehaviorSanitizer would report the deliberate store through a null pointer below.
+#if defined(__clang__) || defined(__GNUC__)
+#define SLANG_TEST_PROCESS_NO_UBSAN __attribute__((no_sanitize("undefined")))
+#else
+#define SLANG_TEST_PROCESS_NO_UBSAN
+#endif
+
+// Writes through this pointer reach the faulting store at run time, because the compiler
+// cannot prove that the pointer stays null.
+static int* volatile g_nullPointer = nullptr;
+
+// The recursion below never stops while this is true, which is always. The compiler cannot
+// see that, so it neither warns about endless recursion nor removes the calls.
+static volatile bool g_keepRecursing = true;
+
+/// Call this function again from inside each call, until the stack overflows.
+static SLANG_NO_INLINE int _recurseForever(int depth)
+{
+    volatile char frame[256];
+    frame[0] = char(depth);
+    if (!g_keepRecursing)
+        return frame[0];
+    return _recurseForever(depth + 1) + frame[0];
+}
+
+/// Install the crash handler as slangc does, then crash in the way that `argv[2]` names:
+/// `segv`, `abort` or `stack-overflow`. Reports are saved in the directory `argv[3]`, if given.
+///
+/// The crash-handler unit tests run this tool and read its stderr, its exit status and the
+/// saved report. The handler must be tested in a process of its own, because the crash ends
+/// the process.
+static SLANG_TEST_PROCESS_NO_UBSAN SlangResult _crash(int argc, const char* const* argv)
+{
+    if (argc < 3)
+        return SLANG_FAIL;
+#if defined(_MSC_VER)
+    // A debug build of the Microsoft C runtime shows a dialog box when `abort` is called and
+    // waits for someone to close it, which would hang the test that aborts on purpose. We turn
+    // the dialog off whatever `SLANG_IGNORE_ABORT_MSG` says, which is what
+    // `TestToolUtil::suppressDebugDialogs` keys on.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+    if (!CrashHandler::install("test-process", "test-version"))
+        return SLANG_E_NOT_AVAILABLE;
+    if (argc > 3)
+        CrashReportUtil::setReportDirectory(argv[3]);
+
+    const UnownedStringSlice kind(argv[2]);
+    if (kind == "segv")
+        *g_nullPointer = 1;
+    else if (kind == "abort")
+        abort();
+    else if (kind == "stack-overflow")
+        return SlangResult(_recurseForever(0));
+    return SLANG_FAIL;
 }
 
 static SlangResult _outputCount(int argc, const char* const* argv)
@@ -245,6 +324,10 @@ static SlangResult execute(int argc, const char* const* argv)
     else if (toolName == "http-crash")
     {
         return _httpCrash();
+    }
+    else if (toolName == "crash")
+    {
+        return _crash(argc, argv);
     }
     else if (toolName == "sleep")
     {

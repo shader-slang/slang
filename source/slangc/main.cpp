@@ -1,6 +1,9 @@
 // main.cpp
 
+#include "core/slang-crash-handler.h"
+#include "core/slang-crash-report.h"
 #include "core/slang-io.h"
+#include "core/slang-platform.h"
 #include "core/slang-test-tool-util.h"
 #include "slang.h"
 #include "slang/slang-internal.h"
@@ -113,8 +116,46 @@ SLANG_TEST_TOOL_API SlangResult innerMain(
     return res;
 }
 
+/// Return true unless the user turned crash reports off with `SLANG_CRASH_REPORT=0`.
+static bool _areCrashReportsWanted()
+{
+    StringBuilder value;
+    if (SLANG_FAILED(
+            PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_CRASH_REPORT"), value)))
+        return true;
+    return value.getUnownedSlice().trim() != UnownedStringSlice("0");
+}
+
 int MAIN(int argc, char** argv)
 {
+    // slangc is Slang's own program, so a failure of the compiler here is ours to report. When
+    // a compile stops on an internal error, the diagnostics on stderr end with a crash report
+    // that the user can file as an issue.
+    if (_areCrashReportsWanted())
+    {
+        slang_enableCrashReports("slangc");
+
+        // The report is also saved, so that the user still has it after the terminal output
+        // is gone: in the directory that `SLANG_CRASH_REPORT_DIR` names, or else in the
+        // working directory.
+        StringBuilder directory;
+        if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice("SLANG_CRASH_REPORT_DIR"),
+                directory)) ||
+            directory.getLength() == 0)
+        {
+            directory.clear();
+            directory << ".";
+        }
+        slang_setCrashReportDirectory(directory.getBuffer());
+
+        // A crash is a failure that the compiler does not detect, so the operating system
+        // reports it to the handler. slangc links its own copy of `core`, so the handler and
+        // its settings live in that copy, apart from the library's.
+        CrashHandler::install("slangc", spGetBuildTagString());
+        CrashReportUtil::setReportDirectory(directory.getBuffer());
+    }
+
     auto stdWriters = StdWriters::initDefaultSingleton();
     SlangResult res = innerMain(stdWriters, nullptr, argc, argv);
     slang::shutdown();
