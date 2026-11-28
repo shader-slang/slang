@@ -99,6 +99,9 @@ private:
     // Set when a push-constant buffer is emitted as `var<immediate>`.
     bool m_requiresImmediateAddressSpace = false;
 
+    // Set when a fragment output takes @blend_src (dual-source blending).
+    bool m_requiresDualSourceBlending = false;
+
     RefPtr<ShaderExtensionTracker> m_extensionTracker;
 };
 
