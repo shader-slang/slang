@@ -1,0 +1,28 @@
+name: Crash Report
+description: Report an internal compiler error or a crash, using the report that Slang printed.
+title: "[crash report] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting this. Slang printed a plain-text report when it stopped. Paste that report below.
+
+        The `[report]` and `[stack]` parts hold only values that Slang defines. The `[details]` part can hold names from your code: read it, and remove what you do not want to publish.
+  - type: textarea
+    id: report
+    attributes:
+      label: Crash report
+      description: Paste everything from the `==== Slang crash report` line to the end of the report.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: reproducer
+    attributes:
+      label: Reproducer
+      description: The Slang code and the `slangc` command line, or the code that calls the Slang API, if you can share them.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else that helps, such as whether an earlier version of Slang worked.
