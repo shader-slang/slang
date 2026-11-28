@@ -1933,6 +1933,43 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
     }
 }
 
+bool CPPSourceEmitter::_shouldDisableFpContraction()
+{
+    if (m_target != CodeGenTarget::CPPSource && m_target != CodeGenTarget::HostCPPSource &&
+        m_target != CodeGenTarget::CPPHeader)
+        return false;
+    return getTargetProgram()->getOptionSet().getFloatingPointMode() == FloatingPointMode::Precise;
+}
+
+void CPPSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
+{
+    Super::emitFrontMatterImpl(targetReq);
+
+    // Under `-fp-mode precise`, tell the C++ compiler not to contract `a * b + c` into a fused
+    // multiply-add, which rounds once instead of twice and so changes the result. Clang contracts
+    // within an expression by default (and slang-llvm compiles host-callable code with Clang),
+    // GCC across expressions; either does it wherever the target has FMA instructions (x86-64
+    // with FMA3, every AArch64). This is the source-level form of the `-ffp-contract=off` that
+    // the GCC/Clang downstream compilers get on the command line in precise mode, so it also
+    // holds when the generated source is compiled elsewhere, unless that build passes
+    // `-ffp-contract=fast`, which overrides these pragmas. It comes before the prelude, so the
+    // prelude's inline functions are compiled under it too. The previous settings are saved here
+    // and restored at the end of the module (see `emitModuleImpl`), so code that follows a
+    // generated header keeps its own contraction setting.
+    if (!_shouldDisableFpContraction())
+        return;
+    m_writer->emit("#if defined(__clang__)\n");
+    m_writer->emit("#pragma float_control(push)\n");
+    m_writer->emit("#pragma clang fp contract(off)\n");
+    m_writer->emit("#elif defined(__GNUC__)\n");
+    m_writer->emit("#pragma GCC push_options\n");
+    m_writer->emit("#pragma GCC optimize(\"fp-contract=off\")\n");
+    m_writer->emit("#elif defined(_MSC_VER)\n");
+    m_writer->emit("#pragma float_control(push)\n");
+    m_writer->emit("#pragma fp_contract(off)\n");
+    m_writer->emit("#endif\n\n");
+}
+
 void CPPSourceEmitter::emitPreModuleImpl()
 {
     if (m_target == CodeGenTarget::CPPSource || m_target == CodeGenTarget::CPPHeader)
@@ -2528,6 +2565,18 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
                 }
             }
         }
+    }
+
+    // Close the region opened in `emitFrontMatterImpl`.
+    if (_shouldDisableFpContraction())
+    {
+        m_writer->emit("\n#if defined(__clang__)\n");
+        m_writer->emit("#pragma float_control(pop)\n");
+        m_writer->emit("#elif defined(__GNUC__)\n");
+        m_writer->emit("#pragma GCC pop_options\n");
+        m_writer->emit("#elif defined(_MSC_VER)\n");
+        m_writer->emit("#pragma float_control(pop)\n");
+        m_writer->emit("#endif\n");
     }
 }
 
