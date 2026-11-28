@@ -3,6 +3,7 @@
 //TEST:COMPARE_COMPUTE(targets=dx12):-profile sm_6_5
 //TEST:COMPARE_COMPUTE(targets=vk):-render-feature subgroup-partitioned-ext
 //TEST:COMPARE_COMPUTE(targets=cuda):-capability cuda_sm_7_0
+//TEST:COMPARE_COMPUTE(targets=metal):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
