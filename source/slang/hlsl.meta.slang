@@ -18582,6 +18582,9 @@ uint WaveGetLaneIndex()
 /// On GLSL and SPIR-V this lowers to gl_NumSubgroups / BuiltIn NumSubgroups,
 /// which are restricted to compute-class execution models (compute, mesh,
 /// amplification); using it from any other stage is a capability error.
+/// On HLSL with Shader Model 6.10 or later it lowers to GetGroupWaveCount; with earlier
+/// shader models it is computed from the workgroup size and the wave size (see
+/// WaveGetWaveIndex).
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
@@ -18609,7 +18612,25 @@ uint WaveGetNumWaves()
             static_assert(false, "WaveGetNumWaves is only supported in compute shaders");
             return 0;
         }
-    default:
+    case _sm_6_10:
+        __stage_switch
+        {
+        case compute:
+        case mesh:
+        case amplification:
+            // The implementation decides how it distributes the threads of a group to waves, so
+            // the count may exceed the number of waves that the threads need, which we compute
+            // below.
+            __intrinsic_asm "GetGroupWaveCount()";
+        default:
+            static_assert(
+                false,
+                "WaveGetNumWaves is only supported in compute, mesh and amplification shaders");
+            return 0;
+        }
+    case cuda:
+    case hlsl:
+    case metal:
         // For HLSL/CUDA/Metal: compute from workgroup size and wave size
         __stage_switch
         {
@@ -18633,6 +18654,14 @@ uint WaveGetNumWaves()
 /// On GLSL and SPIR-V this lowers to gl_SubgroupID / BuiltIn SubgroupId,
 /// which are restricted to compute-class execution models (compute, mesh,
 /// amplification); using it from any other stage is a capability error.
+/// On HLSL with Shader Model 6.10 or later it lowers to GetGroupWaveIndex. Earlier shader
+/// models have no wave index, so it is computed as
+/// WaveReadLaneFirst(SV_GroupIndex / WaveGetLaneCount()): all lanes of a wave return the
+/// quotient of its first active lane. That is the wave index only if each wave consists of
+/// exactly the lanes with one quotient, i.e. the group indices from i * WaveGetLaneCount() to
+/// (i + 1) * WaveGetLaneCount() - 1 for wave i; HLSL does not guarantee that for all hardware
+/// and workgroup shapes. Where the lanes of a wave have different quotients, the value also
+/// depends on which lanes are active.
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
@@ -18670,6 +18699,20 @@ uint WaveGetWaveIndex()
             static_assert(false, "WaveGetWaveIndex is only supported in compute shaders for WGSL");
             return 0;
         }
+    case _sm_6_10:
+        __stage_switch
+        {
+        case compute:
+        case mesh:
+        case amplification:
+            // Shader Model 6.10 defines its wave index to be the same for all lanes of a wave.
+            __intrinsic_asm "GetGroupWaveIndex()";
+        default:
+            static_assert(
+                false,
+                "WaveGetWaveIndex is only supported in compute, mesh and amplification shaders");
+            return 0;
+        }
     case hlsl:
         __stage_switch
         {
@@ -18677,10 +18720,17 @@ uint WaveGetWaveIndex()
             {
                 uint groupIndex = __builtinGroupIndex;
                 uint waveSize = WaveGetLaneCount();
-                return groupIndex / waveSize;
+                // Where the group indices of a wave are in one range
+                // [i * waveSize, (i + 1) * waveSize), the quotient is the same for all its lanes.
+                // We take the value of the first lane, which makes that known to the downstream
+                // compiler, so it keeps the index and the values derived from it in scalar
+                // registers instead of one copy per lane.
+                return WaveReadLaneFirst(groupIndex / waveSize);
             }
         default:
-            static_assert(false, "WaveGetWaveIndex is only supported in compute shaders for HLSL");
+            static_assert(
+                false,
+                "WaveGetWaveIndex is only supported in compute shaders before Shader Model 6.10");
             return 0;
         }
     }
