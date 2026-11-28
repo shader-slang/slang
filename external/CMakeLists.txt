@@ -123,24 +123,26 @@ if(NOT ${SLANG_USE_SYSTEM_LZ4})
 endif()
 
 # cmark-gfm (CommonMark / GFM Markdown parser, swiftlang fork)
-set(CMARK_LIB_FUZZER OFF)
-set(CMARK_FUZZ_QUADRATIC OFF)
-set(_prev_BUILD_TESTING ${BUILD_TESTING})
-set(_prev_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
-set(BUILD_TESTING OFF)
-set(BUILD_SHARED_LIBS OFF)
-if(NOT SLANG_OVERRIDE_CMARK_PATH)
-    add_subdirectory(cmark EXCLUDE_FROM_ALL ${system})
-else()
-    add_subdirectory(
-        ${SLANG_OVERRIDE_CMARK_PATH}/cmark
-        cmark
-        EXCLUDE_FROM_ALL
-        ${system}
-    )
+if(NOT SLANG_USE_SYSTEM_CMARK)
+    set(CMARK_LIB_FUZZER OFF)
+    set(CMARK_FUZZ_QUADRATIC OFF)
+    set(_prev_BUILD_TESTING ${BUILD_TESTING})
+    set(_prev_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+    set(BUILD_TESTING OFF)
+    set(BUILD_SHARED_LIBS OFF)
+    if(NOT SLANG_OVERRIDE_CMARK_PATH)
+        add_subdirectory(cmark EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_CMARK_PATH}/cmark
+            cmark
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
+    set(BUILD_TESTING ${_prev_BUILD_TESTING})
+    set(BUILD_SHARED_LIBS ${_prev_BUILD_SHARED_LIBS})
 endif()
-set(BUILD_TESTING ${_prev_BUILD_TESTING})
-set(BUILD_SHARED_LIBS ${_prev_BUILD_SHARED_LIBS})
 
 # Vulkan headers
 if(NOT TARGET Vulkan::Headers)
@@ -185,7 +187,13 @@ target_include_directories(
 # fast_float headers (header-only). Mark as a system include so the bundled
 # (or override-supplied) headers don't trip Slang's extra warnings / -Werror.
 add_library(fast_float INTERFACE)
-if(NOT SLANG_OVERRIDE_FAST_FLOAT_PATH)
+if(SLANG_USE_SYSTEM_FAST_FLOAT)
+    find_package(FastFloat CONFIG REQUIRED)
+    if(FastFloat_VERSION VERSION_LESS "6.1")
+        message(FATAL_ERROR "Slang requires fast_float 6.1 or newer")
+    endif()
+    target_link_libraries(fast_float INTERFACE FastFloat::fast_float)
+elseif(NOT SLANG_OVERRIDE_FAST_FLOAT_PATH)
     set(_fast_float_include "${CMAKE_CURRENT_LIST_DIR}/fast_float/include")
 else()
     set(_fast_float_include
@@ -203,11 +211,13 @@ else()
         )
     endif()
 endif()
-target_include_directories(
-    fast_float
-    ${system}
-    INTERFACE "${_fast_float_include}"
-)
+if(NOT SLANG_USE_SYSTEM_FAST_FLOAT)
+    target_include_directories(
+        fast_float
+        ${system}
+        INTERFACE "${_fast_float_include}"
+    )
+endif()
 
 # Slang and SPIRV-Tools share one mimalloc target. Resolve the checkout and the shared mimalloc
 # build options before either consumer is configured so slang-compiler can use mimalloc even when

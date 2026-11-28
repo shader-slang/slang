@@ -6,7 +6,7 @@
 #include "slang-com-ptr.h"
 #include "slang-glslang/slang-glslang.h"
 #include "slang.h"
-#include "spirv-tools/include/spirv-tools/linker.hpp"
+#include "spirv-tools/linker.hpp"
 
 namespace gfx
 {

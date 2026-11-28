@@ -1,1 +1,1 @@
-example(hello-world LINK_WITH_PRIVATE Vulkan-Headers)
+example(hello-world LINK_WITH_PRIVATE Vulkan::Headers)
