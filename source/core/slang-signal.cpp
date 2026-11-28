@@ -1,6 +1,7 @@
 #include "slang-signal.h"
 
 #include "slang-exception.h"
+#include "slang-stack-trace.h"
 #include "slang-test-tool-util.h"
 
 #include <ctype.h>
@@ -17,6 +18,18 @@ namespace Slang
 {
 
 thread_local String g_lastSignalMessage;
+
+// The calling thread's most recent internal error. We keep the stack trace by value in
+// thread-local storage, so recording an error never allocates.
+struct LastSignal
+{
+    bool isValid = false;
+    SignalType type = SignalType::Unexpected;
+    const char* file = nullptr;
+    int line = 0;
+    StackTrace stackTrace;
+};
+static thread_local LastSignal g_lastSignal;
 
 static const char* _getSignalTypeAsText(SignalType type)
 {
@@ -146,13 +159,22 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
     char locMsg[1024];
     const char* safeMessage = message ? message : "unknown assert";
     snprintf(locMsg, sizeof(locMsg), "%s(%d): %s", basename, line, safeMessage);
-    handleSignal(SignalType::AssertFailure, locMsg);
+    handleSignal(SignalType::AssertFailure, locMsg, file, line);
 }
 
 // One point of having as a single function is a choke point both for handling (allowing different
 // handling scenarios) as well as a choke point to set a breakpoint to catch 'signal' types
-[[noreturn]] void handleSignal(SignalType type, char const* message)
+[[noreturn]] void handleSignal(SignalType type, char const* message, char const* file, int line)
 {
+    // We record the error before anything else, so that the record exists whichever way this
+    // function leaves: by an exception, or by ending the process. The trace skips this
+    // function's own frame, so it starts at the code that raised the error.
+    g_lastSignal.type = type;
+    g_lastSignal.file = file;
+    g_lastSignal.line = line;
+    StackTraceUtil::capture(1, g_lastSignal.stackTrace);
+    g_lastSignal.isValid = true;
+
     g_lastSignalMessage = _getMessage(type, message);
 
     // Can be useful to enable during debug when problem is on CI
@@ -186,6 +208,43 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
 const char* getLastSignalMessage()
 {
     return g_lastSignalMessage.getBuffer();
+}
+
+bool getLastSignalRecord(SignalRecord& outRecord)
+{
+    if (!g_lastSignal.isValid)
+        return false;
+
+    outRecord.type = g_lastSignal.type;
+    outRecord.file = g_lastSignal.file;
+    outRecord.line = g_lastSignal.line;
+    outRecord.stackTrace = &g_lastSignal.stackTrace;
+    return true;
+}
+
+void clearLastSignalRecord()
+{
+    g_lastSignal.isValid = false;
+}
+
+const char* getSignalTypeName(SignalType type)
+{
+    switch (type)
+    {
+    case SignalType::Unexpected:
+        return "unexpected";
+    case SignalType::Unimplemented:
+        return "unimplemented";
+    case SignalType::AssertFailure:
+        return "assert";
+    case SignalType::Unreachable:
+        return "unreachable";
+    case SignalType::InvalidOperation:
+        return "invalid-operation";
+    case SignalType::AbortCompilation:
+        return "abort-compilation";
+    }
+    return "unknown";
 }
 
 } // namespace Slang
