@@ -65,6 +65,13 @@ protected:
         SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
+    // Emits an atomic IR instruction (`kIROp_AtomicLoad`, `AtomicStore`, `AtomicExchange`,
+    // `AtomicCompareExchange`, `AtomicAdd`/`Sub`/`Inc`/`Dec`, `AtomicAnd`/`Or`/`Xor`,
+    // `AtomicMin`/`Max`) as a call of the prelude helper `_slang_atomic_<op>_<type>`, for
+    // u32, i32, u64, i64, f32 and f64 (no bitwise ops on floats). For any other type or op it
+    // diagnoses `UnsupportedTargetIntrinsic` and, unless the instruction is a store, declares its
+    // result as a default-initialized variable so emission can continue.
+    void _emitAtomicInst(IRInst* inst);
     virtual void emitTempModifiers(IRInst* temp) SLANG_OVERRIDE;
 
     virtual void emitPreModuleImpl() SLANG_OVERRIDE;

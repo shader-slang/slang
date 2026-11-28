@@ -15,7 +15,7 @@ Slang has preliminary support for producing CPU source and binaries.
 These limitations apply to Slang transpiling to C++. 
 
 * Barriers are not supported (making these work would require an ABI change)
-* Atomics are not supported in user code; the C++ backend implements only 32- and 64-bit integer atomic add, for compiler-generated code such as shader coverage counters
+* Atomics: the global `Interlocked*` functions and `Atomic<T>` are supported for 32- and 64-bit integers and for `float` and `double` (no bitwise operations on floating-point types). They lower to the C++ prelude's `_slang_atomic_*` helpers, which use the C++ compiler's atomic builtins, so they stay atomic when the groups of a dispatch run on several threads. `half` atomics and the `RWByteAddressBuffer` atomic methods are not supported
 * Limited support for [out of bounds](#out-of-bounds) accesses handling
 * Entry point/s cannot be named `main` (this is because downstream C++ compiler/s expecting a regular `main`)
 * `float16_t` type is not currently supported

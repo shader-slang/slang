@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl
-//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-llvm, filecheck-buffer=CHECK):-output-using-type
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4);
 RWStructuredBuffer<Atomic<int>> outputBuffer;
 
