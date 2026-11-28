@@ -2893,8 +2893,32 @@ LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getAnyValueRules()
     return &kGLSLAnyValueLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptionSet&, Type*)
+// A `ConstantBuffer<T, Std430DataLayout>` or `ConstantBuffer<T, ScalarDataLayout>` is emitted as a
+// `var<uniform>` laid out by WGSL's own rules for host-shareable types (the
+// `uniform_buffer_standard_layout` language extension), which are std430's. WGSL has no scalar
+// layout (a `vec3` is always 16-byte aligned), so `ScalarDataLayout` gets std430 offsets as well,
+// matching the struct that is emitted.
+LayoutRulesImpl kWGSLStd430ConstantBufferLayoutRulesImpl_ = {
+    &kWGSLLayoutRulesFamilyImpl,
+    &kStd430LayoutRulesImpl,
+    &kWGSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getConstantBufferRules(
+    CompilerOptionSet&,
+    Type* containerType)
 {
+    if (auto cbufferType = as<ConstantBufferType>(containerType))
+    {
+        switch (cbufferType->getLayoutType()->astNodeType)
+        {
+        case ASTNodeType::Std430DataLayoutType:
+        case ASTNodeType::ScalarDataLayoutType:
+            return &kWGSLStd430ConstantBufferLayoutRulesImpl_;
+        default:
+            break;
+        }
+    }
     return &kWGSLConstantBufferLayoutRulesImpl_;
 }
 
@@ -4544,6 +4568,16 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
     // look up the appropriate rules via the `LayoutRulesFamily`
     auto structuredBufferLayoutRules =
         context.getRulesFamily()->getStructuredBufferRules(context.targetReq->getOptionSet());
+
+    // On WGSL, `StructuredBuffer<T, Std140DataLayout>` lowers its elements with std140 rules
+    // (`getTypeLayoutRuleNameForBuffer`), so reflection reports std140 offsets and strides too.
+    if (context.getRulesFamily() == &kWGSLLayoutRulesFamilyImpl)
+    {
+        auto bufferType = as<HLSLStructuredBufferTypeBase>(structuredBufferType);
+        auto layoutType = bufferType ? bufferType->getLayoutType() : nullptr;
+        if (layoutType && layoutType->astNodeType == ASTNodeType::Std140DataLayoutType)
+            structuredBufferLayoutRules = &kStd140LayoutRulesImpl_;
+    }
 
     // Create and save type layout for the buffer contents.
     auto elementTypeLayout =

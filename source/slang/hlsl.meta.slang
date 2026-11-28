@@ -39,19 +39,26 @@ __magic_type(DefaultPushConstantDataLayoutType)
 struct DefaultPushConstantDataLayout : IBufferDataLayout
 {};
 
+/// Lays out a buffer with the std140 rules: arrays and structs are aligned to 16 bytes, so an
+/// array element takes at least 16 bytes. This is the default layout of a uniform buffer on WGSL.
 /// @category misc_types
 __intrinsic_type($(kIROp_Std140BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
+[require(wgsl)]
 __magic_type(Std140DataLayoutType)
 struct Std140DataLayout : IBufferDataLayout
 {};
 
+/// Lays out a buffer with the std430 rules: a member is aligned to its own alignment, and an array
+/// element to the alignment of its type. This is WGSL's own layout for storage buffers, and for
+/// uniform buffers with the `uniform_buffer_standard_layout` extension.
 /// @category misc_types
 __intrinsic_type($(kIROp_Std430BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
 [require(llvm)]
+[require(wgsl)]
 __magic_type(Std430DataLayoutType)
 struct Std430DataLayout : IBufferDataLayout
 {};
