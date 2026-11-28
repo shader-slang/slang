@@ -21,9 +21,11 @@ struct Bindful
     DescriptorHandle<RWStructuredBuffer<uint> > buf;
 }
 
+// On CUDA a descriptor handle is a 64-bit value, so the handles are made from `uint64_t`; the
+// `uint2` constructor is not available there, and the entry point reads this initializer.
 static const Bindful gItems[2] = {
-    {1u, (DescriptorHandle<RWStructuredBuffer<uint> >)uint2(3u, 4u)},
-    {2u, (DescriptorHandle<RWStructuredBuffer<uint> >)uint2(5u, 6u)},
+    {1u, (DescriptorHandle<RWStructuredBuffer<uint> >)uint64_t(3)},
+    {2u, (DescriptorHandle<RWStructuredBuffer<uint> >)uint64_t(5)},
 };
 
 RWStructuredBuffer<uint> outBuf;
