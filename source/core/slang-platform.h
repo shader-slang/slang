@@ -167,8 +167,9 @@ struct PlatformUtil
     /// @return SLANG_E_NOT_AVAILABLE if not on this platform, and potentially other errors
     static SlangResult outputDebugMessage(const char* text);
 
-    /// Print a stack trace to stderr for debugging purposes.
-    /// Only available on Linux family platforms.
+    /// Print a stack trace to stdout for debugging purposes.
+    /// Only available where `SLANG_HAS_BACKTRACE` is set: glibc Linux, recent Android, and
+    /// Apple platforms.
     static void backtrace();
 };
 
