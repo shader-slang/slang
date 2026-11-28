@@ -50,6 +50,16 @@ static bool isWGSLHalfVectorBitCast(IRType* halfType, IRType* otherType)
     return false;
 }
 
+// On the C++ (CPU) and CUDA targets a `DescriptorHandle<T>` is the native resource `T` itself, and
+// every resource there is plain data: a pointer, a CUDA texture or surface object, or a pointer and
+// an element count for a structured buffer. A bit cast to or from a handle is therefore a bitwise
+// copy of those bytes. Other targets represent a handle differently (an index pair, or a type that
+// cannot be built from an integer at all), so this pass cannot rebuild one from bits there.
+static bool isDescriptorHandlePlainData(TargetRequest* targetReq)
+{
+    return isCPUTarget(targetReq) || isCUDATarget(targetReq);
+}
+
 struct BitCastLoweringContext
 {
     TargetProgram* targetProgram;
@@ -102,6 +112,77 @@ struct BitCastLoweringContext
         }
     }
 
+
+    // The size of `handleType` when `readObject` can build it from one integer leaf, or 0 when it
+    // cannot. That is the case for a plain-data handle whose resource is 4 or 8 bytes, such as a
+    // texture, a sampler or a CUDA texture object; a CPU structured buffer handle is 16 bytes.
+    uint32_t getDescriptorHandleLeafSize(IRDescriptorHandleType* handleType)
+    {
+        auto targetReq = targetProgram->getTargetReq();
+        if (!isDescriptorHandlePlainData(targetReq))
+            return 0;
+        IRSizeAndAlignment layout;
+        if (SLANG_FAILED(getNaturalSizeAndAlignment(targetReq, handleType, &layout)))
+            return 0;
+        if (layout.size != 4 && layout.size != 8)
+            return 0;
+        return (uint32_t)layout.size;
+    }
+
+    // Find a `DescriptorHandle<T>` in `type`, either `type` itself or one nested in its struct
+    // fields or array elements, for which `isUnsupported` returns true.
+    template<typename IsUnsupported>
+    IRDescriptorHandleType* findDescriptorHandle(IRType* type, const IsUnsupported& isUnsupported)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_DescriptorHandleType:
+            {
+                auto handleType = as<IRDescriptorHandleType>(type);
+                return isUnsupported(handleType) ? handleType : nullptr;
+            }
+        case kIROp_StructType:
+            for (auto field : as<IRStructType>(type)->getFields())
+            {
+                if (auto handleType = findDescriptorHandle(field->getFieldType(), isUnsupported))
+                    return handleType;
+            }
+            return nullptr;
+        case kIROp_ArrayType:
+            return findDescriptorHandle(as<IRArrayType>(type)->getElementType(), isUnsupported);
+        default:
+            return nullptr;
+        }
+    }
+
+    // Find a `DescriptorHandle<T>` in `type` that `readObject` cannot build from bits on this
+    // target.
+    IRDescriptorHandleType* findUnbuildableDescriptorHandle(IRType* type)
+    {
+        return findDescriptorHandle(
+            type,
+            [&](IRDescriptorHandleType* handleType)
+            { return getDescriptorHandleLeafSize(handleType) == 0; });
+    }
+
+    // Find a `DescriptorHandle<T>` in `type` that `extractValueAtOffset` cannot read. It reads a
+    // leaf of 1, 2, 4 or 8 bytes, and a handle is 4 or 8 bytes where it is readable, so a handle
+    // of another size, such as a 16-byte C++ or CUDA structured-buffer handle, is not.
+    IRDescriptorHandleType* findUnreadableDescriptorHandle(IRType* type)
+    {
+        return findDescriptorHandle(
+            type,
+            [&](IRDescriptorHandleType* handleType)
+            {
+                IRSizeAndAlignment layout;
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        targetProgram->getTargetReq(),
+                        handleType,
+                        &layout)))
+                    return true;
+                return layout.size != 4 && layout.size != 8;
+            });
+    }
 
     // Extract an object of `type` from `offset` in `src`.
     IRInst* readObject(IRBuilder& builder, IRInst* src, IRType* type, uint32_t offset)
@@ -264,6 +345,20 @@ struct BitCastLoweringContext
                 return builder.emitBitCast(type, object);
             }
             break;
+        case kIROp_DescriptorHandleType:
+            {
+                // `findUnbuildableDescriptorHandle` has rejected every handle this case cannot
+                // build, so the handle is plain data and has the size of a 4- or 8-byte leaf.
+                auto objectSize = getDescriptorHandleLeafSize(as<IRDescriptorHandleType>(type));
+                SLANG_RELEASE_ASSERT(objectSize != 0);
+                auto object = extractValueAtOffset(builder, targetProgram, src, offset, objectSize);
+                object = builder.emitCast(
+                    objectSize == sizeof(uint64_t) ? (IRType*)builder.getUInt64Type()
+                                                   : (IRType*)builder.getUIntType(),
+                    object);
+                return builder.emitBitCast(type, object);
+            }
+            break;
         default:
             {
                 SLANG_UNEXPECTED("Unable to generate bit_cast code for the given type");
@@ -419,6 +514,51 @@ struct BitCastLoweringContext
         if (as<IRHLSLStructuredBufferTypeBase>(fromType) ||
             as<IRHLSLStructuredBufferTypeBase>(toType))
         {
+            return;
+        }
+
+        // A cast between a bare handle and other plain data of the same size is a bitwise copy,
+        // which the C++ and CUDA emitters spell as `slang_bit_cast`. Leave it to them, as for the
+        // handle casts that AnyValue marshalling creates for `reinterpret`.
+        if ((as<IRDescriptorHandleType>(fromType) || as<IRDescriptorHandleType>(toType)) &&
+            isDescriptorHandlePlainData(targetProgram->getTargetReq()))
+        {
+            if (fromTypeSize.size != toTypeSize.size)
+            {
+                sink->diagnose(Diagnostics::NotEqualBitCastSize{
+                    .fromType = fromType,
+                    .fromSize = fromTypeSize.size,
+                    .toType = toType,
+                    .toSize = toTypeSize.size,
+                    .location = inst->sourceLoc,
+                });
+            }
+            return;
+        }
+
+        // `readObject` builds the destination from integer leaves, which works for a handle only
+        // where the handle is plain data of a leaf size. Report the others at the cast.
+        if (auto handleType = findUnbuildableDescriptorHandle(toType))
+        {
+            sink->diagnose(Diagnostics::BitCastToUnsupportedDescriptorHandle{
+                .fromType = fromType,
+                .toType = toType,
+                .handleType = handleType,
+                .location = inst->sourceLoc,
+            });
+            return;
+        }
+
+        // `readObject` reads every byte of the source as integer leaves. A handle in the source
+        // that is not a readable leaf would abort that read, so report it at the cast.
+        if (auto handleType = findUnreadableDescriptorHandle(fromType))
+        {
+            sink->diagnose(Diagnostics::BitCastFromUnsupportedDescriptorHandle{
+                .fromType = fromType,
+                .toType = toType,
+                .handleType = handleType,
+                .location = inst->sourceLoc,
+            });
             return;
         }
 
