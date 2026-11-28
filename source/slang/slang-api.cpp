@@ -9,6 +9,7 @@
 
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "core/slang-builtin-module-cache.h"
+#include "core/slang-crash-report.h"
 #include "core/slang-performance-profiler.h"
 #include "core/slang-platform.h"
 #include "core/slang-rtti-info.h"
@@ -410,6 +411,21 @@ SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
 SLANG_API const char* slang_getLastInternalErrorMessage()
 {
     return Slang::getLastSignalMessage();
+}
+
+SLANG_API void slang_enableCrashReports(const char* frontEndName)
+{
+    Slang::CrashReportUtil::enableReports(frontEndName, Slang::getBuildTagString());
+}
+
+SLANG_API void slang_setCrashReportDirectory(const char* directory)
+{
+    Slang::CrashReportUtil::setReportDirectory(directory);
+}
+
+SLANG_API const Slang::CrashBreadcrumbs* slang_getCrashBreadcrumbs()
+{
+    return &Slang::CrashBreadcrumbUtil::getCurrent();
 }
 
 SLANG_API void spDestroySession(SlangSession* inSession)

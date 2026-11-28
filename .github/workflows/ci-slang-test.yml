@@ -84,6 +84,14 @@ jobs:
         if: inputs.slang-user-skills
         run: python3 extras/tests/test_verify_user_skills_package.py
 
+      # The scripts do not depend on the platform, so one kind of runner is enough, and the
+      # Windows runners have no python3.
+      - name: Test crash-report scripts
+        if: inputs.os == 'linux'
+        run: |
+          python3 extras/tests/test_symbolize_crash_report.py
+          python3 extras/tests/test_crash_report_stats.py
+
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
         with:
