@@ -1,0 +1,242 @@
+// slang-win-stack-trace.cpp
+#include "core/slang-stack-trace.h"
+
+#include <windows.h>
+
+namespace Slang
+{
+
+/* static */ bool StackTraceUtil::isSupported()
+{
+    return true;
+}
+
+#if SLANG_PROCESSOR_X86_64 || SLANG_PROCESSOR_ARM_64
+
+// On 64-bit Windows every function that changes the stack has unwind data, and the system can
+// step a register context from a function to its caller with it. We walk the stack that way and
+// not with `RtlCaptureStackBackTrace`, for two reasons. In our optimized ARM64 build, the first
+// frame that `RtlCaptureStackBackTrace` returned was not in the module of our caller. And a
+// crash handler has to start the walk from the context of the fault, which only a walk over a
+// context can do.
+
+static DWORD64 _getProgramCounter(const CONTEXT& context)
+{
+#if SLANG_PROCESSOR_X86_64
+    return context.Rip;
+#else
+    return context.Pc;
+#endif
+}
+
+static DWORD64 _getStackPointer(const CONTEXT& context)
+{
+#if SLANG_PROCESSOR_X86_64
+    return context.Rsp;
+#else
+    return context.Sp;
+#endif
+}
+
+/// Step `context` from the function that it is in to the caller of that function.
+///
+/// Return false at the outermost frame, where there is no caller: on x64 the unwinder leaves a
+/// null program counter there, and on ARM64 it leaves the context unchanged.
+static bool _unwindToCaller(CONTEXT& context)
+{
+    const DWORD64 programCounter = _getProgramCounter(context);
+    const DWORD64 stackPointer = _getStackPointer(context);
+
+    DWORD64 imageBase = 0;
+    PRUNTIME_FUNCTION function = ::RtlLookupFunctionEntry(programCounter, &imageBase, nullptr);
+    if (function)
+    {
+        void* handlerData = nullptr;
+        DWORD64 establisherFrame = 0;
+        ::RtlVirtualUnwind(
+            UNW_FLAG_NHANDLER,
+            imageBase,
+            programCounter,
+            function,
+            &context,
+            &handlerData,
+            &establisherFrame,
+            nullptr);
+    }
+    else
+    {
+        // A function without unwind data is a leaf that left the stack as it found it, so its
+        // return address is where the call put it: on top of the stack on x64, and in the
+        // link register on ARM64.
+#if SLANG_PROCESSOR_X86_64
+        // After a crash the stack pointer can be anything, so we read through it only while
+        // it points into this thread's stack.
+        ULONG_PTR stackLow = 0;
+        ULONG_PTR stackHigh = 0;
+        ::GetCurrentThreadStackLimits(&stackLow, &stackHigh);
+        if (context.Rsp < stackLow || context.Rsp + sizeof(DWORD64) > stackHigh)
+            return false;
+        context.Rip = *reinterpret_cast<const DWORD64*>(context.Rsp);
+        context.Rsp += sizeof(DWORD64);
+#else
+        context.Pc = context.Lr;
+#endif
+    }
+
+    const DWORD64 callerProgramCounter = _getProgramCounter(context);
+    if (callerProgramCounter == 0)
+        return false;
+    return callerProgramCounter != programCounter || _getStackPointer(context) != stackPointer;
+}
+
+/// Step `context` to the caller like `_unwindToCaller`, and return false instead of faulting if
+/// a damaged stack makes the step read memory that is not there.
+///
+/// The structured-exception guard needs the Microsoft compiler. Other compilers step without
+/// it, which is safe on the healthy stack of `capture` and is a risk only after a crash.
+static bool _tryUnwindToCaller(CONTEXT& context)
+{
+#if defined(_MSC_VER)
+    __try
+    {
+        return _unwindToCaller(context);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return false;
+    }
+#else
+    return _unwindToCaller(context);
+#endif
+}
+
+/// Walk from `context` to its callers and append the program counter after each step to
+/// `ioTrace`, leaving out the first `skipStepCount` of them.
+///
+/// The bound on the number of steps ends the walk even if a damaged stack sends the unwinder
+/// around a cycle.
+static void _appendCallers(CONTEXT& context, int skipStepCount, StackTrace& ioTrace)
+{
+    const int maxStepCount = StackTrace::kMaxFrameCount + skipStepCount;
+    for (int step = 0; step < maxStepCount && ioTrace.frameCount < StackTrace::kMaxFrameCount;
+         ++step)
+    {
+        if (!_tryUnwindToCaller(context))
+            break;
+        if (step < skipStepCount)
+            continue;
+        ioTrace.returnAddresses[ioTrace.frameCount++] =
+            reinterpret_cast<void*>(_getProgramCounter(context));
+    }
+}
+
+// We keep `capture` out of line so that it always owns exactly one stack frame: the first step
+// of the walk leaves this function and arrives at the return address in its caller.
+/* static */ SLANG_NO_INLINE void StackTraceUtil::capture(int skipFrameCount, StackTrace& outTrace)
+{
+    if (skipFrameCount < 0)
+        skipFrameCount = 0;
+    if (skipFrameCount > kMaxSkipFrameCount)
+        skipFrameCount = kMaxSkipFrameCount;
+
+    CONTEXT context;
+    ::RtlCaptureContext(&context);
+
+    outTrace.frameCount = 0;
+    _appendCallers(context, skipFrameCount, outTrace);
+}
+
+/* static */ void StackTraceUtil::captureFromContext(
+    const void* platformContext,
+    StackTrace& outTrace)
+{
+    // We walk a copy, because the unwinder rewrites the context at every step, and the caller
+    // may still pass the original to the next exception filter.
+    CONTEXT context = *static_cast<const CONTEXT*>(platformContext);
+
+    // The first frame is the instruction that faulted. It is not a return address, so it comes
+    // from the context itself, and each step after it adds a caller.
+    outTrace.frameCount = 0;
+    outTrace.returnAddresses[outTrace.frameCount++] =
+        reinterpret_cast<void*>(_getProgramCounter(context));
+    _appendCallers(context, 0, outTrace);
+}
+
+#else
+
+// 32-bit Windows has no table-based unwinder, so there we take the trace that the system walks.
+//
+// We keep `capture` out of line so that it always owns exactly one stack frame. The frame count
+// that it removes from the front of the trace would otherwise depend on the optimization level.
+/* static */ SLANG_NO_INLINE void StackTraceUtil::capture(int skipFrameCount, StackTrace& outTrace)
+{
+    if (skipFrameCount < 0)
+        skipFrameCount = 0;
+    if (skipFrameCount > kMaxSkipFrameCount)
+        skipFrameCount = kMaxSkipFrameCount;
+
+    // The first frame that the system reports is this function, so we always remove one more
+    // frame than the caller asked for.
+    const ULONG hiddenFrameCount = ULONG(skipFrameCount) + 1;
+
+    outTrace.frameCount = int(::RtlCaptureStackBackTrace(
+        hiddenFrameCount,
+        ULONG(StackTrace::kMaxFrameCount),
+        outTrace.returnAddresses,
+        nullptr));
+}
+
+/* static */ void StackTraceUtil::captureFromContext(
+    const void* platformContext,
+    StackTrace& outTrace)
+{
+    // Without a table-based unwinder we can only report the faulting instruction.
+    outTrace.returnAddresses[0] =
+        reinterpret_cast<void*>(static_cast<const CONTEXT*>(platformContext)->Eip);
+    outTrace.frameCount = 1;
+}
+
+#endif
+
+/* static */ bool StackTraceUtil::findModule(const void* address, StackFrameModule& outModule)
+{
+    // A module handle on Windows is the address at which the module is loaded.
+    HMODULE module = nullptr;
+    const DWORD flags =
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT;
+    if (!::GetModuleHandleExW(flags, reinterpret_cast<LPCWSTR>(address), &module) || !module)
+        return false;
+
+    outModule.offset = uintptr_t(address) - uintptr_t(module);
+    outModule.moduleName[0] = 0;
+
+    // We read the path into a fixed buffer because this code also runs after a crash, where it
+    // must not allocate. A path that does not fit is cut at its end, which is where the file
+    // name is, so we leave the name empty in that case instead of reporting a wrong one.
+    static const DWORD kMaxPathLength = 1024;
+    wchar_t path[kMaxPathLength];
+    const DWORD pathLength = ::GetModuleFileNameW(module, path, kMaxPathLength);
+    if (pathLength == 0 || pathLength >= kMaxPathLength)
+        return true;
+
+    DWORD nameStart = 0;
+    for (DWORD i = 0; i < pathLength; ++i)
+    {
+        if (path[i] == L'\\' || path[i] == L'/')
+            nameStart = i + 1;
+    }
+
+    // The module names that a report needs are ASCII. A character outside ASCII becomes `?`,
+    // which keeps the conversion free of failure cases and of locale state.
+    int nameLength = 0;
+    for (DWORD i = nameStart; i < pathLength && nameLength < StackFrameModule::kMaxModuleNameLength;
+         ++i)
+    {
+        const wchar_t c = path[i];
+        outModule.moduleName[nameLength++] = (c < 0x80) ? char(c) : '?';
+    }
+    outModule.moduleName[nameLength] = 0;
+    return true;
+}
+
+} // namespace Slang

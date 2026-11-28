@@ -1,5 +1,6 @@
 #include "slang-parser.h"
 
+#include "core/slang-crash-breadcrumbs.h"
 #include "core/slang-semantic-version.h"
 #include "core/slang-string-util.h"
 #include "slang/ast/slang-ast-decl.h"
@@ -10747,6 +10748,8 @@ void parseSourceFile(
     Scope* outerScope,
     ContainerDecl* parentDecl)
 {
+    CrashBreadcrumbScope phaseBreadcrumb(CrashBreadcrumbField::Phase, "parse");
+
     ParserOptions options = {};
     options.stage = ParsingStage::Decl;
     options.enableEffectAnnotations = translationUnit->compileRequest->optionSet.getBoolOption(

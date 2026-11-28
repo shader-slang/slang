@@ -2,6 +2,7 @@
 #include "slang-code-gen.h"
 
 #include "compiler-core/slang-slice-allocator.h"
+#include "core/slang-crash-breadcrumbs.h"
 #include "core/slang-type-convert-util.h"
 #include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
@@ -169,8 +170,42 @@ SlangResult CodeGenContext::emitEntryPointsSource(ComPtr<IArtifact>& outArtifact
 #pragma warning(pop)
 #endif
 
+/// Name the target and, when there is one entry point, its stage in the crash breadcrumbs of
+/// the calling thread, for the lifetime of this object.
+struct CodeGenBreadcrumbScope
+{
+    CodeGenBreadcrumbScope(CodeGenContext* context)
+        : m_target(
+              CrashBreadcrumbField::Target,
+              _getTargetName(context).begin(),
+              int(_getTargetName(context).getLength()))
+        , m_stage(CrashBreadcrumbField::Stage, _getStageName(context))
+    {
+    }
+
+private:
+    static UnownedStringSlice _getTargetName(CodeGenContext* context)
+    {
+        return TypeTextUtil::getCompileTargetName(SlangCompileTarget(context->getTargetFormat()));
+    }
+
+    /// Return the stage of the one entry point that `context` emits, or null if it emits none
+    /// or several. With several, the report cannot say which one failed.
+    static const char* _getStageName(CodeGenContext* context)
+    {
+        if (context->getEntryPointCount() != 1)
+            return nullptr;
+        EntryPoint* entryPoint = context->getEntryPoint(context->getSingleEntryPointIndex());
+        return entryPoint ? getStageName(entryPoint->getStage()) : nullptr;
+    }
+
+    CrashBreadcrumbScope m_target;
+    CrashBreadcrumbScope m_stage;
+};
+
 SlangResult CodeGenContext::emitPrecompiledDownstreamIR(ComPtr<IArtifact>& outArtifact)
 {
+    CodeGenBreadcrumbScope breadcrumbs(this);
     return _emitEntryPoints(outArtifact);
 }
 
@@ -1034,7 +1069,19 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     // Compile
     ComPtr<IArtifact> artifact;
     auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-    SlangResult compileResult = compiler->compile(options, artifact.writeRef());
+    SlangResult compileResult = SLANG_OK;
+    {
+        // While a downstream compiler runs, the `pass` breadcrumb names that compiler, so a
+        // crash inside it, such as in SPIRV-Tools, says which tool crashed.
+        const UnownedStringSlice compilerName =
+            TypeTextUtil::getPassThroughName(SlangPassThrough(compilerType));
+        CrashBreadcrumbScope phaseBreadcrumb(CrashBreadcrumbField::Phase, "downstream");
+        CrashBreadcrumbScope passBreadcrumb(
+            CrashBreadcrumbField::Pass,
+            compilerName.begin(),
+            int(compilerName.getLength()));
+        compileResult = compiler->compile(options, artifact.writeRef());
+    }
     auto downstreamElapsedTime =
         (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
     getSession()->addDownstreamCompileTime(downstreamElapsedTime);
@@ -1302,6 +1349,7 @@ struct CompileTimerRAII
 SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
 {
     CompileTimerRAII recordCompileTime(getSession());
+    CodeGenBreadcrumbScope breadcrumbs(this);
 
     auto target = getTargetFormat();
 

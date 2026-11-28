@@ -1954,7 +1954,9 @@ void CPPSourceEmitter::emitPreModuleImpl()
     }
     else if (m_target == CodeGenTarget::HostCPPSource)
     {
-        m_writer->emit("namespace Slang{ inline void handleSignal(SignalType, char const*) {} }\n");
+        m_writer->emit(
+            "namespace Slang{ inline void handleSignal(SignalType, char const*, char const*, "
+            "int) {} }\n");
     }
     Super::emitPreModuleImpl();
 }
