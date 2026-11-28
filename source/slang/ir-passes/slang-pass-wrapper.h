@@ -3,6 +3,7 @@
 #ifndef SLANG_PASS_WRAPPER_H
 #define SLANG_PASS_WRAPPER_H
 
+#include "core/slang-crash-breadcrumbs.h"
 #include "core/slang-performance-profiler.h"
 #include "slang/slang-code-gen.h"
 #include "slang/slang-compiler-options.h"
@@ -28,8 +29,14 @@ struct PassHooksRAII
     const char* passName;
     std::optional<PerformanceProfilerFuncRAIIContext> perfContext;
 
+    // A crash report names the pass that was running when the compiler failed.
+    CrashBreadcrumbScope passBreadcrumb;
+
     PassHooksRAII(CodeGenContext* ctx, IRModule* module, const char* name)
-        : codeGenContext(ctx), irModule(module), passName(name)
+        : codeGenContext(ctx)
+        , irModule(module)
+        , passName(name)
+        , passBreadcrumb(CrashBreadcrumbField::Pass, name)
     {
         prePassHooks(codeGenContext, irModule, passName);
 

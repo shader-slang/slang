@@ -7,6 +7,7 @@
 #include "compiler-core/slang-name.h"
 #include "compiler-core/slang-slice-allocator.h"
 #include "core/slang-castable.h"
+#include "core/slang-crash-breadcrumbs.h"
 #include "core/slang-performance-profiler.h"
 #include "core/slang-type-text-util.h"
 #include "core/slang-writer.h"
@@ -1100,6 +1101,7 @@ Result linkAndOptimizeIR(
     LinkedIR& outLinkedIR)
 {
     SLANG_PROFILE;
+    CrashBreadcrumbScope phaseBreadcrumb(CrashBreadcrumbField::Phase, "optimize");
 
     // This lambda is here so that we can select the correct overload for our parameters, without it
     // the overload deduction fails for passes which have overloads not taking an IRModule*
@@ -3078,6 +3080,7 @@ Result linkAndOptimizeIR(
 SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact)
 {
     SLANG_PROFILE;
+    CrashBreadcrumbScope phaseBreadcrumb(CrashBreadcrumbField::Phase, "emit");
 
     outArtifact.setNull();
 

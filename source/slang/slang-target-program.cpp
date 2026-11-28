@@ -164,6 +164,7 @@ IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, Diagn
         sink->diagnose(Diagnostics::CompilationAbortedDueToException{
             .exceptionType = typeid(e).name(),
             .exceptionMessage = e.Message});
+        diagnoseCrashReportOfLastInternalError(*sink, e.Message.getBuffer());
         return nullptr;
     }
 #endif

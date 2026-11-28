@@ -36,6 +36,8 @@ jobs:
               cmake --build --preset release -j $(nproc)
               cpack --preset release -G ZIP
               cpack --preset release -G TGZ
+              cpack --preset release-debug-info -G ZIP
+              cpack --preset release-debug-info -G TGZ
             '
       - name: Verify bundled user skills
         run: |
@@ -62,6 +64,12 @@ jobs:
           echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
           sudo mv "$(pwd)/build/dist-release/slang.tar.gz" "${base}.tar.gz"
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> "$GITHUB_OUTPUT"
+          # The debug files turn the stack of a crash report from these packages into function
+          # names and source lines (extras/symbolize-crash-report.py).
+          sudo mv "$(pwd)/build/dist-release-debug-info/slang-debug-info.zip" "${base}-debug-info.zip"
+          echo "SLANG_DEBUG_INFO_ARCHIVE_ZIP=${base}-debug-info.zip" >> "$GITHUB_OUTPUT"
+          sudo mv "$(pwd)/build/dist-release-debug-info/slang-debug-info.tar.gz" "${base}-debug-info.tar.gz"
+          echo "SLANG_DEBUG_INFO_ARCHIVE_TAR=${base}-debug-info.tar.gz" >> "$GITHUB_OUTPUT"
       - name: File check
         run: |
           find "build/dist-release" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
@@ -74,5 +82,7 @@ jobs:
           files: |
             ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_ZIP }}
             ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_TAR }}
+            ${{ steps.package.outputs.SLANG_DEBUG_INFO_ARCHIVE_ZIP }}
+            ${{ steps.package.outputs.SLANG_DEBUG_INFO_ARCHIVE_TAR }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
