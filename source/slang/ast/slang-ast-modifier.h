@@ -1309,6 +1309,25 @@ class NumThreadsAttribute : public Attribute
     FIDDLE() DeclRef<VarDeclBase> specConstExtents[3];
 };
 
+// A `[CudaLaunchBounds(maxThreadsPerBlock, minBlocksPerMultiprocessor)]` attribute,
+// emitted as `__launch_bounds__` on a CUDA kernel.
+FIDDLE()
+class CudaLaunchBoundsAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() int32_t maxThreadsPerBlock;
+    // Zero when the argument is omitted.
+    FIDDLE() int32_t minBlocksPerMultiprocessor;
+};
+
+// A `[CudaMaxRegisters(maxRegisters)]` attribute, emitted as `__maxnreg__` on a CUDA kernel.
+FIDDLE()
+class CudaMaxRegistersAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() int32_t maxRegisters;
+};
+
 FIDDLE()
 class WaveSizeAttribute : public Attribute
 {
