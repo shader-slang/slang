@@ -63,8 +63,8 @@ runs:
       if: inputs.os == 'linux'
       shell: bash
       run: |
-        sudo apt-get update
-        sudo apt-get install -y libx11-dev
+        bash ./extras/apt-get-with-diagnostics.sh update
+        bash ./extras/apt-get-with-diagnostics.sh install -y libx11-dev
 
     - name: Setup Node.js (Linux only)
       if: inputs.os == 'linux'
@@ -79,7 +79,7 @@ runs:
         # Install Ninja
         if ! command -v ninja; then
           case "${{inputs.os}}" in
-            linux*) sudo apt-get install -y ninja-build;;
+            linux*) bash ./extras/apt-get-with-diagnostics.sh install -y ninja-build;;
             windows*) choco install ninja;;
             macos*) brew install ninja;;
           esac
@@ -87,7 +87,7 @@ runs:
 
         # Install cross tools on Ubuntu
         if [[ "${{inputs.os}}" == linux* && "${{inputs.platform}}" == "aarch64" && "$(uname -m)" != "aarch64" ]]; then
-          sudo apt-get install -y crossbuild-essential-arm64
+          bash ./extras/apt-get-with-diagnostics.sh install -y crossbuild-essential-arm64
         fi
 
         # Set compiler
