@@ -42,49 +42,50 @@ void legalizeEntryPointVaryingParamsForWGSL(
 void depointerizeInputParams(IRFunc* entryPoint);
 
 // SystemValueSemanticName member definition macro
-#define SYSTEM_VALUE_SEMANTIC_NAMES(M)                   \
-    M(Position, SV_Position)                             \
-    M(ClipDistance, SV_ClipDistance)                     \
-    M(CullDistance, SV_CullDistance)                     \
-    M(Coverage, SV_Coverage)                             \
-    M(InnerCoverage, SV_InnerCoverage)                   \
-    M(Depth, SV_Depth)                                   \
-    M(DepthGreaterEqual, SV_DepthGreaterEqual)           \
-    M(DepthLessEqual, SV_DepthLessEqual)                 \
-    M(DispatchThreadID, SV_DispatchThreadID)             \
-    M(DomainLocation, SV_DomainLocation)                 \
-    M(GroupID, SV_GroupID)                               \
-    M(WorkgroupCount, SV_WorkgroupCount)                 \
-    M(GroupIndex, SV_GroupIndex)                         \
-    M(GroupThreadID, SV_GroupThreadID)                   \
-    M(GSInstanceID, SV_GSInstanceID)                     \
-    M(InstanceID, SV_InstanceID)                         \
-    M(IsFrontFace, SV_IsFrontFace)                       \
-    M(OutputControlPointID, SV_OutputControlPointID)     \
-    M(PointSize, SV_PointSize)                           \
-    M(PointCoord, SV_PointCoord)                         \
-    M(PrimitiveID, SV_PrimitiveID)                       \
-    M(DrawIndex, SV_DrawIndex)                           \
-    M(DeviceIndex, SV_DeviceIndex)                       \
-    M(RenderTargetArrayIndex, SV_RenderTargetArrayIndex) \
-    M(SampleIndex, SV_SampleIndex)                       \
-    M(StencilRef, SV_StencilRef)                         \
-    M(TessFactor, SV_TessFactor)                         \
-    M(VertexID, SV_VertexID)                             \
-    M(ViewID, SV_ViewID)                                 \
-    M(ViewportArrayIndex, SV_ViewportArrayIndex)         \
-    M(Target, SV_Target)                                 \
-    M(StartVertexLocation, SV_StartVertexLocation)       \
-    M(StartInstanceLocation, SV_StartInstanceLocation)   \
-    M(WaveLaneCount, SV_WaveLaneCount)                   \
-    M(WaveLaneIndex, SV_WaveLaneIndex)                   \
-    M(WaveIndex, SV_WaveIndex)                           \
-    M(WaveCount, SV_WaveCount)                           \
-    M(QuadLaneIndex, SV_QuadLaneIndex)                   \
-    M(VulkanVertexID, SV_VulkanVertexID)                 \
-    M(VulkanInstanceID, SV_VulkanInstanceID)             \
-    M(VulkanSamplePosition, SV_VulkanSamplePosition)     \
-    M(Barycentrics, SV_Barycentrics)                     \
+#define SYSTEM_VALUE_SEMANTIC_NAMES(M)                     \
+    M(Position, SV_Position)                               \
+    M(ClipDistance, SV_ClipDistance)                       \
+    M(CullDistance, SV_CullDistance)                       \
+    M(Coverage, SV_Coverage)                               \
+    M(InnerCoverage, SV_InnerCoverage)                     \
+    M(Depth, SV_Depth)                                     \
+    M(DepthGreaterEqual, SV_DepthGreaterEqual)             \
+    M(DepthLessEqual, SV_DepthLessEqual)                   \
+    M(DispatchThreadID, SV_DispatchThreadID)               \
+    M(DomainLocation, SV_DomainLocation)                   \
+    M(GroupID, SV_GroupID)                                 \
+    M(WorkgroupCount, SV_WorkgroupCount)                   \
+    M(DispatchedWorkgroupSize, SV_DispatchedWorkgroupSize) \
+    M(GroupIndex, SV_GroupIndex)                           \
+    M(GroupThreadID, SV_GroupThreadID)                     \
+    M(GSInstanceID, SV_GSInstanceID)                       \
+    M(InstanceID, SV_InstanceID)                           \
+    M(IsFrontFace, SV_IsFrontFace)                         \
+    M(OutputControlPointID, SV_OutputControlPointID)       \
+    M(PointSize, SV_PointSize)                             \
+    M(PointCoord, SV_PointCoord)                           \
+    M(PrimitiveID, SV_PrimitiveID)                         \
+    M(DrawIndex, SV_DrawIndex)                             \
+    M(DeviceIndex, SV_DeviceIndex)                         \
+    M(RenderTargetArrayIndex, SV_RenderTargetArrayIndex)   \
+    M(SampleIndex, SV_SampleIndex)                         \
+    M(StencilRef, SV_StencilRef)                           \
+    M(TessFactor, SV_TessFactor)                           \
+    M(VertexID, SV_VertexID)                               \
+    M(ViewID, SV_ViewID)                                   \
+    M(ViewportArrayIndex, SV_ViewportArrayIndex)           \
+    M(Target, SV_Target)                                   \
+    M(StartVertexLocation, SV_StartVertexLocation)         \
+    M(StartInstanceLocation, SV_StartInstanceLocation)     \
+    M(WaveLaneCount, SV_WaveLaneCount)                     \
+    M(WaveLaneIndex, SV_WaveLaneIndex)                     \
+    M(WaveIndex, SV_WaveIndex)                             \
+    M(WaveCount, SV_WaveCount)                             \
+    M(QuadLaneIndex, SV_QuadLaneIndex)                     \
+    M(VulkanVertexID, SV_VulkanVertexID)                   \
+    M(VulkanInstanceID, SV_VulkanInstanceID)               \
+    M(VulkanSamplePosition, SV_VulkanSamplePosition)       \
+    M(Barycentrics, SV_Barycentrics)                       \
 /* end */
 
 /// A known system-value semantic name that can be applied to a parameter

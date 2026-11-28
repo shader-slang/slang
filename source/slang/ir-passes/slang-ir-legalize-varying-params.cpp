@@ -4479,6 +4479,20 @@ protected:
                 result.permittedTypes.add(getGroupThreadIdType(builder));
                 break;
             }
+        case SystemValueSemanticName::DispatchedWorkgroupSize:
+            {
+                // The threadgroup size the host passed to the dispatch. It matches
+                // `[numthreads]` only if the host dispatches with that size. This is
+                // `dispatch_threads_per_threadgroup`, not `threads_per_threadgroup`: in a
+                // non-uniform dispatch the latter is the smaller size of an edge threadgroup,
+                // while the former is the requested size in every threadgroup, like CUDA's
+                // `blockDim`.
+                result.systemValueName = toSlice("dispatch_threads_per_threadgroup");
+                result.permittedTypes.add(builder.getVectorType(
+                    builder.getBasicType(BaseType::UInt),
+                    builder.getIntValue(builder.getIntType(), 3)));
+                break;
+            }
         case SystemValueSemanticName::GSInstanceID:
             {
                 result.isUnsupported = true;
